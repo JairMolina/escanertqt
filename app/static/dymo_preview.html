@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A1020">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/static/icons/manifest.webmanifest">
+    <meta name="color-scheme" content="dark light">
+    <title>Etiquetas DYMO · Escáner TQT</title>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('tqt.tema')==='light'?'light':'dark'}catch(e){document.documentElement.dataset.theme='dark'}</script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1316">
+    <style>
+        /* Vista previa de la etiqueta DYMO 30334 · 57 × 32 mm apaisada · 300 dpi · térmica blanco/negro.
+           Solo negro sobre blanco, texto ≥ 7 pt, zona segura de 1.5 mm. Se imprime con DYMO Connect, no con el navegador. */
+        .dymo-label {
+            position: relative; width: 57mm; height: 32mm; box-sizing: border-box; padding: 1.5mm; background: #fff; color: #000;
+            display: flex; align-items: center; gap: 1.5mm; overflow: hidden; flex: none;
+            font-family: Consolas, "IBM Plex Mono", "Courier New", monospace;
+            outline: 1px solid #9aa3b5; border-radius: 2.5mm; box-shadow: 0 10px 28px rgba(0, 0, 0, .35);
+        }
+        .dymo-label::after { content: ""; position: absolute; inset: 1.5mm; border: 1px dashed #e2453c; pointer-events: none; }
+        .dymo-qr { flex: none; display: block; }
+        .dymo-qr svg { display: block; shape-rendering: crispEdges; }
+        .dymo-trama { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 0; }
+        .dymo-par { display: flex; flex-direction: column; gap: 0; }
+        .dymo-l { display: block; font-size: 9.5pt; line-height: 1.25; font-weight: 700; white-space: pre; color: #000; min-height: 1.25em; }
+        .dymo-l.n { font-weight: 700; }
+        .dymo-l.m { font-weight: 700; }
+        .zoomhost { transform-origin: top left; }
+        .stage-preview { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-2); padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; overflow-x: auto; }
+        .pill { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+        .pill i { width: 10px; height: 10px; border-radius: 50%; background: var(--faint); display: block; }
+        .pill[data-k="ok"] i { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+        .pill[data-k="bad"] i { background: var(--bad); }
+        .pill[data-k="warn"] i { background: var(--warn); }
+        ol.pasos { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--muted); }
+        ol.pasos b { color: var(--text); }
+        .progress { height: 8px; border-radius: 4px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
+        .progress > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+    </style>
+</head>
+<body>
+<div class="desk">
+    <header class="desk-top">
+        <a class="iconbtn" href="/monitor" aria-label="Volver al monitor"><span class="svg-slot" data-i="back"></span></a>
+        <div><div class="brand-name" style="font-size:19px">Etiquetas DYMO</div><span class="brand-sub">30334 · 57 × 32 mm · LabelWriter 550 · Escáner TQT <span data-version></span></span></div>
+        <div class="grow"></div>
+    </header>
+
+    <main class="desk-main" style="max-width:1100px">
+        <h1 class="sr-only">Etiquetas DYMO</h1>
+        <section class="panel pad stack" aria-labelledby="hCon">
+            <div class="row wrap" style="justify-content:space-between">
+                <h2 class="silk grow" id="hCon" style="min-width:200px">Conexión con la impresora</h2>
+                <span class="pill" id="pill" data-k=""><i></i><span id="pillTxt">Buscando DYMO Connect…</span></span>
+            </div>
+            <div class="row wrap" style="align-items:flex-end">
+                <div class="field grow" style="min-width:240px"><label for="selPrinter">Impresora</label><select class="input" id="selPrinter" disabled><option>—</option></select></div>
+                <button class="btn" type="button" id="btnRefresh"><span class="svg-slot" data-i="refresh"></span> Actualizar</button>
+            </div>
+            <div id="ayuda" class="stack" style="gap:10px"></div>
+        </section>
+
+        <div class="tools-row">
+            <div class="field" style="width:150px"><label for="inFiltro">Buscar pareja</label><input class="input mono" id="inFiltro" inputmode="numeric" maxlength="4" placeholder="ej. 21" autocomplete="off" aria-describedby="filtroInfo"><small id="filtroInfo" class="faint" aria-live="polite"></small></div>
+            <div class="field" style="min-width:260px"><label for="selTarjeta">Tarjeta</label><select class="input" id="selTarjeta"></select></div>
+            <div class="field" style="width:110px"><label for="inCopias">Copias</label><input class="input mono" id="inCopias" inputmode="numeric" maxlength="2" value="1"></div>
+            <div class="field"><label for="selLoteModo">Marcar al imprimir lote</label>
+                <select class="input" id="selLoteModo"><option value="final">Solo etiquetas finales</option><option value="todas">Todas con R1 y R2</option></select></div>
+            <div class="field"><label for="selZoom">Ampliación de la vista</label>
+                <select class="input" id="selZoom"><option value="1">Tamaño real (1×)</option><option value="2">2×</option><option value="3" selected>3×</option><option value="4">4×</option></select></div>
+        </div>
+
+        <div id="aviso" class="stack" aria-live="polite"></div>
+
+        <div class="stage-preview" tabindex="0" role="region" aria-label="Vista previa de la etiqueta">
+            <div class="silk" style="width:100%">Vista previa · a escala real 57 × 32 mm</div>
+            <div id="unico"><div id="zoomHost" class="zoomhost"><div id="dymoLabelContainer"></div></div></div>
+            <div class="row wrap" style="gap:8px 18px;color:var(--muted);font-size:13px">
+                <span><b style="color:var(--bad)">- - -</b> zona segura de 1.5 mm (no se imprime)</span>
+                <span id="medidas" class="mono"></span>
+            </div>
+        </div>
+
+        <div class="row wrap" style="gap:10px">
+            <button class="btn btn-primary" type="button" id="btnPrint"><span class="svg-slot" data-i="printer"></span> Imprimir en DYMO</button>
+            <button class="btn" type="button" id="btnOpen"><span class="svg-slot" data-i="download"></span> Abrir en DYMO</button>
+            <button class="btn" type="button" id="btnPrintAll"><span class="svg-slot" data-i="layers"></span> Imprimir lote en DYMO…</button>
+            <button class="btn" type="button" id="btnDownAll"><span class="svg-slot" data-i="download"></span> Descargar lote</button>
+        </div>
+        <div id="prog" class="stack" hidden><div class="progress" aria-hidden="true"><i id="progBar"></i></div><div class="hint" id="progTxt" role="status" aria-live="polite"></div></div>
+    </main>
+</div>
+
+<script src="/static/js/common.js?v=1316"></script>
+<script src="/static/js/qrcode-generator.js?v=1316"></script>
+<script src="/static/js/vendor/dymo.connect.framework.js?v=1316"></script>
+<script src="/static/js/dymo_connect.js?v=1316"></script>
+<script src="/static/js/dymo.js?v=1316"></script>
+</body>
+</html>

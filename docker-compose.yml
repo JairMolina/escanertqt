@@ -1,0 +1,32 @@
+services:
+  tqt:
+    build: .
+    image: escaner-tqt:latest
+    container_name: escaner-tqt
+    restart: unless-stopped          # arranca solo con Docker / al reiniciar la PC
+    ports:
+      - "8443:8443"                  # HTTPS para celulares en la WiFi local
+    environment:
+      # IP LAN de ESTA PC en la red del módem. La usa el certificado (SAN) y el QR de inicio.
+      TQT_HOST_IP: ${TQT_HOST_IP:?Ejecuta .\desplegar.ps1 o crea .env (ver .env.example)}
+      TZ: ${TZ:-America/Mexico_City}
+      TQT_ADMIN_PASSWORD: ${TQT_ADMIN_PASSWORD:-}   # área /admin; vacía = deshabilitada
+      TQT_BACKUP_DIR: /backups                      # respaldos automáticos (persisten en ./respaldos)
+    volumes:
+      - tqt_db:/data/db                       # SQLite (WAL) en volumen nativo de Docker: seguro
+      - ./excel_mensual:/data/excel_mensual   # Excel mensuales, visibles en Windows
+      - ./exports:/data/exports
+      - ./certs:/app/certs                    # certificado autofirmado (persiste entre reinicios)
+      - ./respaldos:/backups                  # copias de la BD (ver respaldar.ps1)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl,urllib.request as u; u.urlopen('https://127.0.0.1:8443/api/health', context=ssl._create_unverified_context(), timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+volumes:
+  tqt_db:

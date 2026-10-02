@@ -1,0 +1,337 @@
+[
+ {
+  "caso": "carga 48 pendientes (24 R1 + 24 R2, sin R3)",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "el título de pestaña es Pendientes y el contador dice Faltan 48",
+  "ok": true,
+  "detalle": "Faltan 48\nGuardadas hoy 0"
+ },
+ {
+  "caso": "el foco cae en la MAC de la primera placa",
+  "ok": true,
+  "detalle": "MAC de TQT-R1-V30-0001"
+ },
+ {
+  "caso": "20 MAC tecleadas con Enter encadenado quedan guardadas (1.2 s)",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "tras la 20 el foco salta a la MAC de la R1 0021",
+  "ok": true,
+  "detalle": "MAC de TQT-R1-V30-0021"
+ },
+ {
+  "caso": "la BD tiene las 20 MAC con formato canónico",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "contador: Faltan 28 · Guardadas hoy 20",
+  "ok": true,
+  "detalle": "Faltan 28\nGuardadas hoy 20"
+ },
+ {
+  "caso": "pegado «MAC: 02:aa:00:00:01:00» -> 02:AA:00:00:01:00",
+  "ok": true,
+  "detalle": "02:AA:00:00:01:00"
+ },
+ {
+  "caso": "Esc deja el campo vacío",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "pegado «02-AA-00-00-01-01» -> 02:AA:00:00:01:01",
+  "ok": true,
+  "detalle": "02:AA:00:00:01:01"
+ },
+ {
+  "caso": "Esc deja el campo vacío",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "pegado «02aa.0000.0102» -> 02:AA:00:00:01:02",
+  "ok": true,
+  "detalle": "02:AA:00:00:01:02"
+ },
+ {
+  "caso": "Esc deja el campo vacío",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "pegado «02 aa 00 00 01 03» -> 02:AA:00:00:01:03",
+  "ok": true,
+  "detalle": "02:AA:00:00:01:03"
+ },
+ {
+  "caso": "Esc deja el campo vacío",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "pegado «mac=02AA00000104» -> 02:AA:00:00:01:04",
+  "ok": true,
+  "detalle": "02:AA:00:00:01:04"
+ },
+ {
+  "caso": "Esc deja el campo vacío",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "pegado «MAC 02aa00000105» -> 02:AA:00:00:01:05",
+  "ok": true,
+  "detalle": "02:AA:00:00:01:05"
+ },
+ {
+  "caso": "Esc deja el campo vacío",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "pegado «TQT-R1-V30-0021 MAC: 02:AA:00:00:01:06» -> 02:AA:00:00:01:06",
+  "ok": true,
+  "detalle": "02:AA:00:00:01:06"
+ },
+ {
+  "caso": "Esc deja el campo vacío",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "escribir 8 dígitos da 02:AA:00:00 y avisa que faltan 4",
+  "ok": true,
+  "detalle": "02:AA:00:00"
+ },
+ {
+  "caso": "Backspace no se queda pegado en los dos puntos",
+  "ok": true,
+  "detalle": "02:AA:00:0"
+ },
+ {
+  "caso": "MAC repetida en la propia pantalla: aviso con nombre de la otra placa",
+  "ok": true,
+  "detalle": "Repetida en esta pantalla: la misma MAC está en TQT-R1-V30-0021."
+ },
+ {
+  "caso": "la primera también queda marcada y el campo tiene aria-invalid",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "Enter en una fila repetida no guarda",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "al deshacer la segunda, la primera vuelve a estar lista",
+  "ok": true,
+  "detalle": "Lista · Enter guarda"
+ },
+ {
+  "caso": "MAC ya registrada en la BD: dice de qué placa es",
+  "ok": true,
+  "detalle": "Ya está registrada en TQT-R2-V30-0001."
+ },
+ {
+  "caso": "el error 409 del servidor se muestra tal cual",
+  "ok": true,
+  "detalle": "La MAC 02:AA:00:00:03:00 ya pertenece a TQT-R2-V30-0099."
+ },
+ {
+  "caso": "sin red: mensaje claro y la fila no se pierde",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "Enter reintenta y guarda cuando vuelve la red",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "aviso de sesión: consola sin errores hasta aquí (las 409/abort provocadas se filtran)",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "firmware para todas las R1 se aplica a las filas",
+  "ok": true,
+  "detalle": "['4.1', '4.1', '4.1']"
+ },
+ {
+  "caso": "la MAC se guarda con el firmware elegido (una sola operación)",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "«Otra versión…» guarda el firmware nuevo y entra al catálogo",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "«Solo tarjeta» 5 deja solo las placas de esa tarjeta pendientes",
+  "ok": true,
+  "detalle": "2"
+ },
+ {
+  "caso": "buscar por nombre filtra",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "vista previa: 3 correctas y 5 con problema",
+  "ok": true,
+  "detalle": "3 correctas\n5 con problema\n8 líneas"
+ },
+ {
+  "caso": "vista previa muestra «Repetida»",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "vista previa muestra «R3 no lleva MAC»",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "vista previa muestra «No registrada»",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "vista previa muestra «Formato»",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "revisar NO guarda nada",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "antes de guardar avisa que no se puede deshacer",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "guardado parcial: 3 en la BD, el resto no",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "«asignar en orden» reparte las MAC en las pendientes visibles",
+  "ok": true,
+  "detalle": "2 correctas\n0 con problema\n2 líneas"
+ },
+ {
+  "caso": "en orden: quedaron guardadas en la BD",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "«Con MAC» lista las R1/R2 que ya tienen MAC",
+  "ok": true,
+  "detalle": "29"
+ },
+ {
+  "caso": "Esc vuelve al valor guardado",
+  "ok": true,
+  "detalle": "02:AA:00:00:00:01"
+ },
+ {
+  "caso": "corregir la MAC en sitio la guarda",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "cambiar el firmware se guarda al elegirlo",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "en «Con MAC» también detecta la MAC repetida",
+  "ok": true,
+  "detalle": "Repetida en esta pantalla: la misma MAC está en TQT-R1-V30-0002."
+ },
+ {
+  "caso": "borrar pide confirmación en pantalla",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "confirmar borra la MAC y la placa vuelve a Pendientes",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "la otra pestaña quita la placa guardada por otra persona sin recargar",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "y conserva lo que se estaba tecleando",
+  "ok": true,
+  "detalle": "02:FF:00"
+ },
+ {
+  "caso": "con el foco aún en el campo",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "las pestañas se mueven con flechas",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "↑/↓ cambian de fila",
+  "ok": true,
+  "detalle": "MAC de TQT-R2-V30-0007 / MAC de TQT-R2-V30-0006"
+ },
+ {
+  "caso": "Tab pasa al firmware de la fila siguiente (orden lógico)",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "Shift+Tab regresa a la MAC",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "sin scroll horizontal de página a 1440 dark",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "sin scroll horizontal de página a 1440 light",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "sin scroll horizontal de página a 1024 dark",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "sin scroll horizontal de página a 1024 light",
+  "ok": true,
+  "detalle": ""
+ },
+ {
+  "caso": "consola sin errores propios (se filtran 409/aborto provocados a propósito)",
+  "ok": true,
+  "detalle": "[]"
+ },
+ {
+  "caso": "ninguna petición externa",
+  "ok": true,
+  "detalle": "[]"
+ }
+]

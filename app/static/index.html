@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A1020">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/static/icons/manifest.webmanifest">
+    <meta name="color-scheme" content="dark light">
+    <title>Recibir PCB · Escáner TQT</title>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('tqt.tema')==='light'?'light':'dark'}catch(e){document.documentElement.dataset.theme='dark'}</script>
+    <script>
+    /* PC (pantalla ancha + ratón): la consola de escritorio, sin cámara. Celulares y tablets (dedo) se quedan en esta vista.
+       Se puede elegir a mano: localStorage tqt.vista = 'movil' | 'escritorio' (enlaces "Versión móvil/de escritorio"). */
+    try {
+        var vista = localStorage.getItem('tqt.vista');
+        var pc = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)').matches;
+        if (vista === 'escritorio' || (vista !== 'movil' && pc)) location.replace('/monitor' + location.search.replace(/^\?vista=movil/, ''));
+    } catch (e) { /* sin almacenamiento: se queda la vista móvil */ }
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1316">
+</head>
+<body>
+<div class="app has-cta">
+    <main>
+        <h1 class="sr-only">Recibir PCB</h1>
+        <section id="visorHost" aria-label="Cámara"></section>
+
+        <section class="readout" id="readout" data-idle="1" aria-live="polite" aria-atomic="true">
+            <div class="silk">Última lectura</div>
+            <div class="serie" id="roSerie">0000</div>
+            <div class="meta">
+                <span id="roTipo"></span>
+                <span class="name" id="roName">Apunta la cámara al QR de la placa</span>
+                <span class="msg" id="roMsg"></span>
+            </div>
+        </section>
+
+        <section class="counters" id="counters" aria-label="Piezas recibidas sin confirmar">
+            <div><span class="tipo" data-t="R1">R1</span><span class="n" id="cR1">0</span></div>
+            <div><span class="tipo" data-t="R2">R2</span><span class="n" id="cR2">0</span></div>
+            <div><span class="tipo" data-t="R3">R3</span><span class="n" id="cR3">0</span></div>
+            <div><span class="lbl">Total</span><span class="n" id="cT">0</span></div>
+        </section>
+
+        <div id="avisos" class="stack" aria-live="polite"></div>
+
+        <section class="stack" aria-labelledby="hLista">
+            <div class="row">
+                <h2 class="silk grow" id="hLista">Lote de recepción</h2>
+            </div>
+            <div class="row wrap">
+                <button class="btn btn-sm" type="button" id="btnVersion" aria-label="Versión de hardware por defecto"><span class="mono" id="verChip">V30</span> Hardware</button>
+                <button class="btn btn-sm" type="button" id="btnManual"><span class="svg-slot" data-i="plus"></span> Agregar sin QR</button>
+            </div>
+            <div id="lista" class="list"></div>
+        </section>
+    </main>
+
+    <div class="cta-bar">
+        <button class="btn btn-primary btn-block" type="button" id="btnConfirm" disabled>Confirmar lote <span class="count" id="ctaCount">0</span></button>
+    </div>
+</div>
+
+<script src="/static/js/common.js?v=1316"></script>
+<script src="/static/js/audio.js?v=1316"></script>
+<script src="/static/js/haptics.js?v=1316"></script>
+<script src="/static/js/ws_client.js?v=1316"></script>
+<script src="/static/js/jsQR.js?v=1316"></script>
+<script src="/static/js/scanner.js?v=1316"></script>
+<script src="/static/js/visor.js?v=1316"></script>
+<script src="/static/js/recibir.js?v=1316"></script>
+</body>
+</html>

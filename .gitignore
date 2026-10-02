@@ -1,0 +1,42 @@
+# --- Secretos y llaves privadas: NUNCA al repositorio ---
+.env
+.env.*
+!.env.example
+certs/
+*.key
+*.pem
+
+# --- Datos reales de la planta ---
+*.db
+*.db-wal
+*.db-shm
+*.db.bak
+*.bak
+tqt_produccion.db*
+respaldos/
+excel_mensual/
+exports/
+data/
+tmp*/
+
+# --- Python / entorno ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# --- Artefactos de pruebas ---
+tests/e2e/_shots/
+tests/e2e/__pycache__/
+docs/qa/**/*.png
+docs/qa/**/*.jpg
+docs/qa/*.png
+docs/qa/*.jpg
+!tests/fixtures/*.jpg
+
+# --- Sistema ---
+.DS_Store
+Thumbs.db
+.claude/

@@ -1,0 +1,289 @@
+"""App FastAPI principal: rutas REST, WebSocket, archivos estáticos y ciclo de vida."""
+import os
+import secrets
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from urllib.parse import quote, urlsplit
+
+from fastapi.concurrency import run_in_threadpool
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
+
+from app.config import settings
+from app.database import db
+from app.routers import admin, api, auth, ws, excel_dymo, inventario
+from app.services import admin_auth, usuarios
+from app.ssl_cert import ensure_ssl_certificates
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("escaner_tqt")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ciclo de vida de la aplicación: inicializa base de datos y certificados SSL."""
+    logger.info("Iniciando %s v%s...", settings.APP_NAME, settings.APP_VERSION)
+    logger.info("IP LAN detectada: %s", settings.LOCAL_IP)
+
+    # Inicializar Base de Datos con WAL
+    db.init_db()
+    logger.info("Base de datos SQLite inicializada en: %s", settings.DB_PATH)
+
+    if settings.admin_password:
+        try:
+            admin_auth.sincronizar()
+            logger.info("Área de administración habilitada (contraseña desde TQT_ADMIN_PASSWORD).")
+        except Exception as e:  # noqa: BLE001
+            logger.error("No se pudo preparar la contraseña de administrador: %s", e)
+    else:
+        logger.warning("TQT_ADMIN_PASSWORD no está configurada: el área de administración queda DESHABILITADA. "
+                       "Defínela (mínimo 8 caracteres) y reinicia para habilitarla.")
+
+    try:
+        n = usuarios.sembrar()
+        logger.info("Cuentas de usuario listas (%d nuevas).", n)
+    except Exception as e:  # noqa: BLE001
+        logger.error("No se pudieron preparar las cuentas de usuario: %s", e)
+
+    # Asegurar certificados SSL autofirmados con SAN
+    try:
+        ensure_ssl_certificates()
+    except Exception as e:
+        logger.error("Error al asegurar certificados SSL: %s", e)
+
+    yield
+
+    logger.info("Servidor %s detenido correctamente.", settings.APP_NAME)
+
+
+# Crear instancia FastAPI
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="Sistema de Escaneo y Emparejamiento de Tarjetas de Producción TQT con HTTPS Móvil y WebSockets.",
+    lifespan=lifespan,
+    # El explorador de la API (/docs) permite ejecutar cualquier endpoint: solo con TQT_DOCS=1
+    docs_url="/docs" if os.getenv("TQT_DOCS") == "1" else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if os.getenv("TQT_DOCS") == "1" else None,
+)
+
+# Sin CORS: la interfaz se sirve desde este mismo origen (https://IP:8443). Sin middleware CORS el
+# navegador bloquea que OTROS sitios abiertos en el celular/PC escriban en la API con JSON.
+
+
+
+# Compresión gzip de HTML/JS/CSS/JSON (jsQR pesa 250 KB): en la WiFi de la planta reduce ~65 % la carga inicial del celular.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+
+@app.exception_handler(OverflowError)
+async def _entero_fuera_de_rango(request: Request, exc: OverflowError):
+    """Un id/lote/offset mayor que 2^63 no cabe en SQLite: es un dato inválido del cliente, no un error 500 del servidor."""
+    return JSONResponse(status_code=422, content={"detail": "Número fuera de rango."})
+
+
+def origen_distinto(headers) -> bool:
+    """True si la petición trae `Origin` y no es el propio servidor (otro sitio web intentando usar la API desde el navegador)."""
+    origen = headers.get("origin")
+    if origen is None:
+        return False  # curl, apps y navegadores en navegación normal (GET) no lo envían
+    return urlsplit(origen).netloc.lower() != (headers.get("host") or "").lower()
+
+
+CABECERAS_SEGURIDAD = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+    "Cross-Origin-Resource-Policy": "same-origin",
+}
+
+
+# Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
+# (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
+RUTAS_PUBLICAS = {"/login", "/api/auth/login", "/api/health", "/cert", "/ca", "/favicon.ico"}
+PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js")
+
+
+async def _exigir_sesion(request: Request):
+    """None si puede pasar; si no, la respuesta de rechazo (401 JSON para la API, redirección a /login para las páginas)."""
+    ruta = request.url.path
+    if ruta in RUTAS_PUBLICAS or ruta.startswith(PREFIJOS_PUBLICOS):
+        return None
+    if request.scope.get("type") == "websocket":
+        return None
+    try:
+        await run_in_threadpool(usuarios.validar_sesion, request.cookies.get(usuarios.COOKIE))
+        return None
+    except usuarios.SesionInvalidaError as e:
+        if ruta.startswith(("/api/", "/static/", "/ws")) or request.method not in ("GET", "HEAD"):
+            return JSONResponse(status_code=401, content={"detail": str(e) or "Inicia sesión."}, headers={"X-Auth": "login"})
+        destino = ruta + (("?" + request.url.query) if request.url.query else "")
+        return RedirectResponse("/login?next=" + quote(destino, safe=""), status_code=302)
+
+
+@app.middleware("http")
+async def seguridad(request: Request, call_next):
+    """(1) Anti-CSRF: una petición que CAMBIA datos y viene de otro origen (otra web abierta en el celular/PC) se rechaza.
+    (2) Cabeceras de seguridad básicas. (3) La API nunca se guarda en caché (datos de producción y sesión de admin)."""
+    if request.method not in ("GET", "HEAD", "OPTIONS") and origen_distinto(request.headers):
+        return JSONResponse(status_code=403, content={"detail": "Origen no permitido."}, headers=CABECERAS_SEGURIDAD)
+    bloqueo = await _exigir_sesion(request)
+    if bloqueo is not None:
+        for k, v in CABECERAS_SEGURIDAD.items():
+            bloqueo.headers.setdefault(k, v)
+        bloqueo.headers.setdefault("Cache-Control", "no-store")
+        return bloqueo
+    respuesta = await call_next(request)
+    for k, v in CABECERAS_SEGURIDAD.items():
+        respuesta.headers.setdefault(k, v)
+    if request.url.path.startswith("/api/"):
+        respuesta.headers.setdefault("Cache-Control", "no-store")
+    return respuesta
+
+
+class StaticNoCache(StaticFiles):
+    """Estáticos con `Cache-Control: no-cache`: el navegador revalida (304 barato) y tras cada despliegue
+    los celulares no se quedan con JS/CSS viejos."""
+
+    async def get_response(self, path, scope):
+        respuesta = await super().get_response(path, scope)
+        respuesta.headers["Cache-Control"] = "no-cache"
+        return respuesta
+
+
+# Montar archivos estáticos
+if settings.STATIC_DIR.exists():
+    app.mount("/static", StaticNoCache(directory=str(settings.STATIC_DIR)), name="static")
+
+app.include_router(api.router)
+app.include_router(inventario.router)
+app.include_router(admin.router)
+app.include_router(auth.router)
+app.include_router(ws.router)
+app.include_router(excel_dymo.router)
+
+
+def _serve_file(file_path: Path, fallback_path: Path = None) -> FileResponse:
+    target = file_path if file_path.exists() else fallback_path
+    if target and target.exists():
+        return FileResponse(target, headers={"Cache-Control": "no-cache"})
+    return FileResponse(settings.STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/", include_in_schema=False)
+async def serve_index():
+    """Recibir: visor de cámara y lote de recepción (interfaz móvil del operador)."""
+    return _serve_file(settings.STATIC_DIR / "index.html", settings.TEMPLATES_DIR / "mobile_scanner.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def serve_favicon():
+    """Algunos clientes piden /favicon.ico aunque las páginas declaren su <link rel=icon>."""
+    return _serve_file(settings.STATIC_DIR / "icons" / "icon-192.png")
+
+
+@app.get("/emparejar", include_in_schema=False)
+async def serve_emparejar():
+    """Emparejar R1+R2(+R3), tarjetas impares y reemplazo de PCB falladas."""
+    return _serve_file(settings.STATIC_DIR / "emparejar.html")
+
+
+@app.get("/programar", include_in_schema=False)
+async def serve_programar():
+    """Programar: captura de la MAC y del firmware (solo R1/R2; la R3 no lleva ninguno) después de programar."""
+    return _serve_file(settings.STATIC_DIR / "programar.html")
+
+
+@app.get("/consultar", include_in_schema=False)
+async def serve_consultar():
+    """Consultar: escanea una etiqueta, el QR de una PCB o una MAC y muestra la ficha completa de la tarjeta."""
+    return _serve_file(settings.STATIC_DIR / "consultar.html")
+
+
+@app.get("/monitor", include_in_schema=False)
+async def serve_monitor():
+    """Consola de escritorio para PC. Abre sin contraseña: la clave de supervisor solo protege la zona de administración (/admin)."""
+    resp = _serve_file(settings.STATIC_DIR / "monitor.html")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.get("/admin", include_in_schema=False)
+async def serve_admin(request: Request):
+    """Administración con contraseña: borrar tarjetas/PCB, vaciar lote, exportar Excel."""
+    resp = _serve_file(settings.STATIC_DIR / "admin.html")
+    if not request.cookies.get("tqt_cid"):   # marca anónima de este equipo, para el límite de intentos fallidos
+        resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
+    return resp
+
+
+@app.get("/login", include_in_schema=False)
+async def serve_login(request: Request):
+    """Pantalla de acceso (correo y contraseña). Es la única página pública."""
+    resp = _serve_file(settings.STATIC_DIR / "login.html")
+    resp.headers["Cache-Control"] = "no-store"
+    if not request.cookies.get("tqt_cid"):   # marca anónima de este equipo, para el límite de intentos fallidos
+        resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
+    return resp
+
+
+@app.get("/api/health", tags=["Config"])
+def health():
+    """Pulso para Docker: no revela nada del sistema."""
+    return {"ok": True}
+
+
+@app.get("/dymo", include_in_schema=False)
+async def serve_dymo():
+    """Estación de vista previa e impresión de etiquetas DYMO."""
+    return _serve_file(settings.STATIC_DIR / "dymo_preview.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Sin icono propio: 204 evita un 404 (y un error rojo en consola) en cada página."""
+    from fastapi.responses import Response
+    return Response(status_code=204, headers={"Cache-Control": "public, max-age=86400"})
+
+
+def _ca_publica() -> FileResponse:
+    from app.ssl_cert import ca_paths
+    ca = ca_paths()[0]
+    if not ca.exists():
+        raise HTTPException(status_code=404, detail="La autoridad certificadora aún no se ha generado.")
+    return FileResponse(ca, media_type="application/x-x509-ca-cert", filename="escaner-tqt-ca.crt", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/cert", include_in_schema=False)
+async def descargar_certificado():
+    """Autoridad certificadora LOCAL (solo la parte pública, nunca la llave). Instalarla como confiable en la PC y en los
+    celulares hace desaparecer el aviso de "sitio no seguro"; sigue valiendo aunque cambie la IP."""
+    return _ca_publica()
+
+
+@app.get("/ca", include_in_schema=False)
+async def descargar_autoridad():
+    return _ca_publica()
+
+
+@app.get("/api/config", tags=["Config"])
+def get_config():
+    """Configuración pública del servidor para clientes frontend."""
+    return {
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "ip": settings.LOCAL_IP,
+        "url": settings.https_url,
+        "ws_url": settings.ws_url,
+    }

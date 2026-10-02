@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#0A1020">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/static/icons/manifest.webmanifest">
+    <meta name="color-scheme" content="dark light">
+    <title>Administración · Escáner TQT</title>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('tqt.tema')==='light'?'light':'dark'}catch(e){document.documentElement.dataset.theme='dark'}</script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1316">
+    <style>
+        .login { min-height: 100dvh; display: grid; place-items: center; padding: 24px var(--gutter); }
+        .login .box { width: min(420px, 100%); display: flex; flex-direction: column; gap: 18px; }
+        .login h1 { font-size: 28px; font-weight: 700; letter-spacing: .01em; }
+        .danger-zone { border: 1px solid color-mix(in srgb, var(--bad) 55%, var(--line)); border-radius: var(--r-2); background: color-mix(in srgb, var(--bad) 6%, var(--surface)); }
+        .danger-zone > .dz { display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 14px; flex-wrap: wrap; }
+        .danger-zone > .dz + .dz { border-top: 1px solid color-mix(in srgb, var(--bad) 35%, var(--line)); }
+        .danger-zone b { display: block; font-size: 17px; }
+        .btn-solid-danger { background: var(--bad); border-color: var(--bad); color: var(--bg); }
+        .sesion { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+        .sesion[data-k="warn"] { color: var(--warn); font-weight: 600; }
+        .col-check { width: 44px; }
+        .col-check input { width: 20px; height: 20px; accent-color: var(--accent); }
+        .selbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: var(--surface-2); }
+        @media (max-width: 700px) {
+            .desk-nav { order: 5; flex: 0 0 100%; margin-left: 0; max-width: 100%; overflow-x: auto; }
+            .desk-nav button { padding: 0 9px; font-size: 13px; letter-spacing: .02em; }
+        }
+        /* Movimientos */
+        .mv-cats { display: flex; gap: 8px; flex-wrap: wrap; }
+        .mv-cat { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+        .mv-cat b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
+        .mv-cat[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); font-weight: 600; }
+        .mv-cat[aria-pressed="true"] b { color: var(--text); }
+        .mv-f { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+        .mv-f .input { min-width: 150px; }
+        .mv-table td.mv-fecha { white-space: nowrap; }
+        .mv-table td.mv-fecha small { display: block; color: var(--muted); }
+        .mv-table td.mv-det .mono { display: block; overflow-wrap: anywhere; }
+        .mv-table td.mv-det span.d { display: block; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+        .mv-badge { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .mv-cards { display: none; flex-direction: column; gap: 10px; list-style: none; padding: 0; margin: 0; }
+        .mv-card { border: 1px solid var(--line); border-left-width: 4px; border-radius: var(--r-2); background: var(--surface); padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+        .mv-card[data-c="eliminacion"] { border-left-color: var(--bad); }
+        .mv-card[data-c="edicion"] { border-left-color: var(--warn); }
+        .mv-card[data-c="alta"] { border-left-color: var(--ok); }
+        .mv-card[data-c="sesion"], .mv-card[data-c="excel"] { border-left-color: var(--info); }
+        .mv-card .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+        .mv-card .when { font-size: 13px; color: var(--muted); }
+        .mv-card .tit { font-weight: 600; }
+        .mv-card .mono { overflow-wrap: anywhere; }
+        .mv-card .meta { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+        .mv-resumen-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+        .mv-resumen-lista li { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-1); background: var(--surface); }
+        .mv-resumen-lista .when { font-size: 13px; color: var(--muted); min-width: 110px; }
+        @media (max-width: 700px) {
+            .mv-table-wrap { display: none; }
+            .mv-cards { display: flex; }
+            .mv-f, .mv-f .input { width: 100%; }
+            .mv-f { flex: 1 1 100%; }
+            #mLote { flex: 1 1 100%; width: 100%; }
+        }
+        code.k { font-family: var(--font-mono); background: var(--bg-2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+<main id="loginView" class="login" hidden>
+    <section class="box panel pad" id="cerradaBox" aria-labelledby="cerradaTit" hidden>
+        <div class="row" style="gap:12px"><span id="cerradaMark"></span><div><div class="silk" style="margin-bottom:2px">Administración</div><h1 id="cerradaTit" tabindex="-1">Sesión cerrada</h1></div></div>
+        <div class="banner" data-k="ok" role="status"><svg class="svg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg><div class="grow">Cerraste la sesión. No queda ningún dato de administración en esta pantalla.</div></div>
+        <div class="row wrap"><a class="btn btn-primary grow" id="cerradaEscaner" href="/">Ir al escáner</a><button class="btn grow" type="button" id="cerradaVolver">Volver a entrar</button></div>
+    </section>
+    <form class="box panel pad" id="loginForm" autocomplete="off" novalidate>
+        <div class="row" style="gap:12px"><span id="loginMark"></span><div><div class="silk" style="margin-bottom:2px">Acceso restringido</div><h1>Administración</h1></div></div>
+        <div id="loginMotivo" class="banner" data-k="warn" role="status" hidden><svg class="svg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5M12 7.6v.01"/></svg><div class="grow">Para abrir el monitor necesitas la contraseña de supervisor.</div></div>
+        <p class="muted">Esta zona borra y exporta datos de producción. Solo para el responsable del sistema.</p>
+        <div class="field"><label for="pass">Contraseña</label><input class="input" id="pass" type="password" autocomplete="current-password" required aria-describedby="loginErr"></div>
+        <div id="loginErr" class="banner" data-k="bad" role="alert" hidden></div>
+        <div class="row"><button class="btn btn-primary grow" type="submit" id="btnLogin">Entrar</button><a class="btn btn-ghost" href="/" id="loginEscaner">Ir al escáner</a></div>
+    </form>
+</main>
+
+<div id="adminView" class="desk" hidden>
+    <header class="desk-top">
+        <a class="brand" href="/" aria-label="Ir al escáner"><span id="brandMark"></span><div><span class="brand-name">Administración</span><span class="brand-sub">Escáner TQT · <span data-version></span></span></div></a>
+        <nav class="desk-nav" role="tablist" aria-label="Secciones de administración">
+            <button type="button" role="tab" data-v="resumen" aria-selected="true">Resumen</button>
+            <button type="button" role="tab" data-v="tarjetas" aria-selected="false">Tarjetas</button>
+            <button type="button" role="tab" data-v="pcb" aria-selected="false">PCB</button>
+            <button type="button" role="tab" data-v="movimientos" aria-selected="false">Movimientos</button>
+            <button type="button" role="tab" data-v="riesgo" aria-selected="false">Borrado</button>
+            <button type="button" role="tab" data-v="cuenta" aria-selected="false">Cuenta</button>
+        </nav>
+        <div class="grow"></div>
+        <span class="sesion" id="sesion" role="timer" aria-label="Tiempo de sesión restante"></span>
+        <button class="btn btn-sm" type="button" id="btnExport"><span class="svg-slot" data-i="excel"></span> Exportar Excel</button>
+        <button class="btn btn-sm btn-ghost" type="button" id="btnLogout">Cerrar sesión</button>
+        <button class="iconbtn" type="button" id="btnTheme" aria-label="Cambiar entre tema claro y oscuro"></button>
+    </header>
+
+    <main class="desk-main">
+        <h1 class="sr-only">Administración</h1>
+        <div id="banner" class="stack" aria-live="polite"></div>
+
+        <section id="v-resumen" class="stack" style="gap:18px">
+            <div id="resumenBox" class="stack" style="gap:18px"></div>
+        </section>
+
+        <section id="v-tarjetas" class="stack" hidden>
+            <div class="tools-row">
+                <select class="input" id="tLote" aria-label="Lote"></select>
+                <select class="input" id="tEstado" aria-label="Estado de la tarjeta"><option value="">Todos los estados</option></select>
+                <input class="input" id="tQ" type="search" placeholder="Buscar número, serie o MAC" aria-label="Buscar tarjeta" style="min-width:240px">
+            </div>
+            <div class="selbar"><span id="tSel">0 seleccionadas</span><div class="grow"></div>
+                <button class="btn btn-sm" type="button" id="tAllLote">Seleccionar todas del lote</button>
+                <button class="btn btn-sm" type="button" id="tNone">Quitar selección</button>
+                <button class="btn btn-sm btn-danger" type="button" id="tDel" disabled><span class="svg-slot" data-i="trash"></span> Eliminar seleccionadas</button></div>
+            <div class="tablewrap" id="tTabla"></div>
+        </section>
+
+        <section id="v-pcb" class="stack" hidden>
+            <div class="tools-row">
+                <select class="input" id="pTipo" aria-label="Tipo"><option value="">Todos los tipos</option><option>R1</option><option>R2</option><option>R3</option></select>
+                <select class="input" id="pCiclo" aria-label="Estado"><option value="">Todos los estados</option><option value="RECIBIDA">Sin confirmar</option><option value="DISPONIBLE">Sueltas</option><option value="ASIGNADA">Asignadas</option><option value="FALLA">Falla</option><option value="BAJA">Baja</option></select>
+                <input class="input" id="pQ" type="search" placeholder="Buscar serie, nombre o MAC" aria-label="Buscar PCB" style="min-width:240px">
+            </div>
+            <div class="selbar"><span id="pSel">0 seleccionadas</span><div class="grow"></div>
+                <button class="btn btn-sm" type="button" id="pNone">Quitar selección</button>
+                <button class="btn btn-sm btn-danger" type="button" id="pDel" disabled><span class="svg-slot" data-i="trash"></span> Eliminar seleccionadas</button></div>
+            <div class="tablewrap" id="pTabla"></div>
+        </section>
+
+        <section id="v-movimientos" class="stack" hidden aria-labelledby="mTit">
+            <div><h2 class="silk" id="mTit" style="margin-bottom:6px">Movimientos</h2>
+                <p class="muted" style="max-width:75ch">Historial de lo que se hizo en el sistema: altas, ediciones, eliminaciones, sesiones y Excel. No se borra con «Borrar TODO».</p></div>
+            <div class="mv-cats" id="mCats" role="group" aria-label="Filtrar por tipo de movimiento"></div>
+            <div class="tools-row">
+                <input class="input" id="mQ" type="search" placeholder="Buscar placa, MAC, operador o detalle" aria-label="Buscar en los movimientos" style="min-width:240px;flex:1 1 240px">
+                <label class="mv-f">Desde <input class="input" id="mDesde" type="date" aria-label="Desde la fecha"></label>
+                <label class="mv-f">Hasta <input class="input" id="mHasta" type="date" aria-label="Hasta la fecha"></label>
+                <select class="input" id="mLote" aria-label="Lote"></select>
+                <button class="btn" type="button" id="mLimpiar">Quitar filtros</button>
+                <button class="btn" type="button" id="mAct"><span class="svg-slot" data-i="refresh"></span> Actualizar</button>
+                <button class="btn" type="button" id="mCsv"><span class="svg-slot" data-i="download"></span> Exportar CSV</button>
+            </div>
+            <div id="mEstado" class="muted" role="status" aria-live="polite"></div>
+            <div id="mLista"></div>
+            <div class="row" style="justify-content:center"><button class="btn" type="button" id="mMas" hidden>Cargar más</button></div>
+        </section>
+
+        <section id="v-riesgo" class="stack" hidden>
+            <p class="muted" style="max-width:70ch">Estas acciones no se pueden deshacer desde la app. Antes de ejecutarlas el sistema guarda un respaldo automático de la base de datos.</p>
+            <div class="danger-zone">
+                <div class="dz"><div><b>Vaciar un lote</b><span class="muted">Borra las tarjetas del lote elegido. Sus PCB vuelven al inventario como sueltas.</span></div>
+                    <div class="row wrap"><select class="input" id="vLote" aria-label="Lote a vaciar" style="min-height:44px"></select><button class="btn btn-danger" type="button" id="btnVaciar">Vaciar lote…</button></div></div>
+                <div class="dz"><div><b>Borrar TODO</b><span class="muted">Borra tarjetas y PCB. Se conservan los lotes, la contraseña y los movimientos.</span></div>
+                    <button class="btn btn-solid-danger" type="button" id="btnReset">Borrar todo…</button></div>
+            </div>
+        </section>
+
+        <section id="v-cuenta" class="stack" hidden>
+            <form class="panel pad stack" id="formClave" style="max-width:440px" autocomplete="off" novalidate>
+                <h2 class="silk">Cambiar contraseña</h2>
+                <div class="field"><label for="cActual">Contraseña actual</label><input class="input" id="cActual" type="password" autocomplete="current-password"></div>
+                <div class="field"><label for="cNueva">Contraseña nueva</label><input class="input" id="cNueva" type="password" autocomplete="new-password" minlength="8" aria-describedby="cHint"><div class="hint" id="cHint">Mínimo 8 caracteres.</div></div>
+                <div class="field"><label for="cRep">Repite la nueva</label><input class="input" id="cRep" type="password" autocomplete="new-password"></div>
+                <div id="cErr" class="hint err" role="alert"></div>
+                <button class="btn btn-primary" type="submit" id="btnClave">Guardar contraseña</button>
+            </form>
+        </section>
+    </main>
+</div>
+
+<script src="/static/js/common.js?v=1316"></script>
+<script src="/static/js/admin.js?v=1316"></script>
+</body>
+</html>

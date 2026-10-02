@@ -1,0 +1,96 @@
+/* Sección "MAC y firmware" de la consola de escritorio. Solo tokens de app.css. */
+.macs { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.macs-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.macs-tabs { display: inline-flex; border: 1px solid var(--line-2); border-radius: var(--r-1); overflow: hidden; background: var(--bg-2); }
+.macs-tabs button {
+  min-height: 40px; padding: 0 16px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted);
+  font-weight: 700; font-size: 15px; letter-spacing: .02em; display: inline-flex; align-items: center; gap: 8px;
+}
+.macs-tabs button:last-child { border-right: 0; }
+.macs-tabs button:hover { color: var(--text); }
+.macs-tabs button[aria-selected="true"] { background: var(--surface-2); color: var(--text); box-shadow: inset 0 -3px 0 var(--accent); }
+.macs-tabs .n { font-family: var(--font-mono); font-size: 12px; padding: 1px 6px; border-radius: 3px; background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+.macs-counter { margin-left: auto; display: flex; gap: 14px; align-items: baseline; font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.macs-counter b { font-size: 20px; color: var(--text); font-weight: 600; margin-left: 4px; }
+.macs-counter .ok b { color: var(--ok); }
+
+.macs-bar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); }
+.macs-bar .field { gap: 4px; }
+.macs-bar .input, .macs-bar select.input { min-height: 36px; font-size: 15px; width: auto; }
+.macs-bar .seg button { min-height: 36px; padding: 0 14px; font-size: 14px; }
+.macs-acts { margin-left: auto; align-self: flex-end; }
+.macs-bar .btn { min-height: 36px; font-size: 14px; padding: 0 12px; }
+.macs-bar input[type="search"] { width: 210px; }
+.macs-bar input.num { width: 96px; }
+
+.macs-wrap { border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); overflow: auto; max-height: calc(100vh - 290px); min-height: 220px; }
+table.macs-tbl { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 820px; table-layout: fixed; }
+.macs-tbl thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--surface-2); text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.macs-tbl td { padding: 4px 10px; height: 52px; border-bottom: 1px solid var(--line); vertical-align: middle; overflow: hidden; }
+.macs-tbl tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.macs-tbl tr[data-e="guardada"] td { background: color-mix(in srgb, var(--ok) 7%, var(--surface)); }
+.macs-tbl tr[data-e="guardada"] .macs-in { opacity: .75; }
+.macs-tbl tr[data-e="obsoleta"] td { background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+.macs-tbl .c-placa { width: 210px; } .macs-tbl .c-tj { width: 84px; } .macs-tbl .c-hw { width: 72px; }
+.macs-tbl .c-fw { width: 190px; } .macs-tbl .c-mac { width: 214px; } .macs-tbl .c-acc { width: 128px; }
+.macs-placa { display: flex; align-items: center; gap: 8px; }
+.macs-placa .nm { font-family: var(--font-mono); font-size: 14px; font-weight: 500; white-space: nowrap; }
+.macs-tbl .mono { font-size: 14px; }
+.macs-tbl .dim { color: var(--muted); }
+
+.macs-fw { display: flex; gap: 6px; }
+.macs-fw select, .macs-fw input, .macs-in { min-height: 36px; padding: 0 8px; border-radius: var(--r-1); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font-size: 14px; min-width: 0; }
+.macs-fw select { flex: 1; }
+.macs-fw input { width: 72px; font-family: var(--font-mono); }
+.macs-in { width: 100%; font-family: var(--font-mono); font-size: 16px; letter-spacing: .04em; text-transform: uppercase; }
+.macs-in::placeholder { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--faint); opacity: .8; }
+.macs-fw select:focus, .macs-fw input:focus, .macs-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.macs-in[aria-invalid="true"] { border-color: var(--bad); }
+.macs-in[data-e="valida"] { border-color: var(--ok); }
+.macs-in:disabled, .macs-fw select:disabled, .macs-fw input:disabled { opacity: .6; }
+
+/* estado: icono + texto (nunca solo color), alto fijo para que no salte el diseño */
+.macs-st { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; line-height: 1.2; color: var(--muted); max-height: 40px; overflow: hidden; }
+.macs-st .svg-i { width: 16px; height: 16px; margin-top: 1px; stroke-width: 2.2; }
+.macs-st span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.macs-st[data-e="valida"], .macs-st[data-e="guardada"] { color: var(--ok); }
+.macs-st[data-e="repetida"], .macs-st[data-e="error"] { color: var(--bad); }
+.macs-st[data-e="obsoleta"], .macs-st[data-e="revisando"], .macs-st[data-e="guardando"] { color: var(--warn); }
+.macs-st[data-e="guardada"] span, .macs-st[data-e="valida"] span, .macs-st[data-e="repetida"] span, .macs-st[data-e="error"] span { font-weight: 600; }
+
+.macs-tbl .btn { min-height: 34px; padding: 0 10px; font-size: 13px; }
+.macs-acc { display: flex; gap: 6px; justify-content: flex-end; }
+.macs-conf { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.macs-conf .btn { flex: none; }
+
+.macs-foot { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.macs-kbd kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 3px; background: var(--surface-2); color: var(--text); }
+
+/* pegado masivo */
+.macs-paste { display: grid; grid-template-columns: minmax(280px, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+@media (max-width: 1180px) { .macs-paste { grid-template-columns: 1fr; } }
+.macs-paste textarea { width: 100%; min-height: 260px; resize: vertical; padding: 10px 12px; border-radius: var(--r-1); border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font-family: var(--font-mono); font-size: 14px; line-height: 1.5; white-space: pre; overflow: auto; }
+.macs-paste textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.macs-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.macs-panel h2 { font-size: 15px; letter-spacing: .02em; }
+.macs-radio { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; margin: 0; }
+.macs-radio legend { font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 4px; }
+.macs-radio label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; min-height: 28px; }
+.macs-radio input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); }
+.macs-sum { display: flex; gap: 14px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 13px; align-items: center; }
+.macs-sum b { font-size: 18px; }
+.macs-prev { max-height: calc(100vh - 380px); min-height: 120px; }
+.macs-prev table { min-width: 560px; }
+.macs-prev td { height: 40px; }
+
+@media (prefers-reduced-motion: reduce) { .macs * { transition: none !important; animation: none !important; } }
+@media (max-width: 1180px) { .macs-tbl .c-hw { display: none; } table.macs-tbl { min-width: 760px; } }
+
+.macs-prev .macs-st { max-height: none; }
+.macs-prev .macs-st span { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.macs-prev td { height: auto; min-height: 40px; padding-top: 7px; padding-bottom: 7px; }
+.macs-bar select.input { min-width: 96px; }

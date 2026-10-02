@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A1020">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/static/icons/manifest.webmanifest">
+    <meta name="color-scheme" content="dark light">
+    <title>Emparejar · Escáner TQT</title>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('tqt.tema')==='light'?'light':'dark'}catch(e){document.documentElement.dataset.theme='dark'}</script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1316">
+</head>
+<body>
+<div class="app">
+    <main>
+        <h1 class="sr-only">Emparejar PCB en tarjetas</h1>
+        <section class="counters" aria-label="Resumen de inventario">
+            <div><span class="lbl">Completas</span><span class="n" id="nComp">0</span></div>
+            <div><span class="lbl">Incompl.</span><span class="n" id="nInc">0</span></div>
+            <div><span class="lbl">Sueltas</span><span class="n" id="nSue">0</span></div>
+            <div><span class="lbl">Tarjetas</span><span class="n" id="nTar">0</span></div>
+        </section>
+
+        <section class="stack" aria-labelledby="hTar">
+            <h2 class="silk" id="hTar">Tarjetas emparejadas</h2>
+            <div class="row wrap">
+                <button class="btn btn-sm" type="button" id="btnArmar"><span class="svg-slot" data-i="plus"></span> Armar a mano (impar)</button>
+                <button class="btn btn-sm btn-danger" type="button" id="btnDesTodas" disabled><span class="svg-slot" data-i="unlink"></span> Desemparejar todas</button>
+            </div>
+            <input class="input" id="filtro" type="search" placeholder="Buscar por número, serie o MAC" aria-label="Buscar tarjeta" autocomplete="off">
+            <div id="tar" class="list"></div>
+        </section>
+
+        <section class="stack" aria-labelledby="hComp">
+            <h2 class="silk" id="hComp">Listas para emparejar</h2>
+            <p class="hint">Primero se emparejan las series con R1 y R2 del mismo número (con su R3 si está); después las impares con lo que sobra, todo en orden numérico. También se montan las R3 que llegaron después en su tarjeta.</p>
+            <div class="field">
+                <span class="lbl" id="lblR3">Cómo emparejar las R3</span>
+                <div class="seg" role="group" aria-labelledby="lblR3" id="segR3">
+                    <button type="button" data-v="manual" aria-pressed="true">Manual</button>
+                    <button type="button" data-v="auto" aria-pressed="false">Automático</button>
+                </div>
+                <p class="hint" id="hintR3"></p>
+            </div>
+            <button class="btn btn-primary btn-block" type="button" id="btnAuto" disabled>Emparejar todas <span class="count" id="autoCount">0</span></button>
+            <div id="comp" class="list" role="list"></div>
+        </section>
+
+        <section class="stack" aria-labelledby="hImp" id="secImp" hidden>
+            <h2 class="silk" id="hImp">Impares (con lo que sobra)</h2>
+            <p class="hint">Se emparejan al final, en orden numérico: la R1 más baja con la R2 más baja. Con la R3 automática, la R3 del mismo número o la siguiente que sobre.</p>
+            <div id="imp" class="list" role="list"></div>
+        </section>
+
+        <section class="stack" aria-labelledby="hInc" id="secInc" hidden>
+            <h2 class="silk" id="hInc">Incompletas</h2>
+            <div id="inc" class="list" role="list"></div>
+        </section>
+
+    </main>
+</div>
+
+<script src="/static/js/common.js?v=1316"></script>
+<script src="/static/js/audio.js?v=1316"></script>
+<script src="/static/js/haptics.js?v=1316"></script>
+<script src="/static/js/ws_client.js?v=1316"></script>
+<script src="/static/js/jsQR.js?v=1316"></script>
+<script src="/static/js/scanner.js?v=1316"></script>
+<script src="/static/js/visor.js?v=1316"></script>
+<script src="/static/js/emparejar.js?v=1316"></script>
+</body>
+</html>

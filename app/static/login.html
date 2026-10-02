@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A1020">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <meta name="color-scheme" content="dark light">
+    <meta name="robots" content="noindex">
+    <title>Iniciar sesión · Escáner TQT</title>
+    <script>
+        /* Tema: el que el usuario eligió (mismo ajuste que el resto de la app); si nunca eligió, el del sistema. */
+        (function () {
+            var t = 'dark';
+            try { var g = localStorage.getItem('tqt.tema'); t = g === 'light' || g === 'dark' ? g : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* sin almacenamiento */ }
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1317">
+    <style>
+        /* Mobile-first: una columna. De 900 px en adelante: panel de marca + formulario. */
+        html, body { height: 100%; }
+        body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
+        .tema { position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 5; }
+        .pantalla { flex: 1; display: flex; flex-direction: column; min-height: 100dvh; }
+
+        .marca { padding: max(28px, env(safe-area-inset-top)) 20px 22px; display: flex; flex-direction: column; gap: 10px;
+                 background: linear-gradient(160deg, var(--surface-2), var(--bg-2)); border-bottom: 1px solid var(--line); position: relative; overflow: hidden; }
+        .marca .logo { display: flex; align-items: center; gap: 12px; }
+        .marca .sello { width: 44px; height: 44px; flex: none; color: var(--accent); }
+        .marca h1 { margin: 0; font-size: 26px; line-height: 1.1; letter-spacing: .2px; }
+        .marca .lema { margin: 0; color: var(--muted); font-size: 15px; }
+        .marca .chips, .marca .pcb { display: none; }
+
+        .zona { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 22px 16px max(28px, env(safe-area-inset-bottom)); }
+        .acceso { width: min(440px, 100%); display: flex; flex-direction: column; gap: 16px; }
+        .acceso h2 { margin: 0; font-size: 22px; }
+        .acceso .sub { color: var(--muted); margin: 0; }
+        .acceso form { display: flex; flex-direction: column; gap: 14px; }
+        .acceso form[hidden] { display: none; }
+        .acceso .input { min-height: 48px; font-size: 16px; }              /* 16 px: iOS no hace zoom al enfocar */
+        .acceso .btn { min-height: 48px; font-size: 16px; }
+        .acceso .clave { display: flex; gap: 8px; }
+        .acceso .clave .input { flex: 1; min-width: 0; }
+        .acceso .msg { min-height: 1.4em; margin: 0; color: var(--bad); font-weight: 500; }
+        .acceso .msg.ok { color: var(--ok); }
+        .acceso .pie { color: var(--faint); font-size: 13px; margin: 4px 0 0; }
+
+        @media (min-width: 900px) {
+            .pantalla { flex-direction: row; }
+            .marca { flex: 1 1 52%; justify-content: center; padding: 64px clamp(40px, 6vw, 96px); border-bottom: 0; border-right: 1px solid var(--line); gap: 22px; }
+            .marca .sello { width: 64px; height: 64px; }
+            .marca h1 { font-size: clamp(36px, 4vw, 52px); }
+            .marca .lema { font-size: 19px; max-width: 30ch; }
+            .marca .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+            .marca .chips span { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 14px; background: var(--surface); }
+            .marca .pcb { display: block; position: absolute; inset: auto -60px -60px auto; width: 380px; height: 380px; opacity: .14; color: var(--accent); pointer-events: none; }
+            .zona { flex: 1 1 48%; align-items: center; padding: 48px clamp(32px, 5vw, 80px); }
+            .acceso { padding: 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 48px rgba(0, 0, 0, .18); }
+        }
+        @media (prefers-reduced-motion: no-preference) { .acceso { animation: entra .35s ease-out both; } @keyframes entra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } } }
+    </style>
+</head>
+<body>
+<button class="iconbtn tema" type="button" id="tema" aria-label="Cambiar entre tema claro y oscuro" title="Tema claro / oscuro">
+    <svg id="icoTema" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+</button>
+
+<div class="pantalla">
+    <header class="marca">
+        <div class="logo">
+            <svg class="sello" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="8" y="8" width="32" height="32" rx="5"/><path d="M16 8v-4M24 8v-4M32 8v-4M16 44v-4M24 44v-4M32 44v-4M8 16H4M8 24H4M8 32H4M44 16h-4M44 24h-4M44 32h-4"/>
+                <path d="M17 24h5l3-6 3 12 3-6h2"/>
+            </svg>
+            <h1>Escáner TQT</h1>
+        </div>
+        <p class="lema">Control de producción de tarjetas: recibir, emparejar, programar y etiquetar.</p>
+        <div class="chips" aria-hidden="true"><span>Recibir</span><span>Emparejar</span><span>Programar</span><span>Etiquetas DYMO</span><span>Excel</span></div>
+        <svg class="pcb" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M10 40h70l20 20h90M10 100h50l20-20h110M10 160h90l20-20h70M40 10v60l20 20M120 10v50l20 20M80 190v-60l20-20"/><circle cx="10" cy="40" r="5"/><circle cx="190" cy="60" r="5"/><circle cx="190" cy="80" r="5"/><circle cx="190" cy="140" r="5"/><circle cx="40" cy="10" r="5"/><circle cx="120" cy="10" r="5"/><circle cx="80" cy="190" r="5"/>
+        </svg>
+    </header>
+
+    <main class="zona">
+        <section class="acceso" aria-labelledby="tit">
+            <div>
+                <h2 id="tit">Iniciar sesión</h2>
+                <p class="sub" id="sub">Entra con tu correo y tu contraseña.</p>
+            </div>
+
+            <form id="fLogin" autocomplete="on" novalidate>
+                <div class="field"><label for="email">Correo</label>
+                    <input class="input" id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" placeholder="nombre@skyguardian.mx" required autofocus></div>
+                <div class="field"><label for="pass">Contraseña</label>
+                    <div class="clave"><input class="input" id="pass" name="password" type="password" autocomplete="current-password" maxlength="200" required>
+                        <button class="btn" type="button" id="ver" aria-pressed="false" aria-label="Mostrar la contraseña">Ver</button></div></div>
+                <p class="msg" id="msg" role="alert" aria-live="assertive"></p>
+                <button class="btn btn-primary" type="submit" id="entrar">Entrar</button>
+            </form>
+
+            <form id="fClave" autocomplete="off" novalidate hidden>
+                <p class="sub" id="avisoClave">Por seguridad, cambia tu contraseña (mínimo 10 caracteres).</p>
+                <div class="field"><label for="actual">Contraseña actual</label><input class="input" id="actual" type="password" autocomplete="current-password" maxlength="200"></div>
+                <div class="field"><label for="nueva">Contraseña nueva</label><input class="input" id="nueva" type="password" autocomplete="new-password" maxlength="200"></div>
+                <div class="field"><label for="repite">Repite la nueva</label><input class="input" id="repite" type="password" autocomplete="new-password" maxlength="200"></div>
+                <p class="msg" id="msgClave" role="alert" aria-live="assertive"></p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" type="submit" id="guardar" style="flex:1">Guardar contraseña</button>
+                    <button class="btn btn-ghost" type="button" id="luego">Más tarde</button>
+                </div>
+            </form>
+            <p class="pie">Conexión segura · acceso solo para cuentas autorizadas</p>
+        </section>
+    </main>
+</div>
+<script src="/static/js/login.js?v=1317"></script>
+</body>
+</html>
