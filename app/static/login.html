@@ -16,49 +16,96 @@
             document.documentElement.dataset.theme = t;
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/app.css?v=1317">
+    <link rel="stylesheet" href="/static/css/app.css?v=1325">
     <style>
-        /* Mobile-first: una columna. De 900 px en adelante: panel de marca + formulario. */
+        /* Pantalla de acceso. Mobile-first: banda de marca arriba y formulario debajo.
+           Desde 900 px: mesa de trabajo (etiqueta DYMO + trazos de circuito) a la izquierda y formulario a la derecha. */
         html, body { height: 100%; }
-        body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
+        body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); }
         .tema { position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 5; }
-        .pantalla { flex: 1; display: flex; flex-direction: column; min-height: 100dvh; }
+        .pantalla { min-height: 100dvh; display: flex; flex-direction: column; }
 
-        .marca { padding: max(28px, env(safe-area-inset-top)) 20px 22px; display: flex; flex-direction: column; gap: 10px;
-                 background: linear-gradient(160deg, var(--surface-2), var(--bg-2)); border-bottom: 1px solid var(--line); position: relative; overflow: hidden; }
-        .marca .logo { display: flex; align-items: center; gap: 12px; }
-        .marca .sello { width: 44px; height: 44px; flex: none; color: var(--accent); }
-        .marca h1 { margin: 0; font-size: 26px; line-height: 1.1; letter-spacing: .2px; }
-        .marca .lema { margin: 0; color: var(--muted); font-size: 15px; }
-        .marca .chips, .marca .pcb { display: none; }
+        /* ---------- mesa de trabajo (marca) ---------- */
+        .banco { position: relative; overflow: hidden; isolation: isolate; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+                 padding: max(16px, env(safe-area-inset-top)) 60px 16px 20px; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+        .banco .trazos { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; color: var(--line-2); opacity: .32; pointer-events: none; }
+        .banco::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+                        background: radial-gradient(60% 90% at 78% 50%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%); }
+        .logo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .logo .sello { width: 40px; height: 40px; flex: none; color: var(--accent); }
+        .logo b { font-size: 24px; font-weight: 700; line-height: 1; letter-spacing: .01em; white-space: nowrap; }
+        .titular, .escena .leida { display: none; }
 
-        .zona { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 22px 16px max(28px, env(safe-area-inset-bottom)); }
-        .acceso { width: min(440px, 100%); display: flex; flex-direction: column; gap: 16px; }
-        .acceso h2 { margin: 0; font-size: 22px; }
-        .acceso .sub { color: var(--muted); margin: 0; }
-        .acceso form { display: flex; flex-direction: column; gap: 14px; }
+        .escena { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+        .etiqueta { container-type: inline-size; position: relative; width: 132px; aspect-ratio: 57 / 32; flex: none; transform: rotate(-3deg);
+                    background: #FAFAF6; color: #0D1630; border-radius: 3.2cqw; overflow: hidden;
+                    box-shadow: 0 1px 0 rgba(255, 255, 255, .5) inset, 0 2px 4px rgba(0, 0, 0, .25), 0 22px 40px -18px rgba(0, 0, 0, .55); }
+        .etiqueta .qr { position: absolute; left: 5cqw; top: 50%; width: 40cqw; height: 40cqw; transform: translateY(-50%); }
+        .etiqueta .trama { position: absolute; left: 49.5cqw; right: 2cqw; top: 50%; transform: translateY(-50%); margin: 0; font-family: var(--font-mono); font-weight: 500;
+                           font-size: 4.4cqw; line-height: 1.6; letter-spacing: -.01em; white-space: pre; font-variant-numeric: slashed-zero; }
+        .etiqueta .trama span { display: block; }
+        .etiqueta .trama .mac { color: #4A5570; }
+        .etiqueta .trama span + span.nom { margin-top: 3cqw; }
+        .barrido { position: absolute; top: 0; bottom: 0; left: 0; width: 1.2cqw; background: var(--accent); opacity: 0; pointer-events: none;
+                   box-shadow: 0 0 5cqw 1.2cqw color-mix(in srgb, var(--accent) 65%, transparent); }
+
+        /* ---------- zona del formulario ---------- */
+        .zona { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 28px 20px max(28px, env(safe-area-inset-bottom)); }
+        .acceso { width: min(400px, 100%); display: flex; flex-direction: column; gap: 22px; }
+        .acceso h2 { margin: 0; font-size: 32px; line-height: 1.05; font-weight: 700; letter-spacing: .005em; }
+        .acceso .sub { color: var(--muted); margin: 6px 0 0; font-size: 16px; font-weight: 500; }
+        .acceso form { display: flex; flex-direction: column; gap: 18px; }
         .acceso form[hidden] { display: none; }
-        .acceso .input { min-height: 48px; font-size: 16px; }              /* 16 px: iOS no hace zoom al enfocar */
-        .acceso .btn { min-height: 48px; font-size: 16px; }
-        .acceso .clave { display: flex; gap: 8px; }
-        .acceso .clave .input { flex: 1; min-width: 0; }
-        .acceso .msg { min-height: 1.4em; margin: 0; color: var(--bad); font-weight: 500; }
+        .acceso .field { gap: 7px; }
+        .acceso .field > label { font-family: var(--font-ui); font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text); }
+        .acceso .input { min-height: 52px; font-size: 16px; padding: 0 14px; border-radius: 6px; border-color: var(--line-2); background: var(--surface); transition: border-color .15s, box-shadow .15s; }
+        .acceso .input::placeholder { color: var(--faint); opacity: .8; }
+        .acceso .input:hover { border-color: var(--muted); }
+        .acceso .clave { position: relative; display: block; }
+        .acceso .clave .input { padding-right: 76px; }
+        .acceso .clave .btn { position: absolute; right: 6px; top: 6px; bottom: 6px; min-height: 0; padding: 0 12px; border: 0; border-radius: 4px; background: transparent; color: var(--accent-text); font-size: 15px; font-weight: 600; }
+        .acceso .clave .btn:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+        .acceso .clave .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .acceso .btn { min-height: 52px; font-size: 17px; border-radius: 6px; }
+        .acceso .btn-primary { font-weight: 700; letter-spacing: .01em; box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 8px 18px -10px color-mix(in srgb, var(--accent) 80%, transparent); }
+        .acceso .btn-primary[disabled] { opacity: .7; cursor: progress; }
+        .acceso .msg { min-height: 0; margin: -4px 0 0; color: var(--bad); font-weight: 600; font-size: 15px; }
+        .acceso .msg:empty { display: none; }
         .acceso .msg.ok { color: var(--ok); }
-        .acceso .pie { color: var(--faint); font-size: 13px; margin: 4px 0 0; }
+        .acceso .pie { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; margin: 6px 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
+        .acceso .pie svg { flex: none; color: var(--ok); }
 
         @media (min-width: 900px) {
             .pantalla { flex-direction: row; }
-            .marca { flex: 1 1 52%; justify-content: center; padding: 64px clamp(40px, 6vw, 96px); border-bottom: 0; border-right: 1px solid var(--line); gap: 22px; }
-            .marca .sello { width: 64px; height: 64px; }
-            .marca h1 { font-size: clamp(36px, 4vw, 52px); }
-            .marca .lema { font-size: 19px; max-width: 30ch; }
-            .marca .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-            .marca .chips span { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 14px; background: var(--surface); }
-            .marca .pcb { display: block; position: absolute; inset: auto -60px -60px auto; width: 380px; height: 380px; opacity: .14; color: var(--accent); pointer-events: none; }
-            .zona { flex: 1 1 48%; align-items: center; padding: 48px clamp(32px, 5vw, 80px); }
-            .acceso { padding: 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 48px rgba(0, 0, 0, .18); }
+            .banco { flex: 1 1 56%; flex-direction: column; align-items: stretch; justify-content: space-between; padding: 44px clamp(40px, 5vw, 88px) 52px; border-bottom: 0; border-right: 1px solid var(--line); gap: 32px; }
+            .banco::after { background: radial-gradient(55% 55% at 52% 48%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 72%); }
+            .logo .sello { width: 46px; height: 46px; }
+            .logo b { font-size: 28px; }
+            .escena { gap: 22px; }
+            .etiqueta { width: min(460px, 100%); transform: rotate(-2.4deg); }
+            .escena .leida { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px 8px 10px; border-radius: 999px; font-size: 15px; font-weight: 600;
+                             color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, var(--surface)); border: 1px solid color-mix(in srgb, var(--ok) 40%, var(--line)); }
+            .titular { display: block; max-width: 520px; }
+            .titular h1 { margin: 0 0 10px; font-size: clamp(32px, 3.2vw, 46px); line-height: 1.04; font-weight: 700; letter-spacing: .002em; text-wrap: balance; }
+            .titular p { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.4; max-width: 38ch; }
+            .zona { flex: 1 1 44%; align-items: center; padding: 48px clamp(32px, 5vw, 88px); }
+            .acceso { gap: 26px; }
+            .acceso h2 { font-size: 38px; }
         }
-        @media (prefers-reduced-motion: no-preference) { .acceso { animation: entra .35s ease-out both; } @keyframes entra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } } }
+        @media (max-width: 899.98px) { .banco .trazos { opacity: .22; } }
+        @media (max-width: 899.98px) { .logo b { font-size: 22px; } .etiqueta { width: 104px; transform: rotate(-3deg) translateY(2px); } }
+        @media (max-width: 360px) { .logo b { font-size: 20px; } .logo .sello { width: 34px; height: 34px; } .etiqueta { width: 92px; } }
+
+        /* Un solo momento animado: la etiqueta se lee una vez (barrido) y aparece la confirmación. Sin movimiento: estado final. */
+        @media (prefers-reduced-motion: no-preference) {
+            .barrido { animation: barrer 1.5s cubic-bezier(.45, .05, .35, 1) .55s both; }
+            .escena .leida { animation: aparece .4s ease-out 2.05s both; }
+            .acceso { animation: entra .4s ease-out both; }
+            @keyframes barrer { 0% { opacity: 0; left: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; left: calc(100% - 1.2cqw); } }
+            @keyframes aparece { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+            @keyframes entra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        }
+        @media (prefers-reduced-motion: reduce) { .barrido { display: none; } }
     </style>
 </head>
 <body>
@@ -67,19 +114,33 @@
 </button>
 
 <div class="pantalla">
-    <header class="marca">
+    <header class="banco">
+        <svg class="trazos" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M-10 90h210l36 36h140l30-30h210M-10 170h120l28 28h96M300 198h120l40 40h160M-10 330h160l36-36h110l28 28h130l36-36h120M-10 410h90l34 34h170l30-30h130l30 30h100M120 600v-90l30-30h80l30-30M360 600v-70l36-36h120l40-40M460 -10v70l30 30M220 -10v60l-30 30h-60"/>
+            <g fill="var(--bg-2)"><circle cx="200" cy="90" r="5"/><circle cx="96" cy="198" r="5"/><circle cx="580" cy="238" r="5"/><circle cx="150" cy="330" r="5"/><circle cx="80" cy="410" r="5"/><circle cx="560" cy="440" r="5"/><circle cx="230" cy="480" r="5"/><circle cx="516" cy="494" r="5"/><circle cx="460" cy="90" r="5"/><circle cx="130" cy="130" r="5"/></g>
+        </svg>
+
         <div class="logo">
             <svg class="sello" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <rect x="8" y="8" width="32" height="32" rx="5"/><path d="M16 8v-4M24 8v-4M32 8v-4M16 44v-4M24 44v-4M32 44v-4M8 16H4M8 24H4M8 32H4M44 16h-4M44 24h-4M44 32h-4"/>
                 <path d="M17 24h5l3-6 3 12 3-6h2"/>
             </svg>
-            <h1>Escáner TQT</h1>
+            <b>Escáner TQT</b>
         </div>
-        <p class="lema">Control de producción de tarjetas: recibir, emparejar, programar y etiquetar.</p>
-        <div class="chips" aria-hidden="true"><span>Recibir</span><span>Emparejar</span><span>Programar</span><span>Etiquetas DYMO</span><span>Excel</span></div>
-        <svg class="pcb" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M10 40h70l20 20h90M10 100h50l20-20h110M10 160h90l20-20h70M40 10v60l20 20M120 10v50l20 20M80 190v-60l20-20"/><circle cx="10" cy="40" r="5"/><circle cx="190" cy="60" r="5"/><circle cx="190" cy="80" r="5"/><circle cx="190" cy="140" r="5"/><circle cx="40" cy="10" r="5"/><circle cx="120" cy="10" r="5"/><circle cx="80" cy="190" r="5"/>
-        </svg>
+
+        <div class="escena" aria-hidden="true">
+            <div class="etiqueta">
+                <svg class="qr" id="qr" viewBox="0 0 25 25" shape-rendering="crispEdges" fill="#0D1630"></svg>
+                <p class="trama"><span class="nom">TQT-R1-V30-0021</span><span class="mac">70:4b:ca:5b:9f:6e</span><span class="nom">TQT-R2-V30-0010</span><span class="mac">70:4b:ca:5b:9c:a2</span></p>
+                <i class="barrido"></i>
+            </div>
+            <span class="leida"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.7 2.7L16 9.8"/></svg>Etiqueta leída</span>
+        </div>
+
+        <div class="titular">
+            <h1>Cada tarjeta, rastreada de la placa a la etiqueta.</h1>
+            <p>Recibe placas, empareja R1 y R2, programa, prueba e imprime la etiqueta de cada tarjeta.</p>
+        </div>
     </header>
 
     <main class="zona">
@@ -110,10 +171,26 @@
                     <button class="btn btn-ghost" type="button" id="luego">Más tarde</button>
                 </div>
             </form>
-            <p class="pie">Conexión segura · acceso solo para cuentas autorizadas</p>
+            <p class="pie"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Conexión cifrada. Solo cuentas autorizadas.</p>
         </section>
     </main>
 </div>
+<script>
+    /* QR decorativo de la etiqueta (no codifica nada): tres marcas de posición y módulos con semilla fija. */
+    (function () {
+        var n = 25, s = 7, d = '', p = '', i, j;
+        function fijo(x, y) { return (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9); }
+        for (i = 0; i < n; i++) for (j = 0; j < n; j++) {
+            if (fijo(i, j)) continue;
+            s = (s * 1103515245 + 12345) & 0x7fffffff;
+            if ((s >> 16) % 100 < 47) d += 'M' + i + ' ' + j + 'h1v1h-1z';
+        }
+        [[0, 0], [n - 7, 0], [0, n - 7]].forEach(function (o) {
+            p += '<path fill-rule="evenodd" d="M' + o[0] + ' ' + o[1] + 'h7v7h-7zM' + (o[0] + 1) + ' ' + (o[1] + 1) + 'v5h5v-5z"/><rect x="' + (o[0] + 2) + '" y="' + (o[1] + 2) + '" width="3" height="3"/>';
+        });
+        document.getElementById('qr').innerHTML = '<path d="' + d + '"/>' + p;
+    })();
+</script>
 <script src="/static/js/login.js?v=1317"></script>
 </body>
 </html>

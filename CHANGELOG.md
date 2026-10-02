@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.25 — 2026-10-02
+- **Nuevo diseño de la pantalla de inicio de sesión (móvil y escritorio).** En escritorio, una mesa de trabajo con la etiqueta DYMO real (QR y trama de 4 líneas) que se lee una vez al abrir la página, y el formulario plano a la derecha. En móvil, banda compacta con logo y mini etiqueta, y el formulario a la vista sin desplazarse. Campos más grandes, botón "Ver" dentro del campo de contraseña, errores solo cuando hay texto, tema claro/oscuro y sin movimiento si el sistema lo pide. No cambia el flujo de acceso ni el cambio de contraseña.
+
 ## v1.3.24 — 2026-10-02
 - **Resumen de la consola actualizado.** Nuevo bloque "Producción y entrega" (finalizadas, entregadas, por entregar y etiquetas por imprimir) y dos tarjetas: "Avance de pruebas" (liberadas, en proceso, retrabajo, detenidas, pendientes) y "Etiquetas DYMO" (impresas vs. por imprimir, con la misma regla de firma que el lote de impresión).
 
