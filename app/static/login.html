@@ -37,7 +37,7 @@
         .titular, .escena .leida { display: none; }
 
         .escena { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-        .etiqueta { container-type: inline-size; position: relative; width: 132px; aspect-ratio: 57 / 32; flex: none; transform: rotate(-3deg);
+        .etiqueta { container-type: inline-size; position: relative; width: 132px; aspect-ratio: 57 / 32; flex: none; --giro: -3deg; transform: rotate(var(--giro));
                     background: #FAFAF6; color: #0D1630; border-radius: 3.2cqw; overflow: hidden;
                     box-shadow: 0 1px 0 rgba(255, 255, 255, .5) inset, 0 2px 4px rgba(0, 0, 0, .25), 0 22px 40px -18px rgba(0, 0, 0, .55); }
         .etiqueta .qr { position: absolute; left: 5cqw; top: 50%; width: 40cqw; height: 40cqw; transform: translateY(-50%); }
@@ -75,6 +75,21 @@
         .acceso .pie { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; margin: 6px 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
         .acceso .pie svg { flex: none; color: var(--ok); }
 
+        .acceso .estado { display: flex; align-items: center; gap: 8px; margin: -8px 0 0; color: var(--muted); font-size: 14px; }
+        .acceso .estado .ver { margin-left: auto; color: var(--faint); font-size: 13px; }
+        .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+        .punto[data-s="on"] { background: var(--ok); } .punto[data-s="off"] { background: var(--bad); }
+        .ln { display: block; overflow: hidden; padding-bottom: .08em; } .ln > span { display: block; }
+        .acceso .field > label { transition: color .18s; } .acceso .field:focus-within > label { color: var(--accent-text); }
+        .acceso .btn-primary { position: relative; overflow: hidden; transition: transform .12s, filter .15s, box-shadow .2s; }
+        .acceso .btn-primary:hover:not([disabled]) { box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 12px 24px -10px color-mix(in srgb, var(--accent) 90%, transparent); }
+        .acceso .btn-primary::before { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; transform: skewX(-20deg) translateX(-120%); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .38), transparent); pointer-events: none; }
+        .acceso .btn-primary[disabled]::after { content: ""; position: absolute; right: 18px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; border: 2.5px solid color-mix(in srgb, var(--accent-ink) 30%, transparent); border-top-color: var(--accent-ink); }
+        .tema svg { transition: transform .5s cubic-bezier(.3, 1.4, .5, 1); } .tema:hover svg { transform: rotate(40deg); }
+        .tema:active svg { transform: rotate(180deg) scale(.85); }
+        .dibuja, .tic { stroke-dasharray: 1; }
+        .pads circle { transform-box: fill-box; transform-origin: center; }
+
         @media (min-width: 900px) {
             .pantalla { flex-direction: row; }
             .banco { flex: 1 1 56%; flex-direction: column; align-items: stretch; justify-content: space-between; padding: 44px clamp(40px, 5vw, 88px) 52px; border-bottom: 0; border-right: 1px solid var(--line); gap: 32px; }
@@ -82,7 +97,7 @@
             .logo .sello { width: 46px; height: 46px; }
             .logo b { font-size: 28px; }
             .escena { gap: 22px; }
-            .etiqueta { width: min(460px, 100%); transform: rotate(-2.4deg); }
+            .etiqueta { width: min(460px, 100%); --giro: -2.4deg; }
             .escena .leida { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px 8px 10px; border-radius: 999px; font-size: 15px; font-weight: 600;
                              color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, var(--surface)); border: 1px solid color-mix(in srgb, var(--ok) 40%, var(--line)); }
             .titular { display: block; max-width: 520px; }
@@ -93,19 +108,55 @@
             .acceso h2 { font-size: 38px; }
         }
         @media (max-width: 899.98px) { .banco .trazos { opacity: .22; } }
-        @media (max-width: 899.98px) { .logo b { font-size: 22px; } .etiqueta { width: 104px; transform: rotate(-3deg) translateY(2px); } }
+        @media (max-width: 899.98px) { .logo b { font-size: 22px; } .etiqueta { width: 104px; } }
         @media (max-width: 360px) { .logo b { font-size: 20px; } .logo .sello { width: 34px; height: 34px; } .etiqueta { width: 92px; } }
 
-        /* Un solo momento animado: la etiqueta se lee una vez (barrido) y aparece la confirmación. Sin movimiento: estado final. */
+        /* Movimiento (solo si el sistema lo permite): una secuencia de entrada en orden (circuito, logo, etiqueta, lectura, titular y formulario)
+           y después un ciclo lento y discreto: la etiqueta se vuelve a leer cada 9 s y una señal recorre el circuito. */
         @media (prefers-reduced-motion: no-preference) {
-            .barrido { animation: barrer 1.5s cubic-bezier(.45, .05, .35, 1) .55s both; }
-            .escena .leida { animation: aparece .4s ease-out 2.05s both; }
-            .acceso { animation: entra .4s ease-out both; }
-            @keyframes barrer { 0% { opacity: 0; left: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; left: calc(100% - 1.2cqw); } }
-            @keyframes aparece { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-            @keyframes entra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+            .dibuja { animation: traza 2.4s cubic-bezier(.5, 0, .2, 1) .1s both; }
+            .pads circle { animation: pad .4s ease-out both; } .pads circle:nth-child(odd) { animation-delay: 1.2s; } .pads circle:nth-child(even) { animation-delay: 1.6s; }
+            .pulso { stroke-dasharray: .07 .93; opacity: 0; animation: senal 6s linear 3.2s infinite; }
+            .logo { animation: baja .6s cubic-bezier(.2, .8, .2, 1) .15s both; }
+            .logo .sello { animation: gira .9s cubic-bezier(.3, 1.3, .5, 1) .25s both; }
+            .escena { animation: flota 7s ease-in-out 2.6s infinite; }
+            .etiqueta { animation: llega .85s cubic-bezier(.2, .9, .25, 1.05) .35s both; }
+            .barrido { animation: leer 9s cubic-bezier(.45, .05, .35, 1) 1.3s infinite; }
+            .escena .leida { animation: aparece .45s cubic-bezier(.2, 1.4, .4, 1) 2.7s both, ping 9s ease-out 1.3s infinite; }
+            .escena .leida .tic { animation: marca .5s ease-out 2.95s both; }
+            .titular .ln > span { animation: sube .7s cubic-bezier(.2, .8, .2, 1) both; }
+            .titular .ln:nth-child(1) > span { animation-delay: 1s; } .titular .ln:nth-child(2) > span { animation-delay: 1.12s; }
+            .titular p { animation: aparece .6s ease-out 1.4s both; }
+            .acceso { animation: none; }
+            .acceso > div, .acceso form > *, .acceso .estado, .acceso .pie { animation: sube-suave .55s cubic-bezier(.2, .8, .2, 1) both; }
+            .acceso > div { animation-delay: .5s; }
+            #fLogin > :nth-child(1) { animation-delay: .62s; } #fLogin > :nth-child(2) { animation-delay: .72s; } #fLogin > :nth-child(3) { animation-delay: .8s; } #fLogin > :nth-child(4) { animation-delay: .86s; }
+            .acceso .estado { animation-delay: 1s; } .acceso .pie { animation-delay: 1.08s; }
+            .acceso .btn-primary:hover:not([disabled])::before { animation: brilla .75s ease-out; }
+            .acceso .btn-primary:active:not([disabled]) { transform: translateY(1px) scale(.992); }
+            .acceso .btn-primary[disabled]::after { animation: gira-sin .7s linear infinite; }
+            .acceso .msg:not(:empty) { animation: sacude .45s cubic-bezier(.36, .07, .19, .97); }
+            .acceso .msg.ok:not(:empty) { animation: aparece .4s ease-out; }
+            .punto[data-s="on"] { animation: late 2.4s ease-out infinite; }
+            @keyframes traza { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+            @keyframes pad { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: none; } }
+            @keyframes senal { 0% { stroke-dashoffset: .07; opacity: 0; } 8% { opacity: .9; } 92% { opacity: .9; } 100% { stroke-dashoffset: -.93; opacity: 0; } }
+            @keyframes baja { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+            @keyframes gira { from { transform: rotate(-90deg) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+            @keyframes flota { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+            @keyframes llega { from { opacity: 0; transform: translateX(-70px) rotate(-9deg) scale(.94); } to { opacity: 1; transform: rotate(var(--giro, -2.4deg)); } }
+            @keyframes leer { 0% { opacity: 0; left: 0; } 1.5% { opacity: 1; } 14% { opacity: 1; } 15.5% { opacity: 0; left: calc(100% - 1.2cqw); } 100% { opacity: 0; left: calc(100% - 1.2cqw); } }
+            @keyframes ping { 0%, 15% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); } 26%, 100% { box-shadow: 0 0 0 12px transparent; } }
+            @keyframes marca { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+            @keyframes aparece { from { opacity: 0; transform: translateY(8px) scale(.94); } to { opacity: 1; transform: none; } }
+            @keyframes sube { from { transform: translateY(105%); } to { transform: none; } }
+            @keyframes sube-suave { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+            @keyframes brilla { to { transform: skewX(-20deg) translateX(520%); } }
+            @keyframes gira-sin { to { transform: rotate(360deg); } }
+            @keyframes sacude { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-6px); } 40%, 60% { transform: translateX(6px); } }
+            @keyframes late { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 70%, 100% { box-shadow: 0 0 0 8px transparent; } }
         }
-        @media (prefers-reduced-motion: reduce) { .barrido { display: none; } }
+        @media (prefers-reduced-motion: reduce) { .barrido, .pulso { display: none; } }
     </style>
 </head>
 <body>
@@ -116,8 +167,9 @@
 <div class="pantalla">
     <header class="banco">
         <svg class="trazos" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M-10 90h210l36 36h140l30-30h210M-10 170h120l28 28h96M300 198h120l40 40h160M-10 330h160l36-36h110l28 28h130l36-36h120M-10 410h90l34 34h170l30-30h130l30 30h100M120 600v-90l30-30h80l30-30M360 600v-70l36-36h120l40-40M460 -10v70l30 30M220 -10v60l-30 30h-60"/>
-            <g fill="var(--bg-2)"><circle cx="200" cy="90" r="5"/><circle cx="96" cy="198" r="5"/><circle cx="580" cy="238" r="5"/><circle cx="150" cy="330" r="5"/><circle cx="80" cy="410" r="5"/><circle cx="560" cy="440" r="5"/><circle cx="230" cy="480" r="5"/><circle cx="516" cy="494" r="5"/><circle cx="460" cy="90" r="5"/><circle cx="130" cy="130" r="5"/></g>
+            <path class="dibuja" pathLength="1" d="M-10 90h210l36 36h140l30-30h210M-10 170h120l28 28h96M300 198h120l40 40h160M-10 330h160l36-36h110l28 28h130l36-36h120M-10 410h90l34 34h170l30-30h130l30 30h100M120 600v-90l30-30h80l30-30M360 600v-70l36-36h120l40-40M460 -10v70l30 30M220 -10v60l-30 30h-60"/>
+            <path class="pulso" pathLength="1" stroke="var(--accent)" stroke-width="2.4" d="M-10 90h210l36 36h140l30-30h210"/>
+            <g class="pads" fill="var(--bg-2)"><circle cx="200" cy="90" r="5"/><circle cx="96" cy="198" r="5"/><circle cx="580" cy="238" r="5"/><circle cx="150" cy="330" r="5"/><circle cx="80" cy="410" r="5"/><circle cx="560" cy="440" r="5"/><circle cx="230" cy="480" r="5"/><circle cx="516" cy="494" r="5"/><circle cx="460" cy="90" r="5"/><circle cx="130" cy="130" r="5"/></g>
         </svg>
 
         <div class="logo">
@@ -134,11 +186,11 @@
                 <p class="trama"><span class="nom">TQT-R1-V30-0021</span><span class="mac">70:4b:ca:5b:9f:6e</span><span class="nom">TQT-R2-V30-0010</span><span class="mac">70:4b:ca:5b:9c:a2</span></p>
                 <i class="barrido"></i>
             </div>
-            <span class="leida"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.7 2.7L16 9.8"/></svg>Etiqueta leída</span>
+            <span class="leida"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path class="tic" pathLength="1" d="m8 12.5 2.7 2.7L16 9.8"/></svg>Etiqueta leída</span>
         </div>
 
         <div class="titular">
-            <h1>Cada tarjeta, rastreada de la placa a la etiqueta.</h1>
+            <h1><span class="ln"><span>Cada tarjeta, rastreada</span></span><span class="ln"><span>de la placa a la etiqueta.</span></span></h1>
             <p>Recibe placas, empareja R1 y R2, programa, prueba e imprime la etiqueta de cada tarjeta.</p>
         </div>
     </header>
@@ -171,6 +223,7 @@
                     <button class="btn btn-ghost" type="button" id="luego">Más tarde</button>
                 </div>
             </form>
+            <p class="estado"><span class="punto" id="punto" data-s="?"></span><span id="estadoTxt">Comprobando servidor…</span><span class="ver mono">v__VERSION__</span></p>
             <p class="pie"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Conexión cifrada. Solo cuentas autorizadas.</p>
         </section>
     </main>
@@ -189,6 +242,18 @@
             p += '<path fill-rule="evenodd" d="M' + o[0] + ' ' + o[1] + 'h7v7h-7zM' + (o[0] + 1) + ' ' + (o[1] + 1) + 'v5h5v-5z"/><rect x="' + (o[0] + 2) + '" y="' + (o[1] + 2) + '" width="3" height="3"/>';
         });
         document.getElementById('qr').innerHTML = '<path d="' + d + '"/>' + p;
+    })();
+</script>
+<script>
+    /* Pulso del servidor (público): punto verde "En línea" / rojo "Sin conexión". */
+    (function () {
+        var p = document.getElementById('punto'), t = document.getElementById('estadoTxt');
+        function ver() {
+            fetch('/api/health', { cache: 'no-store' }).then(function (r) { return r.ok; }, function () { return false; }).then(function (ok) {
+                p.dataset.s = ok ? 'on' : 'off'; t.textContent = ok ? 'Servidor en línea' : 'Sin conexión con el servidor';
+            });
+        }
+        ver(); setInterval(ver, 20000);
     })();
 </script>
 <script src="/static/js/login.js?v=1317"></script>

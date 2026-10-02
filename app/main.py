@@ -10,7 +10,7 @@ from urllib.parse import quote, urlsplit
 from fastapi.concurrency import run_in_threadpool
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 
@@ -231,7 +231,8 @@ async def serve_admin(request: Request):
 @app.get("/login", include_in_schema=False)
 async def serve_login(request: Request):
     """Pantalla de acceso (correo y contraseña). Es la única página pública."""
-    resp = _serve_file(settings.STATIC_DIR / "login.html")
+    html = (settings.STATIC_DIR / "login.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
+    resp = HTMLResponse(html)   # la versión se inyecta aquí para que la pantalla de acceso siempre muestre la que corre
     resp.headers["Cache-Control"] = "no-store"
     if not request.cookies.get("tqt_cid"):   # marca anónima de este equipo, para el límite de intentos fallidos
         resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
