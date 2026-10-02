@@ -88,6 +88,13 @@
                 const sinMacAl = tars.filter((t) => (t.sin_mac || []).length).length;
                 const sinPlaca = tars.filter((t) => !t.r1 || !t.r2 || !t.r3).length;
                 const sinMac = pcbs.filter((p) => p.tipo !== 'R3' && !p.mac && ['RECIBIDA', 'ASIGNADA', 'DISPONIBLE'].includes(p.estado_ciclo)).length;   // misma regla que ?sin_mac=1 del servidor
+                // Entrega y etiquetas DYMO (v1.3.19+): una etiqueta cuenta como impresa si su firma guardada sigue vigente (misma regla que dymo.js)
+                const fin = tars.filter((t) => t.fecha_finalizado).length, ent = tars.filter((t) => t.fecha_real).length;
+                const porEntregar = tars.filter((t) => t.fecha_finalizado && !t.fecha_real).length;
+                const conEtq = tars.filter((t) => t.r1 && t.r2 && t.nombre_r1 && t.nombre_r2);
+                const etqImp = conEtq.filter((t) => t.etiqueta_firma === `${(t.sin_mac || []).length ? 'IDENTIFICACION' : 'FINAL'}|${t.nombre_r1}|${t.nombre_r2}`).length;
+                const etqPend = conEtq.length - etqImp;
+                const etapa = (k) => tars.filter((t) => (t.estado_general || 'PENDIENTE') === k).length;
                 const av = ['R1', 'R2', 'R3'].map((tp) => avanceTipo(tp, pcbs));
                 const tabla = h('details', { class: 'esc-tabvista' }, h('summary', null, 'Ver el avance como tabla'),
                     h('table', null, h('caption', { class: 'sr-only' }, 'Avance por tipo de placa'), h('thead', null, h('tr', null, ['Tipo', 'Recibidas', 'Asignadas', 'Con MAC'].map((x) => h('th', { scope: 'col' }, x)))),
@@ -97,6 +104,12 @@
                         kpi('Tarjetas', tot, '', 'R1 + R2 + R3 por número'), kpi('Completas', comp, 'ok', `${pct(comp, tot)}% del lote`),
                         kpi('Con MAC', conMacAl, 'ok', 'R1 y R2 con MAC capturada'), kpi('Sin MAC', sinMacAl, 'info', 'falta la MAC de R1 o R2'),
                         kpi('Falta placa', sinPlaca, 'warn', 'sin R1, R2 o R3'))),
+                    bloque('Producción y entrega', h('div', { class: 'esc-kpis', dataset: { n: 4 } },
+                        kpi('Finalizadas', fin, 'ok', 'R1, R2, R3 y MAC al día'), kpi('Entregadas', ent, 'ok', 'con fecha real de entrega'),
+                        kpi('Por entregar', porEntregar, 'warn', 'finalizadas sin fecha de entrega'), kpi('Etiquetas por imprimir', etqPend, 'info', 'DYMO: sin imprimir o cambiadas'))),
+                    h('div', { class: 'esc-2' },
+                        partes('Avance de pruebas', [{ l: 'Liberadas', v: etapa('LIBERADO'), c: 'ok' }, { l: 'En proceso', v: etapa('EN PROCESO'), c: 'info' }, { l: 'Retrabajo', v: etapa('RETRABAJO'), c: 'warn' }, { l: 'Detenidas', v: etapa('DETENIDO'), c: 'bad' }, { l: 'Pendientes', v: etapa('PENDIENTE'), c: 'faint' }], tot, 'Todavía no hay tarjetas en este lote.'),
+                        partes('Etiquetas DYMO', [{ l: 'Impresas', v: etqImp, c: 'info' }, { l: 'Por imprimir', v: etqPend, c: 'warn' }], conEtq.length, 'Aún no hay tarjetas con R1 y R2.')),
                     bloque('Inventario de PCB', h('div', { class: 'esc-kpis', dataset: { n: 6 } },
                         kpi('En inventario', pcbs.length, '', 'todas las recibidas'), kpi('Sin confirmar', c('RECIBIDA'), 'warn', 'recepción abierta'), kpi('Sueltas', c('DISPONIBLE'), 'info', 'listas para emparejar'),
                         kpi('Asignadas', c('ASIGNADA'), 'ok', 'montadas en tarjetas'), kpi('En falla', c('FALLA'), 'bad', 'apartadas'), kpi('Sin MAC (R1/R2)', sinMac, 'warn', 'por capturar'))),

@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.24 — 2026-10-02
+- **Resumen de la consola actualizado.** Nuevo bloque "Producción y entrega" (finalizadas, entregadas, por entregar y etiquetas por imprimir) y dos tarjetas: "Avance de pruebas" (liberadas, en proceso, retrabajo, detenidas, pendientes) y "Etiquetas DYMO" (impresas vs. por imprimir, con la misma regla de firma que el lote de impresión).
+
 ## v1.3.23 — 2026-10-02
 - **DYMO: lo impreso ahora se guarda en la base de datos.** En v1.3.22 el registro de etiquetas impresas vivía en el navegador, así que no se veía en otros equipos ni incluía lo impreso antes. Ahora es la columna `etiqueta_firma` de la tarjeta (se crea sola al arrancar) y el lote las pinta en azul con "Impresa" desde cualquier equipo.
 
