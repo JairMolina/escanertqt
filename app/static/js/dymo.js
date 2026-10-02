@@ -168,10 +168,15 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Imprime una tarjeta. Prueba primero el XML de DYMO Label v8 (servicio DLS, el de las LabelWriter 450/4xx) y, si el
      *  servicio lo rechaza, el de DYMO Connect (.dymo). El framework solo devuelve "Error: 400", sin detalle, por eso se
      *  prueban ambos formatos en vez de adivinar cuál software tiene instalado la PC. */
+    // Registro de etiquetas ya impresas (en este navegador). La firma incluye pareja y estado de MAC: si la tarjeta cambia después, vuelve a figurar pendiente.
+    const firma = (t) => `${modo(t).k}|${t.nombre_r1 || ''}|${t.nombre_r2 || ''}`;
+    const impresas = () => { try { return JSON.parse(T.store.get('tqt.dymo.impresas', '{}')) || {}; } catch (e) { return {}; } };
+    const yaImpresa = (t) => impresas()[t.id] === firma(t);
+    function marcarImpresa(t) { const m = impresas(); m[t.id] = firma(t); T.store.set('tqt.dymo.impresas', JSON.stringify(m)); }
     async function imprimirTarjeta(printer, t, c) {
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
-            try { await D.print(printer, await xmlDe(t, tipo), c); return; }
+            try { await D.print(printer, await xmlDe(t, tipo), c); marcarImpresa(t); return; }
             catch (e) { if (/no respondi|no encuentra|Elige|cargó|Sin conexión/i.test(e.message)) throw e; if (!primero) primero = e; }
         }
         throw primero;
@@ -240,8 +245,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const visibles = () => { const f = filtro.value.replace(/\D/g, '').replace(/^0+/, ''); return todas.filter((t) => !f || String(t.id_tarjeta_num).replace(/^0+/, '').includes(f)); };
         const actualizarCuenta = () => {
-            const n = [...marcadas].length;
-            cuenta.textContent = `${n} de ${todas.length} seleccionada${n === 1 ? '' : 's'}`;
+            const n = [...marcadas].length, ya = todas.filter(yaImpresa).length;
+            cuenta.textContent = `${n} de ${todas.length} seleccionada${n === 1 ? '' : 's'}` + (ya ? ` · ${ya} ya impresa${ya === 1 ? '' : 's'}` : '');
             if (btnImp) btnImp.disabled = !n;
         };
         let btnImp = null;
@@ -254,9 +259,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cb = h('input', { type: 'checkbox', checked: marcadas.has(t.id) ? '' : null, style: 'width:22px;height:22px;flex:none;accent-color:var(--accent,#D9A441)',
                     onchange: (e) => { if (e.target.checked) marcadas.add(t.id); else marcadas.delete(t.id); actualizarCuenta(); } });
                 cajas.set(t.id, cb);
-                lista.append(h('label', { style: 'display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:var(--surface-2,transparent)' },
+                const ya = yaImpresa(t);
+                const estilo = ya ? 'border:1px solid var(--info,#4C8DFF);background:color-mix(in srgb, var(--info,#4C8DFF) 16%, transparent)' : 'border:1px solid var(--line);background:var(--surface-2,transparent)';
+                lista.append(h('label', { title: ya ? 'Ya impresa' : '', style: `display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;${estilo}` },
                     cb, h('b', { class: 'mono', style: 'min-width:54px' }, `#${t.id_tarjeta_num}`),
                     h('span', { class: 'mono muted grow', style: 'font-size:12px' }, `${t.nombre_r1 || ''} · ${t.nombre_r2 || ''}`),
+                    ya ? T.badge('Impresa', 'info') : null,
                     T.badge(m.k === 'FINAL' ? 'Con MAC' : 'Sin MAC', m.k === 'FINAL' ? 'ok' : 'warn')));
             });
         }

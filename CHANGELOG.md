@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.22 — 2026-10-02
+- **DYMO: el lote marca las etiquetas ya impresas.** En la ventana "Imprimir lote en DYMO" las tarjetas ya impresas se pintan en azul con la insignia "Impresa", y el contador indica cuántas van. Se registra al enviar con éxito a la impresora (individual o lote), por navegador. Si después cambia la pareja o se completa la MAC, la tarjeta vuelve a figurar como pendiente para reimprimirla.
+
 ## v1.3.21 — 2026-10-02
 - **Sonido más confiable al escanear (Consultar, Emparejar, Programar, Recibir).** Si el navegador tenía el audio suspendido, el primer pitido se perdía y, tras suspenderse otra vez (iOS, segundo plano), el desbloqueo ya no se rearmaba. Ahora todos los sonidos esperan al `resume()` y el desbloqueo se rearma solo. En Consultar, las recargas automáticas por cambios de otro equipo ya no hacen sonar el pitido de lectura.
 
