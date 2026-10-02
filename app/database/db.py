@@ -336,6 +336,9 @@ def _asegurar_columnas(conn: sqlite3.Connection) -> None:
     if cols and "sesion" not in cols:
         conn.execute("ALTER TABLE pcb_inventario ADD COLUMN sesion TEXT")
     _asegurar_fechas_entrega(conn)
+    tcols = {r[1] for r in conn.execute("PRAGMA table_info(tarjetas_produccion)")}
+    if tcols and "etiqueta_firma" not in tcols:   # firma (estado + pareja) de la etiqueta DYMO impresa; vacía = nunca impresa
+        conn.execute("ALTER TABLE tarjetas_produccion ADD COLUMN etiqueta_firma TEXT")
     if conn.execute("SELECT name FROM sqlite_master WHERE name='firmware_catalogo'").fetchone()             and conn.execute("SELECT COUNT(*) FROM firmware_catalogo").fetchone()[0] == 0:
         for rol, versiones in FIRMWARE_CATALOGO_INICIAL.items():
             for i, v in enumerate(versiones, 1):
@@ -533,7 +536,7 @@ _SELECT_TARJETA = f"""
         t.id, t.lote_id, t.id_tarjeta_num,
         t.pcb_r1_id, t.pcb_r2_id, t.pcb_r3_id,
         COALESCE(p1.firmware, t.firmware_r1) AS firmware_r1, COALESCE(p2.firmware, t.firmware_r2) AS firmware_r2,
-        t.semana_produccion, t.fecha_proyectada, t.fecha_real, t.fecha_llegada, t.fecha_finalizado, t.gabinete,
+        t.semana_produccion, t.fecha_proyectada, t.fecha_real, t.fecha_llegada, t.fecha_finalizado, t.gabinete, t.etiqueta_firma,
         t.created_at, t.updated_at,
         {_cols_pcb('p1', 'R1')},
         {_cols_pcb('p2', 'R2')},

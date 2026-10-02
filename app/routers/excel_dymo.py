@@ -306,6 +306,18 @@ def get_dymo_archivo(
     return _adjunto(datos, nombre)
 
 
+class ImpresasRequest(BaseModel):
+    marcas: List[Dict[str, Any]] = Field(..., max_length=500, description="[{id, firma}] de las etiquetas enviadas con éxito a la DYMO")
+
+
+@router.post("/dymo/impresas", summary="Registrar etiquetas DYMO impresas (se muestran en color en el lote)")
+def marcar_impresas(payload: ImpresasRequest):
+    pares = [(str(m["firma"])[:120], int(m["id"])) for m in payload.marcas if m.get("firma") and str(m.get("id", "")).isdigit()]
+    with db.transaction() as c:
+        c.executemany("UPDATE tarjetas_produccion SET etiqueta_firma = ? WHERE id = ?", pares)
+    return {"ok": True, "n": len(pares)}
+
+
 @router.get("/dymo/lote/archivo", summary="ZIP con un .dymo por tarjeta (ids de tarjeta separados por coma)")
 def get_dymo_lote_archivo(
     ids: str = Query(..., min_length=1, max_length=4000, description="ids de tarjeta separados por coma, p. ej. 1,2,3"),

@@ -168,11 +168,11 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Imprime una tarjeta. Prueba primero el XML de DYMO Label v8 (servicio DLS, el de las LabelWriter 450/4xx) y, si el
      *  servicio lo rechaza, el de DYMO Connect (.dymo). El framework solo devuelve "Error: 400", sin detalle, por eso se
      *  prueban ambos formatos en vez de adivinar cuál software tiene instalado la PC. */
-    // Registro de etiquetas ya impresas (en este navegador). La firma incluye pareja y estado de MAC: si la tarjeta cambia después, vuelve a figurar pendiente.
+    // Etiquetas ya impresas: se guardan en la base (tarjeta.etiqueta_firma). La firma incluye estado de MAC y pareja:
+    // si la tarjeta cambia después de imprimir, vuelve a figurar pendiente.
     const firma = (t) => `${modo(t).k}|${t.nombre_r1 || ''}|${t.nombre_r2 || ''}`;
-    const impresas = () => { try { return JSON.parse(T.store.get('tqt.dymo.impresas', '{}')) || {}; } catch (e) { return {}; } };
-    const yaImpresa = (t) => impresas()[t.id] === firma(t);
-    function marcarImpresa(t) { const m = impresas(); m[t.id] = firma(t); T.store.set('tqt.dymo.impresas', JSON.stringify(m)); }
+    const yaImpresa = (t) => !!t.etiqueta_firma && t.etiqueta_firma === firma(t);
+    function marcarImpresa(t) { t.etiqueta_firma = firma(t); api('/api/dymo/impresas', { method: 'POST', body: { marcas: [{ id: t.id, firma: t.etiqueta_firma }] } }); }
     async function imprimirTarjeta(printer, t, c) {
         let primero = null;
         for (const tipo of ['label', 'dymo']) {

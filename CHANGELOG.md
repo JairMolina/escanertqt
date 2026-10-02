@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.23 — 2026-10-02
+- **DYMO: lo impreso ahora se guarda en la base de datos.** En v1.3.22 el registro de etiquetas impresas vivía en el navegador, así que no se veía en otros equipos ni incluía lo impreso antes. Ahora es la columna `etiqueta_firma` de la tarjeta (se crea sola al arrancar) y el lote las pinta en azul con "Impresa" desde cualquier equipo.
+
 ## v1.3.22 — 2026-10-02
 - **DYMO: el lote marca las etiquetas ya impresas.** En la ventana "Imprimir lote en DYMO" las tarjetas ya impresas se pintan en azul con la insignia "Impresa", y el contador indica cuántas van. Se registra al enviar con éxito a la impresora (individual o lote), por navegador. Si después cambia la pareja o se completa la MAC, la tarjeta vuelve a figurar como pendiente para reimprimirla.
 
