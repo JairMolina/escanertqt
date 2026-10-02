@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const r = await api(`/api/consulta?codigo=${encodeURIComponent(q)}`);
         state.busy = false;
         if (!r.ok) {
-            if (window.SoundFX) window.SoundFX.playError();
+            if (!silencioso && window.SoundFX) window.SoundFX.playError();
             if (window.Haptics) window.Haptics.error();
             setBusy(false); box.replaceChildren();
             const causa = r.network ? 'No hay conexión con el servidor. Revisa la red y vuelve a intentar.' : (r.error || 'Intenta de nuevo.');
@@ -141,8 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 h('div', { class: 'fichaacts' }, h('button', { class: 'btn btn-primary act-main', type: 'button', onclick: nueva }, icon('refresh'), 'Nueva consulta'))));
             return;
         }
-        if (window.SoundFX) window.SoundFX.playScan(tipoDe(r.data));
-        if (window.Haptics) window.Haptics.scan();
+        if (!silencioso) {   // las recargas por WebSocket no deben sonar
+            if (window.SoundFX) window.SoundFX.playScan(tipoDe(r.data));
+            if (window.Haptics) window.Haptics.scan();
+        }
         recordar(q); render(r.data);
     }
 

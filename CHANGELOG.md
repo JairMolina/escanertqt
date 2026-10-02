@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.21 — 2026-10-02
+- **Sonido más confiable al escanear (Consultar, Emparejar, Programar, Recibir).** Si el navegador tenía el audio suspendido, el primer pitido se perdía y, tras suspenderse otra vez (iOS, segundo plano), el desbloqueo ya no se rearmaba. Ahora todos los sonidos esperan al `resume()` y el desbloqueo se rearma solo. En Consultar, las recargas automáticas por cambios de otro equipo ya no hacen sonar el pitido de lectura.
+
 ## v1.3.20 — 2026-10-02
 - **Consultar (móvil): se puede seguir escaneando tras un resultado.** Antes, con una ficha en pantalla la cámara quedaba en una franja de 60 px sin marco y había que bajar hasta "Nueva consulta". Ahora cámara y buscador quedan fijos arriba (franja de ~130 px con marco) y la ficha se desplaza debajo, de modo que se consulta la siguiente tarjeta sin bajar.
 

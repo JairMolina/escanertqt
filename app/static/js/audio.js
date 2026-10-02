@@ -32,6 +32,7 @@ class AudioManager {
         // iOS Safari solo libera el audio dentro de un gesto del usuario: se reproduce un buffer
         // vacío en el primer toque para "armar" el AudioContext y se re-arma si vuelve a suspenderse.
         const unlock = () => {
+            if (this.ctx && this.ctx.state === 'running') { this.isUnlocked = true; return; }   // se re-arma solo si vuelve a suspenderse
             this._initContext();
             if (this.ctx) {
                 try {
@@ -41,9 +42,6 @@ class AudioManager {
                     src.start(0);
                 } catch (e) { /* no crítico */ }
                 if (this.ctx.state === 'running') this.isUnlocked = true;
-            }
-            if (this.isUnlocked) {
-                ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'].forEach((ev) => window.removeEventListener(ev, unlock, true));
             }
         };
 
@@ -68,6 +66,16 @@ class AudioManager {
 
     /** Estado real del audio: 'running' cuando ya se puede sonar (en iOS solo tras un toque). */
     get state() { return this.ctx ? this.ctx.state : 'none'; }
+
+    /** Ejecuta fn cuando el contexto corre: ya, o tras resume() (un contexto suspendido tiene el reloj congelado y el sonido se pierde). */
+    _go(fn) {
+        if (!this.enabled) return;
+        this._initContext();
+        if (!this.ctx) return;
+        const run = () => { try { fn(); } catch (e) { /* audio no crítico */ } };
+        if (this.ctx.state === 'running') { run(); return; }
+        Promise.race([this.ctx.resume(), new Promise((r) => setTimeout(r, 400))]).then(() => { if (this.ctx.state === 'running') run(); }).catch(() => {});
+    }
 
     _tone(freq, start, dur, type = 'triangle', vol = 0.3) {
         const now = this.ctx.currentTime + start;
@@ -298,6 +306,12 @@ class AudioManager {
         return this.enabled;
     }
 }
+
+// Todos los sonidos pasan por _go: si el audio estaba suspendido esperan al resume en vez de perderse.
+['playScan', 'playDup', 'playStep', 'playSuccess', 'playComplete', 'playError', 'playChime'].forEach((n) => {
+    const orig = AudioManager.prototype[n];
+    AudioManager.prototype[n] = function (...a) { this._go(() => orig.apply(this, a)); };
+});
 
 // Instancia global
 window.SoundFX = new AudioManager();
