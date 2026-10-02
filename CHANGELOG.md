@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.27 — 2026-10-02
+- **Inicio de sesión, segunda pasada de diseño (móvil, escritorio, claro y oscuro).** Campos con etiqueta flotante y una barra ámbar que se dibuja al enfocar; el botón "Entrar" tiene un brillo que sigue al cursor y muestra "Entrando…". En escritorio, la etiqueta DYMO se inclina con el cursor con un reflejo satinado, hay un foco de luz sobre la mesa de trabajo y una cuadrícula de puntos; cada 9 s se lee una tarjeta distinta (cambian QR, trama y confirmación) y el fondo del formulario respira. Aviso de Bloq Mayús, línea "¿Sin cuenta? Pide acceso a un supervisor", objetivos táctiles de 44 px o más. Todo respeta "reducir movimiento".
+
 ## v1.3.26 — 2026-10-02
 - **Inicio de sesión animado y con versión.** Secuencia de entrada en orden: el circuito se traza, el logo gira al lugar, la etiqueta DYMO llega y se lee, el titular sube línea por línea y el formulario aparece campo por campo. Después, un ciclo discreto: la etiqueta se vuelve a leer cada 9 s y una señal recorre el circuito. El botón brilla al pasar el cursor y muestra un indicador mientras entra, el error sacude el mensaje y el campo enfocado resalta su etiqueta. Abajo se muestra la versión en uso (la inyecta el servidor) y un punto "Servidor en línea" que consulta `/api/health`. Con "reducir movimiento" activo no hay animaciones.
 
