@@ -450,11 +450,15 @@ table.grid td.act { text-align: right; white-space: nowrap; }
 .cons-side { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
 .consulta .visor { transition: max-height .28s ease, min-height .28s ease; }
 
-/* móvil: con resultado el visor es una franja y la ficha se ve sin desplazarse; "Nueva consulta" lo restaura */
+/* móvil: con resultado, cámara + buscador quedan fijos arriba (franja escaneable) y la ficha se desplaza debajo,
+   así se puede consultar la siguiente tarjeta sin bajar a "Nueva consulta" */
 @media (max-width: 899.98px) {
-  .consulta[data-has="1"] .visor { min-height: 60px; max-height: 60px; }
-  .consulta[data-has="1"] .visor .frame, .consulta[data-has="1"] .visor .tools { display: none; }
-  .consulta[data-has="1"] .visor .status { min-height: 0; top: 8px; left: 8px; }
+  .consulta[data-has="1"] .cons-side { position: sticky; top: 0; z-index: 20; margin: -12px calc(var(--gutter) * -1) 0; padding: calc(8px + env(safe-area-inset-top, 0px)) var(--gutter) 8px; gap: 8px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .consulta[data-has="1"] .visor { aspect-ratio: auto; height: clamp(110px, 17dvh, 150px); min-height: 110px; max-height: 150px; }
+  .consulta[data-has="1"] .visor .frame { inset: 10% 16%; }
+  .consulta[data-has="1"] .visor .frame i { width: 18px; height: 18px; }
+  .consulta[data-has="1"] .visor .tools { flex-direction: row; top: 6px; right: 6px; }
+  .consulta[data-has="1"] .visor .status { min-height: 0; top: 6px; left: 6px; max-width: calc(100% - 112px); }
   .consulta[data-has="1"] #formBuscar .btn, .consulta[data-has="1"] #formBuscar .input { min-height: 44px; }
 }
 @media (min-width: 900px) {

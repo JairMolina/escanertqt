@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.20 — 2026-10-02
+- **Consultar (móvil): se puede seguir escaneando tras un resultado.** Antes, con una ficha en pantalla la cámara quedaba en una franja de 60 px sin marco y había que bajar hasta "Nueva consulta". Ahora cámara y buscador quedan fijos arriba (franja de ~130 px con marco) y la ficha se desplaza debajo, de modo que se consulta la siguiente tarjeta sin bajar.
+
 ## v1.3.19 — 2026-10-02
 - **Al concluir una tarjeta, la consola pide la fecha real de entrega.** Cuando una tarjeta queda con R1, R2, R3 y las MAC de R1 y R2, la base ya sella sola su "Fecha Finalizado" (columna T del Excel); ahora, además, la consola de escritorio abre una hoja con las tarjetas concluidas que no tienen entrega: cada una con su fecha (se propone la proyectada o la de hoy) y su gabinete. "Guardar fechas de entrega" las manda al Excel (Fecha Real Entrega, K); "Más tarde" las pospone en esa pestaña. Se revisa al abrir la consola y con cada cambio de placas, tarjetas o Excel.
 - **Excel (auditoría de fechas)**: al importar, una celda de fecha solo se acepta si es fecha de Excel, texto `AAAA-MM-DD` o `dd/mm/aaaa`; antes un texto raro o un número se guardaba truncado como basura. Pendientes conocidos de la auditoría: los cuatro formatos de fecha del libro son distintos, S/T no tienen validación y borrar una fecha en un lado no la borra en el otro.
