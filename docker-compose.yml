@@ -12,6 +12,13 @@ services:
       TZ: ${TZ:-America/Mexico_City}
       TQT_ADMIN_PASSWORD: ${TQT_ADMIN_PASSWORD:-}   # área /admin; vacía = deshabilitada
       TQT_BACKUP_DIR: /backups                      # respaldos automáticos (persisten en ./respaldos)
+      TQT_USER_SEED_PASSWORD: ${TQT_USER_SEED_PASSWORD:-}   # clave inicial de las cuentas (sin valor = no se crean)
+      TQT_SMTP_HOST: ${TQT_SMTP_HOST:-}             # correo saliente (ver .env.example); vacío = sin envío
+      TQT_SMTP_PORT: ${TQT_SMTP_PORT:-465}
+      TQT_SMTP_USER: ${TQT_SMTP_USER:-}
+      TQT_SMTP_PASSWORD: ${TQT_SMTP_PASSWORD:-}
+      TQT_SMTP_FROM: ${TQT_SMTP_FROM:-}
+      TQT_SMTP_FROM_NAME: ${TQT_SMTP_FROM_NAME:-Inventario TQT}
     volumes:
       - tqt_db:/data/db                       # SQLite (WAL) en volumen nativo de Docker: seguro
       - ./excel_mensual:/data/excel_mensual   # Excel mensuales, visibles en Windows

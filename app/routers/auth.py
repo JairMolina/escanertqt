@@ -9,7 +9,7 @@ from app.config import settings
 from app.database import db
 from app.services import admin_auth as aa
 from app.routers.ws import manager
-from app.services import usuarios
+from app.services import correo, usuarios
 
 router = APIRouter(prefix="/api/auth", tags=["Sesión"])
 
@@ -139,6 +139,7 @@ async def restablecer(payload: RestablecerIn, request: Request):
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     await run_in_threadpool(db.log_evento, "USUARIO_CLAVE_RESTABLECIDA", None, email, "Contraseña restablecida con aprobación de otra cuenta", email)
+    await run_in_threadpool(correo.avisar_clave_restablecida, email)
     return {"ok": True}
 
 

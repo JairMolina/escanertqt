@@ -24,7 +24,8 @@ from app.services import admin_auth as aa
 
 COOKIE = "tqt_sesion"
 CUENTAS_INICIALES = ("developer@skyguardian.mx", "developer4@skyguardian.mx", "developer5@skyguardian.mx", "developer6@skyguardian.mx")
-CLAVE_INICIAL = os.getenv("TQT_USER_SEED_PASSWORD", "123456789skg")
+# Sin valor por defecto: si no se define, no se crean cuentas (nunca una clave conocida en el código).
+CLAVE_INICIAL = os.getenv("TQT_USER_SEED_PASSWORD", "")
 _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,120}\.[^@\s]{2,}$")
 MENSAJE_CREDENCIALES = "Correo o contraseña incorrectos."
 limitador = aa.LimitadorIntentos()
@@ -49,6 +50,8 @@ def sembrar(db_path: Optional[Path] = None, iteraciones: Optional[int] = None) -
     creadas = 0
     with db.transaction(db_path) as c:
         _asegurar_tabla(c)
+        if not CLAVE_INICIAL:
+            return 0
         for e in CUENTAS_INICIALES:
             if not c.execute("SELECT 1 FROM usuarios WHERE email = ?", (e,)).fetchone():
                 c.execute("INSERT INTO usuarios (email, hash, debe_cambiar) VALUES (?, ?, 1)", (e, aa.hash_clave(CLAVE_INICIAL, iteraciones)))

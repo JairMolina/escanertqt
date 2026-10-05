@@ -23,7 +23,7 @@ from app.database.db import NoEncontradoError
 from app.database.models import MESES_ES
 from app.routers.excel_dymo import excel_engine, ruta_permitida
 from app.routers.ws import manager
-from app.services import admin_auth
+from app.services import admin_auth, correo
 from app.services.admin_auth import (
     AdminDeshabilitadoError, BloqueadoError, TokenInvalidoError, MENSAJE_DESHABILITADO,
 )
@@ -60,6 +60,11 @@ class BorrarPCBIn(BaseModel):
 class VaciarLoteIn(BaseModel):
     confirmar: str = Field(..., max_length=20, description='Debe ser exactamente "VACIAR"')
     eliminar_pcb: bool = Field(False, description="True: las PCB de sus tarjetas también se eliminan (por defecto vuelven a DISPONIBLE)")
+
+
+class CorreoPruebaIn(BaseModel):
+    para: str = Field(..., max_length=200)
+    reply_to: Optional[str] = Field(None, max_length=200)
 
 
 class ResetIn(BaseModel):
@@ -188,6 +193,19 @@ async def movimientos(limite: int = Query(50, ge=1, le=200), desplazamiento: int
         return await run_in_threadpool(admin_ops.movimientos, limite, desplazamiento, categoria, q, desde, hasta, lote_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/correo/prueba", summary="Enviar un correo de prueba desde el backend (SMTP configurado por variables de entorno)")
+async def correo_prueba(payload: CorreoPruebaIn, _: Dict = Depends(admin_requerido)):
+    try:
+        mid = await run_in_threadpool(correo.enviar, payload.para.strip(), "Prueba de envío - Escáner TQT",
+                                      "Correo de prueba enviado desde la aplicación Escáner TQT.", None, payload.reply_to)
+    except correo.CorreoNoConfigurado as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except Exception as e:  # noqa: BLE001 - SMTP/red: se informa sin exponer credenciales
+        logger.warning("Fallo el correo de prueba: %s", e)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"No se pudo enviar: {type(e).__name__}")
+    return {"ok": True, "message_id": mid}
 
 
 @router.get("/resumen", summary="Conteos por lote, tipo y estado, y tamaño de la BD")

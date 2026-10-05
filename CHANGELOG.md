@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.34 — 2026-10-05
+- **Correo saliente desde el backend (SMTP).** Nuevo `app/services/correo.py`: TLS implícito por el puerto 465 con validación de certificado, remitente fijo (`TQT_SMTP_FROM`) y Reply-To opcional. Las credenciales solo viven en variables de entorno (`TQT_SMTP_*`, plantilla sin contraseña en `.env.example`). Nuevo `POST /api/admin/correo/prueba` (solo supervisor) y aviso por correo a la cuenta cuando se restablece su contraseña (si el envío falla, el restablecimiento sigue). SPF, DKIM y DMARC verificados en PASS desde la app.
+- **Sin contraseña inicial por defecto en el código.** `TQT_USER_SEED_PASSWORD` ya no trae valor: si no se define, no se crean las cuentas iniciales (las existentes no se tocan). Las pruebas leen la clave del entorno. Importante al instalar desde cero: define esa variable en `.env`.
+
 ## v1.3.33 — 2026-10-05
 - **"¿Olvidaste tu contraseña?" aprobado por otra cuenta.** En el inicio de sesión se pide el correo; otra persona con sesión abierta ve la solicitud en la consola (icono de escudo con contador), la aprueba y recibe un código de 6 dígitos que le dicta en persona. Quien olvidó escribe el código y su contraseña nueva (mínimo 10 caracteres). Nadie teclea la clave de otra persona. El código vale 10 minutos y se bloquea tras 5 intentos; no se puede aprobar la propia solicitud; el cambio cierra las sesiones de esa cuenta y queda en la bitácora. Respuestas iguales exista o no el correo y límite de solicitudes por equipo.
 

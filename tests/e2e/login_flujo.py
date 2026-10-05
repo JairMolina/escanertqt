@@ -5,7 +5,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 RAIZ = Path(__file__).resolve().parents[2]
-PUERTO = "8464"; BASE = f"https://127.0.0.1:{PUERTO}"; EMAIL = "developer@skyguardian.mx"; CLAVE = "123456789skg"
+PUERTO = "8464"; BASE = f"https://127.0.0.1:{PUERTO}"; EMAIL = "developer@skyguardian.mx"; CLAVE = __import__("os").environ["TQT_USER_SEED_PASSWORD"]
 tmp = Path(tempfile.mkdtemp(prefix="tqt_login_"))
 env = dict(os.environ, TQT_DB_PATH=str(tmp / "x.db"), TQT_EXCEL_DIR=str(tmp / "xl"), TQT_EXPORTS_DIR=str(tmp / "ex"), TQT_BACKUP_DIR=str(tmp / "bk"),
            HTTPS_PORT=PUERTO, TQT_HOST_IP="127.0.0.1")

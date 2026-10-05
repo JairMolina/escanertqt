@@ -32,6 +32,7 @@ os.environ["TQT_DB_PATH"] = str(TMP / "tqt_test.db")
 os.environ["TQT_EXCEL_DIR"] = str(TMP / "excel_mensual")
 os.environ["TQT_EXPORTS_DIR"] = str(TMP / "exports")
 os.environ["TQT_BACKUP_DIR"] = str(TMP / "respaldos")
+os.environ.setdefault("TQT_USER_SEED_PASSWORD", "clave-de-prueba-123")
 os.environ.pop("TQT_ADMIN_PASSWORD", None)  # el admin solo se habilita dentro de los tests que lo piden
 atexit.register(lambda: shutil.rmtree(TMP, ignore_errors=True))
 

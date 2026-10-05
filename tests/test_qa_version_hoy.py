@@ -24,9 +24,9 @@ class TestVersion(unittest.TestCase):
         cls.c = TestClient(app, base_url="https://testserver")
 
     def test_la_version_es_1_1_4_y_sale_del_servidor(self):
-        self.assertEqual(settings.APP_VERSION, "1.3.33")
-        self.assertEqual(self.c.get("/api/config").json()["version"], "1.3.33")
-        self.assertEqual(self.c.get("/api/status").json()["version"], "1.3.33")
+        self.assertEqual(settings.APP_VERSION, "1.3.34")
+        self.assertEqual(self.c.get("/api/config").json()["version"], "1.3.34")
+        self.assertEqual(self.c.get("/api/status").json()["version"], "1.3.34")
 
     def test_la_version_tiene_un_lugar_visible_en_cada_vista(self):
         common = (ESTATICO / "js" / "common.js").read_text(encoding="utf-8")
