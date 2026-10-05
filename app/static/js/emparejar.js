@@ -46,8 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function render() {
         const { completas, impares, r3_pendientes, incompletas, sueltas } = state.sug;
         const porHacer = completas.length + impares.length + r3_pendientes.length;
-        $('nComp').textContent = String(completas.length);
-        $('nInc').textContent = String(incompletas.length);
+        // Completas / incompletas = tarjetas ya armadas del lote (misma regla que el Resumen), no solo las series por unir
+        const nComp = state.tarjetas.filter((t) => T.estadoTarjeta(t).key === 'completa').length;
+        $('nComp').textContent = String(nComp);
+        $('nInc').textContent = String(state.tarjetas.length - nComp);
         $('nSue').textContent = String(SLOTS.reduce((n, s) => n + (sueltas[s] || []).length, 0));
         $('nTar').textContent = String(state.tarjetas.length);
         $('autoCount').textContent = String(porHacer);
@@ -338,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('filtro').addEventListener('input', (e) => { state.q = e.target.value; renderTarjetas(); });
 
     const ws = T.ws();
-    if (ws) ['TARJETA_ACTUALIZADA', 'PCB_ACTUALIZADA', 'PCB_ELIMINADA', 'PCB_RECIBIDA', 'RECEPCION_CONFIRMADA', 'EXCEL_IMPORTADO'].forEach((e) => ws.on(e, reloadSoon));
+    if (ws) ['TARJETA_ACTUALIZADA', 'TARJETA_EMPAREJADA', 'PCB_ACTUALIZADA', 'PCB_ELIMINADA', 'PCB_RECIBIDA', 'RECEPCION_CONFIRMADA', 'EXCEL_IMPORTADO'].forEach((e) => ws.on(e, reloadSoon));
     T.resync(() => reloadSoon());
 
     loadLote().then(loadAll);

@@ -219,10 +219,10 @@ def movimientos(limite: int = 50, desplazamiento: int = 0, categoria: Optional[s
         base.append("(e.valor LIKE ? ESCAPE '!' OR e.detalle LIKE ? ESCAPE '!' OR e.operador LIKE ? ESCAPE '!' OR e.evento LIKE ? ESCAPE '!')")
         params += [like, like, like, like]
     if desde:
-        base.append("date(e.creado_en) >= ?")
+        base.append("date(e.creado_en, 'localtime') >= ?")
         params.append(desde)
     if hasta:
-        base.append("date(e.creado_en) <= ?")
+        base.append("date(e.creado_en, 'localtime') <= ?")
         params.append(hasta)
     if lote_id:
         base.append("e.lote_id = ?")
@@ -243,7 +243,7 @@ def movimientos(limite: int = 50, desplazamiento: int = 0, categoria: Optional[s
     with db.get_db(db_path) as c:
         total = c.execute(f"SELECT COUNT(*) FROM escaneos e {w}", fparams).fetchone()[0]
         filas = c.execute(
-            f"SELECT e.id, e.creado_en, e.evento, e.valor, e.detalle, e.operador, e.lote_id, l.codigo_lote "
+            f"SELECT e.id, datetime(e.creado_en, 'localtime') AS creado_en, e.evento, e.valor, e.detalle, e.operador, e.lote_id, l.codigo_lote "
             f"FROM escaneos e LEFT JOIN lotes_mensuales l ON l.id = e.lote_id {w} ORDER BY e.id DESC LIMIT ? OFFSET ?",
             fparams + [lim, max(0, int(desplazamiento))]).fetchall()
         por_evento = c.execute(f"SELECT e.evento, COUNT(*) AS n FROM escaneos e {wb} GROUP BY e.evento", params).fetchall()

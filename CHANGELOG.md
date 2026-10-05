@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.31 — 2026-10-05
+- **Administración: la hora de "Últimos movimientos" y de la bitácora ya es la local.** Se guardaba en UTC (6 h de adelanto); ahora se muestra y filtra por fecha en hora local del servidor.
+- **Emparejar (móvil): los contadores se actualizan al instante.** "Completas" e "Incompl." cuentan las tarjetas del lote (misma regla que el Resumen) y la pantalla se refresca también cuando se empareja una tarjeta (faltaba escuchar ese aviso).
+
 ## v1.3.30 — 2026-10-05
 - **Descargar copia .xlsx ya no se pierde al pedir la contraseña de administración.** Si la sesión de administración no estaba activa, tras escribir la contraseña correcta se regresa a la sección Excel y la copia se descarga sola, sin tener que volver a pulsar el botón.
 
