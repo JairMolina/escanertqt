@@ -378,6 +378,7 @@
         refs.loteTxt = h('span', { class: 'nm' }); refs.loteEst = h('span', { class: 'est' });
         refs.loteBtn = h('button', { class: 'esc-lote', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: abrirMenu }, h('span', { class: 'tx' }, h('span', { class: 'lbl' }, 'Lote'), refs.loteTxt), refs.loteEst, icon('chevron', 'chev'));
         refs.loteWrap = h('div', { class: 'esc-lotewrap' }, refs.loteBtn);
+        refs.sol = h('button', { class: 'iconbtn esc-sol', type: 'button', hidden: '', 'aria-label': 'Solicitudes de contraseña', title: 'Solicitudes de contraseña', onclick: solicitudesSheet }, icon('shield'), h('span', { class: 'esc-sol-n' }, '0'));
         refs.titulo = document.getElementById('escTitulo') || h('h1', { id: 'escTitulo', tabindex: '-1' }); refs.titulo.className = 'esc-titulo'; refs.titulo.textContent = 'Consola';
         refs.anuncio = h('div', { class: 'sr-only', 'aria-live': 'polite', role: 'status' });
         refs.nav = h('nav', { class: 'esc-nav', 'aria-label': 'Secciones' });
@@ -396,6 +397,7 @@
                 h('header', { class: 'esc-top' }, refs.titulo, h('div', { class: 'grow' }), refs.loteWrap,
                     h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Actualizar los datos', title: 'Actualizar', onclick: () => { invalidar(); cargarLotes(); if (S.cur && S.cur.inst && S.cur.inst.actualizar) S.cur.inst.actualizar(); toast('Datos actualizados', { kind: 'ok', ms: 1200 }); } }, icon('refresh')),
                     conn, temaBtn,
+                    refs.sol,
                     h('a', { class: 'iconbtn', href: '/login?cambiar=1', 'aria-label': 'Cambiar mi contraseña', title: 'Cambiar mi contraseña' }, icon('lock')),
                     h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Cerrar sesión', title: 'Cerrar sesión', onclick: () => T.cerrarSesion() }, icon('logout')),
                     h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Atajos de teclado', title: 'Atajos de teclado (?)', onclick: atajosSheet }, icon('help')),
@@ -498,14 +500,47 @@
             ],
         });
     }
+    // ------------------------------------------------------------------ solicitudes de contraseña (otra cuenta aprueba)
+    // Quien olvidó su contraseña la pide en /login; aquí otra cuenta con sesión la aprueba y recibe un código de 6 dígitos que le dicta en persona.
+    async function revisarSolicitudes() {
+        const r = await api('/api/auth/solicitudes');
+        const items = r.ok && r.data && Array.isArray(r.data.items) ? r.data.items : [];
+        if (refs.sol) { refs.sol.hidden = !items.length; refs.sol.querySelector('.esc-sol-n').textContent = String(items.length); }
+        return items;
+    }
+    async function solicitudesSheet() {
+        const lista = h('div', { class: 'stack' });
+        const hoja = T.sheet({ title: 'Solicitudes de contraseña', body: lista, actions: [{ label: 'Cerrar', kind: 'ghost', onClick: () => true }], focus: false });
+        const hace = (sg) => (sg < 90 ? 'hace un momento' : `hace ${Math.round(sg / 60)} min`);
+        async function resolver(it, aprobar) {
+            const r = await api(`/api/auth/solicitudes/${it.id}/${aprobar ? 'aprobar' : 'rechazar'}`, { method: 'POST' });
+            if (!r.ok) { toast(r.error || 'No se pudo completar', { kind: 'bad' }); pintar(await revisarSolicitudes()); return; }
+            revisarSolicitudes();
+            if (!aprobar) { toast('Solicitud rechazada', { kind: 'ok' }); pintar(await revisarSolicitudes()); return; }
+            lista.replaceChildren(h('div', { class: 'esc-cod' }, h('span', { class: 'muted' }, `Código para ${it.email}`), h('b', { class: 'mono', 'aria-label': `Código ${r.data.codigo.split('').join(' ')}` }, r.data.codigo),
+                h('span', { class: 'muted' }, 'Válido 10 minutos. Díctalo en persona: no se vuelve a mostrar.')));
+        }
+        function pintar(items) {
+            lista.replaceChildren();
+            if (!items.length) { lista.append(T.empty('check', 'Sin solicitudes', 'Nadie ha pedido ayuda con su contraseña.')); return; }
+            lista.append(h('p', { class: 'muted' }, 'Aprueba solo si la persona está contigo y la reconoces. Después le dictas el código.'),
+                ...items.map((it) => h('div', { class: 'esc-sol-fila' }, h('div', null, h('b', { class: 'mono' }, it.email), h('div', { class: 'muted' }, hace(it.hace_seg))),
+                    h('button', { class: 'btn btn-sm', type: 'button', onclick: () => resolver(it, false) }, 'Rechazar'),
+                    h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: () => resolver(it, true) }, 'Aprobar'))));
+        }
+        pintar(await revisarSolicitudes());
+    }
+
     function tiempoReal() {
         const ws = T.ws('monitor'); if (!ws) return;
         const refrescar = T.debounce(() => { if (S.cur && S.cur.inst && S.cur.inst.actualizar) S.cur.inst.actualizar(); }, 350);
         const revisar = T.debounce(() => { pedirEntregas().catch((e) => console.error(e)); }, 1200);
         Object.keys(EV).forEach((ev) => ws.on(ev, (d) => { const [k, t] = EV[ev](d); pushFeed(k, t); invalidar(); refrescar(); if (ev !== 'ADMIN_CAMBIO') revisar(); }));
-        setTimeout(revisar, 2500);   // al abrir la consola: tarjetas que ya estaban concluidas sin fecha
+        setTimeout(revisar, 2500);
+        ws.on('CLAVE_SOLICITADA', (d) => { pushFeed('warn', `${(d && d.email) || 'Una cuenta'} pidió restablecer su contraseña`); toast('Solicitud de contraseña pendiente', { kind: 'warn' }); revisarSolicitudes(); });
+        revisarSolicitudes();   // al abrir la consola: tarjetas que ya estaban concluidas sin fecha
         // Red de seguridad: reconexión del WS, regreso a la pestaña y refresco periódico (sin tocar la actividad en vivo)
-        T.resync(() => { if (document.querySelector('.sheet')) return; invalidar(); refrescar(); });
+        T.resync(() => { revisarSolicitudes(); if (document.querySelector('.sheet')) return; invalidar(); refrescar(); });
         ws.on('LOTE_CAMBIADO', async () => {
             const prev = S.activoId; const seguia = !S.lote || S.lote.id === prev;
             await cargarLotes(); if (seguia && S.activoId && S.lote && S.lote.id !== S.activoId) seleccionarLote(S.activoId);

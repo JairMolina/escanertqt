@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.database import db
 from app.services import admin_auth as aa
+from app.routers.ws import manager
 from app.services import usuarios
 
 router = APIRouter(prefix="/api/auth", tags=["Sesión"])
@@ -20,6 +21,20 @@ class LoginIn(BaseModel):
 
 class CambioClaveIn(BaseModel):
     actual: str = Field(..., max_length=200)
+    nueva: str = Field(..., max_length=200)
+
+
+class OlvideIn(BaseModel):
+    email: str = Field(..., max_length=200)
+
+
+class TicketIn(BaseModel):
+    ticket: str = Field(..., max_length=100)
+
+
+class RestablecerIn(BaseModel):
+    ticket: str = Field(..., max_length=100)
+    codigo: str = Field(..., max_length=12)
     nueva: str = Field(..., max_length=200)
 
 
@@ -92,4 +107,68 @@ async def cambiar_clave(payload: CambioClaveIn, request: Request, response: Resp
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     fijar_sesion(response, token)   # las demás sesiones de la cuenta quedan invalidadas
     await run_in_threadpool(db.log_evento, "USUARIO_CLAVE", None, u["email"], "Contraseña cambiada", u["email"])
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- olvidé mi contraseña (aprobada por otra cuenta)
+@router.post("/olvide", summary="Pedir que otra cuenta apruebe el restablecimiento de mi contraseña")
+async def olvide(payload: OlvideIn, request: Request):
+    try:
+        r = await run_in_threadpool(usuarios.solicitar_restablecimiento, payload.email, _cliente(request))
+    except aa.BloqueadoError as e:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e), headers={"Retry-After": str(e.restante)})
+    if r["registrada"]:
+        await run_in_threadpool(db.log_evento, "USUARIO_RESET_SOLICITUD", None, r["email"], f"Pidió restablecer su contraseña desde {_ip(request)}", "sistema")
+        await manager.broadcast("CLAVE_SOLICITADA", {"email": r["email"]})
+    return {"ticket": r["ticket"], "vigencia_seg": r["vigencia_seg"]}   # mismo formato exista o no la cuenta
+
+
+@router.post("/olvide/estado", summary="Estado de mi solicitud de restablecimiento")
+async def olvide_estado(payload: TicketIn):
+    return {"estado": await run_in_threadpool(usuarios.estado_solicitud, payload.ticket)}
+
+
+@router.post("/restablecer", summary="Poner la contraseña nueva con el código que dio la otra cuenta")
+async def restablecer(payload: RestablecerIn, request: Request):
+    try:
+        email = await run_in_threadpool(usuarios.restablecer_clave, payload.ticket, payload.codigo, payload.nueva, _cliente(request))
+    except aa.BloqueadoError as e:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e), headers={"Retry-After": str(e.restante)})
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    await run_in_threadpool(db.log_evento, "USUARIO_CLAVE_RESTABLECIDA", None, email, "Contraseña restablecida con aprobación de otra cuenta", email)
+    return {"ok": True}
+
+
+@router.get("/solicitudes", summary="Solicitudes de restablecimiento pendientes de otras cuentas")
+async def solicitudes(request: Request):
+    u = usuario_actual(request)
+    return {"items": await run_in_threadpool(usuarios.solicitudes_pendientes, u["email"])}
+
+
+async def _resolver(sid: int, request: Request, aprobar: bool):
+    u = usuario_actual(request)
+    try:
+        if aprobar:
+            return u, await run_in_threadpool(usuarios.aprobar_solicitud, sid, u["email"])
+        return u, {"email": await run_in_threadpool(usuarios.rechazar_solicitud, sid, u["email"])}
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post("/solicitudes/{sid}/aprobar", summary="Aprobar la solicitud y obtener el código de 6 dígitos")
+async def aprobar(sid: int, request: Request):
+    u, r = await _resolver(sid, request, True)
+    await run_in_threadpool(db.log_evento, "USUARIO_RESET_APROBADO", None, r["email"], f"Aprobó {u['email']}", u["email"])
+    return r
+
+
+@router.post("/solicitudes/{sid}/rechazar", summary="Rechazar la solicitud")
+async def rechazar(sid: int, request: Request):
+    u, r = await _resolver(sid, request, False)
+    await run_in_threadpool(db.log_evento, "USUARIO_RESET_RECHAZADO", None, r["email"], f"Rechazó {u['email']}", u["email"])
     return {"ok": True}

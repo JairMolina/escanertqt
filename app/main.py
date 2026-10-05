@@ -111,7 +111,7 @@ CABECERAS_SEGURIDAD = {
 
 # Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
-RUTAS_PUBLICAS = {"/login", "/api/auth/login", "/api/health", "/cert", "/ca", "/favicon.ico"}
+RUTAS_PUBLICAS = {"/login", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js")
 
 

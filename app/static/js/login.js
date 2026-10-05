@@ -72,6 +72,53 @@
     });
     $('luego').addEventListener('click', () => location.replace(destino()));
 
+
+    // ---- Olvidé mi contraseña: la aprueba otra cuenta con sesión abierta (código de 6 dígitos)
+    let ticket = '', sondeo = null, venceOlv = 0;
+    const olvPaso = (n) => { ['olvP1', 'olvP2', 'olvP3'].forEach((id, i) => { $(id).hidden = i + 1 !== n; }); $('olvEnviar').hidden = n === 2; $('olvEnviar').textContent = n === 3 ? 'Guardar contraseña' : 'Pedir ayuda'; };
+    function olvAbrir() {
+        $('fLogin').hidden = true; $('olvidoBox').hidden = true; $('fOlvide').hidden = false; $('sub').textContent = 'Recuperar acceso';
+        $('msgOlv').textContent = ''; $('msgOlv').className = 'msg'; olvPaso(1); $('olvEmail').value = $('email').value.trim(); $('olvEmail').focus();
+    }
+    function olvCerrar(aviso) {
+        clearInterval(sondeo); ticket = '';
+        $('fOlvide').hidden = true; $('fLogin').hidden = false; $('olvidoBox').hidden = false; $('sub').textContent = 'Entra con tu correo y tu contraseña.';
+        ['olvCodigo', 'olvNueva', 'olvRepite'].forEach((id) => { $(id).value = ''; });
+        $('msg').className = aviso ? 'msg ok' : 'msg'; $('msg').textContent = aviso || ''; $('pass').focus();
+    }
+    function olvSondear() {
+        clearInterval(sondeo);
+        sondeo = setInterval(async () => {
+            if (Date.now() > venceOlv) { clearInterval(sondeo); olvPaso(1); $('msgOlv').textContent = 'La solicitud venció. Pídela de nuevo.'; return; }
+            const r = await post('/api/auth/olvide/estado', { ticket });
+            const e = r.ok && r.data && r.data.estado;
+            if (e === 'aprobada') { clearInterval(sondeo); olvPaso(3); $('olvCodigo').focus(); }
+            else if (e === 'cancelada' || e === 'expirada') { clearInterval(sondeo); olvPaso(1); $('msgOlv').textContent = e === 'cancelada' ? 'La solicitud fue rechazada o reemplazada. Pídela de nuevo.' : 'La solicitud venció. Pídela de nuevo.'; }
+        }, 3000);
+    }
+    $('olvido').addEventListener('click', olvAbrir);
+    $('olvVolver').addEventListener('click', () => olvCerrar(''));
+    $('fOlvide').addEventListener('submit', async (e) => {
+        e.preventDefault(); $('msgOlv').className = 'msg'; $('msgOlv').textContent = '';
+        if (!$('olvP3').hidden) {
+            const nueva = $('olvNueva').value;
+            if (!/^\d{6}$/.test($('olvCodigo').value.trim())) { $('msgOlv').textContent = 'El código tiene 6 dígitos.'; return; }
+            if (nueva !== $('olvRepite').value) { $('msgOlv').textContent = 'Las contraseñas nuevas no coinciden.'; return; }
+            $('olvEnviar').disabled = true;
+            const r = await post('/api/auth/restablecer', { ticket, codigo: $('olvCodigo').value.trim(), nueva });
+            $('olvEnviar').disabled = false;
+            if (!r.ok) { $('msgOlv').textContent = texto(r); return; }
+            olvCerrar('Contraseña cambiada. Entra con la nueva.'); return;
+        }
+        const email = $('olvEmail').value.trim();
+        if (!email) { $('msgOlv').textContent = 'Escribe tu correo.'; return; }
+        $('olvEnviar').disabled = true;
+        const r = await post('/api/auth/olvide', { email });
+        $('olvEnviar').disabled = false;
+        if (!r.ok) { $('msgOlv').textContent = texto(r); return; }
+        ticket = r.data.ticket; venceOlv = Date.now() + (r.data.vigencia_seg || 900) * 1000; olvPaso(2); olvSondear();
+    });
+
     // ¿Ya hay sesión? Con ?cambiar=1 se abre directo el cambio de contraseña; si no, se entra a la app.
     fetch('/api/auth/yo', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : null)).then((u) => {
         if (!u) return;

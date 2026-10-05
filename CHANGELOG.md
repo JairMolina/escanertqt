@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.33 — 2026-10-05
+- **"¿Olvidaste tu contraseña?" aprobado por otra cuenta.** En el inicio de sesión se pide el correo; otra persona con sesión abierta ve la solicitud en la consola (icono de escudo con contador), la aprueba y recibe un código de 6 dígitos que le dicta en persona. Quien olvidó escribe el código y su contraseña nueva (mínimo 10 caracteres). Nadie teclea la clave de otra persona. El código vale 10 minutos y se bloquea tras 5 intentos; no se puede aprobar la propia solicitud; el cambio cierra las sesiones de esa cuenta y queda en la bitácora. Respuestas iguales exista o no el correo y límite de solicitudes por equipo.
+
 ## v1.3.32 — 2026-10-05
 - **Resumen (escritorio): cada indicador se abre para ver su detalle.** Al hacer clic (o Enter) en Tarjetas, Completas, Con/Sin MAC, Falta placa, Finalizadas, Entregadas, Por entregar, Etiquetas por imprimir y los de Inventario de PCB, se abre una hoja con la lista de tarjetas o placas que lo componen, con acceso directo a la sección correspondiente.
 

@@ -277,3 +277,11 @@ button.esc-det-fila { cursor: pointer; }
 button.esc-det-fila:hover { background: var(--surface-2); }
 .esc-det-fila .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .esc-kpi-btn, .esc-kpi-btn .go { transition: none; } .esc-kpi-btn:active { transform: none; } }
+
+/* Solicitudes de contraseña aprobadas por otra cuenta (v1.3.33) */
+.esc-sol { position: relative; color: var(--warn); }
+.esc-sol-n { position: absolute; top: 4px; right: 3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--warn); color: #10131c; font: 700 11px/16px var(--font-mono); text-align: center; }
+.esc-sol-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-1); background: var(--surface-2); }
+.esc-sol-fila b { overflow-wrap: anywhere; }
+.esc-cod { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 12px; border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: var(--r-1); background: var(--surface-2); text-align: center; }
+.esc-cod b { font-size: 44px; letter-spacing: .18em; line-height: 1; padding-left: .18em; font-variant-numeric: tabular-nums slashed-zero; }
