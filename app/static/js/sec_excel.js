@@ -52,7 +52,7 @@
                 bDown.disabled = true; bDown.lastChild.textContent = 'Preparando…'; salida.replaceChildren();
                 try {
                     const res = await fetch(`/api/admin/export/excel${loteQ()}`);
-                    if (res.status === 401) { location.href = '/admin?next=/monitor'; return; }
+                    if (res.status === 401) { location.href = '/admin?next=' + encodeURIComponent('/monitor#/excel?descargar=1'); return; }
                     if (!res.ok) {
                         let det = ''; try { const j = await res.json(); det = typeof j.detail === 'string' ? j.detail : ''; } catch (e) { det = ''; }
                         salida.append(T.banner('bad', 'alert', h('b', null, res.status === 404 ? 'Todavía no hay Excel de este lote. ' : 'No se pudo descargar. '), det || (res.status === 404 ? 'Pulsa "Sincronizar Excel" primero.' : `Error ${res.status}.`)));
@@ -78,6 +78,8 @@
                     h('div', { class: 'row wrap' }, bSync, bDown)),
                 salida, histCard));
             pintarLote(); pintarHist();
+            // Volvemos del login de administración con la descarga pendiente: se hace sola (una vez) y se limpia la marca de la URL
+            if (/[?&]descargar=1/.test(location.hash)) { try { history.replaceState(null, '', '#/excel'); } catch (e) { /* nada */ } if (lote()) descargar(); }
             ctx.alCambiarLote(() => { pintarLote(); salida.replaceChildren(); });
             return { actualizar() { ctx.recargarLotes().then(pintarLote); } };
         },

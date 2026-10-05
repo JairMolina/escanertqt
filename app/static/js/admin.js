@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     /** Destino tras el login: solo rutas internas conocidas (nada de //, http: ni otras). */
     function destinoNext() {
-        try { const n = new URLSearchParams(location.search).get('next'); if (n === '/monitor') return n; } catch (e) { /* nada */ }
+        try { const n = new URLSearchParams(location.search).get('next'); if (n === '/monitor' || n === '/monitor#/excel?descargar=1') return n; } catch (e) { /* nada */ }
         return null;
     }
     function irNext() { const n = destinoNext(); if (n) { location.replace(n); return true; } return false; }

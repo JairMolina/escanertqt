@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.30 — 2026-10-05
+- **Descargar copia .xlsx ya no se pierde al pedir la contraseña de administración.** Si la sesión de administración no estaba activa, tras escribir la contraseña correcta se regresa a la sección Excel y la copia se descarga sola, sin tener que volver a pulsar el botón.
+
 ## v1.3.29 — 2026-10-05
 - **Emparejar (móvil): las tarjetas completas van al final.** Arriba quedan las pendientes (sin R3 o sin MAC) y, al completarse, la tarjeta baja sola al final de la lista.
 
