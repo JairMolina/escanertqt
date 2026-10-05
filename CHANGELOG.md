@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.29 — 2026-10-05
+- **Emparejar (móvil): las tarjetas completas van al final.** Arriba quedan las pendientes (sin R3 o sin MAC) y, al completarse, la tarjeta baja sola al final de la lista.
+
 ## v1.3.28 — 2026-10-05
 - **Entrega de tarjetas concluidas: selección múltiple.** En la hoja "¿cuándo se entrega?" ahora hay casilla por tarjeta y "Todas"; con una barra para elegir fecha y/o gabinete y "Aplicar" a las seleccionadas (el gabinete en blanco no cambia nada). Sigue pudiéndose editar cada fila.
 

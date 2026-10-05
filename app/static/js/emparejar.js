@@ -104,7 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTarjetas() {
         const box = $('tar'); box.replaceChildren();
         const q = state.q.trim().toLowerCase();
-        const rows = state.tarjetas.slice().sort((a, b) => String(a.id_tarjeta_num).localeCompare(String(b.id_tarjeta_num))).filter((t) => !q || [t.id_tarjeta_num, t.nombre_r1, t.nombre_r2, t.nombre_r3, t.mac_r1, t.mac_r2].some((v) => String(v || '').toLowerCase().includes(q)));
+        // Las completas (R1+R2+R3 con MAC) van al final; las pendientes arriba
+        const fin = (t) => (T.estadoTarjeta(t).key === 'completa' ? 1 : 0);
+        const rows = state.tarjetas.slice().sort((a, b) => fin(a) - fin(b) || String(a.id_tarjeta_num).localeCompare(String(b.id_tarjeta_num))).filter((t) => !q || [t.id_tarjeta_num, t.nombre_r1, t.nombre_r2, t.nombre_r3, t.mac_r1, t.mac_r2].some((v) => String(v || '').toLowerCase().includes(q)));
         if (!rows.length) {
             box.className = 'empty';
             box.append(icon('box'), h('b', null, state.tarjetas.length ? 'Sin coincidencias' : 'Aún no hay tarjetas'), h('span', null, state.tarjetas.length ? 'Cambia la búsqueda.' : 'Empareja las series completas para crear la primera.'));
