@@ -453,13 +453,34 @@
             const fecha = h('input', { class: 'input mono', type: 'date', 'aria-label': `Entrega de la tarjeta ${t.id_tarjeta_num}`, value: t.fecha_proyectada || ymd(new Date()) });
             const gab = h('select', { class: 'input', 'aria-label': `Gabinete de la tarjeta ${t.id_tarjeta_num}` }, h('option', { value: '' }, 'Sin definir'),
                 ['Quintalock', 'Translock'].map((g) => h('option', { value: g, selected: t.gabinete === g ? '' : null }, g)));
-            return { t, fecha, gab, el: h('div', { style: 'display:grid;grid-template-columns:minmax(0,1fr) 150px 140px;gap:8px;align-items:center' },
-                h('div', {}, h('b', { class: 'mono' }, `#${t.id_tarjeta_num}`), h('div', { class: 'muted' }, `Concluida ${t.fecha_finalizado || 'hoy'}`)), fecha, gab) };
+            const sel = h('input', { type: 'checkbox', 'aria-label': `Seleccionar tarjeta ${t.id_tarjeta_num}`, style: 'width:20px;height:20px' });
+            return { t, fecha, gab, sel, el: h('div', { style: 'display:grid;grid-template-columns:auto minmax(0,1fr) 150px 140px;gap:8px;align-items:center' },
+                sel, h('div', {}, h('b', { class: 'mono' }, `#${t.id_tarjeta_num}`), h('div', { class: 'muted' }, `Concluida ${t.fecha_finalizado || 'hoy'}`)), fecha, gab) };
         });
+        // Aplicar en bloque: se marcan una, varias o todas y se les pone la misma fecha y/o gabinete
+        const todas = h('input', { type: 'checkbox', 'aria-label': 'Seleccionar todas', style: 'width:20px;height:20px' });
+        const cuenta = h('span', { class: 'muted' }, '0 seleccionadas');
+        const bFecha = h('input', { class: 'input mono', type: 'date', 'aria-label': 'Fecha para las seleccionadas', value: ymd(new Date()) });
+        const bGab = h('select', { class: 'input', 'aria-label': 'Gabinete para las seleccionadas' }, h('option', { value: '' }, 'Gabinete (sin cambiar)'),
+            ['Quintalock', 'Translock'].map((g) => h('option', { value: g }, g)));
+        const bAplicar = h('button', { class: 'btn', type: 'button', disabled: '' }, 'Aplicar');
+        const refrescarSel = () => {
+            const n = filas.filter((f) => f.sel.checked).length;
+            cuenta.textContent = `${n} seleccionada${n === 1 ? '' : 's'}`; bAplicar.disabled = !n;
+            todas.checked = n === filas.length; todas.indeterminate = n > 0 && n < filas.length;
+        };
+        todas.addEventListener('change', () => { filas.forEach((f) => { f.sel.checked = todas.checked; }); refrescarSel(); });
+        filas.forEach((f) => f.sel.addEventListener('change', refrescarSel));
+        bAplicar.addEventListener('click', () => {
+            filas.filter((f) => f.sel.checked).forEach((f) => { if (bFecha.value) f.fecha.value = bFecha.value; if (bGab.value) f.gab.value = bGab.value; });
+            toast('Aplicado a las seleccionadas', { kind: 'ok' });
+        });
+        const barra = h('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line, rgba(128,128,128,.3))' },
+            h('label', { class: 'row', style: 'gap:6px;cursor:pointer' }, todas, h('b', {}, 'Todas')), cuenta, h('span', { style: 'flex:1' }), bFecha, bGab, bAplicar);
         T.sheet({
             title: `${pend.length === 1 ? 'Tarjeta concluida' : pend.length + ' tarjetas concluidas'}: ¿cuándo se entrega?`,
             body: h('div', { style: 'display:flex;flex-direction:column;gap:10px' },
-                h('p', { class: 'muted' }, 'Ya tienen R1, R2, R3 y las MAC. Indica la fecha real de entrega (se propone la proyectada o la de hoy) y el gabinete.'), filas.map((f) => f.el)),
+                h('p', { class: 'muted' }, 'Ya tienen R1, R2, R3 y las MAC. Indica la fecha real de entrega (se propone la proyectada o la de hoy) y el gabinete. Para varias a la vez, selecciónalas y usa "Aplicar".'), barra, filas.map((f) => f.el)),
             actions: [
                 { label: 'Más tarde', onClick: () => { try { sessionStorage.setItem(POSPUESTAS, JSON.stringify(pospuestas.concat(pend.map((t) => t.id)))); } catch (e) { /* sin almacenamiento */ } return true; } },
                 { label: 'Guardar fechas de entrega', kind: 'primary', icon: 'check', onClick: async () => {
