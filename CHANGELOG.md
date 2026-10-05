@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.32 — 2026-10-05
+- **Resumen (escritorio): cada indicador se abre para ver su detalle.** Al hacer clic (o Enter) en Tarjetas, Completas, Con/Sin MAC, Falta placa, Finalizadas, Entregadas, Por entregar, Etiquetas por imprimir y los de Inventario de PCB, se abre una hoja con la lista de tarjetas o placas que lo componen, con acceso directo a la sección correspondiente.
+
 ## v1.3.31 — 2026-10-05
 - **Administración: la hora de "Últimos movimientos" y de la bitácora ya es la local.** Se guardaba en UTC (6 h de adelanto); ahora se muestra y filtra por fecha en hora local del servidor.
 - **Emparejar (móvil): los contadores se actualizan al instante.** "Completas" e "Incompl." cuentan las tarjetas del lote (misma regla que el Resumen) y la pantalla se refresca también cuando se empareja una tarjeta (faltaba escuchar ese aviso).

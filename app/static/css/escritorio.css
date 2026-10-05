@@ -257,3 +257,23 @@ table.esc-t { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .esc-ver { margin-top: 8px; padding: 0 10px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .esc-ver b { color: var(--accent-text); font-weight: 600; }
 [data-lat="min"] .esc-ver-n { display: none; }
+
+/* Resumen: indicadores que abren su detalle (v1.3.32) */
+.esc-kpi-btn { font: inherit; color: inherit; text-align: left; width: 100%; cursor: pointer; transition: border-color .15s, background-color .15s, transform .15s; }
+.esc-kpi-btn:hover { border-color: var(--line-2); background: var(--surface-2); }
+.esc-kpi-btn:active { transform: scale(.985); }
+.esc-kpi-btn .go { position: absolute; right: 8px; top: 10px; display: grid; place-items: center; color: var(--faint); transition: color .15s, transform .15s; }
+.esc-kpi-btn .go .svg-i { width: 16px; height: 16px; }
+.esc-kpi-btn:hover .go, .esc-kpi-btn:focus-visible .go { color: var(--accent-text); transform: translateX(2px); }
+.esc-det-res { display: flex; align-items: baseline; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-left: 3px solid var(--line-2); border-radius: var(--r-1); background: var(--surface-2); }
+.esc-det-res[data-k="ok"] { border-left-color: var(--ok); } .esc-det-res[data-k="warn"] { border-left-color: var(--warn); }
+.esc-det-res[data-k="bad"] { border-left-color: var(--bad); } .esc-det-res[data-k="info"] { border-left-color: var(--info); }
+.esc-det-res .v { font-size: 30px; font-weight: 600; line-height: 1; }
+.esc-det { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-1); max-height: 46vh; overflow: auto; }
+.esc-det li + li { border-top: 1px solid var(--line); }
+.esc-det-fila { display: grid; grid-template-columns: minmax(84px, auto) minmax(0, 1fr) auto auto; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 12px; font: inherit; color: inherit; text-align: left; background: transparent; border: 0; }
+div.esc-det-fila { grid-template-columns: minmax(84px, auto) minmax(0, 1fr) auto; }
+button.esc-det-fila { cursor: pointer; }
+button.esc-det-fila:hover { background: var(--surface-2); }
+.esc-det-fila .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .esc-kpi-btn, .esc-kpi-btn .go { transition: none; } .esc-kpi-btn:active { transform: none; } }

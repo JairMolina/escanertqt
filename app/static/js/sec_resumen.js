@@ -14,8 +14,28 @@
             const n = (v) => Number(v).toLocaleString('es-MX');
             const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
-            function kpi(label, valor, kind, sub) {
-                return h('div', { class: 'esc-kpi', dataset: { k: kind || '' } }, h('span', { class: 'l' }, label), h('span', { class: 'v' }, n(valor)), sub ? h('span', { class: 's' }, sub) : null);
+            // Cada indicador abre una hoja con el detalle: det() -> { desc, filas:[{titulo, sub, extra, tarjeta?}], ver:{id, label, params} }
+            const MAXF = 60;
+            function hojaDetalle(label, valor, kind, det) {
+                const d = det();
+                const filas = d.filas || [];
+                const cuerpo = !filas.length
+                    ? T.empty('check', 'Nada en este grupo', 'Cuando haya elementos, aparecerán aquí.')
+                    : h('ul', { class: 'esc-det', 'aria-label': `Detalle de ${label}` }, filas.slice(0, MAXF).map((f) => {
+                        const inner = [h('b', { class: 'mono' }, f.titulo), f.sub ? h('span', { class: 'muted' }, f.sub) : h('span'), f.extra || h('span')];
+                        return h('li', null, f.ir ? h('button', { type: 'button', class: 'esc-det-fila', 'aria-label': `Abrir ${f.titulo}`, onclick: () => { hoja.close(); ctx.ir(f.ir.id, f.ir.params); } }, inner, icon('chevron')) : h('div', { class: 'esc-det-fila' }, inner));
+                    }));
+                const resumen = h('div', { class: 'esc-det-res', dataset: { k: kind || '' } }, h('span', { class: 'v mono' }, n(valor)), h('span', { class: 'muted' }, d.desc || ''));
+                const mas = filas.length > MAXF ? h('p', { class: 'muted' }, `Se muestran ${MAXF} de ${n(filas.length)}.`) : null;
+                const acciones = [{ label: 'Cerrar', kind: 'ghost', onClick: () => true }];
+                if (d.ver) acciones.unshift({ label: d.ver.label, kind: 'primary', onClick: () => { ctx.ir(d.ver.id, d.ver.params); return true; } });
+                const hoja = T.sheet({ title: label, body: [resumen, cuerpo, mas], actions: acciones, focus: false });
+            }
+            function kpi(label, valor, kind, sub, det) {
+                const kids = [h('span', { class: 'l' }, label), h('span', { class: 'v' }, n(valor)), sub ? h('span', { class: 's' }, sub) : null];
+                if (!det) return h('div', { class: 'esc-kpi', dataset: { k: kind || '' } }, kids);
+                return h('button', { type: 'button', class: 'esc-kpi esc-kpi-btn', dataset: { k: kind || '' }, 'aria-haspopup': 'dialog', 'aria-label': `${label}: ${valor}. Ver detalle`, onclick: () => hojaDetalle(label, valor, kind, det) },
+                    kids, h('span', { class: 'go', 'aria-hidden': 'true' }, icon('chevron')));
             }
             function bloque(titulo, ...kids) {
                 return h('section', { class: 'esc-blk' }, h('div', { class: 'esc-h' }, h('h2', null, titulo)), ...kids);
@@ -75,6 +95,11 @@
                 lista.slice(0, 40).forEach((f) => feedUl.append(h('li', { dataset: { k: f.kind } }, h('time', null, f.t), icon(ic[f.kind] || 'info'), h('span', null, f.text))));
             }
 
+            const faltantes = (t) => ['R1', 'R2', 'R3'].filter((k) => !t[k.toLowerCase()]);
+            const filaT = (t, sub, extra) => ({ titulo: `#${t.id_tarjeta_num}`, sub, extra, ir: { id: 'tarjetas', params: { id: t.id } } });
+            const filaP = (p) => ({ titulo: p.nombre, sub: p.mac ? String(p.mac).toLowerCase() : (p.tipo === 'R3' ? '' : 'sin MAC'), extra: T.tipoChip(p.tipo) });
+            const orden = (a, b) => String(a.id_tarjeta_num).localeCompare(String(b.id_tarjeta_num));
+
             function pintar() {
                 host.replaceChildren();
                 if (error && !tars) { host.append(util.errorBox(error, () => cargar(true))); return; }
@@ -101,18 +126,18 @@
                         h('tbody', null, ['R1', 'R2', 'R3'].map((tp, i) => h('tr', null, h('th', { scope: 'row' }, tp), h('td', null, av[i].rec), h('td', null, av[i].asg), h('td', null, av[i].mac === null ? 'no aplica' : av[i].mac))))));
                 host.append(
                     bloque(`Tarjetas del lote ${T.loteNombre(lote)}`, h('div', { class: 'esc-kpis', dataset: { n: 5 } },
-                        kpi('Tarjetas', tot, '', 'R1 + R2 + R3 por número'), kpi('Completas', comp, 'ok', `${pct(comp, tot)}% del lote`),
-                        kpi('Con MAC', conMacAl, 'ok', 'R1 y R2 con MAC capturada'), kpi('Sin MAC', sinMacAl, 'info', 'falta la MAC de R1 o R2'),
-                        kpi('Falta placa', sinPlaca, 'warn', 'sin R1, R2 o R3'))),
+                        kpi('Tarjetas', tot, '', 'R1 + R2 + R3 por número', () => ({ desc: 'Todas las tarjetas del lote, por número.', filas: tars.slice().sort(orden).map((t) => filaT(t, T.estadoTarjeta(t).label)), ver: { id: 'tarjetas', label: 'Abrir Tarjetas' } })), kpi('Completas', comp, 'ok', `${pct(comp, tot)}% del lote`, () => ({ desc: 'Tienen R1, R2, R3 y las MAC capturadas.', filas: tars.filter((t) => T.estadoTarjeta(t).key === 'completa').sort(orden).map((t) => filaT(t, t.fecha_finalizado ? `Concluida ${t.fecha_finalizado}` : 'Concluida')), ver: { id: 'tarjetas', label: 'Abrir Tarjetas' } })),
+                        kpi('Con MAC', conMacAl, 'ok', 'R1 y R2 con MAC capturada', () => ({ desc: 'R1 y R2 ya tienen su MAC (la R3 no lleva).', filas: tars.filter((t) => t.r1 && t.r2 && !(t.sin_mac || []).length).sort(orden).map((t) => filaT(t, 'MAC de R1 y R2 al día')), ver: { id: 'macs', label: 'Abrir MAC y firmware' } })), kpi('Sin MAC', sinMacAl, 'info', 'falta la MAC de R1 o R2', () => ({ desc: 'Tarjetas a las que les falta la MAC de R1 o R2.', filas: tars.filter((t) => (t.sin_mac || []).length).sort(orden).map((t) => filaT(t, `Sin MAC: ${t.sin_mac.join(', ')}`)), ver: { id: 'macs', label: 'Abrir MAC y firmware' } })),
+                        kpi('Falta placa', sinPlaca, 'warn', 'sin R1, R2 o R3', () => ({ desc: 'Les falta alguna placa: R1, R2 o R3.', filas: tars.filter((t) => faltantes(t).length).sort(orden).map((t) => filaT(t, `Falta ${faltantes(t).join(', ')}`)), ver: { id: 'tarjetas', label: 'Abrir Tarjetas', params: { estado: 'incompleta' } } })))),
                     bloque('Producción y entrega', h('div', { class: 'esc-kpis', dataset: { n: 4 } },
-                        kpi('Finalizadas', fin, 'ok', 'R1, R2, R3 y MAC al día'), kpi('Entregadas', ent, 'ok', 'con fecha real de entrega'),
-                        kpi('Por entregar', porEntregar, 'warn', 'finalizadas sin fecha de entrega'), kpi('Etiquetas por imprimir', etqPend, 'info', 'DYMO: sin imprimir o cambiadas'))),
+                        kpi('Finalizadas', fin, 'ok', 'R1, R2, R3 y MAC al día', () => ({ desc: 'Tarjetas concluidas con fecha de finalizado.', filas: tars.filter((t) => t.fecha_finalizado).sort(orden).map((t) => filaT(t, t.fecha_finalizado)) })), kpi('Entregadas', ent, 'ok', 'con fecha real de entrega', () => ({ desc: 'Ya tienen fecha real de entrega.', filas: tars.filter((t) => t.fecha_real).sort(orden).map((t) => filaT(t, t.fecha_real, t.gabinete ? h('span', { class: 'muted' }, t.gabinete) : null)) })),
+                        kpi('Por entregar', porEntregar, 'warn', 'finalizadas sin fecha de entrega', () => ({ desc: 'Finalizadas que aún no tienen fecha de entrega.', filas: tars.filter((t) => t.fecha_finalizado && !t.fecha_real).sort(orden).map((t) => filaT(t, `Concluida ${t.fecha_finalizado}`)) })), kpi('Etiquetas por imprimir', etqPend, 'info', 'DYMO: sin imprimir o cambiadas', () => ({ desc: 'Etiquetas DYMO sin imprimir o que cambiaron desde la última impresión.', filas: conEtq.filter((t) => t.etiqueta_firma !== `${(t.sin_mac || []).length ? 'IDENTIFICACION' : 'FINAL'}|${t.nombre_r1}|${t.nombre_r2}`).sort(orden).map((t) => filaT(t, t.etiqueta_firma ? 'Cambió desde la última impresión' : 'Sin imprimir', h('span', { class: 'muted' }, (t.sin_mac || []).length ? 'Identificación' : 'Final'))), ver: { id: 'etiquetas', label: 'Abrir Etiquetas DYMO' } })))),
                     h('div', { class: 'esc-2' },
                         partes('Avance de pruebas', [{ l: 'Liberadas', v: etapa('LIBERADO'), c: 'ok' }, { l: 'En proceso', v: etapa('EN PROCESO'), c: 'info' }, { l: 'Retrabajo', v: etapa('RETRABAJO'), c: 'warn' }, { l: 'Detenidas', v: etapa('DETENIDO'), c: 'bad' }, { l: 'Pendientes', v: etapa('PENDIENTE'), c: 'faint' }], tot, 'Todavía no hay tarjetas en este lote.'),
                         partes('Etiquetas DYMO', [{ l: 'Impresas', v: etqImp, c: 'info' }, { l: 'Por imprimir', v: etqPend, c: 'warn' }], conEtq.length, 'Aún no hay tarjetas con R1 y R2.')),
                     bloque('Inventario de PCB', h('div', { class: 'esc-kpis', dataset: { n: 6 } },
-                        kpi('En inventario', pcbs.length, '', 'todas las recibidas'), kpi('Sin confirmar', c('RECIBIDA'), 'warn', 'recepción abierta'), kpi('Sueltas', c('DISPONIBLE'), 'info', 'listas para emparejar'),
-                        kpi('Asignadas', c('ASIGNADA'), 'ok', 'montadas en tarjetas'), kpi('En falla', c('FALLA'), 'bad', 'apartadas'), kpi('Sin MAC (R1/R2)', sinMac, 'warn', 'por capturar'))),
+                        kpi('En inventario', pcbs.length, '', 'todas las recibidas', () => ({ desc: ['R1', 'R2', 'R3'].map((tp) => `${tp}: ${pcbs.filter((p) => p.tipo === tp).length}`).join(' · '), filas: pcbs.map((p) => Object.assign(filaP(p), { extra: T.tipoChip(p.tipo) })), ver: { id: 'inventario', label: 'Abrir Inventario de PCB' } })), kpi('Sin confirmar', c('RECIBIDA'), 'warn', 'recepción abierta', () => ({ desc: 'Recibidas con el celular que aún no se confirman.', filas: pcbs.filter((p) => p.estado_ciclo === 'RECIBIDA').map(filaP), ver: { id: 'inventario', label: 'Abrir Inventario de PCB' } })), kpi('Sueltas', c('DISPONIBLE'), 'info', 'listas para emparejar', () => ({ desc: 'Confirmadas y todavía sin tarjeta.', filas: pcbs.filter((p) => p.estado_ciclo === 'DISPONIBLE').map(filaP), ver: { id: 'inventario', label: 'Abrir Inventario de PCB' } })),
+                        kpi('Asignadas', c('ASIGNADA'), 'ok', 'montadas en tarjetas', () => ({ desc: 'Placas ya montadas en una tarjeta.', filas: pcbs.filter((p) => p.estado_ciclo === 'ASIGNADA').map(filaP), ver: { id: 'inventario', label: 'Abrir Inventario de PCB' } })), kpi('En falla', c('FALLA'), 'bad', 'apartadas', () => ({ desc: 'Placas apartadas por falla.', filas: pcbs.filter((p) => p.estado_ciclo === 'FALLA').map(filaP), ver: { id: 'inventario', label: 'Abrir Inventario de PCB' } })), kpi('Sin MAC (R1/R2)', sinMac, 'warn', 'por capturar', () => ({ desc: 'R1 y R2 activas a las que falta capturar la MAC.', filas: pcbs.filter((p) => p.tipo !== 'R3' && !p.mac && ['RECIBIDA', 'ASIGNADA', 'DISPONIBLE'].includes(p.estado_ciclo)).map(filaP), ver: { id: 'macs', label: 'Abrir MAC y firmware' } })))),
                     bloque('Avance por tipo', h('div', { class: 'esc-3' }, av.map((a) => a.card)), tabla),
                     h('div', { class: 'esc-2' },
                         partes('Estado de las tarjetas', [{ l: 'Completas', v: comp, c: 'ok' }, { l: 'Sin MAC', v: sm, c: 'info' }, { l: 'Falta placa', v: inc, c: 'warn' }], tot, 'Todavía no hay tarjetas en este lote.'),
