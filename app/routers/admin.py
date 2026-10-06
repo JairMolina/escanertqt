@@ -4,7 +4,9 @@ Autenticación: POST /api/admin/login -> token (cabecera `X-Admin-Token`, caduca
 hace antes un respaldo automático de la BD, deja registro en la bitácora, emite `ADMIN_CAMBIO` por WebSocket y devuelve
 el nombre del respaldo.
 """
+import html as _html
 import logging
+import os
 import shutil
 import sqlite3
 import tempfile
@@ -23,7 +25,7 @@ from app.database.db import NoEncontradoError
 from app.database.models import MESES_ES
 from app.routers.excel_dymo import excel_engine, ruta_permitida
 from app.routers.ws import manager
-from app.services import admin_auth, correo
+from app.services import admin_auth, correo, usuarios
 from app.services.admin_auth import (
     AdminDeshabilitadoError, BloqueadoError, TokenInvalidoError, MENSAJE_DESHABILITADO,
 )
@@ -206,6 +208,110 @@ async def correo_prueba(payload: CorreoPruebaIn, _: Dict = Depends(admin_requeri
         logger.warning("Fallo el correo de prueba: %s", e)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"No se pudo enviar: {type(e).__name__}")
     return {"ok": True, "message_id": mid}
+
+
+# ============================================================================
+# Cuentas de usuario (alta por invitación de correo, roles)
+# ============================================================================
+class CuentaIn(BaseModel):
+    email: str = Field(..., max_length=200)
+    rol: str = Field(..., max_length=20)
+
+
+class CuentaCambioIn(BaseModel):
+    rol: Optional[str] = Field(None, max_length=20)
+    activo: Optional[bool] = None
+
+
+def _quien(request: Request) -> str:
+    try:
+        return usuarios.validar_sesion(request.cookies.get(usuarios.COOKIE))["email"]
+    except usuarios.SesionInvalidaError:
+        return "admin"
+
+
+def _enlace(request: Request, token: str) -> str:
+    """URL pública del enlace: TQT_PUBLIC_URL si está definida; si no, la que usó el administrador (respeta el proxy de Cloudflare)."""
+    base = os.getenv("TQT_PUBLIC_URL", "").rstrip("/")
+    if not base:
+        esquema = request.headers.get("x-forwarded-proto", request.url.scheme).split(",")[0].strip()
+        base = f"{esquema}://{request.headers.get('host') or request.url.netloc}"
+    return f"{base}/invitacion#{token}"
+
+
+def _enviar_invitacion(email: str, rol: str, enlace: str, por: str) -> Dict[str, Any]:
+    """Envía el correo; si falla, el administrador recibe el enlace para dárselo por otro medio."""
+    texto = (f"Hola:\n\n{por} te dio de alta en Escáner TQT con el rol «{rol}».\n\n"
+             f"Para activar tu cuenta y elegir tu contraseña abre este enlace (vale 48 horas y se usa una sola vez):\n{enlace}\n\n"
+             "Si no esperabas este correo, ignóralo.\n\nInventario TQT")
+    html = (f"<div style=\"font-family:Segoe UI,Arial,sans-serif;max-width:520px;color:#1b2333\"><h2 style=\"color:#2563eb\">Escáner TQT</h2>"
+            f"<p><b>{_html.escape(por)}</b> te dio de alta con el rol <b>{rol}</b>.</p><p>Activa tu cuenta y elige tu contraseña:</p>"
+            f"<p><a href=\"{_html.escape(enlace)}\" style=\"display:inline-block;background:#2563eb;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600\">Activar mi cuenta</a></p>"
+            "<p style=\"color:#667085;font-size:13px\">El enlace vale 48 horas y se usa una sola vez. Si no esperabas este correo, ignóralo.</p></div>")
+    try:
+        correo.enviar(email, "Activa tu cuenta de Escáner TQT", texto, html)
+        return {"enviado": True}
+    except correo.CorreoNoConfigurado as e:
+        return {"enviado": False, "error": str(e), "enlace": enlace}
+    except Exception as e:  # noqa: BLE001 - SMTP/red: se informa sin exponer credenciales
+        logger.warning("No se pudo enviar la invitación a %s: %s", email, e)
+        return {"enviado": False, "error": f"No se pudo enviar el correo ({type(e).__name__}).", "enlace": enlace}
+
+
+@router.get("/usuarios", summary="Cuentas de usuario con su rol y estado")
+async def cuentas(_: Dict = Depends(admin_requerido)):
+    return {"items": await run_in_threadpool(usuarios.listar), "roles": list(usuarios.ROLES), "smtp": correo.configurado()}
+
+
+@router.post("/usuarios", summary="Dar de alta una cuenta y enviarle la invitación por correo")
+async def cuenta_alta(payload: CuentaIn, request: Request, _: Dict = Depends(admin_requerido)):
+    por = _quien(request)
+    try:
+        token = await run_in_threadpool(usuarios.crear_invitacion, payload.email, payload.rol, por)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    email = usuarios.normalizar(payload.email)
+    r = await run_in_threadpool(_enviar_invitacion, email, payload.rol.lower(), _enlace(request, token), por)
+    await run_in_threadpool(db.log_evento, "USUARIO_ALTA", None, email, f"Invitación ({payload.rol.lower()}); correo {'enviado' if r['enviado'] else 'NO enviado'}", por)
+    return r
+
+
+@router.post("/usuarios/{email}/reenviar", summary="Reenviar la invitación (el enlace anterior deja de valer)")
+async def cuenta_reenviar(email: str, request: Request, _: Dict = Depends(admin_requerido)):
+    por = _quien(request)
+    try:
+        token = await run_in_threadpool(usuarios.reenviar_invitacion, email)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    rol = next((u["rol"] for u in await run_in_threadpool(usuarios.listar) if u["email"] == usuarios.normalizar(email)), "")
+    r = await run_in_threadpool(_enviar_invitacion, usuarios.normalizar(email), rol, _enlace(request, token), por)
+    await run_in_threadpool(db.log_evento, "USUARIO_INVITACION", None, usuarios.normalizar(email), "Invitación reenviada", por)
+    return r
+
+
+@router.patch("/usuarios/{email}", summary="Cambiar rol o activar/desactivar una cuenta")
+async def cuenta_cambio(email: str, payload: CuentaCambioIn, request: Request, _: Dict = Depends(admin_requerido)):
+    try:
+        await run_in_threadpool(usuarios.actualizar_cuenta, email, payload.rol, payload.activo)
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    cambios = ", ".join(x for x in (payload.rol and f"rol {payload.rol}", payload.activo is not None and ("activada" if payload.activo else "desactivada")) if x)
+    await run_in_threadpool(db.log_evento, "USUARIO_CAMBIO", None, usuarios.normalizar(email), cambios or "sin cambios", _quien(request))
+    return {"ok": True}
+
+
+@router.delete("/usuarios/{email}", summary="Eliminar una cuenta")
+async def cuenta_baja(email: str, request: Request, _: Dict = Depends(admin_requerido)):
+    try:
+        await run_in_threadpool(usuarios.eliminar_cuenta, email)
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    await run_in_threadpool(db.log_evento, "USUARIO_BAJA", None, usuarios.normalizar(email), "Cuenta eliminada", _quien(request))
+    return {"ok": True}
 
 
 @router.get("/resumen", summary="Conteos por lote, tipo y estado, y tamaño de la BD")

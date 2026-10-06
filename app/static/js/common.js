@@ -195,6 +195,7 @@
         lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3',
         tag: 'M3 12V4h8l9 9-8 8zM7.5 8.5v.01',
         download: 'M12 4v11M7 11l5 5 5-5M5 20h14',
+        mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
         keyboard: 'M3 6h18v12H3zM7 10h.01M11 10h.01M15 10h.01M7 14h10',
         paste: 'M9 4h6v3H9zM7 5H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2',
         link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
@@ -240,7 +241,13 @@
         return b;
     }
     const tarjetaBadge = (t) => { const e = estadoTarjeta(t); return badge(e.label, e.kind, e.icon); };
-    const cicloBadge = (c) => badge(CICLO_LABEL[c] || c || '—', CICLO_KIND[c] || '');
+    /** R1/R2 con MAC y versión de firmware guardadas = programada (v1.3.40). La R3 no se programa. */
+    const programada = (p) => !!p && p.tipo !== 'R3' && !!p.mac && !!p.firmware;
+    const cicloBadge = (c, p) => {
+        if (programada(p) && (c === 'RECIBIDA' || c === 'DISPONIBLE')) return badge('Programada', 'ok');
+        if (programada(p) && c === 'ASIGNADA') return badge('Asignada · programada', 'ok');
+        return badge(CICLO_LABEL[c] || c || '—', CICLO_KIND[c] || '');
+    };
     function banner(kind, iconName, ...kids) {
         return h('div', { class: 'banner', dataset: { k: kind }, role: kind === 'bad' ? 'alert' : 'status' }, icon(iconName), h('div', { class: 'grow' }, kids));
     }
@@ -531,12 +538,68 @@
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pon); else pon();
     });
 
+    /** Enviar por correo un Excel que genera el servidor (v1.3.37).
+     *  opts: { tipo: 'lote'|'reporte_dia'|'inventario_tqtr', lote_id?, fecha?, titulo, adminToken? }
+     *  Muestra las cuentas activas como casillas y un campo para correos sin cuenta (separados por coma o espacio). */
+    async function enviarExcel(opts) {
+        const r = await api('/api/correo/destinatarios');
+        if (!r.ok) { toast(r.error, { kind: 'bad' }); return; }
+        const d = r.data;
+        const marcas = d.items.map((u) => {
+            const cb = h('input', { type: 'checkbox', value: u.email });
+            return { cb, el: h('label', { class: 'row', style: 'gap:10px;padding:6px 0;cursor:pointer' }, cb, h('span', { class: 'mono grow', style: 'overflow-wrap:anywhere' }, u.email), h('span', { class: 'muted', style: 'font-size:12px' }, u.rol)) };
+        });
+        const otros = h('input', { class: 'input', type: 'text', inputmode: 'email', autocapitalize: 'none', spellcheck: 'false', placeholder: 'otra@empresa.com, otro@correo.com', 'aria-label': 'Correos sin cuenta' });
+        const msj = h('textarea', { class: 'input', rows: 2, maxlength: 1000, placeholder: 'Mensaje (opcional)', 'aria-label': 'Mensaje opcional', style: 'resize:vertical' });
+        const err = h('div', { class: 'hint err', role: 'alert' });
+        const body = [
+            h('p', { class: 'muted', style: 'margin:0' }, 'Se adjunta: ', h('b', null, opts.titulo || 'Excel'), '. Cada destinatario recibe su propio correo.'),
+            d.smtp ? null : banner('warn', 'alert', 'El correo SMTP no está configurado en el servidor: no se podrá enviar.'),
+            h('div', { class: 'silk' }, 'Cuentas de la app'),
+            h('div', { style: 'max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:4px 12px' }, marcas.length ? marcas.map((m) => m.el) : h('span', { class: 'muted' }, 'No hay cuentas activas.')),
+            h('div', { class: 'field' }, h('label', null, 'Correos sin cuenta'), otros),
+            h('div', { class: 'field' }, h('label', null, 'Mensaje'), msj),
+            err,
+        ];
+        sheet({
+            title: 'Enviar por correo', body, actions: [
+                { label: 'Cancelar', kind: 'ghost', onClick: () => true },
+                { label: 'Enviar', kind: 'primary', icon: 'mail', onClick: async (btn) => {
+                    const extra = otros.value.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+                    const para = [...new Set([...marcas.filter((m) => m.cb.checked).map((m) => m.cb.value), ...extra])];
+                    if (!para.length) { err.textContent = 'Elige al menos una cuenta o escribe un correo.'; return false; }
+                    if (para.length > d.max) { err.textContent = `Máximo ${d.max} destinatarios por envío.`; return false; }
+                    const malo = extra.find((x) => !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(x));
+                    if (malo) { err.textContent = `Correo no válido: ${malo}`; return false; }
+                    err.textContent = ''; btn.textContent = 'Enviando…';
+                    const headers = { 'Content-Type': 'application/json', 'X-Cliente': clienteId };
+                    if (opts.adminToken) headers['X-Admin-Token'] = opts.adminToken;
+                    let res, data = null;
+                    try {
+                        res = await fetch('/api/correo/excel', { method: 'POST', headers, body: JSON.stringify({ tipo: opts.tipo, lote_id: opts.lote_id || null, fecha: opts.fecha || null, mensaje: msj.value || null, para }) });
+                        try { data = await res.json(); } catch (e) { data = null; }
+                    } catch (e) { btn.textContent = 'Enviar'; err.textContent = 'Sin conexión con el servidor.'; return false; }
+                    btn.textContent = 'Enviar';
+                    if (!res.ok) {
+                        err.textContent = res.status === 401 ? 'Para enviar el Excel del lote primero entra a Administración (contraseña de supervisor).' : (detailText(data && data.detail) || `Error ${res.status}`);
+                        return false;
+                    }
+                    const f = data.fallos || [];
+                    toast(`${data.archivo} enviado a ${data.enviados.length} destinatario${data.enviados.length === 1 ? '' : 's'}` + (f.length ? ` · ${f.length} falló` : ''), { kind: f.length ? 'warn' : 'ok', ms: 5000 });
+                    return true;
+                } },
+            ],
+        });
+    }
+    /** Botón "Enviar por correo" para poner junto a un botón de exportar. getOpts() se evalúa al pulsar. */
+    const botonCorreo = (getOpts, cls) => h('button', { class: cls || 'btn', type: 'button', title: 'Enviar este Excel por correo', onclick: () => { const o = getOpts(); if (o) enviarExcel(o); } }, icon('mail'), h('span', null, 'Enviar por correo'));
+
     window.TQT = {
         versionP,
         hydrateIcons, MESES, esc, h, store, api, parseNombre, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, TARJETA_ESTADOS,
         loteNombre, debounce, hora,
-        icon, tipoChip, badge, tarjetaBadge, cicloBadge, banner, empty,
-        toast, sheet, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, openLotes,
+        icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, banner, empty,
+        toast, sheet, enviarExcel, botonCorreo, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, openLotes,
     };
 })();

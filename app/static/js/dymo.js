@@ -339,5 +339,67 @@ document.addEventListener('DOMContentLoaded', () => {
     const ancho = Math.min(window.innerWidth, 1100) - 72;
     const zFit = Math.max(1, Math.min(3, Math.floor(ancho / (57 * 96 / 25.4))));
     state.zoom = zFit; $('selZoom').value = String(zFit);
+    // ------------------------------------------------------------------ etiquetas R3 (v1.3.36): solo el nombre TQT-R3-Vxx-0000
+    const soloDig = (e) => { e.target.value = e.target.value.replace(/\D/g, ''); };
+    const r3Serie = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 && n <= 9999 ? n : null; };
+    function r3Nombres() {
+        const ver = ($('r3Ver').value || '').replace(/\D/g, '') || '30';
+        const d = r3Serie($('r3Desde').value); if (d === null) return { ver, lista: [] };
+        const hRaw = $('r3Hasta').value.trim(); const hh = hRaw ? r3Serie(hRaw) : d;
+        if (hh === null || hh < d) return { ver, lista: [], error: '"Serie hasta" debe ser mayor o igual que "desde".' };
+        if (hh - d >= 500) return { ver, lista: [], error: 'Máximo 500 etiquetas por tanda.' };
+        const lista = []; for (let n = d; n <= hh; n++) lista.push(`TQT-R3-V${ver}-${String(n).padStart(4, '0')}`);
+        return { ver, lista };
+    }
+    function r3Vista() {
+        const { ver, lista, error } = r3Nombres();
+        const nombre = lista[0] || `TQT-R3-V${ver}-0000`;
+        $('r3Ejemplo').textContent = nombre;
+        $('r3Label').replaceChildren(h('div', { class: 'dymo-label', role: 'img', 'aria-label': `Etiqueta ${nombre}` },
+            h('div', { class: 'dymo-qr' }, qrSvg(nombre)), h('div', { class: 'dymo-trama' }, h('span', { class: 'dymo-l n r3' }, nombre))));
+        $('r3ZoomHost').style.transform = `scale(${state.zoom})`;
+        const lbl = $('r3Label').firstChild; $('r3ZoomHost').style.width = `${lbl.offsetWidth * state.zoom}px`; $('r3ZoomHost').style.height = `${lbl.offsetHeight * state.zoom}px`;
+        $('r3Info').textContent = error || (lista.length > 1 ? `${lista.length} etiquetas: ${lista[0]} … ${lista[lista.length - 1]}` : 'Vista previa · 57 × 32 mm');
+        $('btnR3Print').disabled = $('btnR3Open').disabled = !lista.length || state.busy;
+    }
+    ['r3Ver', 'r3Desde', 'r3Hasta', 'r3Copias'].forEach((id) => $(id).addEventListener('input', (e) => { soloDig(e); r3Vista(); }));
+    $('selZoom').addEventListener('change', r3Vista);
+    async function xmlR3(nombre, tipo) {
+        let res;
+        try { res = await fetch(`/api/dymo/r3/xml?nombre=${encodeURIComponent(nombre)}&tipo=${tipo}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`);
+        const txt = await res.text();
+        if (!D.esXmlEtiqueta(txt)) throw new Error('El servidor no devolvió un XML de etiqueta válido.');
+        return txt;
+    }
+    async function imprimirR3(printer, nombre, c) {
+        let primero = null;
+        for (const tipo of ['label', 'dymo']) {
+            try { await D.print(printer, await xmlR3(nombre, tipo), c); return; }
+            catch (e) { if (/no respondi|no encuentra|Elige|cargó|Sin conexión/i.test(e.message)) throw e; if (!primero) primero = e; }
+        }
+        throw primero;
+    }
+    $('btnR3Print').addEventListener('click', async () => {
+        const { lista } = r3Nombres(); if (!lista.length) return;
+        const printer = $('selPrinter').value; const c = Math.max(1, Math.min(99, parseInt($('r3Copias').value || '1', 10) || 1));
+        state.busy = true; refrescarBotones(); r3Vista(); let hechas = 0; const fallos = [];
+        for (const n of lista) {
+            progreso(hechas, lista.length, `Imprimiendo ${hechas + 1} de ${lista.length}: ${n}…`);
+            try { await imprimirR3(printer, n, c); hechas++; }
+            catch (e) { fallos.push(`${n}: ${e.message}`); if (/no respondió|DYMO Connect|servicio/i.test(e.message)) break; }
+        }
+        progreso(hechas, lista.length, `${hechas} de ${lista.length} etiquetas R3 enviadas.`);
+        if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} R3 sin imprimir. `), fallos.slice(0, 4).join(' · ')));
+        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} R3 enviada${hechas === 1 ? '' : 's'} a la DYMO`, { kind: 'ok' });
+        ocultarProg(4000); state.busy = false; refrescarBotones(); r3Vista();
+    });
+    $('btnR3Open').addEventListener('click', () => {
+        const { lista } = r3Nombres(); if (!lista.length) return;
+        lista.slice(0, 20).forEach((n, i) => setTimeout(() => bajar(`/api/dymo/r3/archivo?nombre=${encodeURIComponent(n)}&tipo=label`, `${n}.label`), i * 300));
+        toast(lista.length > 20 ? 'Se descargaron las primeras 20. Para más, imprime directo en DYMO.' : 'Archivo .label descargado. Ábrelo con DYMO Label (o DYMO Connect).', { ms: 4000 });
+    });
+    r3Vista();
+
     load().then(() => { state.listo = true; }); conectar(false);
 });

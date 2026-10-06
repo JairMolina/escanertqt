@@ -285,3 +285,15 @@ button.esc-det-fila:hover { background: var(--surface-2); }
 .esc-sol-fila b { overflow-wrap: anywhere; }
 .esc-cod { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 12px; border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: var(--r-1); background: var(--surface-2); text-align: center; }
 .esc-cod b { font-size: 44px; letter-spacing: .18em; line-height: 1; padding-left: .18em; font-variant-numeric: tabular-nums slashed-zero; }
+
+/* Tarjetas · reporte por fecha (v1.3.35) */
+.esc-dia { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-2); }
+.esc-dia-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.esc-dia-lbl { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.esc-dia .input[type=date] { min-height: 40px; width: auto; }
+.esc-dia-res { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.esc-dia-kpi { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 13px;
+               background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.esc-dia-kpi b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.esc-dia-kpi.ok { background: color-mix(in srgb, var(--ok, #22a06b) 16%, transparent); color: var(--ok, #22a06b); }
+.esc-dia-kpi.info { color: var(--accent); }

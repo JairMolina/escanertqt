@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return h('article', { class: 'pcbf', dataset: { t: S, empty: '1' }, 'aria-label': `${S} sin asignar` },
                 h('header', null, T.tipoChip(S, { lg: true, empty: true }), h('span', { class: 'nm muted' }, 'Sin placa asignada')));
         }
-        const head = h('header', null, T.tipoChip(S, { lg: true }), h('span', { class: 'nm' }, p.nombre), T.cicloBadge(p.estado_ciclo));
+        const head = h('header', null, T.tipoChip(S, { lg: true }), h('span', { class: 'nm' }, p.nombre), T.cicloBadge(p.estado_ciclo, Object.assign({ tipo: S }, p)));
         if (S === 'R3') {   // la R3 no lleva MAC ni firmware
             return h('article', { class: 'pcbf', dataset: { t: S, hit: hit ? '1' : '' }, 'aria-label': `${S} ${p.nombre}` }, head,
                 h('dl', null, campo('Hardware', 'V' + p.version), campo('Serie', p.serie)),

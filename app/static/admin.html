@@ -93,11 +93,13 @@
             <button type="button" role="tab" data-v="pcb" aria-selected="false">PCB</button>
             <button type="button" role="tab" data-v="movimientos" aria-selected="false">Movimientos</button>
             <button type="button" role="tab" data-v="riesgo" aria-selected="false">Borrado</button>
+            <button type="button" role="tab" data-v="usuarios" aria-selected="false">Cuentas</button>
             <button type="button" role="tab" data-v="cuenta" aria-selected="false">Cuenta</button>
         </nav>
         <div class="grow"></div>
         <span class="sesion" id="sesion" role="timer" aria-label="Tiempo de sesión restante"></span>
         <button class="btn btn-sm" type="button" id="btnExport"><span class="svg-slot" data-i="excel"></span> Exportar Excel</button>
+        <button class="btn btn-sm" type="button" id="btnExportMail"><span class="svg-slot" data-i="mail"></span> Enviar por correo</button>
         <button class="btn btn-sm btn-ghost" type="button" id="btnLogout">Cerrar sesión</button>
         <button class="iconbtn" type="button" id="btnTheme" aria-label="Cambiar entre tema claro y oscuro"></button>
     </header>
@@ -163,6 +165,23 @@
             </div>
         </section>
 
+        <section id="v-usuarios" class="stack" hidden>
+            <form class="panel pad stack" id="formAlta" style="max-width:640px" autocomplete="off" novalidate>
+                <h2 class="silk">Dar de alta una cuenta</h2>
+                <p class="muted" style="margin:0">Se envía un correo con un enlace (48 h, un solo uso) para que la persona elija su contraseña.</p>
+                <div class="row wrap" style="gap:10px;align-items:flex-end">
+                    <div class="field" style="flex:2 1 240px"><label for="uEmail">Correo</label><input class="input" id="uEmail" type="email" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="200"></div>
+                    <div class="field" style="flex:1 1 160px"><label for="uRol">Rol</label><select class="input" id="uRol" style="min-height:44px">
+                        <option value="general">General</option><option value="consultor">Consultor</option><option value="administrador">Administrador</option></select></div>
+                    <button class="btn btn-primary" type="submit" id="btnAlta" style="min-height:44px">Enviar invitación</button>
+                </div>
+                <div class="hint" id="uRolHint"></div>
+                <div id="uMsg" class="hint" role="status"></div>
+            </form>
+            <div class="row wrap" style="gap:10px;align-items:center"><span class="muted" id="uSmtp"></span><button class="btn btn-sm" type="button" id="btnSmtp">Probar envío de correo</button></div>
+            <div class="tablewrap" id="uTabla"></div>
+        </section>
+
         <section id="v-cuenta" class="stack" hidden>
             <form class="panel pad stack" id="formClave" style="max-width:440px" autocomplete="off" novalidate>
                 <h2 class="silk">Cambiar contraseña</h2>
@@ -176,7 +195,7 @@
     </main>
 </div>
 
-<script src="/static/js/common.js?v=1316"></script>
-<script src="/static/js/admin.js?v=1330"></script>
+<script src="/static/js/common.js?v=1340"></script>
+<script src="/static/js/admin.js?v=1340"></script>
 </body>
 </html>

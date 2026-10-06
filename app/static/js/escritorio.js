@@ -181,7 +181,7 @@
                 h('header', null, T.tipoChip(slot, { lg: true, empty: true }), h('span', { class: 'nm muted', style: 'font-family:var(--font-ui);font-weight:500' }, 'Sin placa asignada')));
         }
         const campo = (l, v) => h('div', null, h('dt', null, l), h('dd', null, v === null || v === undefined || v === '' ? h('span', { class: 'muted' }, '—') : v));
-        const cab = h('header', null, T.tipoChip(slot, { lg: true }), h('span', { class: 'nm' }, p.nombre), T.cicloBadge(p.estado_ciclo));
+        const cab = h('header', null, T.tipoChip(slot, { lg: true }), h('span', { class: 'nm' }, p.nombre), T.cicloBadge(p.estado_ciclo, Object.assign({ tipo: slot }, p)));
         const art = (kids) => h('article', { class: 'esc-pl', dataset: { t: slot, hit: hit ? '1' : '' }, 'aria-label': `${slot} ${p.nombre}` }, cab, kids);
         if (slot === 'R3') {
             return art([h('dl', null, campo('Hardware', 'V' + p.version), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC ni firmware.')]);

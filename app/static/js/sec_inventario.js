@@ -12,7 +12,7 @@
             const { T, api, h, icon, toast, sheet, util } = ctx;
             const P = ctx.params();
             const st = { pcbs: null, error: '', tipo: ['R1', 'R2', 'R3'].includes(P.get('tipo')) ? P.get('tipo') : '', ciclo: P.get('estado') || '', ver: '', sinMac: P.get('sin_mac') === '1', q: P.get('q') || '', sort: { id: 'nombre', dir: 'asc' }, limit: 200, sel: new Set() };
-            const CICLOS = [['RECIBIDA', 'Sin confirmar'], ['DISPONIBLE', 'Sueltas'], ['ASIGNADA', 'Asignadas'], ['FALLA', 'Falla'], ['BAJA', 'Baja']];
+            const CICLOS = [['RECIBIDA', 'Sin confirmar'], ['DISPONIBLE', 'Sueltas'], ['PROGRAMADA', 'Programadas'], ['ASIGNADA', 'Asignadas'], ['FALLA', 'Falla'], ['BAJA', 'Baja']];
 
             const q = h('input', { class: 'input', type: 'search', id: 'invQ', placeholder: 'Serie, nombre o MAC', 'aria-label': 'Buscar placa por serie, nombre o MAC', 'data-buscar': '1', value: st.q, autocomplete: 'off' });
             const segBtns = [['', 'Todas'], ['R1', 'R1'], ['R2', 'R2'], ['R3', 'R3']].map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(st.tipo === v), dataset: { v }, onclick: () => { st.tipo = v; st.limit = 200; segBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v))); lista(); } }, l));
@@ -31,7 +31,7 @@
             const norm = (s) => String(s || '').toLowerCase();
             function filtradas() {
                 const txt = norm(st.q).trim(); const hex = txt.replace(/[^0-9a-f]/g, '');
-                return st.pcbs.filter((p) => (!st.tipo || p.tipo === st.tipo) && (!st.ciclo || p.estado_ciclo === st.ciclo) && (!st.ver || p.version === st.ver)
+                return st.pcbs.filter((p) => (!st.tipo || p.tipo === st.tipo) && (!st.ciclo || (st.ciclo === 'PROGRAMADA' ? T.programada(p) && ['RECIBIDA', 'DISPONIBLE'].includes(p.estado_ciclo) : p.estado_ciclo === st.ciclo)) && (!st.ver || p.version === st.ver)
                     && (!st.sinMac || (p.tipo !== 'R3' && !p.mac && ['RECIBIDA', 'DISPONIBLE', 'ASIGNADA'].includes(p.estado_ciclo)))
                     && (!txt || norm(p.nombre).includes(txt) || String(p.serie).includes(txt) || (hex.length >= 2 && norm(p.mac).replace(/:/g, '').includes(hex))));
             }
@@ -41,7 +41,7 @@
                 { id: 'version', titulo: 'Hardware', cel: (p) => h('span', { class: 'mono' }, 'V' + p.version), sort: (a, b) => (+a.version) - (+b.version) },
                 { id: 'firmware', titulo: 'Firmware', cel: (p) => (p.tipo === 'R3' ? h('span', { class: 'muted' }, 'no aplica') : p.firmware ? h('span', { class: 'mono' }, p.firmware) : h('span', { class: 'muted' }, 'sin firmware')), valor: (p) => (p.tipo === 'R3' ? '' : p.firmware) },
                 { id: 'mac', titulo: 'MAC', cel: (p) => (p.tipo === 'R3' ? h('span', { class: 'muted' }, 'no aplica') : p.mac ? h('span', { class: 'mono' }, String(p.mac).toLowerCase()) : h('span', { class: 'muted' }, 'sin MAC')), valor: (p) => (p.tipo === 'R3' ? '' : p.mac) },
-                { id: 'estado_ciclo', titulo: 'Estado', cel: (p) => T.cicloBadge(p.estado_ciclo) },
+                { id: 'estado_ciclo', titulo: 'Estado', cel: (p) => T.cicloBadge(p.estado_ciclo, p) },
                 { id: 'tarjeta', titulo: 'Tarjeta', cls: 'c-3', cel: (p) => (p.id_tarjeta_num ? h('a', { class: 'mono', href: `#/tarjetas?id=${p.tarjeta_id}` }, p.id_tarjeta_num) : h('span', { class: 'muted' }, '—')), valor: (p) => p.id_tarjeta_num },
                 { id: 'recibida_en', titulo: 'Recibida', cls: 'c-2', cel: (p) => h('span', { class: 'mono' }, util.fecha(p.recibida_en)), valor: (p) => p.recibida_en },
                 { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (p) => h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Editar ${p.nombre}`, onclick: () => editar(p) }, icon('edit'), 'Editar') },

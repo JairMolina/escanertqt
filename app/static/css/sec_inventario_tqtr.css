@@ -1,0 +1,81 @@
+/* sec_inventario_tqtr.css - Inventario TQTR (réplica del Excel). Solo tokens de app.css/escritorio.css: funciona en claro y oscuro. */
+.itq { gap: 14px; }
+.itq-top { flex-wrap: wrap; }
+
+/* pestañas */
+.itq-tabs { display: inline-flex; gap: 2px; border-bottom: 1px solid var(--line); }
+.itq-tabs [role="tab"] { min-height: 36px; padding: 0 14px; border: 0; background: transparent; color: var(--muted); font-weight: 700; font-size: 14px; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.itq-tabs [role="tab"]:hover { color: var(--text); }
+.itq-tabs [role="tab"][aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.itq-panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.itq-panel:focus { outline: none; }
+
+/* dashboard */
+.itq-dash { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .itq-dash { grid-template-columns: minmax(0, 1fr); } }
+.itq-t td.num, .itq-t th.num, .esc-t td.num { text-align: right; }
+.itq-mat { font-weight: 600; }
+.itq-bar { display: block; height: 4px; margin-top: 5px; max-width: 220px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.itq-bar > span { display: block; height: 100%; background: var(--ok); }
+.itq-bar[data-k="warn"] > span { background: var(--warn); }
+.itq-bar[data-k="bad"] > span { background: var(--bad); }
+
+.itq-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-1); }
+.itq-lista > li { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13.5px; min-width: 0; }
+.itq-lista > li:last-child { border-bottom: 0; }
+.itq-lista .grow { flex: 1 1 auto; min-width: 0; }
+.itq-lista .mono, .itq-n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.itq-n { font-size: 20px; font-weight: 600; }
+.itq-n[data-k="ok"] { color: var(--ok); }
+.itq-n[data-k="warn"] { color: var(--warn); }
+.itq-n[data-k="bad"] { color: var(--bad); }
+.itq-compacta > li { min-height: 30px; padding: 4px 12px; }
+
+.itq-apilada { display: flex; height: 10px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.itq-apilada > span { display: block; height: 100%; background: var(--line-2); }
+.itq-apilada > span[data-k="ok"], .itq-ley i[data-k="ok"] { background: var(--ok); }
+.itq-apilada > span[data-k="bad"], .itq-ley i[data-k="bad"] { background: var(--bad); }
+.itq-ley { font-size: 12px; display: flex; align-items: center; gap: 6px; margin: 0; }
+.itq-ley i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-left: 6px; }
+
+/* registro y componentes */
+.itq-fecha { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.itq-fecha .input { width: auto; }
+.itq-bom { display: inline-flex; gap: 6px; }
+.itq-bom > span { min-width: 26px; text-align: center; color: var(--faint, var(--muted)); }
+.itq-bom > span[data-on="1"] { color: var(--text); font-weight: 600; }
+
+/* formularios en hoja */
+.itq-form > .field { min-width: 180px; flex: 1 1 200px; }
+.itq-bomset { border: 1px solid var(--line); border-radius: var(--r-1); padding: 10px 12px 12px; margin: 0; }
+.itq-bomset legend { padding: 0 6px; font-size: 12px; color: var(--muted); }
+.itq-bomgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+
+/* configuración */
+.itq-cfg { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.itq-cfg .row .input { flex: 1 1 auto; min-width: 0; }
+.itq-cfg select.input { width: auto; }
+.itq-reglas { display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; margin: 0; font-size: 13.5px; }
+.itq-reglas dt { font-weight: 700; }
+.itq-reglas dd { margin: 0; color: var(--muted); }
+
+/* costos */
+.itq-tc { width: 110px; }
+.esc-t .mono[data-fuera="1"] { color: var(--muted); text-decoration: line-through; }
+
+/* consumo por tarjeta: ficha de materiales (también en el panel de Tarjetas) */
+.itq-ficha { gap: 10px; }
+.itq-ficha .esc-tw { overflow-x: auto; }
+.itq-real { width: 92px; text-align: right; }
+.itq-ficha tr[data-estado="devuelto"] td { color: var(--muted); }
+.itq-ficha tr[data-estado="devuelto"] .itq-mat { text-decoration: line-through; }
+.esc-t td[data-k="bad"], .itq-tot dd[data-k="bad"] { color: var(--bad); }
+.esc-t td[data-k="ok"], .itq-tot dd[data-k="ok"] { color: var(--ok); }
+.esc-t .mono[data-k="bad"] { color: var(--bad); }
+.itq-tot { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0; }
+.itq-tot dt { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.itq-tot dd { margin: 0; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* v1.3.39: stock mínimo */
+.itq-nav-badge { margin-left: auto; min-width: 20px; padding: 1px 6px; border-radius: 10px; background: var(--warn); color: var(--bg); font-family: var(--font-mono); font-size: 11px; font-weight: 700; text-align: center; }
+.esc[data-lat="min"] .itq-nav-badge { position: absolute; top: 4px; right: 4px; margin: 0; padding: 0 4px; min-width: 16px; }

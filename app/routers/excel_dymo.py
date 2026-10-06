@@ -306,6 +306,35 @@ def get_dymo_archivo(
     return _adjunto(datos, nombre)
 
 
+# ---------------------------------------------------------------- etiquetas sueltas de R3 (v1.3.36): solo el nombre TQT-R3-V30-0000
+NOMBRE_R3 = r"^TQT-R3-V[0-9]{1,3}-[0-9]{4}$"
+
+
+def _r3(nombre: str) -> Dict[str, Any]:
+    return {"_lineas": [nombre], "id_tarjeta_num": nombre.rsplit("-", 1)[-1]}
+
+
+@router.get("/dymo/r3/xml", summary="XML de la etiqueta de una R3 (QR + nombre TQT-R3-Vxx-0000) para DYMO")
+def get_dymo_r3_xml(
+    nombre: str = Query(..., pattern=NOMBRE_R3, description="ej. TQT-R3-V30-0084"),
+    label_format: str = Query("30334", description=FORMATO_DOC),
+    tipo: str = Query("dymo", pattern="^(dymo|label)$"),
+):
+    fmt = _formato_o_400(label_format)
+    xml = DymoService.generate_dcd_xml(_r3(nombre), fmt) if tipo == "dymo" else DymoService.generate_dymo_xml(_r3(nombre), fmt)
+    return Response(content=xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/dymo/r3/archivo", summary="Descarga la etiqueta de una R3 como archivo .dymo o .label")
+def get_dymo_r3_archivo(
+    nombre: str = Query(..., pattern=NOMBRE_R3),
+    label_format: str = Query("30334", description=FORMATO_DOC),
+    tipo: str = Query("dymo", pattern="^(dymo|label)$"),
+):
+    datos, _ = DymoService.archivo_dymo(_r3(nombre), _formato_o_400(label_format), tipo)
+    return _adjunto(datos, f"{nombre}.{tipo}")
+
+
 class ImpresasRequest(BaseModel):
     marcas: List[Dict[str, Any]] = Field(..., max_length=500, description="[{id, firma}] de las etiquetas enviadas con éxito a la DYMO")
 

@@ -152,10 +152,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ------------------------------------------------------------------ pestañas
     function setVista(v) {
-        ['resumen', 'tarjetas', 'pcb', 'movimientos', 'riesgo', 'cuenta'].forEach((k) => { $('v-' + k).hidden = k !== v; });
+        ['resumen', 'tarjetas', 'pcb', 'movimientos', 'riesgo', 'usuarios', 'cuenta'].forEach((k) => { $('v-' + k).hidden = k !== v; });
         document.querySelectorAll('.desk-nav [role=tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.v === v)));
     }
-    document.querySelector('.desk-nav').addEventListener('click', (e) => { const b = e.target.closest('[role=tab]'); if (b) { setVista(b.dataset.v); if (b.dataset.v === 'movimientos' && S.token) cargarMov(true); } });
+    document.querySelector('.desk-nav').addEventListener('click', (e) => { const b = e.target.closest('[role=tab]'); if (b) { setVista(b.dataset.v); if (b.dataset.v === 'movimientos' && S.token) cargarMov(true); if (b.dataset.v === 'usuarios') cargarCuentas(); } });
 
     // ------------------------------------------------------------------ datos
     const bonito = (k) => { const s = String(k).replace(/_/g, ' ').trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
@@ -274,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
             host.append(h('table', { class: 'grid' }, h('thead', null, h('tr', null, h('th', { class: 'col-check' }, all), ['Tipo', 'Nombre', 'MAC', 'Estado', 'Tarjeta'].map((x) => h('th', null, x)))),
                 h('tbody', null, rows.map((p) => h('tr', null,
                     h('td', { class: 'col-check' }, h('input', { type: 'checkbox', 'aria-label': `Seleccionar ${p.nombre}`, checked: S.selP.has(p.id) ? '' : null, onchange: (e) => { e.target.checked ? S.selP.add(p.id) : S.selP.delete(p.id); actPSel(); } })),
-                    h('td', null, T.tipoChip(p.tipo)), h('td', { class: 'mono' }, p.nombre), h('td', { class: 'mono' }, (p.tipo === 'R3' ? '—' : (p.mac || 'sin MAC'))), h('td', null, T.cicloBadge(p.estado_ciclo)), h('td', { class: 'mono' }, p.id_tarjeta_num || '—'))))));
+                    h('td', null, T.tipoChip(p.tipo)), h('td', { class: 'mono' }, p.nombre), h('td', { class: 'mono' }, (p.tipo === 'R3' ? '—' : (p.mac || 'sin MAC'))), h('td', null, T.cicloBadge(p.estado_ciclo, p)), h('td', { class: 'mono' }, p.id_tarjeta_num || '—'))))));
         }
         const tot = pVis(true).length; if (tot > rows.length || S.totalP > S.pcbs.length) host.append(h('p', { class: 'muted' }, `Se muestran ${rows.length} de ${Math.max(tot, S.totalP)} placas: usa los filtros para ver el resto.`));
         actPSel();
@@ -448,6 +448,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ------------------------------------------------------------------ exportar Excel (fetch + blob con el token)
+    $('btnExportMail').addEventListener('click', () => {
+        const id = $('tLote').value || $('vLote').value; const l = S.lotes.find((x) => String(x.id) === String(id)) || S.lotes.find((x) => x.activo) || S.lotes[0];
+        T.enviarExcel({ tipo: 'lote', lote_id: l ? l.id : null, titulo: `Control de producción · ${l ? T.loteNombre(l) : 'lote activo'}`, adminToken: S.token });
+    });
     $('btnExport').addEventListener('click', async () => {
         const id = $('tLote').value || $('vLote').value; const l = S.lotes.find((x) => String(x.id) === String(id)) || S.lotes.find((x) => x.activo) || S.lotes[0];
         const b = $('btnExport'); b.disabled = true;
@@ -498,5 +502,73 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Atrás/Adelante desde la caché del navegador: nunca enseñar datos de una sesión ya cerrada.
     window.addEventListener('pageshow', (ev) => { if (ev.persisted) location.reload(); });
+    // ------------------------------------------------------------------ cuentas (alta por invitación, roles) v1.3.35
+    const ROL_TXT = { administrador: 'Puede todo, incluida esta zona de administración.', general: 'Opera la app (recibir, emparejar, programar, consola) sin acceso a Administración.',
+        consultor: 'Solo consulta escaneando: no puede crear, editar ni mover nada.' };
+    const rolHint = () => { $('uRolHint').textContent = ROL_TXT[$('uRol').value] || ''; };
+    $('uRol').addEventListener('change', rolHint); rolHint();
+    function avisoEnvio(d, quien) {
+        const m = $('uMsg'); m.replaceChildren(); m.className = 'hint';
+        if (d.enviado) { m.textContent = `Invitación enviada a ${quien}.`; toast('Invitación enviada', { kind: 'ok' }); return; }
+        m.className = 'hint err';
+        m.append(`${d.error || 'No se envió el correo.'} Comparte este enlace con ${quien}: `, h('span', { class: 'mono', style: 'overflow-wrap:anywhere' }, d.enlace || ''), ' ',
+            h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { if (navigator.clipboard) navigator.clipboard.writeText(d.enlace || ''); toast('Enlace copiado', { kind: 'ok' }); } }, 'Copiar'));
+    }
+    const rutaCuenta = (email) => '/api/admin/usuarios/' + encodeURIComponent(email);
+    async function cargarCuentas() {
+        const r = await adm('/api/admin/usuarios');
+        if (!r.ok) { $('uTabla').replaceChildren(h('p', { class: 'hint err' }, r.error)); return; }
+        $('uSmtp').textContent = r.data.smtp ? 'Correo SMTP configurado.' : 'Correo SMTP sin configurar: al invitar se mostrará el enlace para compartirlo a mano.';
+        const filas = r.data.items.map((u) => {
+            const estado = u.pendiente ? (u.inv_exp * 1000 < Date.now() ? 'Invitación caducada' : 'Invitación pendiente') : u.activo ? 'Activa' : 'Desactivada';
+            const sel = h('select', { class: 'input', 'aria-label': 'Rol de ' + u.email, style: 'min-height:36px' }, ...['administrador', 'general', 'consultor'].map((x) => h('option', { value: x }, bonito(x))));
+            sel.value = u.rol;
+            sel.addEventListener('change', async () => {
+                const x = await adm(rutaCuenta(u.email), { method: 'PATCH', body: { rol: sel.value } });
+                if (x.ok) toast('Rol actualizado', { kind: 'ok' }); else { toast(x.error, { kind: 'bad' }); sel.value = u.rol; }
+            });
+            const acc = [];
+            if (u.pendiente) {
+                acc.push(h('button', { class: 'btn btn-sm', type: 'button', onclick: async (e) => {
+                    e.target.disabled = true;
+                    const x = await adm(rutaCuenta(u.email) + '/reenviar', { method: 'POST', timeout: 45000 });
+                    e.target.disabled = false;
+                    if (x.ok) { avisoEnvio(x.data, u.email); cargarCuentas(); } else toast(x.error, { kind: 'bad' });
+                } }, 'Reenviar'));
+            } else {
+                acc.push(h('button', { class: 'btn btn-sm', type: 'button', onclick: async () => {
+                    const x = await adm(rutaCuenta(u.email), { method: 'PATCH', body: { activo: !u.activo } });
+                    if (x.ok) cargarCuentas(); else toast(x.error, { kind: 'bad' });
+                } }, u.activo ? 'Desactivar' : 'Activar'));
+            }
+            acc.push(h('button', { class: 'btn btn-sm btn-danger', type: 'button', onclick: async (e) => {
+                const b = e.currentTarget;   // dos clics para confirmar (sin diálogos del navegador)
+                if (!b.dataset.seguro) { b.dataset.seguro = '1'; b.textContent = '¿Eliminar?'; setTimeout(() => { delete b.dataset.seguro; b.textContent = 'Eliminar'; }, 4000); return; }
+                const x = await adm(rutaCuenta(u.email), { method: 'DELETE' });
+                if (x.ok) { toast('Cuenta eliminada', { kind: 'ok' }); cargarCuentas(); } else toast(x.error, { kind: 'bad' });
+            } }, 'Eliminar'));
+            return h('tr', {}, h('td', { class: 'mono' }, u.email), h('td', {}, sel), h('td', {}, estado), h('td', {}, u.ultimo_acceso || '—'),
+                h('td', {}, h('div', { class: 'row', style: 'gap:6px' }, ...acc)));
+        });
+        $('uTabla').replaceChildren(h('table', { class: 'table' }, h('thead', {}, h('tr', {}, ...['Correo', 'Rol', 'Estado', 'Último acceso', 'Acciones'].map((t) => h('th', {}, t)))), h('tbody', {}, ...filas)));
+    }
+    $('formAlta').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = $('uEmail').value.trim(); if (!email) { $('uEmail').focus(); return; }
+        $('btnAlta').disabled = true; $('uMsg').textContent = 'Enviando…'; $('uMsg').className = 'hint';
+        const r = await adm('/api/admin/usuarios', { method: 'POST', body: { email, rol: $('uRol').value }, timeout: 45000 });
+        $('btnAlta').disabled = false;
+        if (!r.ok) { $('uMsg').textContent = r.error; $('uMsg').className = 'hint err'; return; }
+        avisoEnvio(r.data, email); $('uEmail').value = ''; cargarCuentas();
+    });
+    $('btnSmtp').addEventListener('click', async () => {
+        const para = $('uEmail').value.trim();
+        if (!para) { $('uMsg').textContent = 'Escribe en "Correo" la dirección a la que se envía la prueba.'; $('uMsg').className = 'hint err'; $('uEmail').focus(); return; }
+        $('btnSmtp').disabled = true;
+        const r = await adm('/api/admin/correo/prueba', { method: 'POST', body: { para }, timeout: 45000 });
+        $('btnSmtp').disabled = false;
+        toast(r.ok ? `Correo de prueba enviado a ${para}` : r.error, { kind: r.ok ? 'ok' : 'bad', ms: 5000 });
+    });
+
     arrancar();
 });

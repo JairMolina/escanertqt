@@ -4,6 +4,7 @@ import secrets
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from urllib.parse import quote, urlsplit
 
@@ -16,7 +17,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from app.config import settings
 from app.database import db
-from app.routers import admin, api, auth, ws, excel_dymo, inventario
+from app.routers import admin, api, auth, correo_excel, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.ssl_cert import ensure_ssl_certificates
 
@@ -53,6 +54,11 @@ async def lifespan(app: FastAPI):
         logger.info("Cuentas de usuario listas (%d nuevas).", n)
     except Exception as e:  # noqa: BLE001
         logger.error("No se pudieron preparar las cuentas de usuario: %s", e)
+    try:  # Inventario TQTR: tablas, trigger de tarjetas borradas y conciliación de consumos
+        from app.services import inventario_tqtr
+        inventario_tqtr.sincronizar_consumos()
+    except Exception as e:  # noqa: BLE001
+        logger.error("No se pudo preparar el inventario TQTR: %s", e)
 
     # Asegurar certificados SSL autofirmados con SAN
     try:
@@ -111,8 +117,35 @@ CABECERAS_SEGURIDAD = {
 
 # Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
-RUTAS_PUBLICAS = {"/login", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
+RUTAS_PUBLICAS = {"/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js")
+
+
+PAGINAS_CONSULTOR = {"/consultar", "/favicon.ico", "/api/health"}
+
+
+def _permiso_rol(rol: Optional[str], ruta: str, metodo: str):
+    """Roles (v1.3.35). administrador: todo. general: todo menos la zona de administración. consultor: solo la página
+    Consultar (escaneo) y lecturas de la API; nada que cree, edite, mueva o borre."""
+    if rol == "administrador":
+        return None
+    if ruta == "/admin" or ruta.startswith(("/api/admin/", "/static/js/admin.js")):
+        if ruta == "/api/admin/estado":
+            return None
+        if ruta.startswith("/api/") or metodo not in ("GET", "HEAD"):
+            return JSONResponse(status_code=403, content={"detail": "Tu cuenta no tiene acceso a Administración."})
+        return RedirectResponse("/consultar" if rol == "consultor" else "/", status_code=302)
+    if rol != "consultor":
+        return None
+    if ruta.startswith("/api/auth/") or ruta.startswith(("/static/", "/ws")):
+        return None
+    if ruta.startswith("/api/"):
+        if metodo in ("GET", "HEAD", "OPTIONS"):
+            return None
+        return JSONResponse(status_code=403, content={"detail": "Tu cuenta es de consulta: no puede crear, editar ni mover datos."})
+    if ruta in PAGINAS_CONSULTOR:
+        return None
+    return RedirectResponse("/consultar", status_code=302)
 
 
 async def _exigir_sesion(request: Request):
@@ -123,8 +156,8 @@ async def _exigir_sesion(request: Request):
     if request.scope.get("type") == "websocket":
         return None
     try:
-        await run_in_threadpool(usuarios.validar_sesion, request.cookies.get(usuarios.COOKIE))
-        return None
+        u = await run_in_threadpool(usuarios.validar_sesion, request.cookies.get(usuarios.COOKIE))
+        return _permiso_rol(u.get("rol"), ruta, request.method)
     except usuarios.SesionInvalidaError as e:
         if ruta.startswith(("/api/", "/static/", "/ws")) or request.method not in ("GET", "HEAD"):
             return JSONResponse(status_code=401, content={"detail": str(e) or "Inicia sesión."}, headers={"X-Auth": "login"})
@@ -168,6 +201,8 @@ if settings.STATIC_DIR.exists():
 
 app.include_router(api.router)
 app.include_router(inventario.router)
+app.include_router(inventario_tqtr.router)
+app.include_router(correo_excel.router)
 app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(ws.router)
@@ -225,6 +260,15 @@ async def serve_admin(request: Request):
     resp = _serve_file(settings.STATIC_DIR / "admin.html")
     if not request.cookies.get("tqt_cid"):   # marca anónima de este equipo, para el límite de intentos fallidos
         resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
+    return resp
+
+
+@app.get("/invitacion", include_in_schema=False)
+async def serve_invitacion():
+    """Activar una cuenta invitada (el token viaja en el #fragmento: nunca llega a registros del servidor ni del proxy)."""
+    html = (settings.STATIC_DIR / "invitacion.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
+    resp = HTMLResponse(html)
+    resp.headers["Cache-Control"] = "no-store"
     return resp
 
 

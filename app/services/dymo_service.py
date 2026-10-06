@@ -218,6 +218,8 @@ class DymoService:
     @staticmethod
     def trama_lineas(tarjeta: Dict[str, Any]) -> List[str]:
         """Las 4 líneas de la trama: nombre R1, MAC R1 (minúsculas), nombre R2, MAC R2 (minúsculas)."""
+        if tarjeta.get("_lineas"):   # etiqueta suelta (p. ej. R3: solo su nombre)
+            return [str(x) for x in tarjeta["_lineas"]]
         def mac(clave: str) -> str:
             m = extract_mac(str(tarjeta.get(clave) or ""))
             return m.lower() if m else ""

@@ -1,5 +1,35 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.40 — 2026-10-06
+- **Placas programadas.** Una R1/R2 con MAC y versión de firmware guardadas se muestra como "Programada" (o "Asignada · programada" si ya está en una tarjeta) en Inventario de PCB, Consultar, el detalle de la tarjeta y Administración; nuevo filtro "Programadas".
+- **Inventario TQTR: Translock disponible = 16, como el Excel.** "Devolución" y "Desinstalado o Garantía" ya no suman a disponible: quedan aparte como "Devueltas / en revisión" (Translock: 2), con acciones "Pasar a disponible" o "Dar de baja" que registran el movimiento. Los armados que alcanzan con el stock bajan de 18 a 16 (los limita la caja Translock).
+
+## v1.3.39 — 2026-10-06
+- **Sensores magnéticos:** entrada de 73 en el Registro; con las 33 ya consumidas por los armados registrados, quedan 40 (migración única, también en bases existentes).
+- **Silicón en gramos y catalizador en ml.** Por armado: 400 g de silicón y 6 ml de catalizador (Translock/Quintalock) y 100 g y 1.5 ml para la R3. Registros previos convertidos con factores editables en Configuración (envase de silicón = 1000 g, de catalizador = 15 ml). Costo por armado: **4,451.14 MXN** (Translock) / 4,625.14 (Quintalock).
+- **Nueva pestaña "Stock Mínimo".** Mínimo, punto de reorden, armados objetivo, proveedor y tiempo de entrega por material; lista "Materiales a comprar" ordenada por urgencia (días de cobertura vs. tiempo de entrega) con cantidad sugerida. Aviso en el Dashboard de la sección y en la barra lateral, y correo a los administradores una vez cada vez que un material cruza su mínimo.
+- **Auditoría de precios contra `Costos_Produccion_TQTR.xlsx`:** coinciden tipo de cambio, monedas, R2 y gabinete/actuador; cambian solo silicón y catalizador por las nuevas cantidades.
+
+## v1.3.38 — 2026-10-06
+- **Inventario TQTR descuenta materiales solo.** Al quedar completa una tarjeta (R1+R2+R3 y MAC de R1 y R2) se descuentan los materiales de sus tres placas; al asignarle gabinete se descuentan la caja (Quintalock/Translock) y el actuador, y si cambia de gabinete se ajusta. Solo cuentan las tarjetas completadas desde la activación (fecha editable en Configuración).
+- **Ficha de materiales por tarjeta (merma).** Cantidad estándar vs. real de cada material, editable desde el detalle de la tarjeta (Tarjetas) y desde la nueva pestaña "Consumo" de Inventario TQTR; el costo real de la tarjeta y la merma se recalculan.
+- **Desemparejar o borrar una tarjeta completa** devuelve al inventario solo el actuador y el gabinete; el resto queda como consumo de tarjeta disuelta. Funciona aunque nadie tenga abierta la consola (se concilia al arrancar y con un disparador en la base).
+- Auditoría contra los dos Excel: diferencias (cables 0.55 vs 0.5 m, catalizador en ml vs piezas, relevador R3 fuera del total de costos) listadas en la pestaña Costos.
+
+## v1.3.37 — 2026-10-06
+- **"Enviar por correo" junto a cada exportación a Excel.** En Excel (copia del lote), Administración (Exportar Excel), Tarjetas (reporte por fecha) e Inventario TQTR. Se abre una ventana con las cuentas activas de la app como casillas, un campo para correos sin cuenta (separados por coma) y un mensaje opcional. El servidor genera el archivo (igual que la descarga) y lo manda adjunto por SMTP, un correo por destinatario (máx. 10). El Excel del lote sigue pidiendo la sesión de administración. Queda registrado en Movimientos (`EXCEL_CORREO`). Endpoints `GET /api/correo/destinatarios` y `POST /api/correo/excel`.
+
+## v1.3.36 — 2026-10-06
+- **"Resumen" ahora se llama "Dashboard"** en la consola de escritorio (el atajo `g r` sigue funcionando).
+- **Etiquetas DYMO › Etiquetas R3.** Apartado propio para imprimir etiquetas de R3 que solo llevan el nombre de la placa (texto y QR): `TQT-R3-V30-0000`. La versión (V30) se puede cambiar; se imprime una serie o un rango (máx. 500 por tanda) con sus copias, con vista previa a escala real. Endpoints `GET /api/dymo/r3/xml` y `/api/dymo/r3/archivo`.
+- **Inventario TQTR › Costos** (desde `Costos_Produccion_TQTR.xlsx`). Costo por armado (R1 + R2 + R3 + gabinete y actuador) = **4,426.28 MXN** con Translock y tipo de cambio 18.5, desglosado por placa; tipo de cambio y gabinete de costeo editables; valor del inventario en existencia, armados que alcanzan con el stock y costo de lo producido. KPIs de costo en el Dashboard de la sección y hoja "Costos" en la exportación.
+
+## v1.3.35 — 2026-10-06
+- **Administración › Cuentas: alta por invitación de correo.** El administrador escribe correo y rol; la persona recibe por SMTP un enlace (48 h, un solo uso) a `/invitacion`, elige su contraseña y entra directo. Nadie conoce la clave de otro. Si el correo falla, se muestra el enlace para compartirlo a mano. Lista de cuentas con cambio de rol, activar/desactivar, reenviar invitación y eliminar (doble clic para confirmar). Botón "Probar envío de correo". Todo queda en Movimientos.
+- **Roles.** *Administrador*: todo, incluida Administración. *General*: opera la app sin acceso a Administración. *Consultor*: solo la página Consultar (escaneo) y lecturas; cualquier intento de crear, editar o mover datos responde 403 y las demás páginas lo mandan a Consultar. Las cuentas que ya existían quedan como administrador. Nunca se puede dejar la app sin un administrador activo.
+- **Tarjetas › Reporte por fecha.** Se elige un día y se ve cuántas tarjetas se completaron (fecha de finalizado) y cuántas se entregaron (fecha real) en todos los lotes; la tabla se filtra a esas tarjetas y "Exportar Excel" descarga un reporte con encabezado, indicadores, tabla con filtros y nota de criterios (`GET /api/reporte-dia`, `/api/reporte-dia/excel`).
+- **Nueva sección Inventario TQTR** en la consola de escritorio con el contenido del libro `INVENTARIO_TQTR_26_v.xlsx`.
+
 ## v1.3.34 — 2026-10-05
 - **Correo saliente desde el backend (SMTP).** Nuevo `app/services/correo.py`: TLS implícito por el puerto 465 con validación de certificado, remitente fijo (`TQT_SMTP_FROM`) y Reply-To opcional. Las credenciales solo viven en variables de entorno (`TQT_SMTP_*`, plantilla sin contraseña en `.env.example`). Nuevo `POST /api/admin/correo/prueba` (solo supervisor) y aviso por correo a la cuenta cuando se restablece su contraseña (si el envío falla, el restablecimiento sigue). SPF, DKIM y DMARC verificados en PASS desde la app.
 - **Sin contraseña inicial por defecto en el código.** `TQT_USER_SEED_PASSWORD` ya no trae valor: si no se define, no se crean las cuentas iniciales (las existentes no se tocan). Las pruebas leen la clave del entorno. Importante al instalar desde cero: define esa variable en `.env`.

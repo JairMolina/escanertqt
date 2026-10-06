@@ -40,3 +40,6 @@ docs/qa/*.jpg
 .DS_Store
 Thumbs.db
 .claude/
+
+# Datos reales del inventario TQTR (precios, costos, proveedores): no se publican en el repositorio público
+app/data_seed/

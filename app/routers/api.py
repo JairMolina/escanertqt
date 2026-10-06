@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from app.services.admin_dep import admin_si_habilitado, admin_token
 
@@ -20,6 +20,7 @@ from app.database import db
 from app.database.models import LoteCreate, StatsResponse
 from app.routers.excel_dymo import ejecutar_sync_excel, excel_engine, ruta_permitida
 from app.routers.ws import manager
+from app.services import reporte_dia as reporte_dia_svc
 
 logger = logging.getLogger(__name__)
 
@@ -186,3 +187,24 @@ def export_excel(lote_id: Optional[int] = Query(None, description="ID del lote a
         filename=Path(ruta).name,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+# ============================================================================
+# Reporte de un día: tarjetas completadas y entregadas en una fecha (v1.3.35)
+# ============================================================================
+@router.get("/reporte-dia", summary="Tarjetas completadas (fecha de finalizado) y entregadas (fecha real) en una fecha, de todos los lotes")
+async def reporte_dia(fecha: str = Query(..., max_length=10, description="AAAA-MM-DD")):
+    try:
+        return await run_in_threadpool(reporte_dia_svc.tarjetas_del_dia, fecha)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/reporte-dia/excel", summary="Descargar el reporte del día en Excel")
+async def reporte_dia_excel(fecha: str = Query(..., max_length=10, description="AAAA-MM-DD")):
+    try:
+        datos = await run_in_threadpool(reporte_dia_svc.excel_del_dia, fecha)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return Response(content=datos, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="Tarjetas_{fecha}.xlsx"'})

@@ -6,7 +6,7 @@
     'use strict';
     const E = window.TQTEscritorio;
     E.registrar({
-        id: 'resumen', titulo: 'Resumen', icono: 'dash', grupo: 'operacion', orden: 10,
+        id: 'resumen', titulo: 'Dashboard', icono: 'dash', grupo: 'operacion', orden: 10,
         montar(host, ctx) {
             const { T, h, icon, util } = ctx;
             let tars = null, pcbs = null, cargandoAhora = false, otra = false, error = '';

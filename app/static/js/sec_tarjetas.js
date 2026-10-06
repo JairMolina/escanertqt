@@ -36,7 +36,7 @@
             const norm = (s) => String(s || '').toLowerCase();
             function filtradas() {
                 const txt = norm(st.q).trim(); const hex = txt.replace(/[^0-9a-f]/g, '');
-                return st.tars.filter((t) => (!st.estado || T.estadoTarjeta(t).key === st.estado)
+                return st.tars.filter((t) => (!st.dia || st.dia.has(t.id)) && (!st.estado || T.estadoTarjeta(t).key === st.estado)
                     && (!txt || String(t.id_tarjeta_num).includes(txt) || [t.nombre_r1, t.nombre_r2, t.nombre_r3].some((n) => norm(n).includes(txt)) || (hex.length >= 2 && [t.mac_r1, t.mac_r2].some((m) => norm(m).replace(/:/g, '').includes(hex)))));
             }
             const COLS = [
@@ -94,6 +94,7 @@
                     h('div', { class: 'cuerpo' },
                         h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => util.placaCard(s.toUpperCase(), conFw(t, s)))),
                         bloqueEntrega(t),
+                        window.TQTMateriales ? window.TQTMateriales.bloque(t.id, ctx) : null,
                         h('div', { class: 'acciones' },
                             ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'row', style: 'gap:6px' },
                                 h('button', { class: 'btn btn-sm', type: 'button', onclick: () => elegirPlaca(sl, `${t[sl.toLowerCase()] ? 'Cambiar' : 'Asignar'} ${sl} de la tarjeta ${t.id_tarjeta_num}`, async (np) => {
@@ -234,9 +235,34 @@
                 try { st.tars = await ctx.tarjetas(); st.error = ''; } catch (e) { st.error = e.message; }
                 if (st.error && !st.tars) { tw.replaceChildren(util.errorBox(st.error, () => cargar(true))); return; }
                 if (st.abierta && !st.tars.find((t) => t.id === st.abierta)) st.abierta = null;
-                lista(); pintarPanel(false); cargarSug();
+                lista(); pintarPanel(false); cargarSug(); if (diaIn.value) reporteDia();
             }
-            host.append(h('div', { class: 'esc-bar' }, h('div', { class: 'esc-buscar' }, icon('search'), q), h('div', { class: 'esc-seg', role: 'group', 'aria-label': 'Estado de la tarjeta' }, segBtns), h('div', { class: 'grow' }), selR3, btnEmp, btnTodas, info), barSel, sugBox, split);
+            // ---- reporte por fecha (v1.3.35): completadas (fecha de finalizado) y entregadas (fecha real) ese día, de todos los lotes
+            const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+            const diaIn = h('input', { class: 'input', type: 'date', id: 'tarDia', value: P.get('fecha') || '', max: hoy, 'aria-label': 'Fecha del reporte' });
+            const diaRes = h('div', { class: 'esc-dia-res', role: 'status', 'aria-live': 'polite' });
+            const btnXls = h('a', { class: 'btn btn-primary', hidden: true, download: '' }, icon('download'), 'Exportar Excel');
+            const btnMailDia = T.botonCorreo(() => (diaIn.value ? { tipo: 'reporte_dia', fecha: diaIn.value, titulo: `Reporte de tarjetas del ${diaIn.value}` } : null));
+            const btnQuitarDia = h('button', { class: 'btn btn-ghost', type: 'button', hidden: true, onclick: () => { diaIn.value = ''; reporteDia(); } }, 'Quitar fecha');
+            const kpiDia = (n, t, cls) => h('div', { class: 'esc-dia-kpi ' + cls }, h('b', {}, String(n)), h('span', {}, t));
+            async function reporteDia() {
+                const f = diaIn.value; st.dia = null; btnXls.hidden = btnQuitarDia.hidden = btnMailDia.hidden = !f;
+                if (!f) { diaRes.replaceChildren(h('span', { class: 'muted' }, 'Elige un día para ver cuántas tarjetas se completaron o entregaron.')); lista(); return; }
+                diaRes.replaceChildren(h('span', { class: 'muted' }, 'Consultando…'));
+                const r = await api(`/api/reporte-dia?fecha=${f}`);
+                if (!r.ok) { diaRes.replaceChildren(h('span', { class: 'hint err' }, r.error)); lista(); return; }
+                const d = r.data; st.dia = new Set(d.items.map((t) => t.id));
+                const enLote = st.tars ? st.tars.filter((t) => st.dia.has(t.id)).length : 0;
+                btnXls.href = `/api/reporte-dia/excel?fecha=${f}`; btnXls.setAttribute('download', `Tarjetas_${f}.xlsx`);
+                diaRes.replaceChildren(kpiDia(d.completadas, 'completadas', 'ok'), kpiDia(d.entregadas, 'entregadas', 'info'),
+                    h('span', { class: 'muted' }, d.items.length ? `${enLote} de ${d.items.length} en este lote · la tabla muestra solo esas` : 'Sin movimientos ese día'));
+                lista();
+            }
+            diaIn.addEventListener('change', reporteDia);
+            const diaBox = h('section', { class: 'esc-blk esc-dia', 'aria-label': 'Reporte por fecha' },
+                h('div', { class: 'esc-dia-bar' }, h('label', { for: 'tarDia', class: 'esc-dia-lbl' }, icon('clock'), 'Reporte por fecha'), diaIn, diaRes, h('div', { class: 'grow' }), btnQuitarDia, btnXls, btnMailDia));
+            host.append(h('div', { class: 'esc-bar' }, h('div', { class: 'esc-buscar' }, icon('search'), q), h('div', { class: 'esc-seg', role: 'group', 'aria-label': 'Estado de la tarjeta' }, segBtns), h('div', { class: 'grow' }), selR3, btnEmp, btnTodas, info), diaBox, barSel, sugBox, split);
+            reporteDia();
             cargar(true);
             return {
                 actualizar() { cargar(false); },

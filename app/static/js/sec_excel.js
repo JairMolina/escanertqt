@@ -16,6 +16,7 @@
             const lote = () => ctx.lote();
             const loteQ = () => (lote() ? `?lote_id=${lote().id}` : '');
             const bSync = h('button', { class: 'btn btn-primary', type: 'button', onclick: sincronizar }, icon('excel'), h('span', null, 'Sincronizar Excel'));
+            const bMail = T.botonCorreo(() => (lote() ? { tipo: 'lote', lote_id: lote().id, titulo: `Control de producción · ${T.loteNombre(lote())}` } : null));
             const bDown = h('button', { class: 'btn', type: 'button', onclick: descargar }, icon('download'), h('span', null, 'Descargar copia (.xlsx)'));
             const titulo = h('b', { class: 'nm', style: 'font-size:18px' });
             const tarj = h('span', { class: 'muted' });
@@ -27,7 +28,7 @@
                 histUl.replaceChildren(...historial.map((x) => h('li', null, h('time', null, x.t), h('span', null, x.texto))));
                 histCard.hidden = !historial.length;
             }
-            function pintarLote() { const l = lote(); titulo.textContent = l ? `Lote ${T.loteNombre(l)}` : 'Sin lote'; tarj.textContent = l ? `${l.tarjetas || 0} tarjetas${l.activo ? ' · lote activo' : ''}` : ''; bSync.disabled = !l; bDown.disabled = !l; }
+            function pintarLote() { const l = lote(); titulo.textContent = l ? `Lote ${T.loteNombre(l)}` : 'Sin lote'; tarj.textContent = l ? `${l.tarjetas || 0} tarjetas${l.activo ? ' · lote activo' : ''}` : ''; bSync.disabled = !l; bDown.disabled = !l; bMail.disabled = !l; }
 
             async function sincronizar() {
                 const l = lote(); if (!l) return;
@@ -75,7 +76,7 @@
                     h('header', null, icon('excel'), h('h2', { id: 'xlT' }, 'Excel mensual del lote')),
                     h('div', { class: 'row wrap' }, titulo, tarj),
                     h('p', { class: 'muted' }, 'Sincronizar escribe las tarjetas del lote en su archivo mensual (fórmulas y validaciones intactas). La copia descargable es una plantilla nueva con los datos del lote; no toca el archivo en uso.'),
-                    h('div', { class: 'row wrap' }, bSync, bDown)),
+                    h('div', { class: 'row wrap' }, bSync, bDown, bMail)),
                 salida, histCard));
             pintarLote(); pintarHist();
             // Volvemos del login de administración con la descarga pendiente: se hace sola (una vez) y se limpia la marca de la URL

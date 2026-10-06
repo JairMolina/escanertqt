@@ -28,6 +28,7 @@
         .dymo-l { display: block; font-size: 9.5pt; line-height: 1.25; font-weight: 700; white-space: pre; color: #000; min-height: 1.25em; }
         .dymo-l.n { font-weight: 700; }
         .dymo-l.m { font-weight: 700; }
+        .dymo-l.r3 { font-size: 11pt; }
         .zoomhost { transform-origin: top left; }
         .stage-preview { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-2); padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; overflow-x: auto; }
         .pill { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
@@ -90,14 +91,34 @@
             <button class="btn" type="button" id="btnPrintAll"><span class="svg-slot" data-i="layers"></span> Imprimir lote en DYMO…</button>
             <button class="btn" type="button" id="btnDownAll"><span class="svg-slot" data-i="download"></span> Descargar lote</button>
         </div>
+        <section class="panel pad stack" aria-labelledby="hR3" id="r3Box">
+            <div class="row wrap" style="justify-content:space-between;gap:8px">
+                <h2 class="silk grow" id="hR3" style="min-width:200px">Etiquetas R3</h2>
+                <span class="hint">Solo llevan el nombre de la placa (texto y QR): <b class="mono" id="r3Ejemplo">TQT-R3-V30-0000</b></span>
+            </div>
+            <div class="tools-row">
+                <div class="field" style="width:110px"><label for="r3Ver">Versión</label><input class="input mono" id="r3Ver" inputmode="numeric" maxlength="3" value="30" autocomplete="off"></div>
+                <div class="field" style="width:130px"><label for="r3Desde">Serie desde</label><input class="input mono" id="r3Desde" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
+                <div class="field" style="width:130px"><label for="r3Hasta">Serie hasta</label><input class="input mono" id="r3Hasta" inputmode="numeric" maxlength="4" placeholder="(igual)" autocomplete="off"></div>
+                <div class="field" style="width:110px"><label for="r3Copias">Copias</label><input class="input mono" id="r3Copias" inputmode="numeric" maxlength="2" value="1"></div>
+            </div>
+            <div class="stage-preview" role="region" aria-label="Vista previa de la etiqueta R3">
+                <div class="silk" style="width:100%" id="r3Info">Vista previa · 57 × 32 mm</div>
+                <div id="r3ZoomHost" class="zoomhost"><div id="r3Label"></div></div>
+            </div>
+            <div class="row wrap" style="gap:10px">
+                <button class="btn btn-primary" type="button" id="btnR3Print"><span class="svg-slot" data-i="printer"></span> Imprimir R3 en DYMO</button>
+                <button class="btn" type="button" id="btnR3Open"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
+            </div>
+        </section>
         <div id="prog" class="stack" hidden><div class="progress" aria-hidden="true"><i id="progBar"></i></div><div class="hint" id="progTxt" role="status" aria-live="polite"></div></div>
     </main>
 </div>
 
-<script src="/static/js/common.js?v=1316"></script>
+<script src="/static/js/common.js?v=1340"></script>
 <script src="/static/js/qrcode-generator.js?v=1316"></script>
 <script src="/static/js/vendor/dymo.connect.framework.js?v=1316"></script>
 <script src="/static/js/dymo_connect.js?v=1316"></script>
-<script src="/static/js/dymo.js?v=1323"></script>
+<script src="/static/js/dymo.js?v=1336"></script>
 </body>
 </html>

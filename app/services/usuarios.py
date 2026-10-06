@@ -30,6 +30,8 @@ _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,120}\.[^@\s]{2,}$")
 MENSAJE_CREDENCIALES = "Correo o contraseña incorrectos."
 limitador = aa.LimitadorIntentos()
 _DUMMY = None
+ROLES = ("administrador", "general", "consultor")
+INVITACION_VIGENCIA = 48 * 3600
 
 
 class SesionInvalidaError(ValueError):
@@ -43,6 +45,13 @@ def normalizar(email: Optional[str]) -> str:
 def _asegurar_tabla(c) -> None:
     c.execute("CREATE TABLE IF NOT EXISTS usuarios (email TEXT PRIMARY KEY, hash TEXT NOT NULL, activo INTEGER NOT NULL DEFAULT 1, "
               "debe_cambiar INTEGER NOT NULL DEFAULT 1, creado TEXT NOT NULL DEFAULT (datetime('now','localtime')), ultimo_acceso TEXT)")
+    cols = {r[1] for r in c.execute("PRAGMA table_info(usuarios)")}
+    if "rol" not in cols:   # v1.3.35: las cuentas que ya existían conservan todo su acceso (administrador)
+        c.execute("ALTER TABLE usuarios ADD COLUMN rol TEXT NOT NULL DEFAULT 'administrador'")
+    if "inv_hash" not in cols:
+        c.execute("ALTER TABLE usuarios ADD COLUMN inv_hash TEXT")
+        c.execute("ALTER TABLE usuarios ADD COLUMN inv_exp REAL")
+        c.execute("ALTER TABLE usuarios ADD COLUMN invitado_por TEXT")
 
 
 def sembrar(db_path: Optional[Path] = None, iteraciones: Optional[int] = None) -> int:
@@ -62,7 +71,8 @@ def sembrar(db_path: Optional[Path] = None, iteraciones: Optional[int] = None) -
 def listar(db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
     with db.get_db(db_path) as c:
         _asegurar_tabla(c)
-        return [dict(r) for r in c.execute("SELECT email, activo, debe_cambiar, creado, ultimo_acceso FROM usuarios ORDER BY email")]
+        return [dict(r) for r in c.execute("SELECT email, rol, activo, debe_cambiar, creado, ultimo_acceso, invitado_por, "
+                                                "inv_hash IS NOT NULL AS pendiente, inv_exp FROM usuarios ORDER BY email")]
 
 
 # ---------------------------------------------------------------- sesión firmada
@@ -117,10 +127,10 @@ def validar_sesion(token: Optional[str], db_path: Optional[Path] = None, ahora: 
         raise SesionInvalidaError("Sesión inválida.")
     with db.get_db(db_path) as c:
         _asegurar_tabla(c)
-        r = c.execute("SELECT hash, activo, debe_cambiar FROM usuarios WHERE email = ?", (email,)).fetchone()
+        r = c.execute("SELECT hash, activo, debe_cambiar, rol FROM usuarios WHERE email = ?", (email,)).fetchone()
     if not r or not r["activo"] or not hmac.compare_digest(_huella(r["hash"]).encode(), str(datos.get("v", "")).encode()):
         raise SesionInvalidaError("La sesión ya no es válida: inicia sesión de nuevo.")
-    return {"email": email, "debe_cambiar": bool(r["debe_cambiar"])}
+    return {"email": email, "debe_cambiar": bool(r["debe_cambiar"]), "rol": r["rol"]}
 
 
 # ---------------------------------------------------------------- inicio de sesión y cambio de clave
@@ -138,7 +148,7 @@ def iniciar_sesion(email: str, password: str, cliente: str, db_path: Optional[Pa
     if _EMAIL.match(email):
         with db.get_db(db_path) as c:
             _asegurar_tabla(c)
-            r = c.execute("SELECT hash, activo, debe_cambiar FROM usuarios WHERE email = ?", (email,)).fetchone()
+            r = c.execute("SELECT hash, activo, debe_cambiar, rol FROM usuarios WHERE email = ?", (email,)).fetchone()
     if _DUMMY is None:
         _DUMMY = aa.hash_clave(secrets.token_hex(8))
     ok = aa.verificar_clave(password or "", r["hash"] if r else _DUMMY) and bool(r) and bool(r["activo"])
@@ -148,7 +158,7 @@ def iniciar_sesion(email: str, password: str, cliente: str, db_path: Optional[Pa
         with db.transaction(db_path) as c:
             c.execute("UPDATE usuarios SET ultimo_acceso = datetime('now','localtime') WHERE email = ?", (email,))
         aa.retardo_uniforme(inicio)
-        return {"token": _emitir(email, r["hash"], db_path), "email": email, "debe_cambiar": bool(r["debe_cambiar"])}
+        return {"token": _emitir(email, r["hash"], db_path), "email": email, "debe_cambiar": bool(r["debe_cambiar"]), "rol": r["rol"]}
     bloqueo = max(limitador.fallo(k) for k in claves)
     aa.retardo_uniforme(inicio)
     if bloqueo:
@@ -310,3 +320,113 @@ def restablecer_clave(ticket: str, codigo: str, nueva: str, cliente: str, db_pat
         raise invalido
     limitador.exito(k)
     return r["email"]
+
+
+# ---------------------------------------------------------------- alta de cuentas por invitación (v1.3.35)
+# El administrador da de alta correo + rol; la cuenta queda desactivada con una invitación de un solo uso (48 h) que
+# llega por correo. Quien la recibe elige su contraseña: nadie más la conoce. Solo se guarda el SHA-256 del enlace.
+def _validar_rol(rol: str) -> str:
+    rol = str(rol or "").strip().lower()
+    if rol not in ROLES:
+        raise ValueError("Rol no válido (administrador, general o consultor).")
+    return rol
+
+
+def _nueva_invitacion(c, email: str, ahora: Optional[float]) -> str:
+    token = secrets.token_urlsafe(32)
+    c.execute("UPDATE usuarios SET inv_hash = ?, inv_exp = ? WHERE email = ?",
+              (_sha(token), (ahora if ahora is not None else time.time()) + INVITACION_VIGENCIA, email))
+    return token
+
+
+def crear_invitacion(email: str, rol: str, por: str, db_path: Optional[Path] = None, ahora: Optional[float] = None) -> str:
+    """Crea la cuenta (desactivada, con su rol) y devuelve el token de invitación. ValueError si el correo ya existe."""
+    email, rol = normalizar(email), _validar_rol(rol)
+    if not _EMAIL.match(email):
+        raise ValueError("Correo no válido.")
+    with aa._lock, db.transaction(db_path) as c:
+        _asegurar_tabla(c)
+        if c.execute("SELECT 1 FROM usuarios WHERE email = ?", (email,)).fetchone():
+            raise ValueError("Ya existe una cuenta con ese correo.")
+        c.execute("INSERT INTO usuarios (email, hash, activo, debe_cambiar, rol, invitado_por) VALUES (?, ?, 0, 0, ?, ?)",
+                  (email, "!" + secrets.token_hex(16), rol, normalizar(por)))   # "!": hash imposible, no se puede entrar
+        return _nueva_invitacion(c, email, ahora)
+
+
+def reenviar_invitacion(email: str, db_path: Optional[Path] = None, ahora: Optional[float] = None) -> str:
+    """Nuevo enlace (el anterior deja de valer) para una cuenta que aún no aceptó."""
+    email = normalizar(email)
+    with aa._lock, db.transaction(db_path) as c:
+        _asegurar_tabla(c)
+        if not c.execute("SELECT 1 FROM usuarios WHERE email = ? AND inv_hash IS NOT NULL", (email,)).fetchone():
+            raise ValueError("Esa cuenta no tiene una invitación pendiente.")
+        return _nueva_invitacion(c, email, ahora)
+
+
+def _invitacion(c, token: str, ahora: Optional[float]):
+    if not token or len(token) > 100:
+        return None
+    r = c.execute("SELECT email, rol, inv_exp FROM usuarios WHERE inv_hash = ?", (_sha(token),)).fetchone()
+    if not r or float(r["inv_exp"] or 0) < (ahora if ahora is not None else time.time()):
+        return None
+    return r
+
+
+INVITACION_INVALIDA = "La invitación no es válida o ya caducó. Pide al administrador que te la reenvíe."
+
+
+def ver_invitacion(token: str, db_path: Optional[Path] = None, ahora: Optional[float] = None) -> Dict[str, Any]:
+    with db.get_db(db_path) as c:
+        _asegurar_tabla(c)
+        r = _invitacion(c, token, ahora)
+    if not r:
+        raise PermissionError(INVITACION_INVALIDA)
+    return {"email": r["email"], "rol": r["rol"]}
+
+
+def aceptar_invitacion(token: str, nueva: str, db_path: Optional[Path] = None, ahora: Optional[float] = None) -> Dict[str, Any]:
+    """Fija la contraseña elegida, activa la cuenta y devuelve {'email', 'rol', 'token'} (sesión ya abierta)."""
+    if len(nueva or "") < settings.USER_MIN_CLAVE:
+        raise ValueError(f"La contraseña debe tener al menos {settings.USER_MIN_CLAVE} caracteres.")
+    nuevo = aa.hash_clave(nueva)
+    with aa._lock, db.transaction(db_path) as c:
+        _asegurar_tabla(c)
+        r = _invitacion(c, token, ahora)
+        if not r:
+            raise PermissionError(INVITACION_INVALIDA)
+        c.execute("UPDATE usuarios SET hash = ?, activo = 1, debe_cambiar = 0, inv_hash = NULL, inv_exp = NULL WHERE email = ?", (nuevo, r["email"]))
+    return {"email": r["email"], "rol": r["rol"], "token": _emitir(r["email"], nuevo, db_path)}
+
+
+def _admins_activos(c) -> int:
+    return c.execute("SELECT COUNT(*) FROM usuarios WHERE activo = 1 AND rol = 'administrador'").fetchone()[0]
+
+
+def actualizar_cuenta(email: str, rol: Optional[str] = None, activo: Optional[bool] = None, db_path: Optional[Path] = None) -> None:
+    """Cambia rol y/o activa/desactiva (desactivar cierra sus sesiones). Nunca deja la app sin un administrador activo."""
+    email = normalizar(email)
+    with aa._lock, db.transaction(db_path) as c:
+        _asegurar_tabla(c)
+        r = c.execute("SELECT rol, activo, inv_hash FROM usuarios WHERE email = ?", (email,)).fetchone()
+        if not r:
+            raise LookupError("No existe esa cuenta.")
+        if activo and r["inv_hash"]:
+            raise ValueError("La cuenta se activa sola cuando la persona acepta la invitación.")
+        nuevo_rol = _validar_rol(rol) if rol is not None else r["rol"]
+        nuevo_act = int(bool(activo)) if activo is not None else r["activo"]
+        quita_admin = r["activo"] and r["rol"] == "administrador" and (nuevo_rol != "administrador" or not nuevo_act)
+        if quita_admin and _admins_activos(c) <= 1:
+            raise ValueError("Debe quedar al menos un administrador activo.")
+        c.execute("UPDATE usuarios SET rol = ?, activo = ? WHERE email = ?", (nuevo_rol, nuevo_act, email))
+
+
+def eliminar_cuenta(email: str, db_path: Optional[Path] = None) -> None:
+    email = normalizar(email)
+    with aa._lock, db.transaction(db_path) as c:
+        _asegurar_tabla(c)
+        r = c.execute("SELECT rol, activo FROM usuarios WHERE email = ?", (email,)).fetchone()
+        if not r:
+            raise LookupError("No existe esa cuenta.")
+        if r["activo"] and r["rol"] == "administrador" and _admins_activos(c) <= 1:
+            raise ValueError("Debe quedar al menos un administrador activo.")
+        c.execute("DELETE FROM usuarios WHERE email = ?", (email,))

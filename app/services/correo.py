@@ -11,7 +11,7 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
-from typing import Optional
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,8 @@ def configurado() -> bool:
     return bool(c["host"] and c["usuario"] and c["clave"] and c["remitente"])
 
 
-def enviar(para: str, asunto: str, texto: str, html: Optional[str] = None, reply_to: Optional[str] = None) -> str:
+def enviar(para: str, asunto: str, texto: str, html: Optional[str] = None, reply_to: Optional[str] = None,
+           adjuntos: Optional[List[Tuple[str, bytes, str]]] = None) -> str:
     """Envía un correo y devuelve su Message-ID. Lanza CorreoNoConfigurado o smtplib.SMTPException."""
     c = _cfg()
     if not configurado():
@@ -55,6 +56,9 @@ def enviar(para: str, asunto: str, texto: str, html: Optional[str] = None, reply
     msg.set_content(texto)
     if html:
         msg.add_alternative(html, subtype="html")
+    for nombre, datos, mime in adjuntos or []:   # (nombre, bytes, "tipo/subtipo")
+        principal, _, sub = mime.partition("/")
+        msg.add_attachment(datos, maintype=principal, subtype=sub, filename=nombre)
 
     contexto = ssl.create_default_context()
     if c["puerto"] == 465:

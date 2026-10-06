@@ -173,3 +173,34 @@ async def rechazar(sid: int, request: Request):
     u, r = await _resolver(sid, request, False)
     await run_in_threadpool(db.log_evento, "USUARIO_RESET_RECHAZADO", None, r["email"], f"Rechazó {u['email']}", u["email"])
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- invitaciones (públicas: quien es invitado aún no tiene sesión)
+class AceptarInvitacionIn(BaseModel):
+    token: str = Field(..., max_length=100)
+    nueva: str = Field(..., max_length=200)
+
+
+class VerInvitacionIn(BaseModel):
+    token: str = Field(..., max_length=100)
+
+
+@router.post("/invitacion", summary="Datos de una invitación vigente (correo y rol)")
+async def ver_invitacion(payload: VerInvitacionIn):
+    try:
+        return await run_in_threadpool(usuarios.ver_invitacion, payload.token)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/invitacion/aceptar", summary="Elegir contraseña, activar la cuenta y abrir sesión")
+async def aceptar_invitacion(payload: AceptarInvitacionIn, request: Request, response: Response):
+    try:
+        r = await run_in_threadpool(usuarios.aceptar_invitacion, payload.token, payload.nueva)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    fijar_sesion(response, r["token"])
+    await run_in_threadpool(db.log_evento, "USUARIO_INVITACION_ACEPTADA", None, r["email"], f"Cuenta activada ({r['rol']}) desde {_ip(request)}", r["email"])
+    return {"email": r["email"], "rol": r["rol"]}

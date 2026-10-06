@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark light">
+    <meta name="robots" content="noindex">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <title>Activar cuenta · Escáner TQT</title>
+    <script>
+        (function () {
+            var t = 'dark';
+            try { var g = localStorage.getItem('tqt.tema'); t = g === 'light' || g === 'dark' ? g : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* sin almacenamiento */ }
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1335">
+    <style>
+        body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: var(--bg); color: var(--text); padding: 16px; box-sizing: border-box; }
+        .caja { width: 100%; max-width: 420px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 16px; padding: 28px 24px; }
+        h1 { margin: 0 0 4px; font-size: 1.35rem; }
+        .sub { margin: 0 0 20px; color: var(--muted, var(--text-2)); font-size: .92rem; }
+        .rol { display: inline-block; padding: 2px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; font-size: .82rem; }
+        form { display: grid; gap: 14px; }
+        .msg { min-height: 1.2em; margin: 0; font-size: .9rem; }
+        .msg.err { color: var(--danger, #e5484d); }
+        .ver { font-size: .78rem; color: var(--muted, var(--text-2)); text-align: center; margin-top: 18px; }
+    </style>
+</head>
+<body>
+<main class="caja">
+    <h1>Activa tu cuenta</h1>
+    <p class="sub" id="sub">Comprobando la invitación…</p>
+    <form id="f" hidden>
+        <div class="field"><label for="p1">Contraseña nueva</label><input class="input" id="p1" type="password" autocomplete="new-password" maxlength="200" required></div>
+        <div class="field"><label for="p2">Repite la contraseña</label><input class="input" id="p2" type="password" autocomplete="new-password" maxlength="200" required></div>
+        <p class="msg" id="msg" role="alert"></p>
+        <button class="btn btn-primary btn-block" type="submit" id="ok">Activar y entrar</button>
+    </form>
+    <p class="ver">Escáner TQT v__VERSION__</p>
+</main>
+<script>
+(function () {
+    const token = decodeURIComponent(location.hash.slice(1));
+    const $ = (id) => document.getElementById(id);
+    const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' })
+        .then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : 'Error ' + r.status); return d; });
+    const err = (t) => { $('msg').textContent = t; $('msg').className = 'msg err'; };
+    if (!token) { $('sub').textContent = 'Falta el enlace de invitación. Ábrelo desde el correo que recibiste.'; return; }
+    post('/api/auth/invitacion', { token }).then((d) => {
+        $('sub').innerHTML = '';
+        $('sub').append('Cuenta ', Object.assign(document.createElement('b'), { textContent: d.email }), ' · rol ', Object.assign(document.createElement('span'), { className: 'rol', textContent: d.rol }),
+            '. Elige tu contraseña (mínimo 10 caracteres).');
+        $('f').hidden = false; $('p1').focus();
+    }).catch((e) => { $('sub').textContent = e.message; });
+    $('f').addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        if ($('p1').value.length < 10) return err('La contraseña debe tener al menos 10 caracteres.');
+        if ($('p1').value !== $('p2').value) return err('Las contraseñas no coinciden.');
+        $('ok').disabled = true;
+        post('/api/auth/invitacion/aceptar', { token, nueva: $('p1').value })
+            .then((d) => { history.replaceState(null, '', '/invitacion'); location.replace(d.rol === 'consultor' ? '/consultar' : '/'); })
+            .catch((e) => { err(e.message); $('ok').disabled = false; });
+    });
+})();
+</script>
+</body>
+</html>
