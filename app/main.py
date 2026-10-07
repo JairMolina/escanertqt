@@ -122,30 +122,48 @@ PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/stati
 
 
 PAGINAS_CONSULTOR = {"/consultar", "/favicon.ico", "/api/health"}
+ROL_NOMBRE = {"general": "General", "consultor": "Consultor"}
+# Páginas (y sus copias bajo /static) → zona que se nombra en el aviso "sin acceso" (v1.3.42)
+ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "emparejar", "/static/emparejar.html": "emparejar",
+               "/programar": "programar", "/static/programar.html": "programar", "/monitor": "monitor", "/static/monitor.html": "monitor",
+               "/dymo": "dymo", "/static/dymo_preview.html": "dymo"}
+ZONAS_ADMIN = ("/admin", "/static/admin.html")
+# Lo único que un consultor puede ENVIAR (POST): cerrar sesión y cambiar su propia contraseña
+POST_CONSULTOR = {"/api/auth/logout", "/api/auth/cambiar-clave"}
+
+
+def _sin_acceso(rol: Optional[str], ruta: str, metodo: str, zona: str, detalle: str):
+    """403 JSON (API o envíos) con `X-Acceso: rol` para que el frontend muestre el aviso, o redirección de página
+    a una zona permitida con `?denegado=<zona>` (la página destino explica por qué no se pudo entrar)."""
+    if ruta.startswith(("/api/", "/ws")) or metodo not in ("GET", "HEAD"):
+        return JSONResponse(status_code=403, content={"detail": detalle, "zona": zona, "rol": rol}, headers={"X-Acceso": "rol"})
+    destino = "/consultar" if rol == "consultor" else "/"
+    return RedirectResponse(f"{destino}?denegado={zona}", status_code=302)
 
 
 def _permiso_rol(rol: Optional[str], ruta: str, metodo: str):
     """Roles (v1.3.35). administrador: todo. general: todo menos la zona de administración. consultor: solo la página
-    Consultar (escaneo) y lecturas de la API; nada que cree, edite, mueva o borre."""
+    Consultar (escaneo) y lecturas de la API; nada que cree, edite, mueva o borre. Cada rechazo explica el motivo (v1.3.42)."""
     if rol == "administrador":
         return None
-    if ruta == "/admin" or ruta.startswith(("/api/admin/", "/static/js/admin.js")):
+    nombre = ROL_NOMBRE.get(rol or "", rol or "sin rol")
+    if ruta in ZONAS_ADMIN or ruta.startswith(("/api/admin/", "/static/js/admin.js")):
         if ruta == "/api/admin/estado":
             return None
-        if ruta.startswith("/api/") or metodo not in ("GET", "HEAD"):
-            return JSONResponse(status_code=403, content={"detail": "Tu cuenta no tiene acceso a Administración."})
-        return RedirectResponse("/consultar" if rol == "consultor" else "/", status_code=302)
+        return _sin_acceso(rol, ruta, metodo, "admin",
+                           f"Tu cuenta ({nombre}) no tiene acceso a Administración: solo los administradores pueden entrar. Pide ayuda a un administrador.")
     if rol != "consultor":
         return None
-    if ruta.startswith("/api/auth/") or ruta.startswith(("/static/", "/ws")):
-        return None
-    if ruta.startswith("/api/"):
-        if metodo in ("GET", "HEAD", "OPTIONS"):
+    if ruta.startswith("/api/") or ruta.startswith("/ws"):
+        if metodo in ("GET", "HEAD", "OPTIONS") or ruta in POST_CONSULTOR or ruta.startswith("/ws"):
             return None
-        return JSONResponse(status_code=403, content={"detail": "Tu cuenta es de consulta: no puede crear, editar ni mover datos."})
-    if ruta in PAGINAS_CONSULTOR:
+        return _sin_acceso(rol, ruta, metodo, "accion",
+                           "Tu cuenta es de consulta: puede ver y escanear, pero no crear, editar, mover, enviar ni borrar datos. Pide a un administrador que cambie tu rol si lo necesitas.")
+    if ruta in ZONA_PAGINA:
+        return _sin_acceso(rol, ruta, metodo, ZONA_PAGINA[ruta], "")
+    if ruta.startswith("/static/") or ruta in PAGINAS_CONSULTOR:
         return None
-    return RedirectResponse("/consultar", status_code=302)
+    return _sin_acceso(rol, ruta, metodo, "otra", "")
 
 
 async def _exigir_sesion(request: Request):

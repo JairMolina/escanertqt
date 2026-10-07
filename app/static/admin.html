@@ -11,7 +11,7 @@
     <meta name="color-scheme" content="dark light">
     <title>Administración · Escáner TQT</title>
     <script>try{document.documentElement.dataset.theme=localStorage.getItem('tqt.tema')==='light'?'light':'dark'}catch(e){document.documentElement.dataset.theme='dark'}</script>
-    <link rel="stylesheet" href="/static/css/app.css?v=1316">
+    <link rel="stylesheet" href="/static/css/app.css?v=1342">
     <style>
         .login { min-height: 100dvh; display: grid; place-items: center; padding: 24px var(--gutter); }
         .login .box { width: min(420px, 100%); display: flex; flex-direction: column; gap: 18px; }
@@ -27,8 +27,9 @@
         .col-check input { width: 20px; height: 20px; accent-color: var(--accent); }
         .selbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: var(--surface-2); }
         @media (max-width: 700px) {
-            .desk-nav { order: 5; flex: 0 0 100%; margin-left: 0; max-width: 100%; overflow-x: auto; }
-            .desk-nav button { padding: 0 9px; font-size: 13px; letter-spacing: .02em; }
+            /* v1.3.42: en el celular las 7 pestañas se acomodan en filas (antes Cuentas y Cuenta quedaban fuera de la pantalla) */
+            .desk-nav { order: 5; flex: 0 0 100%; margin-left: 0; max-width: 100%; flex-wrap: wrap; row-gap: 0; }
+            .desk-nav button { flex: 1 1 auto; justify-content: center; min-height: 40px; padding: 0 8px; font-size: 12px; letter-spacing: .02em; }
         }
         /* Movimientos */
         .mv-cats { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -195,7 +196,7 @@
     </main>
 </div>
 
-<script src="/static/js/common.js?v=1341"></script>
+<script src="/static/js/common.js?v=1342"></script>
 <script src="/static/js/admin.js?v=1340"></script>
 </body>
 </html>

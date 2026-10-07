@@ -19,7 +19,7 @@
 .macs-bar .field { gap: 4px; }
 .macs-bar .input, .macs-bar select.input { min-height: 36px; font-size: 15px; width: auto; }
 .macs-bar .seg button { min-height: 36px; padding: 0 14px; font-size: 14px; }
-.macs-acts { margin-left: auto; align-self: flex-end; }
+.macs-acts { margin-left: auto; align-self: flex-end; flex-wrap: wrap; max-width: 100%; }   /* v1.3.42: en el celular los botones bajan de línea */
 .macs-bar .btn { min-height: 36px; font-size: 14px; padding: 0 12px; }
 .macs-bar input[type="search"] { width: 210px; }
 .macs-bar input.num { width: 96px; }

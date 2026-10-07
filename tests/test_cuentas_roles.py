@@ -62,8 +62,18 @@ class TestCuentas(unittest.TestCase):
         self.assertEqual(anon.post("/api/lotes", json={"mes": 1, "anio": 2030}).status_code, 403)
         self.assertEqual(anon.get("/consultar", follow_redirects=False).status_code, 200)
         r = anon.get("/monitor", follow_redirects=False)
-        self.assertEqual((r.status_code, r.headers["location"]), (302, "/consultar"))
+        self.assertEqual((r.status_code, r.headers["location"]), (302, "/consultar?denegado=monitor"))
         self.assertEqual(anon.get("/api/admin/usuarios").status_code, 403)
+        # v1.3.42: cada rechazo explica el motivo (el frontend muestra el aviso "Acceso restringido")
+        r = anon.post("/api/lotes", json={"mes": 1, "anio": 2030})
+        self.assertEqual((r.headers.get("x-acceso"), r.json()["zona"]), ("rol", "accion"))
+        self.assertIn("consulta", r.json()["detail"])
+        for ruta, zona in (("/", "recibir"), ("/static/emparejar.html", "emparejar"), ("/programar", "programar"), ("/dymo", "dymo"), ("/admin", "admin"), ("/static/admin.html", "admin")):
+            r = anon.get(ruta, follow_redirects=False)
+            self.assertEqual((r.status_code, r.headers["location"]), (302, f"/consultar?denegado={zona}"), ruta)
+        self.assertEqual(anon.get("/static/js/common.js").status_code, 200)
+        self.assertEqual(anon.get("/api/auth/yo").json()["rol"], "consultor")
+        self.assertEqual(anon.post("/api/auth/cambiar-clave", json={"actual": "x", "nueva": "y"}).status_code != 403, True)
 
     def test_02_general_sin_administracion(self):
         token = self.invitar("general1@ejemplo.com", "general")
@@ -71,7 +81,12 @@ class TestCuentas(unittest.TestCase):
         self.assertEqual(anon.post("/api/auth/invitacion/aceptar", json={"token": token, "nueva": CLAVE}).status_code, 200)
         self.assertEqual(anon.get("/monitor", follow_redirects=False).status_code, 200)
         self.assertEqual(anon.get("/api/admin/usuarios").status_code, 403)
-        self.assertEqual(anon.get("/admin", follow_redirects=False).status_code, 302)
+        r = anon.get("/admin", follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (302, "/?denegado=admin"))
+        r = anon.post("/api/admin/login", json={"password": "x"})
+        self.assertEqual((r.status_code, r.headers.get("x-acceso"), r.json()["zona"]), (403, "rol", "admin"))
+        self.assertIn("General", r.json()["detail"])
+        self.assertEqual(anon.post("/api/lotes", json={"mes": 1, "anio": 2030}).status_code != 403, True)   # general sí escribe
 
     def test_03_correo_repetido_rol_invalido_y_smtp_caido(self):
         self.assertEqual(self.adm.post("/api/admin/usuarios", json={"email": ADMIN, "rol": "general"}).status_code, 422)

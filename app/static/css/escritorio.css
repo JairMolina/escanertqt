@@ -303,3 +303,16 @@ button.esc-det-fila:hover { background: var(--surface-2); }
 .esc-dia-atajos { display: flex; flex-wrap: wrap; gap: 4px; }
 .esc-dia-atajo[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-color: transparent; }
 .esc-dia-res:empty { display: none; }
+
+/* v1.3.42: consola abierta en un celular (≤ 640 px). El encabezado se acomoda en dos filas en vez de empujar
+   los botones fuera de la pantalla (antes la página entera se desplazaba de lado). */
+@media (max-width: 640px) {
+  .esc-top { height: auto; min-height: var(--top-h); flex-wrap: wrap; row-gap: 6px; padding: 8px 12px; }
+  .esc-top > .grow { flex: 1 1 0; min-width: 0; }
+  .esc-top .esc-lotewrap { order: 10; flex: 1 1 100%; }
+  .esc-top .esc-lote { width: 100%; }
+  .esc-top .iconbtn { width: 36px; height: 36px; }
+  .esc-top .conn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .esc-main { padding: 12px 12px 40px; }
+  .esc-3 { grid-template-columns: minmax(0, 1fr); }   /* Dashboard: avance por tipo R1/R2/R3 en una columna */
+}

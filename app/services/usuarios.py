@@ -252,6 +252,7 @@ def solicitudes_pendientes(ayudante: str, db_path: Optional[Path] = None, ahora:
         _asegurar_tabla_reset(c)
         filas = c.execute("SELECT id, email, creado FROM usuarios_reset WHERE estado = 'pendiente' AND creado > ? AND email != ? ORDER BY id",
                           (t - RESET_VIGENCIA_SOLICITUD, normalizar(ayudante))).fetchall()
+        filas = [r for r in filas if _puede_ayudar(c, ayudante, r["email"])]   # solo las que esta cuenta puede aprobar
     return [{"id": r["id"], "email": r["email"], "hace_seg": int(t - r["creado"]), "vence_seg": int(RESET_VIGENCIA_SOLICITUD - (t - r["creado"]))} for r in filas]
 
 
@@ -261,7 +262,22 @@ def _solicitud_abierta(c, sid: int, ayudante: str, t: float):
         raise LookupError("La solicitud ya no está disponible.")
     if normalizar(ayudante) == r["email"]:
         raise PermissionError("No puedes aprobar tu propia solicitud: pide a otra persona.")
+    if not _puede_ayudar(c, ayudante, r["email"]):
+        raise PermissionError("Tu rol no puede aprobar esta solicitud: la de un administrador solo la aprueba otro administrador y las cuentas de consulta no aprueban solicitudes.")
     return r
+
+
+def _rol_de(c, email: str) -> str:
+    r = c.execute("SELECT rol FROM usuarios WHERE email = ?", (normalizar(email),)).fetchone()
+    return r["rol"] if r else ""
+
+
+def _puede_ayudar(c, ayudante: str, objetivo: str) -> bool:
+    """v1.3.42: nadie aprueba el restablecimiento de una cuenta con más permisos que la suya (evita que un consultor o un
+    general se quede con una cuenta de administrador) y un consultor no aprueba ninguno."""
+    nivel = {"consultor": 0, "general": 1, "administrador": 2}
+    a = nivel.get(_rol_de(c, ayudante), -1)
+    return a >= 1 and a >= nivel.get(_rol_de(c, objetivo), 2)
 
 
 def aprobar_solicitud(sid: int, ayudante: str, db_path: Optional[Path] = None, ahora: Optional[float] = None) -> Dict[str, Any]:

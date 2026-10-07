@@ -58,6 +58,25 @@ class TestReset(unittest.TestCase):
         r2 = self.anon.post("/api/auth/restablecer", json={"ticket": t, "codigo": codigo, "nueva": NUEVA + "x"})
         self.assertEqual(r2.status_code, 403)
 
+    def test_01b_rol_menor_no_aprueba_la_de_un_administrador(self):
+        """v1.3.42: un general o consultor no puede quedarse con una cuenta de administrador aprobando su restablecimiento."""
+        with db.transaction() as c:
+            c.execute("UPDATE usuarios SET rol = 'general' WHERE email = ?", (AYUDA,))
+            c.execute("UPDATE usuarios SET rol = 'administrador' WHERE email = ?", (OLVIDADA,))
+        try:
+            self.pedir()
+            self.assertEqual(self.ayuda.get("/api/auth/solicitudes").json()["items"], [])   # ni la ve
+            with db.get_db() as c:
+                sid = c.execute("SELECT id FROM usuarios_reset WHERE email = ? AND estado = 'pendiente'", (OLVIDADA,)).fetchone()["id"]
+            self.assertEqual(self.ayuda.post(f"/api/auth/solicitudes/{sid}/aprobar").status_code, 403)
+            with db.transaction() as c:   # un consultor no aprueba ni la de otro consultor
+                c.execute("UPDATE usuarios SET rol = 'consultor' WHERE email IN (?, ?)", (AYUDA, OLVIDADA))
+            self.assertEqual(self.ayuda.post(f"/api/auth/solicitudes/{sid}/aprobar").status_code, 403)
+        finally:
+            with db.transaction() as c:
+                c.execute("UPDATE usuarios SET rol = 'administrador' WHERE email IN (?, ?)", (AYUDA, OLVIDADA))
+                c.execute("UPDATE usuarios_reset SET estado = 'cancelada' WHERE estado = 'pendiente'")
+
     def test_02_no_se_aprueba_la_propia_solicitud(self):
         self.pedir(AYUDA)
         self.assertEqual(self.ayuda.get("/api/auth/solicitudes").json()["items"], [])   # ni la ve

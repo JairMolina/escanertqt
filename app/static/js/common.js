@@ -425,6 +425,7 @@
         if (document.dispatchEvent(ev)) setTimeout(() => location.reload(), 350);
     }
 
+    const esAdmin = () => !acceso.rol || acceso.rol === 'administrador';   // sin dato aún: se muestra todo y el servidor decide
     function openLotes(shell) {
         const body = h('div', { class: 'stack lotes' });
         const s = sheet({ title: 'Lotes', body, focus: false, actions: [{ label: 'Cerrar', kind: 'ghost', onClick: () => true }] });
@@ -446,6 +447,9 @@
             busy = true; pintar();
             let r = await fn();
             busy = false;
+            if (r.status === 401 && acceso.rol && acceso.rol !== 'administrador') {   // v1.3.42: sin rol de administrador no sirve la clave
+                pintar(); avisoAcceso('lotes'); return null;
+            }
             if (r.status === 401) {
                 const ok = await new Promise((resolve) => { pendiente = { resolve }; authErr = ''; pintar(); const p = body.querySelector('#lotePass'); if (p) p.focus(); });
                 if (!ok) { pintar(); return null; }
@@ -502,8 +506,13 @@
                     h('div', { class: 'lote-nom' }, loteNombre(l), l.activo ? badge('Activo', 'ok', 'check') : null),
                     h('div', { class: 't2' }, `${l.tarjetas || 0} tarjeta${l.tarjetas === 1 ? '' : 's'}`)),
                 h('div', { class: 'lote-acc' },
-                    l.activo ? null : h('button', { class: 'btn btn-sm btn-primary', type: 'button', disabled: busy ? '' : null, 'aria-label': `Usar el lote ${loteNombre(l)}`, onclick: () => usar(l) }, 'Usar este lote'),
+                    l.activo || !esAdmin() ? null : h('button', { class: 'btn btn-sm btn-primary', type: 'button', disabled: busy ? '' : null, 'aria-label': `Usar el lote ${loteNombre(l)}`, onclick: () => usar(l) }, 'Usar este lote'),
                     h('a', { class: 'btn btn-sm', href: `/monitor?lote=${l.id}`, 'aria-label': `Ver el lote ${loteNombre(l)} en el monitor` }, icon('monitor'), 'Ver en el monitor'))))));
+            if (!esAdmin()) {   // v1.3.42: cambiar o crear lotes es de administradores; se explica en vez de mostrar botones que fallan
+                body.append(h('div', { class: 'acceso-aviso' }, h('span', { class: 'acceso-ico' }, icon('lock')),
+                    h('div', null, h('b', null, 'Solo un administrador puede cambiar o crear lotes.'), h('p', { class: 'muted' }, 'Puedes ver los lotes; pide a un administrador que active el que necesitas.'))));
+                return;
+            }
             body.append(h('section', { class: 'panel pad stack', 'aria-labelledby': 'nlTit' },
                 h('h3', { class: 'silk', id: 'nlTit' }, 'Nuevo lote'),
                 h('div', { class: 'row' }, h('div', { class: 'field grow' }, h('label', { for: 'nlMes' }, 'Mes'), mesSel), h('div', { class: 'field', style: 'width:110px' }, h('label', { for: 'nlAnio' }, 'Año'), anioIn)),
@@ -594,12 +603,130 @@
     /** Botón "Enviar por correo" para poner junto a un botón de exportar. getOpts() se evalúa al pulsar. */
     const botonCorreo = (getOpts, cls) => h('button', { class: cls || 'btn', type: 'button', title: 'Enviar este Excel por correo', onclick: () => { const o = getOpts(); if (o) enviarExcel(o); } }, icon('mail'), h('span', null, 'Enviar por correo'));
 
+    // ---------------------------------------------------------------- acceso por rol (v1.3.42)
+    // El servidor decide (middleware `_permiso_rol`); aquí solo se EXPLICA: aviso al intentar entrar a una zona sin permiso,
+    // candados en pestañas/menús y el mismo aviso cuando la API responde 403 con `X-Acceso: rol`.
+    const ROL_TXT = { administrador: 'Administrador', general: 'General', consultor: 'Consultor' };
+    const ZONA_TXT = {
+        admin: 'Administración', recibir: 'Recibir', emparejar: 'Emparejar', programar: 'Programar', monitor: 'la consola de escritorio',
+        dymo: 'Etiquetas DYMO', movimientos: 'Movimientos', lotes: 'el cambio o la creación de lotes', otra: 'esa página',
+    };
+    const PUEDE_TXT = {
+        general: 'Puedes usar Recibir, Emparejar, Programar, Consultar y la consola de escritorio. Administración (cuentas, movimientos, borrados, respaldos, cambio de lote y Excel protegido) es solo para administradores.',
+        consultor: 'Tu cuenta es de consulta: puedes escanear y ver fichas en Consultar, pero no registrar, emparejar, programar, editar, enviar ni borrar datos.',
+    };
+    const acceso = { rol: null };
+    /** Zona de una ruta de página (para saber si el rol puede abrirla). */
+    function zonaDe(path) {
+        const p = path.replace(/\/+$/, '') || '/';
+        if (p === '/admin' || p === '/static/admin.html') return 'admin';
+        if (p === '/' || p === '/static/index.html') return 'recibir';
+        if (p === '/emparejar' || p === '/static/emparejar.html') return 'emparejar';
+        if (p === '/programar' || p === '/static/programar.html') return 'programar';
+        if (p === '/monitor' || p === '/static/monitor.html') return 'monitor';
+        if (p === '/dymo' || p === '/static/dymo_preview.html') return 'dymo';
+        return null;
+    }
+    function zonaPermitida(zona, rol) {
+        if (!zona || !rol || rol === 'administrador') return true;
+        if (zona === 'admin' || zona === 'movimientos' || zona === 'lotes') return false;
+        return rol !== 'consultor';
+    }
+    let avisoAbierto = null, avisoUlt = 0;
+    /** Hoja "Acceso restringido": qué intentó, por qué no puede y qué sí puede hacer su rol. */
+    function avisoAcceso(zona, detalle) {
+        if (avisoAbierto || Date.now() - avisoUlt < 1200) return;
+        avisoUlt = Date.now();
+        const rol = acceso.rol;
+        const que = zona === 'accion' ? null : (ZONA_TXT[zona] || ZONA_TXT.otra);
+        const titular = que ? `Tu cuenta${rol ? ` (${ROL_TXT[rol] || rol})` : ''} no tiene acceso a ${que}.` : (detalle || 'Tu cuenta no tiene permiso para hacer esto.');
+        avisoAbierto = sheet({
+            title: 'Acceso restringido',
+            body: [
+                h('div', { class: 'acceso-aviso' }, h('span', { class: 'acceso-ico' }, icon('lock')), h('div', null, h('b', null, titular),
+                    que && zona === 'admin' ? h('p', { class: 'muted' }, 'Solo las cuentas con rol Administrador pueden entrar.') : null)),
+                rol && PUEDE_TXT[rol] ? h('p', { class: 'muted', style: 'margin:0' }, PUEDE_TXT[rol]) : null,
+                h('p', { class: 'muted', style: 'margin:0' }, 'Si necesitas este acceso, pide a un administrador que cambie tu rol en Administración › Cuentas.'),
+            ],
+            actions: [{ label: 'Entendido', kind: 'primary', onClick: () => true }],
+            onClose: () => { avisoAbierto = null; },
+        });
+    }
+    // 403 por rol en CUALQUIER petición (api(), fetch directos, descargas): se muestra el aviso además del error de quien llamó
+    if (window.fetch && !window.fetch.__tqtAcceso) {
+        const fetch0 = window.fetch.bind(window);
+        const envuelto = async (...args) => {
+            const r = await fetch0(...args);
+            if (r.status === 403 && r.headers.get('X-Acceso') === 'rol') {
+                const url = String((args[0] && args[0].url) || args[0] || '');
+                if (!/\/api\/admin\/logout/.test(url)) {
+                    r.clone().json().then((d) => avisoAcceso((d && d.zona) || 'accion', d && d.detail)).catch(() => avisoAcceso('accion'));
+                }
+            }
+            return r;
+        };
+        envuelto.__tqtAcceso = true;
+        window.fetch = envuelto;
+    }
+    // Enlaces a zonas sin permiso: aviso en vez de navegar (fase de captura: antes que los manejadores de cada página)
+    document.addEventListener('click', (e) => {
+        if (!acceso.rol || acceso.rol === 'administrador' || e.defaultPrevented || e.button !== 0) return;
+        const a = e.target.closest && e.target.closest('a[href]');
+        if (!a || a.hasAttribute('download')) return;
+        let u; try { u = new URL(a.href, location.href); } catch (err) { return; }
+        if (u.origin !== location.origin) return;
+        const zona = (u.pathname === '/admin' && /movimientos/.test(u.hash)) ? 'movimientos' : zonaDe(u.pathname);
+        if (zonaPermitida(zona, acceso.rol)) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        avisoAcceso(zona);
+    }, true);
+    function aplicarRol(rol) {
+        acceso.rol = rol;
+        document.documentElement.dataset.rol = rol;
+        // ¿Venimos de una redirección del servidor por falta de permiso? (?denegado=<zona>)
+        const q = new URLSearchParams(location.search);
+        const den = q.get('denegado');
+        if (den) {
+            q.delete('denegado');
+            const resto = q.toString();
+            history.replaceState(history.state, '', location.pathname + (resto ? '?' + resto : '') + location.hash);
+            const mostrar = () => avisoAcceso(den);
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mostrar); else setTimeout(mostrar, 50);
+        }
+        marcarCandados();
+    }
+    /** Candado en pestañas, menú y barra lateral que llevan a zonas sin permiso (se vuelve a llamar al pintar). */
+    function marcarCandados(root) {
+        if (!acceso.rol || acceso.rol === 'administrador') return;
+        if (acceso.rol === 'consultor') (root || document).querySelectorAll('a.brand, a.brand-logo').forEach((a) => { if (a.getAttribute('href') !== '/consultar') a.href = '/consultar'; });   // su inicio es Consultar
+        (root || document).querySelectorAll('a[href]').forEach((a) => {
+            let u; try { u = new URL(a.href, location.href); } catch (e) { return; }
+            if (u.origin !== location.origin) return;
+            const zona = (u.pathname === '/admin' && /movimientos/.test(u.hash)) ? 'movimientos' : zonaDe(u.pathname);
+            const bloqueado = !zonaPermitida(zona, acceso.rol);
+            a.classList.toggle('acceso-bloq', bloqueado);
+            if (bloqueado) { a.setAttribute('aria-disabled', 'true'); a.title = `Sin acceso con tu rol (${ROL_TXT[acceso.rol] || acceso.rol})`; }
+        });
+    }
+    if (!/^\/(login|invitacion)/.test(location.pathname)) {
+        fetch('/api/auth/yo', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((u) => {
+            if (!u || !u.rol) return;
+            const listo = () => aplicarRol(u.rol);
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', listo); else listo();
+            // la barra lateral y los menús se pintan después: re-marcar cuando cambie el DOM (barato, con espera)
+            if (u.rol !== 'administrador' && window.MutationObserver) {
+                let t = null;
+                new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => marcarCandados(), 120); }).observe(document.documentElement, { childList: true, subtree: true });
+            }
+        }).catch(() => { /* sin red: el servidor sigue protegiendo */ });
+    }
+
     window.TQT = {
         versionP,
         hydrateIcons, MESES, esc, h, store, api, parseNombre, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, TARJETA_ESTADOS,
         loteNombre, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, banner, empty,
-        toast, sheet, enviarExcel, botonCorreo, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, openLotes,
+        toast, sheet, enviarExcel, botonCorreo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, openLotes,
     };
 })();

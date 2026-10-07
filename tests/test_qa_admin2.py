@@ -203,7 +203,7 @@ class TestFrontendAdminEstatico(unittest.TestCase):
         self.assertEqual(len(etiquetas), len(set(etiquetas)))
 
     def test_la_navegacion_no_desborda_en_movil(self):
-        self.assertRegex(HTML, r"@media \(max-width: 700px\)[^}]*\.desk-nav[^}]*overflow-x: auto")
+        self.assertRegex(HTML, r"@media \(max-width: 700px\)[^}]*\.desk-nav[^}]*flex-wrap: wrap")   # v1.3.42: filas, no scroll lateral
 
     def test_el_toast_de_borrado_usa_las_claves_reales_del_servidor(self):
         self.assertIn("d.tarjetas_borradas", JS)

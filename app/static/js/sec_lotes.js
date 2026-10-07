@@ -16,6 +16,7 @@
                 if (ocupado) return; ocupado = true; pintar();
                 const r = await api(`/api/lotes/${l.id}/activar`, { method: 'POST' });
                 ocupado = false;
+                if (r.status === 401 && T.acceso.rol && T.acceso.rol !== 'administrador') { pintar(); T.avisoAcceso('lotes'); return; }   // v1.3.42
                 if (!r.ok) { error = r.status === 401 ? 'Tu sesión de supervisor caducó. Entra otra vez para usar este lote.' : r.error; pintar(); return; }
                 error = ''; toast(`Lote ${T.loteNombre(l)} activo para todos los celulares`, { kind: 'ok' });
                 await ctx.recargarLotes(); ctx.seleccionarLote(l.id); pintar();

@@ -3,7 +3,7 @@
 .itq-top { flex-wrap: wrap; }
 
 /* pestañas */
-.itq-tabs { display: inline-flex; gap: 2px; border-bottom: 1px solid var(--line); }
+.itq-tabs { display: inline-flex; gap: 2px; border-bottom: 1px solid var(--line); max-width: 100%; flex-wrap: wrap; }   /* v1.3.42: en el celular las pestañas bajan de línea */
 .itq-tabs [role="tab"] { min-height: 36px; padding: 0 14px; border: 0; background: transparent; color: var(--muted); font-weight: 700; font-size: 14px; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
 .itq-tabs [role="tab"]:hover { color: var(--text); }
 .itq-tabs [role="tab"][aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
