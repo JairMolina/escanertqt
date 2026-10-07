@@ -31,6 +31,8 @@ class EnvioExcelIn(BaseModel):
     para: List[str] = Field(..., min_length=1, max_length=MAX_DESTINOS)
     lote_id: Optional[int] = Field(None, ge=1, le=2**31)
     fecha: Optional[str] = Field(None, max_length=10)
+    desde: Optional[str] = Field(None, max_length=10)
+    hasta: Optional[str] = Field(None, max_length=10)
     mensaje: Optional[str] = Field(None, max_length=1000)
 
 
@@ -40,7 +42,10 @@ async def destinatarios():
     return {"items": [{"email": u["email"], "rol": u["rol"]} for u in cuentas if u["activo"]], "smtp": correo.configurado(), "max": MAX_DESTINOS}
 
 
-def _excel_lote(lote_id: Optional[int]) -> Tuple[str, bytes, str]:
+Kpis = List[Tuple[str, object, str]]
+
+
+def _excel_lote(lote_id: Optional[int]) -> Tuple[str, bytes, str, Kpis]:
     from app.routers.admin import _exportar   # import diferido (admin importa routers que importan éste)
     lote = db.get_lote_by_id(lote_id) if lote_id else db.get_active_lote()
     if not lote:
@@ -49,20 +54,24 @@ def _excel_lote(lote_id: Optional[int]) -> Tuple[str, bytes, str]:
     carpeta = Path(tempfile.mkdtemp(prefix="tqt_correo_"))
     try:
         _exportar(lote, carpeta / nombre)
-        return nombre, (carpeta / nombre).read_bytes(), f"Control de producción TQT · {MESES_ES[lote['mes'] - 1]} {lote['anio']}"
+        return nombre, (carpeta / nombre).read_bytes(), f"Control de producción TQT · {MESES_ES[lote['mes'] - 1]} {lote['anio']}", []
     finally:
         shutil.rmtree(carpeta, ignore_errors=True)
 
 
-def _generar(p: EnvioExcelIn) -> Tuple[str, bytes, str]:
+def _generar(p: EnvioExcelIn) -> Tuple[str, bytes, str, Kpis]:
+    """(archivo, bytes, título, indicadores para el cuerpo del correo)."""
     if p.tipo == "lote":
         return _excel_lote(p.lote_id)
     if p.tipo == "reporte_dia":
-        datos = reporte_dia.excel_del_dia(p.fecha or "")
-        return f"Tarjetas_{p.fecha}.xlsx", datos, f"Reporte de tarjetas del {p.fecha}"
+        a = p.desde or p.fecha or ""
+        b = p.hasta or a
+        res = reporte_dia.tarjetas_del_rango(a, b)
+        kpis = [("Completadas", res["completadas"], "ok"), ("Entregadas", res["entregadas"], "info"), ("En el reporte", len(res["items"]), "gris")]
+        return reporte_dia.nombre_archivo(a, b), reporte_dia.excel_del_rango(a, b), f"Reporte de tarjetas {'del ' if a == b else ''}{reporte_dia.texto_rango(a, b)}", kpis
     from app.services import inventario_tqtr
-    hoy = date.today().isoformat()
-    return f"INVENTARIO_TQTR_{hoy}.xlsx", inventario_tqtr.exportar_xlsx(), f"Inventario TQTR al {hoy}"
+    hoy = date.today()
+    return f"INVENTARIO_TQTR_{hoy}.xlsx", inventario_tqtr.exportar_xlsx(), f"Inventario TQTR al {hoy.day} de {MESES_ES[hoy.month - 1].lower()} de {hoy.year}", []
 
 
 @router.post("/excel", summary="Generar un Excel de la app y enviarlo por correo a cuentas o direcciones externas")
@@ -82,21 +91,27 @@ async def enviar_excel(p: EnvioExcelIn, request: Request,
     if not correo.configurado():
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="El envío de correo no está configurado en el servidor.")
     try:
-        nombre, datos, titulo = await run_in_threadpool(_generar, p)
+        nombre, datos, titulo, kpis = await run_in_threadpool(_generar, p)
     except (LookupError, ValueError) as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     try:
         quien = usuarios.validar_sesion(request.cookies.get(usuarios.COOKIE))["email"]
     except usuarios.SesionInvalidaError:
         quien = "desconocido"
-    texto = f"Hola:\n\n{quien} te envía «{titulo}» desde Escáner TQT (archivo adjunto: {nombre}).\n"
-    if p.mensaje and p.mensaje.strip():
-        texto += f"\nMensaje:\n{p.mensaje.strip()}\n"
-    texto += "\nInventario TQT"
+    mensaje = (p.mensaje or "").strip()
+    texto = f"Hola:\n\n{quien} te comparte «{titulo}» desde Escáner TQT. El archivo {nombre} va adjunto a este correo.\n"
+    if kpis:
+        texto += "\n" + "\n".join(f"- {etq}: {val}" for etq, val, _ in kpis) + "\n"
+    if mensaje:
+        texto += f"\nMensaje de {quien}:\n{mensaje}\n"
+    texto += "\nSaludos,\nEscáner TQT · Control de producción"
+    html = correo.plantilla(titulo, [f"{quien} te comparte este reporte desde Escáner TQT. El archivo va adjunto a este correo."],
+                            saludo="Hola:", preencabezado=f"{quien} te comparte {titulo}", kpis=kpis or None,
+                            nota=(f"Mensaje de {quien}:\n{mensaje}" if mensaje else None), adjunto=nombre)
     enviados, fallos = [], []
     for d in para:   # uno por destinatario: nadie ve los correos de los demás
         try:
-            await run_in_threadpool(correo.enviar, d, f"{titulo} - Escáner TQT", texto, None, quien if "@" in quien else None, [(nombre, datos, MIME_XLSX)])
+            await run_in_threadpool(correo.enviar, d, f"{titulo} · Escáner TQT", texto, html, quien if "@" in quien else None, [(nombre, datos, MIME_XLSX)])
             enviados.append(d)
         except Exception as e:  # noqa: BLE001 - SMTP/red: se informa sin exponer credenciales
             logger.warning("No se pudo enviar %s a %s: %s", nombre, d, e)

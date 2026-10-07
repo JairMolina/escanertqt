@@ -297,3 +297,9 @@ button.esc-det-fila:hover { background: var(--surface-2); }
 .esc-dia-kpi b { font-size: 18px; font-variant-numeric: tabular-nums; }
 .esc-dia-kpi.ok { background: color-mix(in srgb, var(--ok, #22a06b) 16%, transparent); color: var(--ok, #22a06b); }
 .esc-dia-kpi.info { color: var(--accent); }
+/* rango de fechas (v1.3.41) */
+.esc-dia { display: flex; flex-direction: column; gap: 10px; }
+.esc-dia-campo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.esc-dia-atajos { display: flex; flex-wrap: wrap; gap: 4px; }
+.esc-dia-atajo[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-color: transparent; }
+.esc-dia-res:empty { display: none; }

@@ -1505,9 +1505,18 @@ def _avisar_minimo(nuevos: List[Dict[str, Any]], comprar: List[Dict[str, Any]], 
                  + "\n\nLista completa de materiales a comprar (por urgencia):\n\n" + "\n".join(linea(x) for x in comprar)
                  + "\n\nConsola de escritorio: /monitor#/inventario_tqtr?tab=stock\n")
         asunto = f"Inventario TQTR: {len(nuevos)} material{'es' if len(nuevos) != 1 else ''} en stock mínimo"
+        cab = ["Material", "Quedan", "Mínimo", "Comprar", "Proveedor", "Entrega"]
+        fila = lambda x: [x["descripcion"], f"{x['disponible']} {x['unidad']}", x["stock_minimo"], f"{x['sugerida']} {x['unidad']}",
+                          x["proveedor"] or "Sin definir", f"{x['entrega_dias']} días" if x["entrega_dias"] else "—"]
+        tablas = [("Llegaron a su stock mínimo", cab, [fila(x) for x in nuevos])]
+        if comprar:
+            tablas.append(("Lista completa de materiales a comprar (por urgencia)", cab, [fila(x) for x in comprar]))
+        html = correo.plantilla(asunto, ["Estos materiales del Inventario TQTR acaban de llegar a su stock mínimo."],
+                                kpis=[("Llegaron al mínimo", len(nuevos), "bad"), ("Materiales a comprar", len(comprar), "warn")],
+                                tablas=tablas, aviso=("info", "Consúltalo en la consola de escritorio: Inventario TQTR › Stock Mínimo."))
         for d in destinos:
             try:
-                correo.enviar(d, asunto, texto)
+                correo.enviar(d, asunto, texto, html)
             except Exception as e:  # noqa: BLE001
                 logger.error("Inventario TQTR: no se pudo enviar el aviso de stock mínimo a %s: %s", d, e)
     except Exception as e:  # noqa: BLE001

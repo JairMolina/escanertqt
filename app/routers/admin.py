@@ -4,7 +4,6 @@ Autenticación: POST /api/admin/login -> token (cabecera `X-Admin-Token`, caduca
 hace antes un respaldo automático de la BD, deja registro en la bitácora, emite `ADMIN_CAMBIO` por WebSocket y devuelve
 el nombre del respaldo.
 """
-import html as _html
 import logging
 import os
 import shutil
@@ -200,8 +199,11 @@ async def movimientos(limite: int = Query(50, ge=1, le=200), desplazamiento: int
 @router.post("/correo/prueba", summary="Enviar un correo de prueba desde el backend (SMTP configurado por variables de entorno)")
 async def correo_prueba(payload: CorreoPruebaIn, _: Dict = Depends(admin_requerido)):
     try:
-        mid = await run_in_threadpool(correo.enviar, payload.para.strip(), "Prueba de envío - Escáner TQT",
-                                      "Correo de prueba enviado desde la aplicación Escáner TQT.", None, payload.reply_to)
+        html = correo.plantilla("Prueba de envío", ["Este es un correo de prueba enviado desde la aplicación Escáner TQT.",
+                                                     "Si lo recibiste, el envío de correo del servidor está funcionando."],
+                                aviso=("ok", "Configuración de correo verificada."))
+        mid = await run_in_threadpool(correo.enviar, payload.para.strip(), "Prueba de envío · Escáner TQT",
+                                      "Correo de prueba enviado desde la aplicación Escáner TQT.", html, payload.reply_to)
     except correo.CorreoNoConfigurado as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:  # noqa: BLE001 - SMTP/red: se informa sin exponer credenciales
@@ -244,10 +246,10 @@ def _enviar_invitacion(email: str, rol: str, enlace: str, por: str) -> Dict[str,
     texto = (f"Hola:\n\n{por} te dio de alta en Escáner TQT con el rol «{rol}».\n\n"
              f"Para activar tu cuenta y elegir tu contraseña abre este enlace (vale 48 horas y se usa una sola vez):\n{enlace}\n\n"
              "Si no esperabas este correo, ignóralo.\n\nInventario TQT")
-    html = (f"<div style=\"font-family:Segoe UI,Arial,sans-serif;max-width:520px;color:#1b2333\"><h2 style=\"color:#2563eb\">Escáner TQT</h2>"
-            f"<p><b>{_html.escape(por)}</b> te dio de alta con el rol <b>{rol}</b>.</p><p>Activa tu cuenta y elige tu contraseña:</p>"
-            f"<p><a href=\"{_html.escape(enlace)}\" style=\"display:inline-block;background:#2563eb;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600\">Activar mi cuenta</a></p>"
-            "<p style=\"color:#667085;font-size:13px\">El enlace vale 48 horas y se usa una sola vez. Si no esperabas este correo, ignóralo.</p></div>")
+    html = correo.plantilla("Activa tu cuenta", saludo="Hola:", preencabezado=f"{por} te dio de alta en Escáner TQT",
+                            parrafos=[f"{por} te dio de alta en Escáner TQT. Para activar tu cuenta y elegir tu contraseña, usa el botón:"],
+                            filas=[("Cuenta", email), ("Rol", rol.capitalize())], boton=("Activar mi cuenta", enlace),
+                            aviso=("gris", "El enlace vale 48 horas y se usa una sola vez. Si no esperabas este correo, ignóralo."))
     try:
         correo.enviar(email, "Activa tu cuenta de Escáner TQT", texto, html)
         return {"enviado": True}

@@ -539,7 +539,7 @@
     });
 
     /** Enviar por correo un Excel que genera el servidor (v1.3.37).
-     *  opts: { tipo: 'lote'|'reporte_dia'|'inventario_tqtr', lote_id?, fecha?, titulo, adminToken? }
+     *  opts: { tipo: 'lote'|'reporte_dia'|'inventario_tqtr', lote_id?, fecha?, desde?, hasta?, titulo, adminToken? }
      *  Muestra las cuentas activas como casillas y un campo para correos sin cuenta (separados por coma o espacio). */
     async function enviarExcel(opts) {
         const r = await api('/api/correo/destinatarios');
@@ -576,7 +576,7 @@
                     if (opts.adminToken) headers['X-Admin-Token'] = opts.adminToken;
                     let res, data = null;
                     try {
-                        res = await fetch('/api/correo/excel', { method: 'POST', headers, body: JSON.stringify({ tipo: opts.tipo, lote_id: opts.lote_id || null, fecha: opts.fecha || null, mensaje: msj.value || null, para }) });
+                        res = await fetch('/api/correo/excel', { method: 'POST', headers, body: JSON.stringify({ tipo: opts.tipo, lote_id: opts.lote_id || null, fecha: opts.fecha || null, desde: opts.desde || null, hasta: opts.hasta || null, mensaje: msj.value || null, para }) });
                         try { data = await res.json(); } catch (e) { data = null; }
                     } catch (e) { btn.textContent = 'Enviar'; err.textContent = 'Sin conexión con el servidor.'; return false; }
                     btn.textContent = 'Enviar';

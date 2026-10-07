@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.41 — 2026-10-07
+- **Tarjetas › Reporte por fecha con rango.** Campos "Desde" y "Hasta" (sin "Hasta" = un solo día) y atajos: Hoy, Ayer, Esta semana, Últimos 7 días, Este mes y Mes pasado. La tabla, el Excel y el envío por correo usan el rango (máximo un año). El Excel de un rango se llama `Tarjetas_AAAA-MM-DD_a_AAAA-MM-DD.xlsx`, agrega las columnas "Fecha finalizado" y "Fecha entrega" y una hoja "Por día" con completadas y entregadas de cada día.
+- **Correos con diseño profesional y menos spam.** Todos los correos (Excel por correo, invitaciones, aviso de contraseña, stock mínimo y prueba) salen en texto + HTML con la plantilla de la marca: encabezado azul, indicadores, ficha del adjunto, mensaje del remitente y pie. Se agregan los encabezados `Content-Language`, `Auto-Submitted` y `X-Auto-Response-Suppress`. Los correos de solo texto con un adjunto eran los que los filtros mandaban a spam. El dominio ya tiene SPF, DKIM (Hostinger) y DMARC.
+
 ## v1.3.40 — 2026-10-06
 - **Placas programadas.** Una R1/R2 con MAC y versión de firmware guardadas se muestra como "Programada" (o "Asignada · programada" si ya está en una tarjeta) en Inventario de PCB, Consultar, el detalle de la tarjeta y Administración; nuevo filtro "Programadas".
 - **Inventario TQTR: Translock disponible = 16, como el Excel.** "Devolución" y "Desinstalado o Garantía" ya no suman a disponible: quedan aparte como "Devueltas / en revisión" (Translock: 2), con acciones "Pasar a disponible" o "Dar de baja" que registran el movimiento. Los armados que alcanzan con el stock bajan de 18 a 16 (los limita la caja Translock).

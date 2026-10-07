@@ -119,6 +119,26 @@ class TestCuentas(unittest.TestCase):
         vacio = load_workbook(io.BytesIO(reporte_dia.excel_del_dia("2031-01-01"))).active
         self.assertIn("No hubo", vacio["A9"].value)
 
+    def test_07_reporte_por_rango(self):
+        r = self.adm.get("/api/reporte-dia?desde=2031-03-08&hasta=2031-03-10").json()
+        self.assertEqual((r["completadas"], r["entregadas"], r["dias"]), (3, 2, 3))
+        self.assertEqual(self.adm.get("/api/reporte-dia?desde=2031-03-10&hasta=2031-03-01").status_code, 400)
+        self.assertEqual(self.adm.get("/api/reporte-dia?desde=2030-01-01&hasta=2031-03-01").status_code, 400)
+        self.assertEqual(self.adm.get("/api/reporte-dia").status_code, 400)
+        x = self.adm.get("/api/reporte-dia/excel?desde=2031-03-08&hasta=2031-03-10")
+        self.assertIn("Tarjetas_2031-03-08_a_2031-03-10.xlsx", x.headers["content-disposition"])
+        wb = load_workbook(io.BytesIO(x.content))
+        self.assertEqual(wb.sheetnames, ["Reporte del periodo", "Por día"])
+        self.assertEqual(wb["Por día"]["C7"].value, "=SUM(C4:C6)")
+        self.assertEqual(reporte_dia.texto_rango("2031-10-01", "2031-10-06"), "del 1 al 6 de octubre de 2031")
+
+    def test_08_plantilla_de_correo_escapa_y_tiene_marca(self):
+        html = correo.plantilla("Título <x>", ["Hola <b>"], kpis=[("Completadas", 3, "ok")], adjunto="a.xlsx", boton=("Abrir", "https://x/?a=1&b=2"))
+        self.assertIn("Escáner TQT", html)
+        self.assertIn("Título &lt;x&gt;", html)
+        self.assertNotIn("<b>", html.split("<body")[1].replace("<b style", ""))
+        self.assertIn("a=1&amp;b=2", html)
+
 
 if __name__ == "__main__":
     unittest.main()
