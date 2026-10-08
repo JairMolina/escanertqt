@@ -99,15 +99,15 @@
     }
 
     // ---------------------------------------------------------------- parsers (espejo del backend)
-    const NOMBRE_RE = /TQT[\s_-]*R([123])[\s_-]*V([0-9]{1,3})[\s_-]+([0-9]{1,4})(?![0-9])/i;  // igual que el servidor
+    const NOMBRE_RE = /TQT[\s_-]*R([123])[\s_-]*V([0-9]{1,3}(?:[._][0-9](?=[\s_-]))?)(?:[\s_-]+[A-Za-z][A-Za-z0-9]*)*[\s_-]+([0-9]{1,4})(?![0-9])/i;  // igual que el servidor (v1.3.46: acepta 'PCB_TQT_R3_V2_0_TIMER_0073' → V20)
     const VERSION_DEFAULT = '30';
 
     /** {tipo:'R3', version:'30', serie:'0084', nombre:'TQT-R3-V30-0084'} o null. */
     function parseNombre(raw) {
         const m = NOMBRE_RE.exec(String(raw || ''));
         if (!m) return null;
-        if (!Number(m[2]) || !Number(m[3])) return null;   // versión 0 o serie 0000 no existen
-        const serie = m[3].padStart(4, '0'), version = String(Number(m[2]));   // V030 == V30
+        if (!Number(m[2].replace(/\D/g, '')) || !Number(m[3])) return null;   // versión 0 o serie 0000 no existen
+        const serie = m[3].padStart(4, '0'), version = String(Number(m[2].replace(/\D/g, '')));   // V030 == V30 · V2_0 == V20
         return { tipo: 'R' + m[1], version, serie, nombre: `TQT-R${m[1]}-V${version}-${serie}` };
     }
     const nombreDe = (tipo, version, serie) => `TQT-${tipo}-V${version}-${String(serie).padStart(4, '0')}`;

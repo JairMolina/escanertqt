@@ -85,3 +85,26 @@ class TestEscanerRemoto(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRespaldoHttpV1346(TestEscanerRemoto):
+    """v1.3.46: códigos y resultados se pueden recuperar por HTTP; el nombre tolera 'PCB_TQT_R3_V2_0_TIMER_0073'."""
+
+    def test_respaldo_http(self):
+        tok = self.c.post("/api/escaner/sesion", json={"seccion": "macs", "titulo": "MAC y firmware"}).json()["token"]
+        self.c.post(f"/api/escaner/{tok}/codigo", json={"codigo": "A"})
+        self.c.post(f"/api/escaner/{tok}/seccion", json={"seccion": "dymo", "titulo": "Etiquetas DYMO"})
+        e = self.c.post(f"/api/escaner/{tok}/codigo", json={"codigo": "B"}).json()
+        self.assertEqual(e["titulo"], "Etiquetas DYMO")
+        cs = self.c.get(f"/api/escaner/{tok}/codigos?desde=1").json()
+        self.assertEqual([x["codigo"] for x in cs["items"]], ["B"])
+        self.assertFalse(self.c.get(f"/api/escaner/{tok}/resultado/2").json()["listo"])
+        self.c.post(f"/api/escaner/{tok}/resultado", json={"n": 2, "ok": True, "texto": "hecho"})
+        r = self.c.get(f"/api/escaner/{tok}/resultado/2").json()
+        self.assertEqual((r["listo"], r["ok"], r["texto"], r["titulo"]), (True, True, "hecho", "Etiquetas DYMO"))
+
+    def test_nombre_tolerante(self):
+        from app.database.models import parse_tarjeta_code as p
+        self.assertEqual(p("PCB_TQT_R3_V2_0_TIMER_0073")["nombre"], "TQT-R3-V20-0073")
+        self.assertEqual(p("TQT_R1_V30_0021")["nombre"], "TQT-R1-V30-0021")
+        self.assertEqual(p("TQT-R1-V30-0021\n70:4b:ca:5b:9f:6e")["nombre"], "TQT-R1-V30-0021")

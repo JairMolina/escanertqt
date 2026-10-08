@@ -41,6 +41,9 @@ class ResultadoIn(BaseModel):
     texto: str = Field("", max_length=300)
 
 
+MAX_GUARDADOS = 50
+
+
 def _limpiar(ahora: float) -> None:
     for tok in [t for t, s in _sesiones.items() if ahora - s["uso"] > TTL_SEG]:
         _sesiones.pop(tok, None)
@@ -78,7 +81,7 @@ async def crear_sesion(datos: Optional[SeccionIn] = None):
             _sesiones.pop(min(_sesiones, key=lambda t: _sesiones[t]["uso"]), None)
         token = secrets.token_urlsafe(18)
         s = {"id": secrets.token_hex(6), "creada": ahora, "uso": ahora, "seccion": (datos.seccion if datos else ""),
-             "titulo": (datos.titulo if datos else ""), "moviles": 0, "n": 0, "ultimo": None}
+             "titulo": (datos.titulo if datos else ""), "moviles": 0, "n": 0, "ultimo": None, "codigos": [], "res": {}}
         _sesiones[token] = s
     return {"token": token, "id": s["id"], "ruta": f"/escaner?s={token}", "caduca_seg": TTL_SEG}
 
@@ -109,6 +112,8 @@ async def codigo(token: str, datos: CodigoIn):
     s = _sesion(token)
     s["n"] += 1
     s["ultimo"] = time.time()
+    s.setdefault("codigos", []).append({"n": s["n"], "codigo": datos.codigo.strip()})   # respaldo si la consola perdió el WebSocket
+    del s["codigos"][:-MAX_GUARDADOS]
     await manager.broadcast("ESCANEO_REMOTO", {"id": s["id"], "n": s["n"], "codigo": datos.codigo.strip()})
     return {"ok": True, "n": s["n"], "titulo": s["titulo"]}
 
@@ -116,8 +121,25 @@ async def codigo(token: str, datos: CodigoIn):
 @router.post("/{token}/resultado", summary="La consola responde al celular qué hizo con el código")
 async def resultado(token: str, datos: ResultadoIn):
     s = _sesion(token)
+    res = s.setdefault("res", {})
+    res[datos.n] = {"ok": datos.ok, "texto": datos.texto}   # respaldo si el celular perdió el WebSocket
+    for viejo in sorted(res)[:-MAX_GUARDADOS]:
+        res.pop(viejo, None)
     await manager.broadcast("ESCANER_RESULTADO", {"id": s["id"], "n": datos.n, "ok": datos.ok, "texto": datos.texto})
     return {"ok": True}
+
+
+@router.get("/{token}/codigos", summary="Códigos enviados después de `desde` (la consola los recupera si perdió el WebSocket)")
+async def codigos(token: str, desde: int = 0):
+    s = _sesion(token)
+    return {**_publica(s), "items": [c for c in s.get("codigos", []) if c["n"] > desde]}
+
+
+@router.get("/{token}/resultado/{n}", summary="Respuesta de la consola a un código (el celular la consulta si perdió el WebSocket)")
+async def ver_resultado(token: str, n: int):
+    s = _sesion(token)
+    r = s.get("res", {}).get(n)
+    return {**_publica(s), "listo": r is not None, **(r or {})}
 
 
 @router.delete("/{token}", summary="Terminar la vinculación")

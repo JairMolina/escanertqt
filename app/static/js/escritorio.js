@@ -278,7 +278,7 @@
     // y cada lectura llega por WebSocket (ESCANEO_REMOTO). Cada sección puede manejarla con inst.escaneo(codigo) → {ok, texto};
     // si no, la consola decide: Consultar busca, Tarjetas abre la tarjeta, Inventario filtra la placa y el resto muestra la ficha.
     const ESC_KEY = 'tqt.escaner.sesion';
-    const RS = { token: null, id: null, moviles: 0, hoja: null, ficha: null, estado: null, pintarEstado: null };
+    const RS = { token: null, id: null, moviles: 0, hoja: null, ficha: null, estado: null, pintarEstado: null, ultN: 0 };
     function guardarRS() { try { if (RS.token) sessionStorage.setItem(ESC_KEY, JSON.stringify({ token: RS.token, id: RS.id })); else sessionStorage.removeItem(ESC_KEY); } catch (e) { /* nada */ } }
     function pintarEscBtn() {
         if (!refs.escBtn) return;
@@ -294,7 +294,7 @@
         let g = null; try { g = JSON.parse(sessionStorage.getItem(ESC_KEY) || 'null'); } catch (e) { g = null; }
         if (!g || !g.token) return;
         const r = await api(`/api/escaner/${g.token}`);
-        if (r.ok && r.data) { RS.token = g.token; RS.id = r.data.id; RS.moviles = r.data.moviles || 0; pintarEscBtn(); avisarSeccion(); } else olvidarRS();
+        if (r.ok && r.data) { RS.token = g.token; RS.id = r.data.id; RS.moviles = r.data.moviles || 0; RS.ultN = r.data.n || 0; pintarEscBtn(); avisarSeccion(); } else olvidarRS();
     }
     function qrSvg(texto) {
         const q = window.qrcode(0, 'M'); q.addData(texto); q.make();
@@ -307,7 +307,7 @@
         if (!RS.token) {
             const r = await api('/api/escaner/sesion', { method: 'POST', body: { seccion: S.cur ? S.cur.id : '', titulo: S.cur ? S.cur.def.titulo : '' } });
             if (!r.ok) { toast(r.error || 'No se pudo crear la vinculación', { kind: 'bad' }); return; }
-            RS.token = r.data.token; RS.id = r.data.id; RS.moviles = 0; guardarRS(); pintarEscBtn();
+            RS.token = r.data.token; RS.id = r.data.id; RS.moviles = 0; RS.ultN = 0; guardarRS(); pintarEscBtn();
         }
         const url = `${location.origin}/escaner?s=${encodeURIComponent(RS.token)}`;
         const local = /^(localhost|127\.|\[::1\])/i.test(location.hostname);
@@ -389,6 +389,7 @@
     }
     async function recibirEscaneo(d) {
         const codigo = String((d && d.codigo) || '').trim(); if (!codigo) return;
+        if (d.n) { if (d.n <= RS.ultN) return; RS.ultN = d.n; }   // ya atendido (llegó por WebSocket y por el sondeo)
         pushFeed('info', `Escaneado desde el celular: ${primeraLinea(codigo)}`);
         let res = null;
         try {
@@ -408,6 +409,14 @@
         });
         ws.on('ESCANEO_REMOTO', (d) => { if (d && d.id === RS.id) recibirEscaneo(d); });
         ws.on('ESCANER_CERRADO', (d) => { if (d && d.id === RS.id) { olvidarRS(); toast('Se cerró la vinculación con el celular', { kind: 'warn' }); } });
+        // v1.3.46: respaldo por HTTP (si el WebSocket se cayó, los códigos del celular no se pierden)
+        setInterval(async () => {
+            if (!RS.token || document.hidden) return;
+            const r = await api(`/api/escaner/${RS.token}/codigos?desde=${RS.ultN}`);
+            if (!r.ok) { if (r.status === 404) olvidarRS(); return; }
+            if (r.data.moviles !== RS.moviles) { RS.moviles = r.data.moviles || 0; pintarEscBtn(); if (RS.pintarEstado) RS.pintarEstado(); }
+            for (const c of r.data.items || []) await recibirEscaneo({ id: RS.id, n: c.n, codigo: c.codigo });
+        }, 2500);
     }
 
     // ------------------------------------------------------------------ router y montaje de secciones

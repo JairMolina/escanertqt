@@ -71,11 +71,34 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         f.li.dataset.e = 'env'; f.txt.textContent = 'Enviado · esperando a la consola…';
+        if ((r.data.titulo || '') !== st.titulo) { st.titulo = r.data.titulo || ''; pintarEstado('ok'); }   // sección actual de la PC
         st.envios.set(r.data.n, f);
+        consultar(r.data.n, f, 0);
         if (st.tempranos.has(r.data.n)) { aplicar(f, st.tempranos.get(r.data.n)); st.tempranos.delete(r.data.n); }   // la consola respondió antes que el POST
         setTimeout(() => { if (st.envios.get(r.data.n) === f && f.li.dataset.e === 'env') { f.txt.textContent = 'Enviado (la consola no respondió: ¿está abierta?)'; f.li.dataset.e = 'warn'; } }, 6000);
         if (window.SoundFX) window.SoundFX.playScan('R1');
         if (window.Haptics) window.Haptics.scan();
+    }
+
+    // v1.3.46: si el WebSocket del celular se cayó, la respuesta de la consola se pide por HTTP
+    function consultar(n, f, i) {
+        const esperas = [1200, 2500, 4500, 8000];
+        if (i >= esperas.length) return;
+        setTimeout(async () => {
+            if (!st.token || st.envios.get(n) !== f || (f.li.dataset.e !== 'env' && f.li.dataset.e !== 'warn')) return;
+            const r = await api(`/api/escaner/${encodeURIComponent(st.token)}/resultado/${n}`);
+            if (r.ok && r.data) {
+                if ((r.data.titulo || '') !== st.titulo) { st.titulo = r.data.titulo || ''; pintarEstado('ok'); }
+                if (r.data.listo) { aplicar(f, r.data); return; }
+            }
+            consultar(n, f, i + 1);
+        }, esperas[i]);
+    }
+    async function refrescarVinculo() {
+        if (!st.token) return;
+        const r = await api(`/api/escaner/${encodeURIComponent(st.token)}`);
+        if (r.ok && r.data) { if ((r.data.titulo || '') !== st.titulo) { st.titulo = r.data.titulo || ''; pintarEstado('ok'); } }
+        else if (r.status === 404) { olvidar(); pintarEstado('error', 'La consola cerró la vinculación. Escanea de nuevo su QR.'); }
     }
 
     function aplicar(f, d) {
@@ -111,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ws.on('ESCANER_SECCION', (d) => { if (d && d.id === st.id) { st.titulo = d.titulo || ''; pintarEstado('ok'); } });
         ws.on('ESCANER_CERRADO', (d) => { if (d && d.id === st.id) { olvidar(); pintarEstado('error', 'La consola cerró la vinculación. Escanea de nuevo su QR para seguir.'); } });
     }
+    if (T.resync) T.resync(refrescarVinculo, 10000);   // al reconectar, al volver a la app y cada 10 s: sección actual de la PC
 
     T.mountVisor($('visorHost'), { compact: true, onCode, vinculo: true });   // aquí el QR de la consola lo maneja onCode (sin recargar)
     if (st.token) unir(st.token); else pintarEstado('emparejar');

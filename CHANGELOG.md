@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.46 — 2026-10-08
+- **QR de otras versiones.** Se reconocen etiquetas como `PCB_TQT_R3_V2_0_TIMER_0073` (versión con decimal "2_0" = V20 y texto entre la versión y el número) en Recibir, Consultar, MAC y firmware, DYMO y el servidor.
+- **Recibir: ¿lote nuevo?** Si se escanea una placa de otra versión que la de la recepción actual, pregunta si es un lote nuevo: "Sí" confirma lo ya escaneado como su propio lote, cambia la versión por defecto e inicia el registro nuevo; "No" solo registra esa versión.
+- **Escáner remoto más confiable.** El celular ve siempre la sección abierta en la PC (se actualiza en cada envío, al volver a la app y cada 10 s) y recibe la respuesta aunque se haya caído su conexión en tiempo real; la consola y DYMO recuperan los códigos que no les llegaron. Ya no hace falta desvincular al cambiar de sección.
+
 ## v1.3.45 — 2026-10-08
 - **R3 en MAC y firmware.** Las R3 aparecen junto a las R1/R2 en "Pendientes" (las que no tienen firmware) y en "Con MAC" (las programadas), con filtro "R3". La columna MAC dice "No lleva MAC" y al elegir el firmware se guarda y queda "Programada". Al escanear una R3 (celular o lector USB) se abre la hoja **"Lote R3"**: cada R3 escaneada se agrega a la lista y con "Aplicar firmware a todas" se programa todo el lote con un solo firmware (también con el botón "Lote R3 (escanear)"). Botón **"Quitar firmware"** para regresar una R3 a "Sin firmware".
 - **Escanear para imprimir en Etiquetas DYMO.** Nuevo panel con "Botón de escaneo" (vincula el celular con un QR) y campo para lector USB: se escanean solo las placas a imprimir. Una R1 o R2 agrega la etiqueta de su tarjeta (R1 + R2); las R3 se acomodan de dos en dos en la etiqueta R3 doble (si queda una sola, la otra mitad va vacía). "Imprimir escaneadas en DYMO" manda todo.

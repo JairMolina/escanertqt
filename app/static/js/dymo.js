@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const QUIET = 2;
     const NS = 'http://www.w3.org/2000/svg';
     const state = { tarjetas: [], cur: null, zoom: 3, dymo: { estado: 'buscando', printers: [], preferred: null }, busy: false };
-    const ESC = { tarjetas: new Map(), r3: [], token: null, id: null, moviles: 0, est: null };   // v1.3.45: lote escaneado
+    const ESC = { tarjetas: new Map(), r3: [], token: null, id: null, moviles: 0, est: null, ultN: 0 };   // v1.3.45: lote escaneado
 
     // ------------------------------------------------------------------ trama y modo
     const pcbDe = (t, s) => t[s] || (t[`nombre_${s}`] ? { nombre: t[`nombre_${s}`], mac: t[`mac_${s}`], estado_pcb: t[`estado_pcb_${s}`] } : null);
@@ -540,14 +540,14 @@ document.addEventListener('DOMContentLoaded', () => {
         let g = null; try { g = JSON.parse(sessionStorage.getItem(ESC_KEY) || 'null'); } catch (e) { g = null; }
         if (!g || !g.token) return;
         const r = await api(`/api/escaner/${g.token}`);
-        if (r.ok && r.data) { ESC.token = g.token; ESC.id = r.data.id; ESC.moviles = r.data.moviles || 0; escBoton(); escAvisar(); } else escOlvidar();
+        if (r.ok && r.data) { ESC.token = g.token; ESC.id = r.data.id; ESC.moviles = r.data.moviles || 0; ESC.ultN = r.data.n || 0; escBoton(); escAvisar(); } else escOlvidar();
     }
     async function escVincular() {
         if (!window.qrcode) { toast('No se pudo cargar el generador de QR. Recarga la página.', { kind: 'bad' }); return; }
         if (!ESC.token) {
             const r = await api('/api/escaner/sesion', { method: 'POST', body: { seccion: 'dymo', titulo: 'Etiquetas DYMO' } });
             if (!r.ok) { toast(r.error || 'No se pudo crear la vinculación', { kind: 'bad' }); return; }
-            ESC.token = r.data.token; ESC.id = r.data.id; ESC.moviles = 0; escGuardar();
+            ESC.token = r.data.token; ESC.id = r.data.id; ESC.moviles = 0; ESC.ultN = 0; escGuardar();
         }
         const url = `${location.origin}/escaner?s=${encodeURIComponent(ESC.token)}`;
         const q = window.qrcode(0, 'M'); q.addData(url); q.make();
@@ -621,14 +621,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (wsc && wsc.on) {
         wsc.on('ESCANER_VINCULADO', (d) => { if (d && d.id === ESC.id) { ESC.moviles = d.moviles || ESC.moviles + 1; escBoton(); toast('Celular vinculado: ya puedes escanear', { kind: 'ok' }); } });
         wsc.on('ESCANER_CERRADO', (d) => { if (d && d.id === ESC.id) { escOlvidar(); toast('Se cerró la vinculación con el celular', { kind: 'warn' }); } });
-        wsc.on('ESCANEO_REMOTO', async (d) => {
+        wsc.on('ESCANEO_REMOTO', (d) => escRemoto(d));
+    }
+    async function escRemoto(d) {
             if (!d || d.id !== ESC.id || !d.codigo) return;
+            if (d.n) { if (d.n <= ESC.ultN) return; ESC.ultN = d.n; }
             let res; try { res = await escAgregar(d.codigo); } catch (e) { res = null; }
             res = res || { ok: false, texto: 'No se pudo procesar el código.' };
             toast(res.texto, { kind: res.ok ? 'ok' : 'warn' });
             if (ESC.token) api(`/api/escaner/${ESC.token}/resultado`, { method: 'POST', body: { n: d.n || 0, ok: res.ok, texto: String(res.texto).slice(0, 300) } });
-        });
     }
+    setInterval(async () => {   // respaldo por HTTP si el WebSocket se cayó
+        if (!ESC.token || document.hidden) return;
+        const r = await api(`/api/escaner/${ESC.token}/codigos?desde=${ESC.ultN}`);
+        if (!r.ok) { if (r.status === 404) escOlvidar(); return; }
+        if (r.data.moviles !== ESC.moviles) { ESC.moviles = r.data.moviles || 0; escBoton(); }
+        for (const c of r.data.items || []) await escRemoto({ id: ESC.id, n: c.n, codigo: c.codigo });
+    }, 2500);
     escPintar(); escRestaurar();
 
     load().then(() => { state.listo = true; }); conectar(false);

@@ -147,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const known = state.known.get(parsed.nombre);
         if (known || sessionSeen.has(parsed.nombre)) return duplicated(parsed, known);
+        if (parsed.version !== String(state.version) && !verOk.has(parsed.version)) return preguntarVersion(parsed, text);
 
         // Lectura válida y nueva: confirmar de inmediato con sonido/vibración y registrar en segundo plano.
         window.SoundFX.playScan(parsed.tipo); window.Haptics.scan();
@@ -156,6 +157,49 @@ document.addEventListener('DOMContentLoaded', () => {
         state.pending.unshift(item);
         ensureListBox(); renderList();
         send(item);
+    }
+
+    // v1.3.46: una placa de otra versión pregunta si es un lote nuevo (confirma lo escaneado y cambia la versión por defecto)
+    const verOk = new Set();           // versiones aceptadas sin cambiar de lote en esta sesión
+    const verCola = new Map();         // lecturas que esperan la respuesta (sin repetir)
+    let verHoja = null;
+    function preguntarVersion(parsed, text) {
+        verCola.set(parsed.nombre, text);
+        if (verHoja) return;
+        window.SoundFX.playDup(); window.Haptics.dup();
+        showRead({ kind: 'warn', tipo: parsed.tipo, serie: parsed.serie, nombre: parsed.nombre, msg: `Versión V${parsed.version}: ¿lote nuevo?` });
+        const v = parsed.version, antes = String(state.version);
+        const nAntes = state.items.length + state.pending.length;
+        const err = h('div', { class: 'hint err', role: 'alert' });
+        const seguir = () => { const l = [...verCola.values()]; verCola.clear(); verHoja = null; setTimeout(() => l.forEach((t) => onCode(t)), 0); };
+        verHoja = sheet({
+            title: `¿Es un lote nuevo de V${v}?`,
+            body: [
+                h('p', null, 'Leíste ', h('b', { class: 'mono' }, parsed.nombre), ` (versión V${v}), pero la recepción actual es V${antes}.`),
+                nAntes ? T.banner('info', 'info', `Si es un lote nuevo, primero se confirman las ${nAntes} placa${nAntes === 1 ? '' : 's'} ya escaneadas como su propio lote y luego se inicia un registro nuevo con V${v}.`)
+                    : h('p', { class: 'muted' }, `Si es un lote nuevo, la versión por defecto cambia a V${v} para lo que sigas recibiendo.`),
+                err,
+            ],
+            onClose: () => { if (verHoja) { verHoja = null; verCola.clear(); } },
+            actions: [
+                { label: 'Cancelar', kind: 'ghost', onClick: () => { verCola.clear(); verHoja = null; return true; } },
+                { label: `No, solo registrar V${v}`, onClick: () => { verOk.add(v); seguir(); return true; } },
+                { label: `Sí, lote nuevo V${v}`, kind: 'primary', onClick: async () => {
+                    if (state.items.length) {
+                        const r = await api('/api/recepcion/confirmar', { method: 'POST', body: {} });
+                        if (!r.ok) { err.textContent = r.error || 'No se pudo confirmar el lote actual.'; return false; }
+                        toast(`${(r.data && r.data.confirmadas) || state.items.length} placas V${antes} confirmadas`, { kind: 'ok' });
+                    }
+                    const a = await api('/api/ajustes', { method: 'PUT', body: { version_defecto: v } });
+                    if (!a.ok) { err.textContent = a.error || 'No se pudo cambiar la versión.'; return false; }
+                    state.version = String((a.data && a.data.version_defecto) || v); $('verChip').textContent = 'V' + state.version;
+                    verOk.clear(); sessionSeen.clear();
+                    await Promise.all([loadDraft(), loadInventory()]);
+                    seguir();
+                    return true;
+                } },
+            ],
+        });
     }
 
     function duplicated(parsed, pcb) {

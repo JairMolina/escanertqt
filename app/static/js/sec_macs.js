@@ -9,7 +9,8 @@
 
     const MAC_RE = /(^|[^0-9A-Fa-f])((?:[0-9A-Fa-f]{2}[:\-.]?){5}[0-9A-Fa-f]{2})(?![0-9A-Fa-f])/;
     const MAC_ESPACIOS_RE = /(^|[^0-9A-Za-z])((?:[0-9A-Fa-f]{2}[ \t]+){5}[0-9A-Fa-f]{2})(?![0-9A-Za-z])/;
-    const NOMBRE_RE = /TQT[\s_-]*R([123])[\s_-]*V([0-9]{1,3})[\s_-]+([0-9]{1,4})(?![0-9])/i;
+    const NOMBRE_RE = /TQT[\s_-]*R([123])[\s_-]*V([0-9]{1,3}(?:[._][0-9](?=[\s_-]))?)(?:[\s_-]+[A-Za-z][A-Za-z0-9]*)*[\s_-]+([0-9]{1,4})(?![0-9])/i;
+    const execNombre = (s) => { const m = NOMBRE_RE.exec(s); if (m) m[2] = m[2].replace(/\D/g, ''); return m; };   // V2_0 → 20
     const OTRA = '__otra';
     const MAX_LOTE = 500;
 
@@ -728,7 +729,7 @@
                 if (!L.mac && !L.err) L.err = 'No hay una MAC en esta línea.';
                 return L;
             }
-            const mn = NOMBRE_RE.exec(s);
+            const mn = execNombre(s);
             if (mn) {
                 const pn = T.parseNombre(mn[0]);
                 if (pn) { L.nombre = pn.nombre; L.tipo = pn.tipo; s = s.replace(mn[0], ' '); } else if (!L.err) L.err = 'El nombre de la placa no es válido (versión o serie en cero).';
@@ -965,7 +966,7 @@
                 if (ev.key !== 'Enter') return;
                 ev.preventDefault();
                 const v = LR.inp.value; LR.inp.value = '';
-                const nm = NOMBRE_RE.exec(v);
+                const nm = execNombre(v);
                 if (!nm || nm[1] !== '3') { toast('Eso no es una R3 (TQT-R3-V30-0001).', { kind: 'warn' }); return; }
                 const res = await loteR3Agregar(Number(nm[2]), Number(nm[3]), nm[2]);
                 if (res && !res.ok) toast(res.texto, { kind: 'warn' });
@@ -1009,7 +1010,7 @@
 
         async function escaneo(codigo) {
             const txt = String(codigo || '');
-            const nm = NOMBRE_RE.exec(txt);
+            const nm = execNombre(txt);
             const mac = extraerMac(txt);
             if (!nm && mac && mac.mac) {   // se leyó una MAC: va a la placa ubicada antes
                 const r = S.ultFila;
