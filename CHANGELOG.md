@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.45 — 2026-10-08
+- **R3 en MAC y firmware.** Las R3 aparecen junto a las R1/R2 en "Pendientes" (las que no tienen firmware) y en "Con MAC" (las programadas), con filtro "R3". La columna MAC dice "No lleva MAC" y al elegir el firmware se guarda y queda "Programada". Al escanear una R3 (celular o lector USB) se abre la hoja **"Lote R3"**: cada R3 escaneada se agrega a la lista y con "Aplicar firmware a todas" se programa todo el lote con un solo firmware (también con el botón "Lote R3 (escanear)"). Botón **"Quitar firmware"** para regresar una R3 a "Sin firmware".
+- **Escanear para imprimir en Etiquetas DYMO.** Nuevo panel con "Botón de escaneo" (vincula el celular con un QR) y campo para lector USB: se escanean solo las placas a imprimir. Una R1 o R2 agrega la etiqueta de su tarjeta (R1 + R2); las R3 se acomodan de dos en dos en la etiqueta R3 doble (si queda una sola, la otra mitad va vacía). "Imprimir escaneadas en DYMO" manda todo.
+
 ## v1.3.44 — 2026-10-07
 - **Vincular el celular desde cualquier cámara.** El QR del "Botón de escaneo" de la consola se reconoce en Recibir, Emparejar, Programar y Consultar (y con la cámara del teléfono): el celular pasa directo a modo escáner vinculado, sin entrar antes a "Escáner para la consola".
 - **R3 programada (sin MAC).** La R3 ya guarda su versión de firmware y queda "Programada" al tenerla. Al escanearla (Consultar, ficha de la consola, Inventario) se ve si está programada y con qué firmware. Se programa en el celular (Programar: selector de firmware para R3) y en la consola (MAC y firmware › pestaña "R3 firmware"; el escáner remoto la ubica ahí). Catálogo de firmware propio para R3. La R3 sigue sin aceptar MAC.

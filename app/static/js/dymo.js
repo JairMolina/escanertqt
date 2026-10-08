@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const QUIET = 2;
     const NS = 'http://www.w3.org/2000/svg';
     const state = { tarjetas: [], cur: null, zoom: 3, dymo: { estado: 'buscando', printers: [], preferred: null }, busy: false };
+    const ESC = { tarjetas: new Map(), r3: [], token: null, id: null, moviles: 0, est: null };   // v1.3.45: lote escaneado
 
     // ------------------------------------------------------------------ trama y modo
     const pcbDe = (t, s) => t[s] || (t[`nombre_${s}`] ? { nombre: t[`nombre_${s}`], mac: t[`mac_${s}`], estado_pcb: t[`estado_pcb_${s}`] } : null);
@@ -140,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('btnPrintAll').disabled = state.busy || !dym || !state.tarjetas.some((x) => modo(x).k !== 'NO');
         $('btnDownAll').disabled = state.busy || !state.tarjetas.some((x) => modo(x).k !== 'NO');
         $('btnPrint').title = dym ? '' : 'Requiere DYMO Connect y una impresora conectada en esta PC';
+        $('btnEscPrint').disabled = state.busy || !dym || !(ESC.tarjetas.size + ESC.r3.length);
     }
     async function refresh() {
         const t = state.cur; const box = $('dymoLabelContainer'); box.replaceChildren();
@@ -517,6 +519,117 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     r3Vista();
     cargarLotesR3();
+
+    // ------------------------------------------------------------------ v1.3.45: escanear un lote pequeño para imprimir
+    // R1/R2 → la etiqueta de su tarjeta (R1 + R2); R3 → etiqueta R3 doble, de dos en dos (si queda una sola, la otra mitad va vacía).
+    // El celular se vincula como en la consola (misma vinculación guardada en la pestaña) o se usa un lector USB en el campo.
+    const ESC_KEY = 'tqt.escaner.sesion';
+    const primera = (c) => String(c || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean)[0] || '';
+    function escGuardar() { try { if (ESC.token) sessionStorage.setItem(ESC_KEY, JSON.stringify({ token: ESC.token, id: ESC.id })); else sessionStorage.removeItem(ESC_KEY); } catch (e) { /* nada */ } }
+    function escOlvidar() { ESC.token = null; ESC.id = null; ESC.moviles = 0; escGuardar(); escBoton(); }
+    function escBoton() {
+        const on = Boolean(ESC.token && ESC.moviles);
+        $('btnEscVinc').dataset.on = on ? '1' : '';
+        $('escVincTxt').textContent = on ? 'Celular vinculado' : 'Botón de escaneo (celular)';
+        if (ESC.est) ESC.est.textContent = on ? 'Celular vinculado: lo que escanees se agrega a la lista.' : 'Esperando al celular…';
+    }
+    function escAvisar() {
+        if (ESC.token) api(`/api/escaner/${ESC.token}/seccion`, { method: 'POST', body: { seccion: 'dymo', titulo: 'Etiquetas DYMO' } }).then((r) => { if (!r.ok && r.status === 404) escOlvidar(); });
+    }
+    async function escRestaurar() {
+        let g = null; try { g = JSON.parse(sessionStorage.getItem(ESC_KEY) || 'null'); } catch (e) { g = null; }
+        if (!g || !g.token) return;
+        const r = await api(`/api/escaner/${g.token}`);
+        if (r.ok && r.data) { ESC.token = g.token; ESC.id = r.data.id; ESC.moviles = r.data.moviles || 0; escBoton(); escAvisar(); } else escOlvidar();
+    }
+    async function escVincular() {
+        if (!window.qrcode) { toast('No se pudo cargar el generador de QR. Recarga la página.', { kind: 'bad' }); return; }
+        if (!ESC.token) {
+            const r = await api('/api/escaner/sesion', { method: 'POST', body: { seccion: 'dymo', titulo: 'Etiquetas DYMO' } });
+            if (!r.ok) { toast(r.error || 'No se pudo crear la vinculación', { kind: 'bad' }); return; }
+            ESC.token = r.data.token; ESC.id = r.data.id; ESC.moviles = 0; escGuardar();
+        }
+        const url = `${location.origin}/escaner?s=${encodeURIComponent(ESC.token)}`;
+        const q = window.qrcode(0, 'M'); q.addData(url); q.make();
+        const qr = h('div', { style: 'background:#fff;padding:10px;border-radius:8px;width:220px;max-width:100%', role: 'img', 'aria-label': 'Código QR para vincular el celular' });
+        qr.innerHTML = q.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+        ESC.est = h('p', { role: 'status', 'aria-live': 'polite', style: 'font-weight:600;margin:0' });
+        const partes = [qr, h('p', { class: 'hint', style: 'margin:0' }, 'Escanea este QR con el celular (o en la app: Más opciones › Escáner para la consola). Después escanea las placas o etiquetas que quieres imprimir.')];
+        if (/^(localhost|127\.|\[::1\])/i.test(location.hostname)) partes.push(T.banner('warn', 'alert', 'Abriste la página como "localhost": el celular no llega a esa dirección. Ábrela con la IP de esta PC y vuelve a generar el QR.'));
+        partes.push(ESC.est);
+        escBoton();
+        T.sheet({
+            title: 'Botón de escaneo · vincular celular', focus: false, body: h('div', { class: 'stack', style: 'align-items:center;gap:12px' }, ...partes),
+            onClose: () => { ESC.est = null; },
+            actions: [
+                { label: 'Desvincular', kind: 'ghost', onClick: async () => { const tk = ESC.token; escOlvidar(); if (tk) await api(`/api/escaner/${tk}`, { method: 'DELETE' }); toast('Celular desvinculado', { kind: 'ok' }); return true; } },
+                { label: 'Listo', kind: 'primary', onClick: () => true },
+            ],
+        });
+    }
+    async function escAgregar(codigo) {
+        const txt = primera(codigo); if (!txt) return null;
+        const r = await api(`/api/consulta?codigo=${encodeURIComponent(String(codigo).trim())}`);
+        if (!r.ok) return { ok: false, texto: r.network ? 'Sin conexión con el servidor.' : (r.error || `"${txt}" no se encontró`) };
+        const d = r.data || {}; const p = d.pcb; const t = d.tarjeta;
+        if (p && p.tipo === 'R3') {
+            if (ESC.r3.includes(p.nombre)) return { ok: true, texto: `${p.nombre} ya estaba en la lista` };
+            ESC.r3.push(p.nombre); escPintar();
+            return { ok: true, texto: `${p.nombre} agregada (etiqueta R3)` };
+        }
+        if (!t) return { ok: false, texto: p ? `${p.nombre} no está emparejada: no tiene etiqueta de tarjeta.` : `"${txt}" no es una placa ni una tarjeta.` };
+        const tj = state.tarjetas.find((x) => x.id === t.id) || t;
+        if (modo(tj).k === 'NO') return { ok: false, texto: `Tarjeta ${tj.id_tarjeta_num}: falta R1 o R2, no se puede etiquetar.` };
+        if (ESC.tarjetas.has(tj.id)) return { ok: true, texto: `Tarjeta ${tj.id_tarjeta_num} ya estaba en la lista` };
+        ESC.tarjetas.set(tj.id, tj); escPintar();
+        return { ok: true, texto: `Tarjeta ${tj.id_tarjeta_num} agregada (R1 + R2)` };
+    }
+    function escPintar() {
+        const tj = [...ESC.tarjetas.values()];
+        const quitar = (fn, lbl) => h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': lbl, title: lbl, onclick: () => { fn(); escPintar(); } }, T.icon('x'));
+        const fila = (...c) => h('div', { class: 'row', style: 'gap:8px;align-items:center;flex-wrap:nowrap;min-width:0' }, ...c);
+        const filas = tj.map((t) => {
+            const l = lineas(t); const fin = modo(t).k === 'FINAL';
+            return fila(T.tipoChip('R1'), h('span', { class: 'mono grow', style: 'min-width:0;overflow-wrap:anywhere' }, `Tarjeta ${t.id_tarjeta_num} · ${l[0]} + ${l[2]}`),
+                h('span', { class: 'hint' }, fin ? 'final' : 'identificación'), quitar(() => ESC.tarjetas.delete(t.id), `Quitar tarjeta ${t.id_tarjeta_num}`));
+        });
+        pares(ESC.r3).forEach((par, i) => {
+            filas.push(fila(T.tipoChip('R3'), h('span', { class: 'mono grow', style: 'min-width:0;overflow-wrap:anywhere' }, `Etiqueta R3 ${i + 1} · ${par.join(' + ')}${par.length === 1 ? ' (mitad libre)' : ''}`),
+                ...par.map((n) => quitar(() => { ESC.r3 = ESC.r3.filter((x) => x !== n); }, `Quitar ${n}`))));
+        });
+        const nR3 = pares(ESC.r3).length;
+        $('escLista').replaceChildren(...(filas.length ? filas : [h('p', { class: 'muted', style: 'margin:0' }, 'Todavía no has escaneado nada.')]));
+        $('escResumen').textContent = filas.length ? `${tj.length} tarjeta${tj.length === 1 ? '' : 's'} (R1 + R2) · ${ESC.r3.length} R3 en ${nR3} etiqueta${nR3 === 1 ? '' : 's'} → ${tj.length + nR3} etiqueta${tj.length + nR3 === 1 ? '' : 's'} en total` : '';
+        refrescarBotones();
+    }
+    $('btnEscVinc').addEventListener('click', escVincular);
+    $('btnEscVaciar').addEventListener('click', () => { ESC.tarjetas.clear(); ESC.r3 = []; escPintar(); });
+    $('escIn').addEventListener('keydown', async (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const v = e.target.value.trim(); e.target.value = '';
+        if (!v) return;
+        const res = await escAgregar(v);
+        if (res) toast(res.texto, { kind: res.ok ? 'ok' : 'warn' });
+    });
+    $('btnEscPrint').addEventListener('click', async () => {
+        const tj = [...ESC.tarjetas.values()]; const r3 = ESC.r3.slice();
+        if (tj.length) await imprimirSeleccion(tj);
+        if (r3.length) await imprimirParesR3(r3);
+    });
+    const wsc = T.ws && T.ws('monitor');
+    if (wsc && wsc.on) {
+        wsc.on('ESCANER_VINCULADO', (d) => { if (d && d.id === ESC.id) { ESC.moviles = d.moviles || ESC.moviles + 1; escBoton(); toast('Celular vinculado: ya puedes escanear', { kind: 'ok' }); } });
+        wsc.on('ESCANER_CERRADO', (d) => { if (d && d.id === ESC.id) { escOlvidar(); toast('Se cerró la vinculación con el celular', { kind: 'warn' }); } });
+        wsc.on('ESCANEO_REMOTO', async (d) => {
+            if (!d || d.id !== ESC.id || !d.codigo) return;
+            let res; try { res = await escAgregar(d.codigo); } catch (e) { res = null; }
+            res = res || { ok: false, texto: 'No se pudo procesar el código.' };
+            toast(res.texto, { kind: res.ok ? 'ok' : 'warn' });
+            if (ESC.token) api(`/api/escaner/${ESC.token}/resultado`, { method: 'POST', body: { n: d.n || 0, ok: res.ok, texto: String(res.texto).slice(0, 300) } });
+        });
+    }
+    escPintar(); escRestaurar();
 
     load().then(() => { state.listo = true; }); conectar(false);
 });

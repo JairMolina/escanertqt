@@ -35,6 +35,7 @@
         .r3m + .r3m::before { content: ""; position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed #1d63c2; }
         .r3m .dymo-l { font-size: 10pt; }
         .r3m-vacia { color: #8a93a6; font: 600 7pt/1.2 system-ui, sans-serif; text-align: center; }
+        #btnEscVinc[data-on="1"] { border-color: var(--ok); color: var(--ok); }
         .zoomhost { transform-origin: top left; }
         .stage-preview { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-2); padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; overflow-x: auto; }
         .pill { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
@@ -97,6 +98,22 @@
             <button class="btn" type="button" id="btnPrintAll"><span class="svg-slot" data-i="layers"></span> Imprimir lote en DYMO…</button>
             <button class="btn" type="button" id="btnDownAll"><span class="svg-slot" data-i="download"></span> Descargar lote</button>
         </div>
+        <section class="panel pad stack" aria-labelledby="hEsc" id="escBox">
+            <div class="row wrap" style="justify-content:space-between;gap:8px">
+                <h2 class="silk grow" id="hEsc" style="min-width:200px">Escanear para imprimir</h2>
+                <button class="btn" type="button" id="btnEscVinc"><span class="svg-slot" data-i="qr"></span> <span id="escVincTxt">Botón de escaneo (celular)</span></button>
+            </div>
+            <p class="hint" style="margin:0">Escanea solo las placas o etiquetas que quieres imprimir (con el celular vinculado o con un lector USB en el campo). Una R1 o R2 agrega la etiqueta de su tarjeta (R1 + R2); las R3 van aparte, de dos en dos por etiqueta (si queda una sola, la otra mitad sale vacía).</p>
+            <div class="row wrap" style="align-items:flex-end">
+                <div class="field grow" style="min-width:220px"><label for="escIn">Código escaneado</label><input class="input mono" id="escIn" autocomplete="off" spellcheck="false" placeholder="Escanea o escribe y pulsa Enter (ej. TQT-R1-V30-0021)"></div>
+                <button class="btn btn-ghost" type="button" id="btnEscVaciar">Vaciar lista</button>
+            </div>
+            <div id="escLista" class="stack" style="gap:6px" aria-live="polite"></div>
+            <div class="row wrap" style="gap:10px;align-items:center">
+                <button class="btn btn-primary" type="button" id="btnEscPrint" disabled><span class="svg-slot" data-i="printer"></span> Imprimir escaneadas en DYMO</button>
+                <span class="hint" id="escResumen"></span>
+            </div>
+        </section>
         <section class="panel pad stack" aria-labelledby="hR3" id="r3Box">
             <div class="row wrap" style="justify-content:space-between;gap:8px">
                 <h2 class="silk grow" id="hR3" style="min-width:200px">Etiquetas R3</h2>
@@ -125,9 +142,10 @@
 </div>
 
 <script src="/static/js/common.js?v=1344"></script>
+<script src="/static/js/ws_client.js?v=1316"></script>
 <script src="/static/js/qrcode-generator.js?v=1316"></script>
 <script src="/static/js/vendor/dymo.connect.framework.js?v=1316"></script>
 <script src="/static/js/dymo_connect.js?v=1316"></script>
-<script src="/static/js/dymo.js?v=1346"></script>
+<script src="/static/js/dymo.js?v=1347"></script>
 </body>
 </html>

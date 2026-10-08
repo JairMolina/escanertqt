@@ -86,7 +86,7 @@ class TestR3Programada(unittest.TestCase):
         for f in ("consultar.js", "escritorio.js", "programar.js", "sec_macs.js", "sec_inventario.js", "sec_resumen.js"):
             self.assertNotIn("no lleva MAC ni firmware", (JS / f).read_text(encoding="utf-8"), f)
         macs = (JS / "sec_macs.js").read_text(encoding="utf-8")
-        self.assertIn("ubicarR3(", macs)
+        self.assertIn("crearFilaR3", macs)
         self.assertIn("'R3 firmware '", macs)
         prog = (JS / "programar.js").read_text(encoding="utf-8")
         self.assertIn("sin_firmware=1", prog)
