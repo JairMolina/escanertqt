@@ -70,17 +70,18 @@ def tarjetas_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optiona
     d1, d2 = validar_rango(desde, hasta)
     a, b = d1.isoformat(), d2.isoformat()
     sql = """SELECT t.id, t.id_tarjeta_num, p1.nombre AS nombre_r1, p1.mac AS mac_r1, p2.nombre AS nombre_r2, p2.mac AS mac_r2,
-                    p3.nombre AS nombre_r3, t.fecha_finalizado, t.fecha_real, t.gabinete, l.mes, l.anio
+                    p3.nombre AS nombre_r3, t.fecha_finalizado, t.fecha_real, t.gabinete, l.mes, l.anio,
+                    l.tipo_lote, l.fecha_inicio, l.codigo_lote
              FROM tarjetas_produccion t JOIN lotes_mensuales l ON l.id = t.lote_id
              LEFT JOIN pcb_inventario p1 ON p1.id = t.pcb_r1_id
              LEFT JOIN pcb_inventario p2 ON p2.id = t.pcb_r2_id
              LEFT JOIN pcb_inventario p3 ON p3.id = t.pcb_r3_id
              WHERE t.fecha_finalizado BETWEEN ? AND ? OR t.fecha_real BETWEEN ? AND ?
-             ORDER BY l.anio, l.mes, t.id_tarjeta_num"""
+             ORDER BY l.anio, l.mes, l.fecha_inicio, t.id_tarjeta_num"""
     with db.get_db(db_path) as c:
         filas = [dict(r) for r in c.execute(sql, (a, b, a, b))]
     for f in filas:
-        f["lote"] = f"{MESES_ES[f.pop('mes') - 1]} {f.pop('anio')}"
+        f["lote"] = db.nombre_lote_de({k: f.pop(k) for k in ("mes", "anio", "tipo_lote", "fecha_inicio", "codigo_lote")})
         f["completada"] = bool(f["fecha_finalizado"]) and a <= f["fecha_finalizado"] <= b
         f["entregada"] = bool(f["fecha_real"]) and a <= f["fecha_real"] <= b
     return {"fecha": a, "desde": a, "hasta": b, "dias": (d2 - d1).days + 1,

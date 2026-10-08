@@ -1,6 +1,7 @@
 /**
  * sec_excel.js - Excel del lote: sincronizar el lote con su Excel mensual y descargar una copia.
- * API: POST /api/sync/excel?lote_id= (423 = Excel abierto) · GET /api/admin/export/excel?lote_id= (fetch + blob: exige sesión)
+ * API: POST /api/sync/excel?lote_id= (423 = Excel abierto) · GET /api/admin/export/excel?lote_id= (fetch + blob: solo sesión de usuario,
+ *      sin clave de administración desde v1.3.44; el consultor también descarga)
  */
 (function () {
     'use strict';
@@ -15,7 +16,7 @@
             const histCard = h('section', { class: 'esc-card', hidden: true, 'aria-labelledby': 'xlHT' }, h('header', null, h('h2', { id: 'xlHT' }, 'Esta sesión')), histUl);
             const lote = () => ctx.lote();
             const loteQ = () => (lote() ? `?lote_id=${lote().id}` : '');
-            const bSync = h('button', { class: 'btn btn-primary', type: 'button', onclick: sincronizar }, icon('excel'), h('span', null, 'Sincronizar Excel'));
+            const bSync = h('button', { class: 'btn btn-primary', type: 'button', 'data-escribe': true, onclick: sincronizar }, icon('excel'), h('span', null, 'Sincronizar Excel'));
             const bMail = T.botonCorreo(() => (lote() ? { tipo: 'lote', lote_id: lote().id, titulo: `Control de producción · ${T.loteNombre(lote())}` } : null));
             const bDown = h('button', { class: 'btn', type: 'button', onclick: descargar }, icon('download'), h('span', null, 'Descargar copia (.xlsx)'));
             const titulo = h('b', { class: 'nm', style: 'font-size:18px' });
@@ -53,7 +54,6 @@
                 bDown.disabled = true; bDown.lastChild.textContent = 'Preparando…'; salida.replaceChildren();
                 try {
                     const res = await fetch(`/api/admin/export/excel${loteQ()}`);
-                    if (res.status === 401) { location.href = '/admin?next=' + encodeURIComponent('/monitor#/excel?descargar=1'); return; }
                     if (!res.ok) {
                         let det = ''; try { const j = await res.json(); det = typeof j.detail === 'string' ? j.detail : ''; } catch (e) { det = ''; }
                         salida.append(T.banner('bad', 'alert', h('b', null, res.status === 404 ? 'Todavía no hay Excel de este lote. ' : 'No se pudo descargar. '), det || (res.status === 404 ? 'Pulsa "Sincronizar Excel" primero.' : `Error ${res.status}.`)));
@@ -61,7 +61,7 @@
                     }
                     const blob = await res.blob();
                     const cd = res.headers.get('Content-Disposition') || ''; const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
-                    const nombre = m ? decodeURIComponent(m[1]) : `Control_Produccion_TQT_${T.loteNombre(l).replace(' ', '_')}.xlsx`;
+                    const nombre = m ? decodeURIComponent(m[1]) : `Control_Produccion_TQT_${T.loteNombre(l).replace(/[^0-9A-Za-zÀ-ÿ]+/g, '_')}.xlsx`;
                     const url = URL.createObjectURL(blob); const a = h('a', { href: url, download: nombre }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
                     salida.append(T.banner('ok', 'check', h('b', null, 'Copia descargada. '), `${nombre} (${Math.max(1, Math.round(blob.size / 1024))} KB). El archivo mensual en uso no se tocó.`));
                     anotar('ok', `${T.loteNombre(l)}: copia descargada`);

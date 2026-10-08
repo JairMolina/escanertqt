@@ -11,6 +11,10 @@
 
     const GRUPOS = { operacion: 'Operación', gestion: 'Gestión' };
     const ATAJOS = { r: 'resumen', i: 'inventario', t: 'tarjetas', m: 'macs', c: 'consultar', l: 'lotes', x: 'excel', o: 'movimientos', e: 'etiquetas', a: 'admin' };
+    // v1.3.44: el consultor (solo lectura) entra a la consola, pero solo a estas secciones; las demás no salen en el menú
+    // y, si llega por enlace, hash o atajo, ve el aviso "Acceso restringido" y vuelve al Dashboard.
+    const SEC_CONSULTOR = new Set(['resumen', 'tarjetas', 'inventario', 'consultar', 'excel']);
+    const permitida = (id) => !(T.acceso && T.acceso.rol === 'consultor') || SEC_CONSULTOR.has(id);
     const ETQ_ATAJO = {}; Object.keys(ATAJOS).forEach((k) => { ETQ_ATAJO[ATAJOS[k]] = k; });
 
     const secciones = new Map();
@@ -85,7 +89,7 @@
         if (!p) return h('span', { class: 'muted' }, '—');
         const r3 = slot === 'R3' || p.tipo === 'R3';
         return h('div', { class: 'esc-placa' }, h('span', { class: 'mono nm' }, p.nombre),
-            r3 ? null : h('span', { class: 'mono sub' }, p.mac ? String(p.mac).toLowerCase() : 'sin MAC', p.firmware ? h('span', { class: 'fw' }, ` · fw ${p.firmware}`) : null));
+            r3 ? (p.firmware ? h('span', { class: 'mono sub' }, h('span', { class: 'fw' }, `fw ${p.firmware}`)) : null) : h('span', { class: 'mono sub' }, p.mac ? String(p.mac).toLowerCase() : 'sin MAC', p.firmware ? h('span', { class: 'fw' }, ` · fw ${p.firmware}`) : null));
     }
 
     /**
@@ -174,7 +178,7 @@
     /** Alterna orden: misma columna invierte, otra empieza ascendente. */
     function alternarOrden(actual, id) { return actual && actual.id === id ? { id, dir: actual.dir === 'asc' ? 'desc' : 'asc' } : { id, dir: 'asc' }; }
 
-    /** Ficha de una placa: tipo, nombre, estado, Hardware V30, serie y (solo R1/R2) MAC y Firmware. slot = 'R1'|'R2'|'R3'. */
+    /** Ficha de una placa: tipo, nombre, estado, Hardware V30, serie, Firmware y (solo R1/R2) MAC. slot = 'R1'|'R2'|'R3'. */
     function placaCard(slot, p, hit) {
         if (!p) {
             return h('article', { class: 'esc-pl', dataset: { t: slot, vacia: '1' }, 'aria-label': `${slot} sin asignar` },
@@ -183,15 +187,15 @@
         const campo = (l, v) => h('div', null, h('dt', null, l), h('dd', null, v === null || v === undefined || v === '' ? h('span', { class: 'muted' }, '—') : v));
         const cab = h('header', null, T.tipoChip(slot, { lg: true }), h('span', { class: 'nm' }, p.nombre), T.cicloBadge(p.estado_ciclo, Object.assign({ tipo: slot }, p)));
         const art = (kids) => h('article', { class: 'esc-pl', dataset: { t: slot, hit: hit ? '1' : '' }, 'aria-label': `${slot} ${p.nombre}` }, cab, kids);
-        if (slot === 'R3') {
-            return art([h('dl', null, campo('Hardware', 'V' + p.version), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC ni firmware.')]);
+        const fw = p.firmware ? h('span', null, p.firmware) : h('span', { class: 'soft' }, icon('clock'), 'Sin firmware');
+        if (slot === 'R3') {   // la R3 no lleva MAC, pero sí firmware (programada = con firmware)
+            return art([h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fw), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC.')]);
         }
         const mac = p.mac ? String(p.mac).toLowerCase() : '';
         const macBox = mac
             ? h('div', { class: 'mac' }, h('span', { class: 'val', 'aria-label': 'MAC ' + mac.split(':').join(' ') }, mac),
                 h('button', { class: 'btn btn-sm', type: 'button', 'aria-label': `Copiar la MAC de ${p.nombre}`, title: 'Copiar MAC', onclick: () => copiar(mac, 'MAC copiada') }, icon('paste')))
             : h('div', { class: 'mac' }, h('span', { class: 'soft' }, icon('clock'), 'Sin MAC todavía'));
-        const fw = p.firmware ? h('span', null, p.firmware) : h('span', { class: 'soft' }, icon('clock'), 'Sin firmware');
         return art([macBox, h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fw), campo('Serie', p.serie))]);
     }
     /** Texto plano de una tarjeta (para copiar). */
@@ -199,7 +203,7 @@
         const l = [`Tarjeta ${t.id_tarjeta_num}`];
         ['r1', 'r2', 'r3'].forEach((s) => {
             const p = t[s]; if (!p) return;
-            if (s === 'r3') { l.push(`R3 ${p.nombre} · Hardware V${p.version} (sin MAC ni firmware)`); return; }
+            if (s === 'r3') { l.push(`R3 ${p.nombre} · Hardware V${p.version} (sin MAC)${p.firmware ? ' · Firmware ' + p.firmware : ''}`); return; }
             l.push(`${s.toUpperCase()} ${p.nombre} · Hardware V${p.version}${p.mac ? ' · MAC ' + String(p.mac).toLowerCase() : ''}${p.firmware ? ' · Firmware ' + p.firmware : ''}`);
         });
         if (t.fecha_llegada || t.fecha_finalizado || t.fecha_real || t.gabinete) l.push(`Llegada ${t.fecha_llegada || '—'} · Finalizado ${t.fecha_finalizado || '—'} · Entrega ${t.fecha_real || '—'} · Gabinete ${t.gabinete || '—'}`);
@@ -219,7 +223,7 @@
         const r = await api('/api/lotes');
         if (!r.ok) { S.errorLotes = r.error; return false; }
         S.errorLotes = '';
-        S.lotes = (r.data || []).slice().sort((a, b) => (b.anio - a.anio) || (b.mes - a.mes));
+        S.lotes = T.ordenarLotes(r.data);   // v1.3.44: por fecha de inicio (lotes de mes, semana o día)
         const activo = S.lotes.find((l) => l.activo) || S.lotes[0] || null;
         S.activoId = activo ? activo.id : null;
         if (!S.lote) {
@@ -231,7 +235,7 @@
     }
     function pintarLote() {
         if (!refs.loteTxt) return;
-        refs.loteTxt.textContent = T.loteNombre(S.lote);
+        refs.loteTxt.textContent = T.loteNombre(S.lote); refs.loteTxt.title = T.loteNombre(S.lote);
         refs.loteEst.replaceChildren(S.lote && S.lote.activo ? 'activo' : (S.lote ? 'solo vista' : ''));
         refs.loteEst.dataset.a = S.lote && S.lote.activo ? '1' : '';
         refs.loteBtn.setAttribute('aria-label', `Lote: ${T.loteNombre(S.lote)}${S.lote && S.lote.activo ? ', activo' : ''}. Cambiar de lote`);
@@ -267,6 +271,143 @@
         refs.loteWrap.append(S.menu); refs.loteBtn.setAttribute('aria-expanded', 'true');
         (S.menu.querySelector('[aria-checked="true"]') || S.menu.querySelector('button')).focus();
         setTimeout(() => document.addEventListener('click', clicFuera, true), 0);
+    }
+
+    // ------------------------------------------------------------------ escáner remoto (v1.3.43): el celular escanea y la consola ubica
+    // "Botón de escaneo" en la cabecera (todas las secciones): muestra un QR; el celular lo abre (/escaner?s=token), queda vinculado
+    // y cada lectura llega por WebSocket (ESCANEO_REMOTO). Cada sección puede manejarla con inst.escaneo(codigo) → {ok, texto};
+    // si no, la consola decide: Consultar busca, Tarjetas abre la tarjeta, Inventario filtra la placa y el resto muestra la ficha.
+    const ESC_KEY = 'tqt.escaner.sesion';
+    const RS = { token: null, id: null, moviles: 0, hoja: null, ficha: null, estado: null, pintarEstado: null };
+    function guardarRS() { try { if (RS.token) sessionStorage.setItem(ESC_KEY, JSON.stringify({ token: RS.token, id: RS.id })); else sessionStorage.removeItem(ESC_KEY); } catch (e) { /* nada */ } }
+    function pintarEscBtn() {
+        if (!refs.escBtn) return;
+        refs.escBtn.dataset.on = RS.token && RS.moviles ? '1' : (RS.token ? 'esp' : '');
+        refs.escBtn.title = RS.token && RS.moviles ? 'Celular vinculado: lo que escanees aparece aquí' : 'Botón de escaneo: vincula tu celular con un QR';
+    }
+    function olvidarRS() { RS.token = null; RS.id = null; RS.moviles = 0; guardarRS(); pintarEscBtn(); }
+    function avisarSeccion() {
+        if (!RS.token || !S.cur) return;
+        api(`/api/escaner/${RS.token}/seccion`, { method: 'POST', body: { seccion: S.cur.id, titulo: S.cur.def.titulo } }).then((r) => { if (!r.ok && r.status === 404) olvidarRS(); });
+    }
+    async function restaurarRS() {
+        let g = null; try { g = JSON.parse(sessionStorage.getItem(ESC_KEY) || 'null'); } catch (e) { g = null; }
+        if (!g || !g.token) return;
+        const r = await api(`/api/escaner/${g.token}`);
+        if (r.ok && r.data) { RS.token = g.token; RS.id = r.data.id; RS.moviles = r.data.moviles || 0; pintarEscBtn(); avisarSeccion(); } else olvidarRS();
+    }
+    function qrSvg(texto) {
+        const q = window.qrcode(0, 'M'); q.addData(texto); q.make();
+        const box = h('div', { class: 'esc-qr', role: 'img', 'aria-label': 'Código QR para vincular el celular' });
+        box.innerHTML = q.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+        return box;
+    }
+    async function abrirEscaner() {
+        if (!window.qrcode) { toast('No se pudo cargar el generador de QR. Recarga la página.', { kind: 'bad' }); return; }
+        if (!RS.token) {
+            const r = await api('/api/escaner/sesion', { method: 'POST', body: { seccion: S.cur ? S.cur.id : '', titulo: S.cur ? S.cur.def.titulo : '' } });
+            if (!r.ok) { toast(r.error || 'No se pudo crear la vinculación', { kind: 'bad' }); return; }
+            RS.token = r.data.token; RS.id = r.data.id; RS.moviles = 0; guardarRS(); pintarEscBtn();
+        }
+        const url = `${location.origin}/escaner?s=${encodeURIComponent(RS.token)}`;
+        const local = /^(localhost|127\.|\[::1\])/i.test(location.hostname);
+        RS.estado = h('div', { class: 'esc-qr-est', role: 'status', 'aria-live': 'polite' });
+        RS.pintarEstado = () => {
+            if (!RS.estado) return;
+            RS.estado.dataset.on = RS.moviles ? '1' : '';
+            RS.estado.replaceChildren(RS.moviles ? icon('check') : h('i', { class: 'esc-qr-pulso', 'aria-hidden': 'true' }),
+                h('span', null, RS.moviles ? `Celular vinculado${RS.moviles > 1 ? ` (${RS.moviles})` : ''}. Lo que escanees llegará a la sección abierta.` : 'Esperando al celular…'));
+        };
+        RS.pintarEstado();
+        const body = h('div', { class: 'esc-qr-hoja' },
+            qrSvg(url),
+            h('div', { class: 'esc-qr-txt' },
+                h('ol', null,
+                    h('li', null, 'En el celular escanea este QR con la cámara (o en la app: ', h('b', null, 'Más opciones › Escáner para la consola'), ').'),
+                    h('li', null, 'Inicia sesión si te lo pide. El celular queda como escáner de esta consola.'),
+                    h('li', null, 'Escanea la PCB o la etiqueta: aquí se ubica sola en la sección abierta (Inventario, Tarjetas, MAC y firmware, Consultar…).')),
+                local ? T.banner('warn', 'alert', h('b', null, 'Abriste la consola como "localhost". '), 'El celular no puede llegar a esa dirección: abre la consola con la IP de esta PC (por ejemplo https://192.168.x.x:8443/monitor) y vuelve a generar el QR.') : null,
+                RS.estado,
+                h('details', null, h('summary', null, 'Enlace manual'), h('code', { class: 'mono esc-qr-url' }, url),
+                    h('button', { class: 'btn btn-sm', type: 'button', onclick: () => copiar(url, 'Enlace copiado') }, icon('paste'), 'Copiar'))));
+        RS.hoja = T.sheet({
+            title: 'Botón de escaneo · vincular celular', body, focus: false,
+            onClose: () => { RS.hoja = null; RS.estado = null; },
+            actions: [
+                { label: 'Desvincular', kind: 'ghost', icon: 'unlink', onClick: async () => { const tk = RS.token; olvidarRS(); if (tk) await api(`/api/escaner/${tk}`, { method: 'DELETE' }); toast('Celular desvinculado', { kind: 'ok' }); return true; } },
+                { label: 'Listo', kind: 'primary', onClick: () => true },
+            ],
+        });
+        RS.hoja.el.classList.add('esc-hoja-ancha');
+    }
+    function responder(n, res) {
+        if (!RS.token) return;
+        api(`/api/escaner/${RS.token}/resultado`, { method: 'POST', body: { n: n || 0, ok: !!(res && res.ok), texto: String((res && res.texto) || '').slice(0, 300) } });
+    }
+    function fichaRapida(d, codigo) {
+        if (RS.ficha) { RS.ficha.close(); RS.ficha = null; }
+        const t = d.tarjeta;
+        const p = d.pcb || null;
+        const body = h('div', { class: 'esc-ficha' });
+        (d.avisos || []).forEach((a) => body.append(T.banner('warn', 'alert', a)));
+        const acts = [{ label: 'Cerrar', kind: 'ghost', onClick: () => true }];
+        let titulo = 'Código escaneado';
+        if (t) {
+            titulo = `Tarjeta ${t.id_tarjeta_num}`;
+            body.append(T.estatusTarjeta(t, { onGuardado: () => { invalidar(); if (RS.ficha) RS.ficha.close(); } }),
+                h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => placaCard(s.toUpperCase(), t[s], false))));
+            acts.unshift({ label: 'Abrir en Tarjetas', icon: 'card', onClick: () => { ir('tarjetas', { id: t.id }); return true; } });
+        } else if (d.serie) {
+            titulo = `Número ${d.serie.numero} (sin tarjeta)`;
+            body.append(h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => placaCard(s.toUpperCase(), d.serie[s], false))));
+        } else if (p) {
+            titulo = `Placa ${p.nombre}`;
+            body.append(h('div', { class: 'esc-placas', style: 'grid-template-columns:minmax(0,420px)' }, placaCard(p.tipo, p, true)));
+            acts.unshift({ label: 'Ver en Inventario', icon: 'box', onClick: () => { ir('inventario', { q: p.nombre }); return true; } });
+        }
+        acts.unshift({ label: 'Abrir en Consultar', icon: 'consultar', onClick: () => { ir('consultar', { codigo }); return true; } });
+        RS.ficha = T.sheet({ title: titulo, body, actions: acts, focus: false, onClose: () => { RS.ficha = null; } });
+        RS.ficha.el.classList.add('esc-hoja-ancha');
+    }
+    const primeraLinea = (c) => String(c || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean)[0] || '';
+    async function porDefecto(id, codigo) {
+        if (id === 'consultar') { ir('consultar', { codigo }); return { ok: true, texto: 'Consultando en la consola' }; }
+        const r = await api(`/api/consulta?codigo=${encodeURIComponent(codigo)}`);
+        if (!r.ok) {
+            const b = refs.main.querySelector('[data-buscar]');   // código ajeno (p. ej. un material): va al buscador de la sección
+            if (b && !r.network) { b.value = primeraLinea(codigo); b.dispatchEvent(new Event('input', { bubbles: true })); b.focus(); return { ok: true, texto: `"${primeraLinea(codigo)}" puesto en el buscador` }; }
+            return { ok: false, texto: r.network ? 'La consola no pudo consultar el código (sin conexión).' : (r.error || 'Código no encontrado') };
+        }
+        const d = r.data; const t = d.tarjeta; const p = d.pcb;
+        if (id === 'tarjetas' && t) { ir('tarjetas', { id: t.id }); return { ok: true, texto: `Tarjeta ${t.id_tarjeta_num} abierta` }; }
+        if (id === 'inventario' && (p || t)) {
+            const nombre = p ? p.nombre : (t.r1 || t.r2 || t.r3 || {}).nombre;
+            if (nombre) { ir('inventario', { q: nombre }); return { ok: true, texto: `${nombre} ubicada en Inventario` }; }
+        }
+        fichaRapida(d, codigo);
+        return { ok: true, texto: t ? `Ficha de la tarjeta ${t.id_tarjeta_num} abierta` : p ? `Ficha de ${p.nombre} abierta` : 'Ficha abierta' };
+    }
+    async function recibirEscaneo(d) {
+        const codigo = String((d && d.codigo) || '').trim(); if (!codigo) return;
+        pushFeed('info', `Escaneado desde el celular: ${primeraLinea(codigo)}`);
+        let res = null;
+        try {
+            const inst = S.cur && S.cur.inst;
+            if (inst && typeof inst.escaneo === 'function') res = await inst.escaneo(codigo);
+            if (!res) res = await porDefecto(S.cur ? S.cur.id : '', codigo);
+        } catch (e) { console.error(e); res = { ok: false, texto: 'La consola no pudo procesar el código.' }; }
+        toast(res.texto || primeraLinea(codigo), { kind: res.ok ? 'ok' : 'warn' });
+        responder(d.n, res);
+    }
+    function escanerTiempoReal(ws) {
+        ws.on('ESCANER_VINCULADO', (d) => {
+            if (!d || d.id !== RS.id) return;
+            RS.moviles = d.moviles || RS.moviles + 1; pintarEscBtn(); if (RS.pintarEstado) RS.pintarEstado();
+            toast('Celular vinculado: ya puedes escanear', { kind: 'ok' }); pushFeed('ok', 'Celular vinculado como escáner');
+            if (RS.hoja) { const hj = RS.hoja; setTimeout(() => { if (RS.hoja === hj) hj.close(); }, 1600); }
+        });
+        ws.on('ESCANEO_REMOTO', (d) => { if (d && d.id === RS.id) recibirEscaneo(d); });
+        ws.on('ESCANER_CERRADO', (d) => { if (d && d.id === RS.id) { olvidarRS(); toast('Se cerró la vinculación con el celular', { kind: 'warn' }); } });
     }
 
     // ------------------------------------------------------------------ router y montaje de secciones
@@ -315,6 +456,7 @@
         try { cur.inst = def.montar(host, crearCtx(cur)) || {}; }
         catch (e) { console.error(e); cur.inst = {}; host.replaceChildren(errorBox('Esta sección tuvo un problema al abrirse. Recarga la página.')); }
         if (!S.primera) { refs.titulo.focus({ preventScroll: true }); anunciar(`Sección ${def.titulo}`); }
+        avisarSeccion();
         S.primera = false;
         window.scrollTo({ top: 0 });
     }
@@ -324,6 +466,7 @@
         if (!r) { r = { id: 'resumen', params: new URLSearchParams() }; history.replaceState(null, '', '#/resumen'); }
         const def = secciones.get(r.id);
         if (!def) { history.replaceState(null, '', '#/resumen'); r = { id: 'resumen', params: new URLSearchParams() }; return montarId(r); }
+        if (!permitida(r.id)) { T.avisoAcceso('sec:' + def.titulo); history.replaceState(null, '', '#/resumen'); return montarId({ id: 'resumen', params: new URLSearchParams() }); }
         montarId(r);
     }
     function montarId(r) {
@@ -332,7 +475,7 @@
         if (S.cur && S.cur.id === r.id) { S.params = r.params; if (S.cur.inst && S.cur.inst.parametros) S.cur.inst.parametros(r.params); return; }
         montar(def, r.params);
     }
-    function irSeccion(id) { const d = secciones.get(id); if (!d) return; if (d.href) location.href = d.href; else ir(id); }
+    function irSeccion(id) { const d = secciones.get(id); if (!d) return; if (!permitida(id)) { T.avisoAcceso('sec:' + d.titulo); return; } if (d.href) location.href = d.href; else ir(id); }
 
     // ------------------------------------------------------------------ armazón (DOM)
     function brandMark() {
@@ -345,7 +488,7 @@
     function pintarNav() {
         refs.nav.replaceChildren();
         Object.keys(GRUPOS).forEach((g) => {
-            const defs = [...secciones.values()].filter((d) => d.grupo === g).sort((a, b) => a.orden - b.orden);
+            const defs = [...secciones.values()].filter((d) => d.grupo === g && permitida(d.id)).sort((a, b) => a.orden - b.orden);
             if (!defs.length) return;
             const gid = 'escG-' + g;
             refs.nav.append(h('div', { class: 'esc-grp', id: gid }, GRUPOS[g]),
@@ -366,7 +509,7 @@
     }
     function atajosSheet() {
         const fila = (k, t) => h('div', { class: 'esc-atajo' }, h('span', { class: 'ks' }, k.split(' ').map((x) => h('kbd', { class: 'esc-k' }, x))), h('span', null, t));
-        const irs = Object.keys(ATAJOS).filter((k) => secciones.has(ATAJOS[k])).map((k) => fila('g ' + k, 'Ir a ' + secciones.get(ATAJOS[k]).titulo));
+        const irs = Object.keys(ATAJOS).filter((k) => secciones.has(ATAJOS[k]) && permitida(ATAJOS[k])).map((k) => fila('g ' + k, 'Ir a ' + secciones.get(ATAJOS[k]).titulo));
         T.sheet({ title: 'Atajos de teclado', body: h('div', { class: 'esc-atajos' }, fila('/', 'Buscar en la sección'), fila('[', 'Contraer o expandir el menú'), fila('Esc', 'Cerrar el panel o la ventana'), fila('↑ ↓', 'Moverse entre filas de una tabla'), fila('Enter', 'Abrir la fila'), fila('Espacio', 'Marcar la fila'), irs, fila('?', 'Ver esta lista')),
             actions: [{ label: 'Cerrar', kind: 'primary', onClick: () => true }] });
     }
@@ -379,6 +522,7 @@
         refs.loteBtn = h('button', { class: 'esc-lote', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: abrirMenu }, h('span', { class: 'tx' }, h('span', { class: 'lbl' }, 'Lote'), refs.loteTxt), refs.loteEst, icon('chevron', 'chev'));
         refs.loteWrap = h('div', { class: 'esc-lotewrap' }, refs.loteBtn);
         refs.sol = h('button', { class: 'iconbtn esc-sol', type: 'button', hidden: '', 'aria-label': 'Solicitudes de contraseña', title: 'Solicitudes de contraseña', onclick: solicitudesSheet }, icon('shield'), h('span', { class: 'esc-sol-n' }, '0'));
+        refs.escBtn = h('button', { class: 'btn esc-escbtn', type: 'button', onclick: abrirEscaner, 'aria-label': 'Botón de escaneo: vincular el celular como escáner' }, icon('qr'), h('span', { class: 'hb-t' }, 'Botón de escaneo'), h('i', { class: 'esc-escdot', 'aria-hidden': 'true' }));
         refs.titulo = document.getElementById('escTitulo') || h('h1', { id: 'escTitulo', tabindex: '-1' }); refs.titulo.className = 'esc-titulo'; refs.titulo.textContent = 'Consola';
         refs.anuncio = h('div', { class: 'sr-only', 'aria-live': 'polite', role: 'status' });
         refs.nav = h('nav', { class: 'esc-nav', 'aria-label': 'Secciones' });
@@ -394,7 +538,7 @@
                 h('div', { class: 'esc-brand' }, h('a', { href: '#/resumen', class: 'esc-logo', 'aria-label': 'Escáner TQT, ir al resumen' }, brandMark(), h('span', { class: 'esc-brand-t' }, h('b', null, 'Escáner TQT'), h('small', null, 'Consola')))),
                 refs.nav, h('div', { class: 'esc-lat-pie' }, refs.latBtn, h('div', { class: 'esc-ver', title: 'Versión de Escáner TQT' }, h('span', { class: 'esc-ver-n' }, 'Escáner TQT '), h('b', { 'data-version': '' })))),
             h('div', { class: 'esc-col' },
-                h('header', { class: 'esc-top' }, refs.titulo, h('div', { class: 'grow' }), refs.loteWrap,
+                h('header', { class: 'esc-top' }, refs.titulo, h('div', { class: 'grow' }), refs.escBtn, refs.loteWrap,
                     h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Actualizar los datos', title: 'Actualizar', onclick: () => { invalidar(); cargarLotes(); if (S.cur && S.cur.inst && S.cur.inst.actualizar) S.cur.inst.actualizar(); toast('Datos actualizados', { kind: 'ok', ms: 1200 }); } }, icon('refresh')),
                     conn, temaBtn,
                     refs.sol,
@@ -537,6 +681,7 @@
         const revisar = T.debounce(() => { pedirEntregas().catch((e) => console.error(e)); }, 1200);
         Object.keys(EV).forEach((ev) => ws.on(ev, (d) => { const [k, t] = EV[ev](d); pushFeed(k, t); invalidar(); refrescar(); if (ev !== 'ADMIN_CAMBIO') revisar(); }));
         setTimeout(revisar, 2500);
+        escanerTiempoReal(ws);
         ws.on('CLAVE_SOLICITADA', (d) => { pushFeed('warn', `${(d && d.email) || 'Una cuenta'} pidió restablecer su contraseña`); toast('Solicitud de contraseña pendiente', { kind: 'warn' }); revisarSolicitudes(); });
         revisarSolicitudes();   // al abrir la consola: tarjetas que ya estaban concluidas sin fecha
         // Red de seguridad: reconexión del WS, regreso a la pestaña y refresco periódico (sin tocar la actividad en vivo)
@@ -556,9 +701,11 @@
                 return {};
             } });
         }
+        await T.acceso.listo;   // el rol decide qué secciones se ven (v1.3.44)
         const est = await api('/api/admin/estado');
         S.sesion.admin = !!(est.ok && est.data && est.data.habilitado);
         construir(); pintarNav(); teclado();
+        pintarEscBtn(); restaurarRS();
         T.ws('monitor');
         document.addEventListener('tqt:lote-cambiado', (e) => {   // la hoja de lotes de common.js avisa; aquí no se recarga la página
             e.preventDefault(); const l = e.detail && e.detail.lote;

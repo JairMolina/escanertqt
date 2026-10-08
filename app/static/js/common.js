@@ -145,11 +145,25 @@
         return { key: 'completa', label: 'Completa', kind: 'ok', icon: 'check' };
     }
     const TARJETA_ESTADOS = [{ key: 'completa', label: 'Completas' }, { key: 'incompleta', label: 'Falta placa' }, { key: 'sin_mac', label: 'Sin MAC' }];
+    // v1.3.44: lote de mes ("Septiembre 2026"), semana ("Semana 40 · 28 sep–4 oct 2026") o día ("15 sep 2026").
+    const MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    function fechaLote(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; }
+    function semanaIso(d) { const t = new Date(d); t.setUTCDate(t.getUTCDate() + 3 - ((t.getUTCDay() + 6) % 7)); const y = t.getUTCFullYear(); const s = new Date(Date.UTC(y, 0, 4)); return { anio: y, sem: 1 + Math.round(((t - s) / 864e5 - 3 + ((s.getUTCDay() + 6) % 7)) / 7) }; }
     function loteNombre(l) {
         if (!l) return 'Sin lote';
+        const f = fechaLote(l.fecha_inicio), tipo = l.tipo_lote || 'mes';
+        if (tipo === 'semana' && f) {
+            const fin = new Date(f.getTime() + 6 * 864e5);
+            const ini = `${f.getUTCDate()} ${MES_CORTO[f.getUTCMonth()]}` + (f.getUTCFullYear() !== fin.getUTCFullYear() ? ' ' + f.getUTCFullYear() : '');
+            return `Semana ${semanaIso(f).sem} · ${ini}–${fin.getUTCDate()} ${MES_CORTO[fin.getUTCMonth()]} ${fin.getUTCFullYear()}`;
+        }
+        if (tipo === 'dia' && f) return `${f.getUTCDate()} ${MES_CORTO[f.getUTCMonth()]} ${f.getUTCFullYear()}`;
         if (l.mes >= 1 && l.mes <= 12 && l.anio) return `${MESES[l.mes - 1]} ${l.anio}`;
         return l.codigo_lote || 'Lote';
     }
+    // Del más reciente al más antiguo por fecha de inicio (los lotes viejos sin fecha usan el día 1 de su mes).
+    function loteInicio(l) { return l.fecha_inicio || `${l.anio || 0}-${String(l.mes || 1).padStart(2, '0')}-01`; }
+    function ordenarLotes(arr) { return (arr || []).slice().sort((a, b) => loteInicio(b).localeCompare(loteInicio(a)) || (b.id - a.id)); }
     function debounce(fn, ms) { let t = null; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
     // Un solo Intl.DateTimeFormat: toLocaleTimeString() crea uno nuevo en cada llamada (con 300 filas son ~100 ms por repintado).
     let HORA_FMT = null;
@@ -241,8 +255,8 @@
         return b;
     }
     const tarjetaBadge = (t) => { const e = estadoTarjeta(t); return badge(e.label, e.kind, e.icon); };
-    /** R1/R2 con MAC y versión de firmware guardadas = programada (v1.3.40). La R3 no se programa. */
-    const programada = (p) => !!p && p.tipo !== 'R3' && !!p.mac && !!p.firmware;
+    /** R1/R2 con MAC y firmware guardados = programada (v1.3.40). La R3 no lleva MAC: programada = tiene firmware (v1.3.44). */
+    const programada = (p) => !!p && !!p.firmware && (p.tipo === 'R3' || !!p.mac);
     const cicloBadge = (c, p) => {
         if (programada(p) && (c === 'RECIBIDA' || c === 'DISPONIBLE')) return badge('Programada', 'ok');
         if (programada(p) && c === 'ASIGNADA') return badge('Asignada · programada', 'ok');
@@ -434,10 +448,14 @@
         const mesSel = h('select', { class: 'input', id: 'nlMes', 'aria-label': 'Mes' }, MESES.map((m, i) => h('option', { value: String(i + 1), selected: i + 1 === mesAct ? '' : null }, m)));
         const anioIn = h('input', { class: 'input mono', id: 'nlAnio', type: 'number', inputmode: 'numeric', min: '2020', max: '2100', value: String(anioAct), 'aria-label': 'Año' });
         const nlErr = h('div', { class: 'hint err', role: 'alert' });
+        const hoyIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+        const tipoSel = h('select', { class: 'input', id: 'nlTipo', 'aria-label': 'Tipo de lote', onchange: () => pintar() },
+            [['mes', 'Mes'], ['semana', 'Semana'], ['dia', 'Día']].map(([v, t]) => h('option', { value: v }, t)));
+        const fechaIn = h('input', { class: 'input mono', id: 'nlFecha', type: 'date', value: hoyIso, min: '2020-01-01', max: '2100-12-31' });
 
         async function cargar() {
             const r = await api('/api/lotes');
-            if (r.ok) { lotes = (r.data || []).slice().sort((a, b) => (b.anio - a.anio) || (b.mes - a.mes)); error = ''; } else error = r.error;
+            if (r.ok) { lotes = ordenarLotes(r.data); error = ''; } else error = r.error;
             pintar();
         }
 
@@ -477,13 +495,21 @@
         }
         async function crear() {
             nlErr.textContent = '';
-            const mes = +mesSel.value, anio = +anioIn.value;
-            if (!(anio >= 2020 && anio <= 2100)) { nlErr.textContent = 'Escribe un año entre 2020 y 2100.'; anioIn.setAttribute('aria-invalid', 'true'); return; }
-            anioIn.removeAttribute('aria-invalid');
-            const r = await conClave(() => api('/api/lotes', { method: 'POST', body: { codigo_lote: `${anio}-${String(mes).padStart(2, '0')}`, mes, anio, activo: true }, timeout: 30000 }));
+            const tipo = tipoSel.value, mes = +mesSel.value, anio = +anioIn.value, fecha = fechaIn.value;
+            let cuerpo;
+            if (tipo === 'mes') {
+                if (!(anio >= 2020 && anio <= 2100)) { nlErr.textContent = 'Escribe un año entre 2020 y 2100.'; anioIn.setAttribute('aria-invalid', 'true'); return; }
+                anioIn.removeAttribute('aria-invalid');
+                cuerpo = { tipo_lote: 'mes', mes, anio, activo: true };
+            } else {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || fecha < '2020-01-01' || fecha > '2100-12-31') { nlErr.textContent = 'Elige una fecha válida.'; fechaIn.setAttribute('aria-invalid', 'true'); return; }
+                fechaIn.removeAttribute('aria-invalid');
+                cuerpo = { tipo_lote: tipo, fecha_inicio: fecha, activo: true };
+            }
+            const r = await conClave(() => api('/api/lotes', { method: 'POST', body: cuerpo, timeout: 30000 }));
             if (!r) return;
-            if (!r.ok) { nlErr.textContent = r.status === 409 ? `Ya existe el lote de ${MESES[mes - 1]} ${anio}. Búscalo en la lista y pulsa "Usar este lote".` : r.error; return; }
-            toast(`Lote ${MESES[mes - 1]} ${anio} creado y activo para todos`, { kind: 'ok' });
+            if (!r.ok) { nlErr.textContent = r.status === 409 ? `${r.error} Búscalo en la lista y pulsa "Usar este lote".` : r.error; return; }
+            toast(`Lote ${loteNombre(r.data)} creado y activo para todos`, { kind: 'ok' });
             s.close(); loteCambiado(shell, r.data);
         }
 
@@ -515,7 +541,11 @@
             }
             body.append(h('section', { class: 'panel pad stack', 'aria-labelledby': 'nlTit' },
                 h('h3', { class: 'silk', id: 'nlTit' }, 'Nuevo lote'),
-                h('div', { class: 'row' }, h('div', { class: 'field grow' }, h('label', { for: 'nlMes' }, 'Mes'), mesSel), h('div', { class: 'field', style: 'width:110px' }, h('label', { for: 'nlAnio' }, 'Año'), anioIn)),
+                h('div', { class: 'field' }, h('label', { for: 'nlTipo' }, 'Tipo'), tipoSel),
+                tipoSel.value === 'mes'
+                    ? h('div', { class: 'row' }, h('div', { class: 'field grow' }, h('label', { for: 'nlMes' }, 'Mes'), mesSel), h('div', { class: 'field', style: 'width:110px' }, h('label', { for: 'nlAnio' }, 'Año'), anioIn))
+                    : h('div', { class: 'field' }, h('label', { for: 'nlFecha' }, tipoSel.value === 'semana' ? 'Cualquier día de la semana' : 'Día'), fechaIn,
+                        tipoSel.value === 'semana' ? h('div', { class: 'hint' }, 'La semana va de lunes a domingo.') : null),
                 nlErr,
                 h('button', { class: 'btn btn-primary', type: 'button', disabled: busy ? '' : null, onclick: crear }, icon('plus'), 'Crear y usar este lote')));
         }
@@ -528,6 +558,7 @@
             title: 'Más opciones',
             body: h('div', { class: 'list' },
                 link('/monitor', 'monitor', 'Versión de escritorio', 'Consola para PC: consulta, MAC y administración (sin cámara)', () => { try { localStorage.setItem('tqt.vista', 'escritorio'); } catch (e) { /* nada */ } }),
+                link('/escaner', 'qr', 'Escáner para la consola', 'Vincula este celular con la PC (QR del "Botón de escaneo") y escanea desde aquí'),
                 link('/dymo', 'printer', 'Etiquetas DYMO', 'Vista previa e impresión'),
                 link('/admin', 'info', 'Administración', 'Borrado, exportación y contraseña (requiere clave)')),
             focus: false,
@@ -601,7 +632,7 @@
         });
     }
     /** Botón "Enviar por correo" para poner junto a un botón de exportar. getOpts() se evalúa al pulsar. */
-    const botonCorreo = (getOpts, cls) => h('button', { class: cls || 'btn', type: 'button', title: 'Enviar este Excel por correo', onclick: () => { const o = getOpts(); if (o) enviarExcel(o); } }, icon('mail'), h('span', null, 'Enviar por correo'));
+    const botonCorreo = (getOpts, cls) => h('button', { class: cls || 'btn', type: 'button', 'data-escribe': true, title: 'Enviar este Excel por correo', onclick: () => { const o = getOpts(); if (o) enviarExcel(o); } }, icon('mail'), h('span', null, 'Enviar por correo'));
 
     // ---------------------------------------------------------------- acceso por rol (v1.3.42)
     // El servidor decide (middleware `_permiso_rol`); aquí solo se EXPLICA: aviso al intentar entrar a una zona sin permiso,
@@ -610,12 +641,13 @@
     const ZONA_TXT = {
         admin: 'Administración', recibir: 'Recibir', emparejar: 'Emparejar', programar: 'Programar', monitor: 'la consola de escritorio',
         dymo: 'Etiquetas DYMO', movimientos: 'Movimientos', lotes: 'el cambio o la creación de lotes', otra: 'esa página',
+        seccion: 'esa sección de la consola',
     };
     const PUEDE_TXT = {
-        general: 'Puedes usar Recibir, Emparejar, Programar, Consultar y la consola de escritorio. Administración (cuentas, movimientos, borrados, respaldos, cambio de lote y Excel protegido) es solo para administradores.',
-        consultor: 'Tu cuenta es de consulta: puedes escanear y ver fichas en Consultar, pero no registrar, emparejar, programar, editar, enviar ni borrar datos.',
+        general: 'Puedes usar Recibir, Emparejar, Programar, Consultar y la consola de escritorio. Administración (cuentas, movimientos, borrados, respaldos, cambio de lote ) es solo para administradores. Las descargas de Excel no piden contraseña.',
+        consultor: 'Tu cuenta es de consulta: en el celular puedes escanear y ver fichas en Consultar; en la consola de escritorio, ver el Dashboard, Tarjetas, Inventario de PCB, Consultar y descargar Excel. No puedes registrar, emparejar, programar, editar, enviar ni borrar datos.',
     };
-    const acceso = { rol: null };
+    const acceso = { rol: null, listo: Promise.resolve(null) };   // listo: promesa con el rol (v1.3.44, la consola la espera)
     /** Zona de una ruta de página (para saber si el rol puede abrirla). */
     function zonaDe(path) {
         const p = path.replace(/\/+$/, '') || '/';
@@ -630,7 +662,7 @@
     function zonaPermitida(zona, rol) {
         if (!zona || !rol || rol === 'administrador') return true;
         if (zona === 'admin' || zona === 'movimientos' || zona === 'lotes') return false;
-        return rol !== 'consultor';
+        return rol !== 'consultor' || zona === 'monitor';   // v1.3.44: el consultor entra a la consola (solo algunas secciones)
     }
     let avisoAbierto = null, avisoUlt = 0;
     /** Hoja "Acceso restringido": qué intentó, por qué no puede y qué sí puede hacer su rol. */
@@ -638,7 +670,7 @@
         if (avisoAbierto || Date.now() - avisoUlt < 1200) return;
         avisoUlt = Date.now();
         const rol = acceso.rol;
-        const que = zona === 'accion' ? null : (ZONA_TXT[zona] || ZONA_TXT.otra);
+        const que = zona === 'accion' ? null : (ZONA_TXT[zona] || (/^sec:/.test(zona || '') ? zona.slice(4) : ZONA_TXT.otra));   // 'sec:<título>' = sección de la consola
         const titular = que ? `Tu cuenta${rol ? ` (${ROL_TXT[rol] || rol})` : ''} no tiene acceso a ${que}.` : (detalle || 'Tu cuenta no tiene permiso para hacer esto.');
         avisoAbierto = sheet({
             title: 'Acceso restringido',
@@ -709,8 +741,9 @@
         });
     }
     if (!/^\/(login|invitacion)/.test(location.pathname)) {
-        fetch('/api/auth/yo', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((u) => {
-            if (!u || !u.rol) return;
+        acceso.listo = fetch('/api/auth/yo', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((u) => {
+            if (!u || !u.rol) return null;
+            acceso.rol = u.rol; document.documentElement.dataset.rol = u.rol;   // ya, para que la consola filtre secciones y botones
             const listo = () => aplicarRol(u.rol);
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', listo); else listo();
             // la barra lateral y los menús se pintan después: re-marcar cuando cambie el DOM (barato, con espera)
@@ -718,15 +751,77 @@
                 let t = null;
                 new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => marcarCandados(), 120); }).observe(document.documentElement, { childList: true, subtree: true });
             }
-        }).catch(() => { /* sin red: el servidor sigue protegiendo */ });
+            return u.rol;
+        }).catch(() => null);   // sin red: el servidor sigue protegiendo
+    }
+
+    // ---------------------------------------------------------------- estatus de la tarjeta (v1.3.43, Consultar móvil y escritorio)
+    const ymdHoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const fechaCorta = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? `${+m[3]} ${MESES[+m[2] - 1].slice(0, 3).toLowerCase()} ${m[1]}` : ''; };
+    /** Estatus de la tarjeta en el ciclo: emparejada → programada (MAC) → completa → entregada. */
+    function estatusCiclo(t) {
+        const e = estadoTarjeta(t);
+        const prog = !!(t.r1 && t.r2 && !(t.sin_mac || []).length);
+        const pasos = [
+            { k: 'emp', t: 'Emparejada', ok: true, f: (t.created_at || '').slice(0, 10) },
+            { k: 'prog', t: 'Programada', ok: prog, f: '' },
+            { k: 'comp', t: 'Completa', ok: e.key === 'completa', f: t.fecha_finalizado || '' },
+            { k: 'ent', t: 'Entregada', ok: e.key === 'completa' && !!t.fecha_real, f: t.fecha_real || '' },
+        ];
+        let actual;
+        if (pasos[3].ok) actual = { label: 'Entregada', kind: 'ok', icon: 'check' };
+        else if (pasos[2].ok) actual = { label: 'Completa · por entregar', kind: 'ok', icon: 'clock' };
+        else if (e.key === 'sin_mac') actual = { label: 'En programación', kind: 'info', icon: 'clock' };
+        else actual = { label: 'Incompleta', kind: 'warn', icon: 'alert' };
+        return { pasos, actual, completa: e.key === 'completa', detalle: e.label };
+    }
+    /** Panel "Estatus": pasos, fechas y (si está completa y el rol puede editar) la fecha real de entrega y el gabinete.
+     *  opts.onGuardado(tarjeta) se llama al guardar. */
+    function estatusTarjeta(t, opts = {}) {
+        const c = estatusCiclo(t);
+        const sec = h('section', { class: 'estatus', 'aria-label': 'Estatus de la tarjeta' });
+        sec.append(h('div', { class: 'estatus-cab' }, h('span', { class: 'silk' }, 'Estatus'), badge(c.actual.label, c.actual.kind, c.actual.icon),
+            c.completa ? null : h('span', { class: 'hint' }, c.detalle)));
+        sec.append(h('ol', { class: 'estatus-pasos' }, c.pasos.map((p, i) => h('li', { dataset: { ok: p.ok ? '1' : '', sig: !p.ok && (i === 0 || c.pasos[i - 1].ok) ? '1' : '' } },
+            h('i', { 'aria-hidden': 'true' }, p.ok ? icon('check') : String(i + 1)), h('span', null, p.t), p.f ? h('small', { class: 'mono' }, fechaCorta(p.f)) : null,
+            h('span', { class: 'sr-only' }, p.ok ? ' (hecho)' : ' (pendiente)')))));
+        const dato = (l, v) => h('div', null, h('dt', null, l), h('dd', null, v || h('span', { class: 'muted' }, '—')));
+        sec.append(h('dl', { class: 'estatus-datos' }, dato('Llegada', fechaCorta(t.fecha_llegada)), dato('Finalizada', fechaCorta(t.fecha_finalizado)),
+            dato('Proyectada', fechaCorta(t.fecha_proyectada)), dato('Entrega', fechaCorta(t.fecha_real)), dato('Gabinete', t.gabinete)));
+        if (!c.completa) return sec;
+        if (acceso.rol === 'consultor') { sec.append(h('p', { class: 'hint' }, icon('lock'), ' La fecha de entrega la registra una cuenta General o Administrador.')); return sec; }
+        const idF = 'entF' + t.id, idG = 'entG' + t.id;
+        const fecha = h('input', { class: 'input mono', type: 'date', id: idF, value: t.fecha_real || t.fecha_proyectada || ymdHoy() });
+        const gab = h('select', { class: 'input', id: idG }, h('option', { value: '' }, 'Sin definir'),
+            ['Quintalock', 'Translock'].map((g) => h('option', { value: g, selected: t.gabinete === g ? '' : null }, g)));
+        const msg = h('span', { class: 'hint', role: 'status', 'aria-live': 'polite' });
+        const btn = h('button', { class: 'btn btn-primary', type: 'submit' }, icon('check'), t.fecha_real ? 'Actualizar entrega' : 'Guardar entrega');
+        const form = h('form', { class: 'estatus-entrega', onsubmit: async (e) => {
+            e.preventDefault();
+            if (!fecha.value) { msg.textContent = 'Elige la fecha de entrega.'; fecha.focus(); return; }
+            btn.disabled = true; msg.textContent = 'Guardando…';
+            const r = await api(`/api/tarjetas/${t.id}`, { method: 'PATCH', body: { fecha_real: fecha.value, gabinete: gab.value } });
+            btn.disabled = false;
+            if (!r.ok) { msg.textContent = ''; toast(r.error || 'No se pudo guardar la entrega', { kind: 'bad' }); return; }
+            msg.textContent = '';
+            toast(`Entrega de la tarjeta ${t.id_tarjeta_num} guardada`, { kind: 'ok' });
+            if (opts.onGuardado) opts.onGuardado(r.data);
+        } },
+            h('div', { class: 'estatus-entrega-t' }, h('b', null, t.fecha_real ? 'Entrega registrada' : '¿Cuándo se entrega?'),
+                h('span', { class: 'hint' }, t.fecha_real ? 'Puedes corregir la fecha o el gabinete.' : 'Tiene R1, R2, R3 y las MAC: indica la fecha real de entrega y el gabinete.')),
+            h('div', { class: 'field' }, h('label', { for: idF }, 'Fecha de entrega'), fecha),
+            h('div', { class: 'field' }, h('label', { for: idG }, 'Gabinete'), gab),
+            h('div', { class: 'estatus-entrega-b' }, btn, msg));
+        sec.append(form);
+        return sec;
     }
 
     window.TQT = {
         versionP,
         hydrateIcons, MESES, esc, h, store, api, parseNombre, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, TARJETA_ESTADOS,
-        loteNombre, debounce, hora,
+        loteNombre, ordenarLotes, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, banner, empty,
-        toast, sheet, enviarExcel, botonCorreo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, openLotes,
+        toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, openLotes,
     };
 })();

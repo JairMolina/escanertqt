@@ -54,7 +54,7 @@
                 const mezcla = (p) => `color-mix(in srgb, ${base} ${p}%, var(--surface-2))`;
                 const ul = h('ul', { class: 'esc-av' },
                     fila('Recibidas', rec, rec, mezcla(38)), fila('Asignadas', asg, rec, mezcla(68)),
-                    tp === 'R3' ? h('li', null, h('span', { class: 'nota' }, 'La R3 no lleva MAC ni firmware.')) : fila('Con MAC', mac, rec, mezcla(100)));
+                    tp === 'R3' ? fila('Con firmware (sin MAC)', all.filter((p) => p.firmware).length, rec, mezcla(100)) : fila('Con MAC', mac, rec, mezcla(100)));
                 return { rec, asg, mac, card: h('article', { class: 'esc-card', 'aria-label': `Avance de ${tp}` }, h('header', null, T.tipoChip(tp, { lg: true }), h('h3', null, `${rec} placa${rec === 1 ? '' : 's'}`)), ul) };
             }
             function partes(titulo, items, total, vacio) {

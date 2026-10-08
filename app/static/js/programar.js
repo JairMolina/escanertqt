@@ -1,9 +1,10 @@
 /**
  * programar.js - Captura de la MAC y del firmware (versión con la que se programó) de las placas R1 y R2.
- * La R3 no lleva MAC ni firmware. Se escanea el QR de la placa (o se elige de "Pendientes"), se teclea la MAC con el
+ * La R3 no lleva MAC: solo se captura su firmware (programada = con firmware). Se escanea el QR de la placa (o se elige de "Pendientes"), se teclea la MAC con el
  * teclado hexadecimal propio, se elige el firmware del catálogo (R1 = Principal, R2 = Respaldo) o se escribe otro,
  * y se guarda todo junto; luego salta a la siguiente pendiente.
- * API: GET /api/pcb/por-codigo · GET /api/pcb?sin_mac=1 · GET /api/firmware · PUT /api/pcb/{id}/programacion {mac, firmware}
+ * API: GET /api/pcb/por-codigo · GET /api/pcb?sin_mac=1 · GET /api/pcb?tipo=R3&sin_firmware=1 · GET /api/firmware
+ *      PUT /api/pcb/{id}/programacion {mac, firmware} · PUT /api/pcb/{id}/firmware {firmware} (R3)
  */
 document.addEventListener('DOMContentLoaded', () => {
     'use strict';
@@ -13,24 +14,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     T.mountShell({ active: 'programar', sub: 'Programación' });
 
-    const state = { pend: [], active: null, tipo: '', q: '', raw: '', native: false, dupOf: null, fw: { R1: [], R2: [] } };
+    const state = { pend: [], active: null, tipo: '', q: '', raw: '', native: false, dupOf: null, fw: { R1: [], R2: [], R3: [] } };
     const OTRA = '__otra', NADA = '';
-    const ROL = { R1: 'Principal', R2: 'Respaldo' };
+    const ROL = { R1: 'Principal', R2: 'Respaldo', R3: 'R3' };
     const fwKey = (t) => 'tqt.fw.' + t;
     const ultimoFw = (t) => { try { return localStorage.getItem(fwKey(t)) || ''; } catch (e) { return ''; } };
     const recordarFw = (t, v) => { try { localStorage.setItem(fwKey(t), v); } catch (e) { /* modo privado */ } };
 
     async function loadFw() {
         const r = await api('/api/firmware');
-        if (r.ok && r.data) state.fw = { R1: r.data.R1 || [], R2: r.data.R2 || [] };
+        if (r.ok && r.data) state.fw = { R1: r.data.R1 || [], R2: r.data.R2 || [], R3: r.data.R3 || [] };
     }
 
     // ------------------------------------------------------------------ pendientes
     async function loadPend() {
-        const r = await api('/api/pcb?sin_mac=1&limit=1000');
+        const [r, r3] = await Promise.all([api('/api/pcb?sin_mac=1&limit=1000'), api('/api/pcb?tipo=R3&sin_firmware=1&limit=1000')]);
         if (!r.ok) { toast(r.error || 'No se pudieron cargar las pendientes', { kind: 'bad' }); return; }
-        state.pend = ((r.data && r.data.items) || [])
-            .filter((p) => p.tipo !== 'R3' && !p.mac && p.estado_ciclo !== 'FALLA' && p.estado_ciclo !== 'BAJA')
+        // R1/R2 sin MAC + R3 sin firmware (la R3 no lleva MAC, pero sí se programa)
+        state.pend = ((r.data && r.data.items) || []).concat((r3.ok && r3.data && r3.data.items) || [])
+            .filter((p) => (p.tipo === 'R3' ? !p.firmware : !p.mac) && p.estado_ciclo !== 'FALLA' && p.estado_ciclo !== 'BAJA')
             .sort((a, b) => a.serie.localeCompare(b.serie) || a.tipo.localeCompare(b.tipo));
         renderList();
     }
@@ -49,12 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
             box.className = 'empty';
             box.appendChild(icon('check'));
             box.appendChild(h('b', null, state.pend.length ? 'Sin coincidencias' : 'Todo tiene MAC'));
-            box.appendChild(h('span', null, state.pend.length ? 'Prueba con otra serie o quita el filtro.' : 'No hay placas R1 o R2 esperando MAC.'));
+            box.appendChild(h('span', null, state.pend.length ? 'Prueba con otra serie o quita el filtro.' : 'No hay R1/R2 esperando MAC ni R3 esperando firmware.'));
             return;
         }
         box.className = 'list';
         rows.forEach((p) => box.appendChild(h('button', {
-            class: 'item', type: 'button', 'aria-label': `Capturar MAC de ${p.nombre}`,
+            class: 'item', type: 'button', 'aria-label': `Capturar ${p.tipo === 'R3' ? 'firmware' : 'MAC'} de ${p.nombre}`,
             'aria-current': state.active && state.active.id === p.id ? 'true' : null,
             style: state.active && state.active.id === p.id ? 'background:var(--surface-2);box-shadow:inset 3px 0 0 var(--accent)' : null,
             onclick: () => select(p),
@@ -86,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!p) {
             box.className = 'empty';
             box.append(icon('programar'), h('b', null, 'Escanea la placa que acabas de programar'),
-                h('span', null, 'Apunta la cámara al QR de una R1 o R2, o elige una de la lista. La R3 no lleva MAC ni firmware.'));
+                h('span', null, 'Apunta la cámara al QR de una placa, o elige una de la lista. La R3 no lleva MAC: solo se captura su firmware.'));
             return;
         }
         if (p.tipo === 'R3') { renderR3(p); return; }
@@ -147,13 +149,43 @@ document.addEventListener('DOMContentLoaded', () => {
         sync();
     }
 
-    // La R3 no lleva MAC ni firmware: solo un aviso amable (no hay nada que capturar)
+    // La R3 no lleva MAC, pero sí se programa: solo se captura su firmware (programada = con firmware)
     function renderR3(p) {
         const box = $('activo'); box.className = 'panel';
+        field = null;   // sin campo de MAC: sync() no hace nada
+        const cat = (state.fw.R3 || []).slice();
+        const previo = p.firmware || ultimoFw('R3');
+        if (previo && !cat.includes(previo)) cat.push(previo);
+        const sel = h('select', { class: 'input mono', id: 'fwSel', 'aria-label': `Firmware de ${p.nombre}`, onchange: () => { fwIn.hidden = sel.value !== OTRA; if (!fwIn.hidden) fwIn.focus(); } },
+            ...cat.map((v) => h('option', { value: v, selected: v === previo ? '' : null }, v)),
+            h('option', { value: OTRA, selected: cat.length ? null : '' }, 'Otra versión…'));
+        const fwIn = h('input', { class: 'input mono', id: 'fwIn', type: 'text', maxlength: 40, autocomplete: 'off', spellcheck: 'false', placeholder: 'Ej. 1.0', 'aria-label': 'Otra versión de firmware', hidden: cat.length ? true : null });
+        const err = h('div', { class: 'hint err', id: 'fwHint', role: 'alert' });
+        const btn = h('button', { class: 'btn btn-primary grow', type: 'button' }, icon('check'), 'Guardar firmware');
+        btn.onclick = async () => {
+            const fw = (sel.value === OTRA ? fwIn.value : sel.value || '').trim();
+            if (!fw) { err.textContent = 'Elige o escribe la versión de firmware.'; fwIn.hidden = false; fwIn.focus(); return; }
+            btn.disabled = true;
+            const r = await api(`/api/pcb/${p.id}/firmware`, { method: 'PUT', body: { firmware: fw } });
+            btn.disabled = false;
+            if (!r.ok) { window.SoundFX.playError(); window.Haptics.error(); err.textContent = r.error; return; }
+            recordarFw('R3', fw); loadFw();
+            window.SoundFX.playSuccess(); window.Haptics.success();
+            toast(`${p.nombre} · Firmware ${fw} · programada`, { kind: 'ok' });
+            const nxt = nextAfter(p);
+            state.pend = state.pend.filter((x) => x.id !== p.id);
+            state.active = null;
+            if (state.active === null && nxt && nxt.id !== p.id) select(nxt); else { renderList(); renderActive(); }
+        };
         box.replaceChildren(h('div', { class: 'stack', style: 'padding:14px' },
             h('div', { class: 'row' }, T.tipoChip('R3', { lg: true }), h('span', { class: 'mono', style: 'font-size:18px;font-weight:600;overflow-wrap:anywhere' }, p.nombre)),
-            T.banner('info', 'info', 'La R3 no lleva MAC ni firmware. No hay nada que capturar aquí: escanea una R1 o una R2.'),
-            h('div', { class: 'row' }, h('button', { class: 'btn grow', type: 'button', onclick: () => { state.active = null; renderList(); renderActive(); } }, 'Entendido'))));
+            h('div', { class: 'hint' }, `Hardware V${p.version} · ` + (p.id_tarjeta_num ? `Tarjeta ${p.id_tarjeta_num}` : 'Aún no está en una tarjeta')),
+            T.banner('info', 'info', 'La R3 no lleva MAC. Registra el firmware con el que se programó.'),
+            p.firmware ? T.banner('warn', 'info', `Ya tiene firmware ${p.firmware}. Si guardas, se reemplaza.`) : null,
+            h('div', { class: 'field' }, h('label', { for: 'fwSel' }, 'Firmware (R3)'), sel, fwIn, err),
+            h('div', { class: 'row' },
+                h('button', { class: 'btn', type: 'button', onclick: () => { state.active = null; renderList(); renderActive(); } }, 'Cancelar'),
+                btn)));
     }
 
     function push(ch) { if (state.raw.length < 12) { state.raw += ch; sync(); if (window.Haptics) window.Haptics.vibrate(12); } }

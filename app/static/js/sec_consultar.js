@@ -43,6 +43,7 @@
                     cuerpo.append(h('div', { class: 'esc-ficha-cab' },
                         h('div', null, h('div', { class: 'silk', style: 'margin-bottom:4px' }, 'Tarjeta'), h('div', { class: 'num', 'aria-label': 'Tarjeta ' + t.id_tarjeta_num }, t.id_tarjeta_num)),
                         h('div', { class: 'meta' }, T.tarjetaBadge(t), h('span', { class: 'hint' }, ORIGEN[d.origen] || ''))),
+                        T.estatusTarjeta(t, { onGuardado: () => { ctx.invalidar(); if (st.ultimo) buscar(st.ultimo, true); } }),
                         h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => { const p = conFw(s); return util.placaCard(s.toUpperCase(), p, p && leidos.has(p.nombre)); })),
                         h('div', { class: 'esc-bar' },
                             h('a', { class: 'btn btn-primary', href: `/dymo?tarjeta_id=${t.id}` }, icon('printer'), 'Etiqueta DYMO'),
@@ -53,7 +54,7 @@
                         h('div', null, h('div', { class: 'silk', style: 'margin-bottom:4px' }, 'Número'), h('div', { class: 'num', 'aria-label': 'Número ' + d.serie.numero }, d.serie.numero)),
                         h('div', { class: 'meta' }, T.badge('Sin tarjeta', 'warn', 'alert'), h('span', { class: 'hint' }, ORIGEN.serie))),
                         h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => util.placaCard(s.toUpperCase(), d.serie[s], false))),
-                        h('div', { class: 'esc-bar' }, h('a', { class: 'btn btn-primary', href: '#/tarjetas' }, icon('link'), 'Ir a emparejar'), nueva));
+                        h('div', { class: 'esc-bar' }, h('a', { class: 'btn btn-primary', href: '#/tarjetas', 'data-escribe': true }, icon('link'), 'Ir a emparejar'), nueva));
                 } else if (d.pcb) {
                     cuerpo.append(h('div', { class: 'esc-ficha-cab' }, h('div', null, h('div', { class: 'silk', style: 'margin-bottom:4px' }, 'Placa suelta'), h('div', { class: 'hint' }, 'Esta placa todavía no está en una tarjeta.'))),
                         h('div', { class: 'esc-placas', style: 'grid-template-columns:minmax(0,420px)' }, util.placaCard(d.pcb.tipo, d.pcb, true)), h('div', { class: 'esc-bar' }, nueva));
@@ -64,6 +65,7 @@
                 const c = String(texto || '').trim();
                 if (!c) { q.focus(); return; }
                 if (st.busy) return;
+                if (silencioso && document.activeElement && document.activeElement.closest('.estatus-entrega')) return;   // no borrar lo que se está capturando
                 st.busy = true; btn.disabled = true; out.setAttribute('aria-busy', 'true');
                 if (!silencioso) out.replaceChildren(h('div', { class: 'stack', role: 'status' }, h('span', { class: 'sr-only' }, 'Buscando…'), h('div', { class: 'sk', style: 'height:90px;width:60%' }), h('div', { class: 'sk', style: 'height:160px' })));
                 const r = await api(`/api/consulta?codigo=${encodeURIComponent(c)}`);

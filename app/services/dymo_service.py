@@ -172,6 +172,95 @@ def _pulg(mm: float) -> str:
     return f"{mm / 25.4:.4f}"
 
 
+# --- Etiqueta R3 doble (v1.3.44) ------------------------------------------------------------------------------------
+# La PCB R3 es muy pequeña: cada etiqueta lleva DOS R3, una en cada mitad HORIZONTAL (se corta a lo largo: dos tiras de
+# 57 x 16 mm). Cada tira: QR (solo el nombre) a la izquierda y el nombre a la derecha. Con una sola R3 se usa la de arriba.
+R3_FUENTE_PT = 10.0
+R3_SEPARACION_MM = 1.5
+
+
+@dataclass(frozen=True)
+class MitadR3:
+    nombre: str
+    qr: Caja
+    puntos_por_modulo: int
+    texto: Caja
+
+
+def calcular_diseno_r3(formato: FormatoEtiqueta, nombres: List[str]) -> List[MitadR3]:
+    m = MARGEN_SEGURO_MM
+    mitad = formato.alto_mm / 2
+    mitades: List[MitadR3] = []
+    for i, nombre in enumerate(nombres[:2]):
+        y0, alto = i * mitad + m, mitad - 2 * m
+        modulos = len(matriz_qr(nombre)) + 2 * SILENCIO_MODULOS
+        ppm = PUNTOS_POR_MODULO
+        while ppm > 3 and modulos * ppm / DOTS_PER_MM > alto:
+            ppm -= 1
+        lado = modulos * ppm / DOTS_PER_MM
+        qr = Caja(m, y0 + (alto - lado) / 2, lado, lado)
+        x_txt = qr.derecha + R3_SEPARACION_MM
+        texto = Caja(x_txt, y0, formato.ancho_mm - m - x_txt, alto)
+        mitades.append(MitadR3(nombre, qr, ppm, texto))
+    return mitades
+
+
+def _v8_imagen(nombre: str, png: str, c: "Caja") -> str:
+    return f"""    <ObjectInfo>
+        <ImageObject>
+            <Name>{nombre}</Name>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+            <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+            <LinkedObjectName></LinkedObjectName>
+            <Rotation>Rotation0</Rotation>
+            <IsMirrored>False</IsMirrored>
+            <IsVariable>False</IsVariable>
+            <GroupID>-1</GroupID>
+            <IsOutlined>False</IsOutlined>
+            <Image>{png}</Image>
+            <ScaleMode>Uniform</ScaleMode>
+            <BorderWidth>0</BorderWidth>
+            <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
+            <HorizontalAlignment>Center</HorizontalAlignment>
+            <VerticalAlignment>Center</VerticalAlignment>
+        </ImageObject>
+        <Bounds X="{_tw(c.x)}" Y="{_tw(c.y)}" Width="{_tw(c.w)}" Height="{_tw(c.h)}" />
+    </ObjectInfo>
+"""
+
+
+def _v8_texto(nombre: str, texto: str, pt: float, c: "Caja") -> str:
+    return f"""    <ObjectInfo>
+        <TextObject>
+            <Name>{nombre}</Name>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+            <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+            <LinkedObjectName></LinkedObjectName>
+            <Rotation>Rotation0</Rotation>
+            <IsMirrored>False</IsMirrored>
+            <IsVariable>False</IsVariable>
+            <GroupID>-1</GroupID>
+            <IsOutlined>False</IsOutlined>
+            <HorizontalAlignment>Left</HorizontalAlignment>
+            <VerticalAlignment>Middle</VerticalAlignment>
+            <TextFitMode>ShrinkToFit</TextFitMode>
+            <UseFullFontHeight>True</UseFullFontHeight>
+            <Verticalized>False</Verticalized>
+            <StyledText>
+                <Element>
+                    <String>{xml_escape(texto)}</String>
+                    <Attributes>
+                        <Font Family="{FUENTE}" Size="{pt:g}" Bold="True" Italic="False" Underline="False" Strikeout="False" />
+                        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+                    </Attributes>
+                </Element>
+            </StyledText>
+        </TextObject>
+        <Bounds X="{_tw(c.x)}" Y="{_tw(c.y)}" Width="{_tw(c.w)}" Height="{_tw(c.h)}" />
+    </ObjectInfo>
+"""
+
+
 class DymoService:
     """Validación, trama, QR y archivos de etiqueta para la DYMO LabelWriter 550."""
 
@@ -454,6 +543,114 @@ class DymoService:
                 usados.add(nombre)
                 z.writestr(nombre, datos)
         return buf.getvalue()
+
+    # ------------------------------------------------------------------ R3 doble (v1.3.44): dos R3 por etiqueta, una por mitad
+    @classmethod
+    def generate_r3_label_xml(cls, nombres: List[str], label_format: Optional[str] = None) -> str:
+        """`.label` (DYMO Label v8) con 1 o 2 R3: objetos QR1/TEXTO1 (mitad de arriba) y QR2/TEXTO2 (de abajo)."""
+        f = obtener_formato(label_format)
+        objetos = ""
+        for i, md in enumerate(calcular_diseno_r3(f, nombres), 1):
+            objetos += _v8_imagen(f"QR{i}", cls.generate_qr_base64(md.nombre, box_size=md.puntos_por_modulo), md.qr)
+            objetos += _v8_texto(f"TEXTO{i}", md.nombre, R3_FUENTE_PT, md.texto)
+        return f"""<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+    <PaperOrientation>{f.v8_orientacion}</PaperOrientation>
+    <Id>{f.paper_id}</Id>
+    <PaperName>{f.paper_name}</PaperName>
+    <DrawCommands>
+        <RoundRectangle X="0" Y="0" Width="{f.v8_ancho or f.twips_alto}" Height="{f.v8_alto or f.twips_ancho}" Rx="270" Ry="270" />
+    </DrawCommands>
+{objetos}</DieCutLabel>"""
+
+    @classmethod
+    def generate_r3_dcd_xml(cls, nombres: List[str], label_format: Optional[str] = None) -> str:
+        """`.dymo` (DYMO Connect) con 1 o 2 R3, una por mitad de la etiqueta."""
+        f = obtener_formato(label_format)
+        m = MARGEN_SEGURO_MM
+        negro = cls._color(1, 0, 0, 0)
+        margen = '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0" /></Margin>'
+
+        def layout(c: Caja) -> str:
+            return (f"<ObjectLayout><DYMOPoint><X>{_pulg(c.x)}</X><Y>{_pulg(c.y)}</Y></DYMOPoint>"
+                    f"<Size><Width>{_pulg(c.w)}</Width><Height>{_pulg(c.h)}</Height></Size></ObjectLayout>")
+        fuente = (f"<FontInfo><FontName>{FUENTE}</FontName><FontSize>{R3_FUENTE_PT:g}</FontSize><IsBold>True</IsBold>"
+                  f"<IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>")
+        objetos = ""
+        for i, md in enumerate(calcular_diseno_r3(f, nombres), 1):
+            objetos += f"""
+        <BarcodeObject>
+          <Name>QR{i}</Name>
+          {cls._brushes()}
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          {margen}
+          <BarcodeFormat>QRCode</BarcodeFormat>
+          <Data><MultiDataString><DataString>{xml_escape(md.nombre)}</DataString></MultiDataString></Data>
+          <HorizontalAlignment>Center</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <Size>Medium</Size>
+          <TextPosition>None</TextPosition>
+          {fuente}
+          {layout(md.qr)}
+        </BarcodeObject>
+        <TextObject>
+          <Name>TEXTO{i}</Name>
+          {cls._brushes()}
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          {margen}
+          <HorizontalAlignment>Left</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <FitMode>AlwaysFit</FitMode>
+          <IsVertical>False</IsVertical>
+          <FormattedText>
+            <FitMode>AlwaysFit</FitMode>
+            <HorizontalAlignment>Left</HorizontalAlignment>
+            <VerticalAlignment>Middle</VerticalAlignment>
+            <IsVertical>False</IsVertical>
+            <LineTextSpan><TextSpan><Text>{xml_escape(md.nombre)}</Text>{fuente}</TextSpan></LineTextSpan>
+          </FormattedText>
+          {layout(md.texto)}
+        </TextObject>"""
+        return f"""<?xml version="1.0" encoding="utf-8"?>
+<DesktopLabel Version="1">
+  <DYMOLabel Version="3">
+    <Description>TQT R3 doble {f.codigo} {f.ancho_mm:g}x{f.alto_mm:g} mm</Description>
+    <Orientation>Landscape</Orientation>
+    <LabelName>{f.nombre_dcd}</LabelName>
+    <InitialLength>0</InitialLength>
+    <BorderStyle>SolidLine</BorderStyle>
+    <DYMORect>
+      <DYMOPoint><X>{_pulg(m)}</X><Y>{_pulg(m)}</Y></DYMOPoint>
+      <Size><Width>{_pulg(f.ancho_mm - 2 * m)}</Width><Height>{_pulg(f.alto_mm - 2 * m)}</Height></Size>
+    </DYMORect>
+    <BorderColor>{negro}</BorderColor>
+    <BorderThickness>1</BorderThickness>
+    <Show_Border>False</Show_Border>
+    <DynamicLayoutManager>
+      <RotationBehavior>ClearObjects</RotationBehavior>
+      <LabelObjects>{objetos}
+      </LabelObjects>
+    </DynamicLayoutManager>
+  </DYMOLabel>
+  <LabelApplication>Blank</LabelApplication>
+  <DataTable>
+    <Columns></Columns>
+    <Rows></Rows>
+  </DataTable>
+</DesktopLabel>"""
+
+    @classmethod
+    def archivo_r3(cls, nombres: List[str], label_format: Optional[str] = None, tipo: str = "dymo") -> Tuple[bytes, str]:
+        base = "_".join(n.rsplit("-", 1)[-1] for n in nombres[:2])
+        if tipo == "label":
+            return cls.generate_r3_label_xml(nombres, label_format).encode("utf-8"), f"TQT_R3_{base}.label"
+        return b"\xef\xbb\xbf" + cls.generate_r3_dcd_xml(nombres, label_format).encode("utf-8"), f"TQT_R3_{base}.dymo"
 
     # ------------------------------------------------------------------ paquete de datos
     @classmethod

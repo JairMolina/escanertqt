@@ -1,6 +1,6 @@
 /**
  * consultar.js - Ficha completa de una tarjeta al escanear su etiqueta DYMO (4 líneas), el QR de una PCB o una MAC.
- * Muestra la pareja (R1, R2, R3): hardware (V30), serie, MAC y firmware (R1/R2; la R3 no lleva ni MAC ni firmware).
+ * Muestra la pareja (R1, R2, R3): hardware (V30), serie, MAC (R1/R2) y firmware (las tres; la R3 no lleva MAC).
  * Acepta: etiqueta DYMO, QR de una PCB, MAC o el NÚMERO de tarjeta (0011). Sin tarjeta con ese número, muestra sus placas sueltas.
  * API: GET /api/consulta?codigo=...   (también acepta ?codigo= en la URL, p. ej. desde el monitor)
  */
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     T.mountShell({ active: 'consultar', sub: 'Consulta' });
 
     const SLOTS = ['r1', 'r2', 'r3'];
-    const state = { last: '', at: 0, busy: false, data: null };
+    const state = { last: '', at: 0, busy: false, data: null, q: '' };
     const CLAVE = 'tqt.consultas.movil';
     const recientes = () => { try { const j = JSON.parse(localStorage.getItem(CLAVE) || '[]'); return Array.isArray(j) ? j.filter((x) => typeof x === 'string').slice(0, 6) : []; } catch (e) { return []; } };
     const recordar = (q) => { const t = String(q).split(/\r?\n/).filter(Boolean)[0]; if (!t || t.length > 40) return; try { localStorage.setItem(CLAVE, JSON.stringify([t, ...recientes().filter((x) => x !== t)].slice(0, 6))); } catch (e) { /* sin almacenamiento */ } };
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function nueva() {
-        state.data = null; state.last = ''; $('q').value = ''; vacio();
+        state.data = null; state.last = ''; state.q = ''; $('q').value = ''; vacio();
         window.scrollTo({ top: 0 });
         $('q').focus({ preventScroll: true });
     }
@@ -62,17 +62,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 h('header', null, T.tipoChip(S, { lg: true, empty: true }), h('span', { class: 'nm muted' }, 'Sin placa asignada')));
         }
         const head = h('header', null, T.tipoChip(S, { lg: true }), h('span', { class: 'nm' }, p.nombre), T.cicloBadge(p.estado_ciclo, Object.assign({ tipo: S }, p)));
-        if (S === 'R3') {   // la R3 no lleva MAC ni firmware
+        const fwBox = p.firmware ? h('span', { class: 'mono' }, p.firmware) : h('span', { class: 'soft' }, icon('clock'), 'Sin firmware');
+        if (S === 'R3') {   // la R3 no lleva MAC, pero sí se programa (firmware)
             return h('article', { class: 'pcbf', dataset: { t: S, hit: hit ? '1' : '' }, 'aria-label': `${S} ${p.nombre}` }, head,
-                h('dl', null, campo('Hardware', 'V' + p.version), campo('Serie', p.serie)),
-                h('p', { class: 'pcbf-nota' }, icon('info'), 'La R3 no lleva MAC ni firmware'));
+                h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fwBox), campo('Serie', p.serie)),
+                h('p', { class: 'pcbf-nota' }, icon('info'), 'La R3 no lleva MAC'));
         }
         const mac = p.mac ? String(p.mac).toLowerCase() : '';
         const macBox = mac
             ? h('div', { class: 'macline' }, h('span', { class: 'macval mono', 'aria-label': 'MAC ' + mac.split(':').join(' ') }, mac),
                 h('button', { class: 'btn btn-sm', type: 'button', 'aria-label': `Copiar MAC de ${p.nombre}`, title: 'Copiar MAC', onclick: () => copiar(mac, 'MAC copiada') }, icon('paste')))
             : h('span', { class: 'soft' }, icon('clock'), 'Sin MAC todavía');
-        const fwBox = p.firmware ? h('span', { class: 'mono' }, p.firmware) : h('span', { class: 'soft' }, icon('clock'), 'Sin firmware');
         return h('article', { class: 'pcbf', dataset: { t: S, hit: hit ? '1' : '' }, 'aria-label': `${S} ${p.nombre}` }, head,
             h('div', { class: 'macwrap' }, h('div', { class: 'dt-l' }, 'MAC'), macBox),
             h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fwBox), campo('Serie', p.serie)));
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const l = [`Tarjeta ${t.id_tarjeta_num}`];
         SLOTS.forEach((s) => {
             const p = t[s]; if (!p) return;
-            if (s === 'r3') { l.push(`R3 ${p.nombre} (Hardware V${p.version}; sin MAC ni firmware)`); return; }
+            if (s === 'r3') { l.push(`R3 ${p.nombre} (Hardware V${p.version}; sin MAC${p.firmware ? '; Firmware ' + p.firmware : '; sin firmware'})`); return; }
             l.push(`${s.toUpperCase()} ${p.nombre} · Hardware V${p.version}${p.mac ? ' · MAC ' + String(p.mac).toLowerCase() : ''}${p.firmware ? ' · Firmware ' + p.firmware : ''}`);
         });
         return l.join('\n');
@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 h('div', { class: 'fh-num' }, h('div', { class: 'silk' }, 'Tarjeta'), h('div', { class: 'num', 'aria-label': 'Tarjeta ' + t.id_tarjeta_num }, t.id_tarjeta_num)),
                 h('div', { class: 'fh-meta' }, T.tarjetaBadge(t), h('div', { class: 'hint' }, ORIGEN[d.origen] || ''),
                     h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: nueva }, icon('refresh'), 'Nueva consulta'))));
+            cuerpo.append(T.estatusTarjeta(t, { onGuardado: () => { if (state.q) buscar(state.q, false, true); } }));
             cuerpo.append(h('div', { class: 'fichagrid' }, SLOTS.map((s) => tarjetaPcb(s, t[s], t[s] && leidos.has(t[s].nombre)))));
             cuerpo.append(h('div', { class: 'fichaacts' },
                 h('a', { class: 'btn btn-primary act-main', href: `/dymo?tarjeta_id=${t.id}` }, icon('printer'), 'Etiqueta DYMO'),
@@ -127,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function buscar(texto, desdeCamara, silencioso) {
         const q = String(texto || '').trim();
         if (!q || state.busy) return;
+        if (silencioso && document.activeElement && document.activeElement.closest('.estatus-entrega')) return;   // no borrar lo que se está capturando
         state.busy = true; if (!silencioso) cargando(q);
         const r = await api(`/api/consulta?codigo=${encodeURIComponent(q)}`);
         state.busy = false;
@@ -145,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.SoundFX) window.SoundFX.playScan(tipoDe(r.data));
             if (window.Haptics) window.Haptics.scan();
         }
-        recordar(q); render(r.data);
+        state.q = q; recordar(q); render(r.data);
     }
 
     function onCode(text) {
@@ -158,8 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
     $('formBuscar').addEventListener('submit', (e) => { e.preventDefault(); state.last = ''; buscar($('q').value, false); });
 
     const ws = T.ws();
-    if (ws) ['PCB_ACTUALIZADA', 'TARJETA_ACTUALIZADA', 'PCB_ELIMINADA', 'EXCEL_IMPORTADO'].forEach((ev) => ws.on(ev, () => { if (state.last) buscar(state.last, true, true); }));
-    T.resync(() => { if (state.last) buscar(state.last, true, true); });
+    if (ws) ['PCB_ACTUALIZADA', 'TARJETA_ACTUALIZADA', 'PCB_ELIMINADA', 'EXCEL_IMPORTADO'].forEach((ev) => ws.on(ev, () => { if (state.q) buscar(state.q, true, true); }));
+    T.resync(() => { if (state.q) buscar(state.q, true, true); });
 
     document.addEventListener('tqt:lote-cambiado', (e) => e.preventDefault());   // las placas son globales: no hace falta recargar
     T.mountVisor($('visorHost'), { compact: true, onCode });

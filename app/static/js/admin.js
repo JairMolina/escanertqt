@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const lotes = Array.isArray(d.lotes) ? d.lotes : [];
         if (lotes.length) box.append(h('div', null, tit('Lotes'), h('div', { class: 'tablewrap', tabindex: '0', role: 'region', 'aria-label': 'Tabla de lotes' }, h('table', { class: 'grid' },
             h('thead', null, h('tr', null, ['Lote', 'Activo', 'Tarjetas', 'Por estado'].map((x) => h('th', null, x)))),
-            h('tbody', null, lotes.map((l) => h('tr', null, h('td', { class: 'mono' }, l.codigo_lote), h('td', null, l.activo ? 'Sí' : 'No'), h('td', { class: 'mono' }, String(l.tarjetas)),
+            h('tbody', null, lotes.map((l) => h('tr', null, h('td', null, T.loteNombre(l), h('span', { class: 'mono t2' }, ' · ' + l.codigo_lote)), h('td', null, l.activo ? 'Sí' : 'No'), h('td', { class: 'mono' }, String(l.tarjetas)),
                 h('td', null, Object.entries(l.por_estado || {}).map(([k, v]) => `${k} ${v}`).join(' · ') || '—'))))))));
         const inv = d.inventario || {}; const tipos = Object.keys(inv).sort();
         if (tipos.length) { const ciclos = [...new Set(tipos.flatMap((t) => Object.keys(inv[t])))].sort();

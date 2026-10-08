@@ -332,6 +332,13 @@ class ExcelSyncEngine:
         """Ruta estándar del Excel mensual: <EXCEL_DIR>/Control_Produccion_TQT_[Mes]_[Año].xlsx"""
         return settings.EXCEL_DIR / f"Control_Produccion_TQT_{MESES_ES[mes - 1]}_{anio}.xlsx"
 
+    def lote_path(self, lote: Dict[str, Any]) -> Path:
+        """Ruta estándar del Excel de un lote. Mes: la mensual de siempre; semana/día: archivo propio con su código
+        (Control_Produccion_TQT_Septiembre_2026_Semana40.xlsx / _Dia15.xlsx) para que lotes del mismo mes no se mezclen."""
+        if (lote.get("tipo_lote") or "mes") == "mes":
+            return self.monthly_path(int(lote["mes"]), int(lote["anio"]))
+        return settings.EXCEL_DIR / db.archivo_excel_lote(lote)
+
     def create_monthly_excel(
         self,
         mes: int,

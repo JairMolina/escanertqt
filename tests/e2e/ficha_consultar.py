@@ -153,7 +153,7 @@ try:
             pq.wait_for_selector("#activo .banner", timeout=15000)
         except Exception:
             pass
-        check("al escanear la R3 (QR invertido) solo aparece el aviso amable", "La R3 no lleva MAC ni firmware" in pq.inner_text("#activo"))
+        check("al escanear la R3 (QR invertido) solo aparece el aviso amable", "La R3 no lleva MAC" in pq.inner_text("#activo"))
         check("la R3 NO muestra campo de MAC ni de firmware", pq.query_selector("#macIn") is None and pq.query_selector("#fwSel") is None and pq.query_selector("#fwIn") is None)
         check("la R3 sigue sin MAC", api("GET", f"/api/pcb/{pid84}")[1]["mac"] is None)
         pq.screenshot(path=str(RAIZ / "docs" / "qa" / "programar_r3_390.png"))

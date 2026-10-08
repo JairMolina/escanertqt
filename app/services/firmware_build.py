@@ -55,7 +55,7 @@ def compilar_firmware(tipo: str, numero: Optional[str] = None) -> bytes:
     tipo = (tipo or "").strip().upper()
     src_dir = SKETCHES.get(tipo)
     if not src_dir:
-        raise FirmwareBuildError(f"Tipo de placa no soportado para flasheo por USB: '{tipo}' (solo R1 o R2; la R3 no lleva firmware).")
+        raise FirmwareBuildError(f"Tipo de placa no soportado para flasheo por USB: '{tipo}' (solo R1 o R2; el firmware de la R3 no se compila aquí).")
     if not src_dir.is_dir():
         raise FirmwareBuildError(f"No se encontró el firmware fuente de {tipo} en el servidor ({src_dir}).")
 

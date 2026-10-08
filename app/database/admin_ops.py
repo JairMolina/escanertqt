@@ -40,11 +40,13 @@ def listar_respaldos(limite: int = 10) -> List[Dict[str, Any]]:
 def resumen(db_path: Optional[Path] = None) -> Dict[str, Any]:
     with db.get_db(db_path) as c:
         lotes = []
-        for lote in c.execute("SELECT id, codigo_lote, activo FROM lotes_mensuales ORDER BY anio DESC, mes DESC"):
+        for lote in c.execute("SELECT * FROM lotes_mensuales ORDER BY COALESCE(fecha_inicio, printf('%04d-%02d-01', anio, mes)) DESC, id DESC"):
             estados = {r["estado_general"]: r["n"] for r in c.execute(
                 "SELECT COALESCE(p.estado_general,'PENDIENTE') AS estado_general, COUNT(*) n FROM tarjetas_produccion t "
                 "LEFT JOIN pruebas_historial p ON p.tarjeta_id = t.id WHERE t.lote_id = ? GROUP BY 1", (lote["id"],))}
             lotes.append({"id": lote["id"], "codigo_lote": lote["codigo_lote"], "activo": bool(lote["activo"]),
+                          "nombre": db.nombre_lote_de(dict(lote)), "tipo_lote": lote["tipo_lote"], "fecha_inicio": lote["fecha_inicio"],
+                          "mes": lote["mes"], "anio": lote["anio"],
                           "tarjetas": sum(estados.values()), "por_estado": estados})
         inventario: Dict[str, Dict[str, int]] = {}
         for r in c.execute("SELECT tipo, estado_ciclo, COUNT(*) n FROM pcb_inventario GROUP BY tipo, estado_ciclo"):

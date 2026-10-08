@@ -94,3 +94,7 @@ table.macs-tbl { width: 100%; border-collapse: separate; border-spacing: 0; min-
 .macs-prev .macs-st span { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .macs-prev td { height: auto; min-height: 40px; padding-top: 7px; padding-bottom: 7px; }
 .macs-bar select.input { min-width: 96px; }
+
+/* escáner remoto (v1.3.43): la fila ubicada parpadea */
+@keyframes macsFlash { 0%, 60% { background: color-mix(in srgb, var(--accent) 28%, transparent); } 100% { background: transparent; } }
+tr.macs-flash > td { animation: macsFlash 1.8s ease-out; }

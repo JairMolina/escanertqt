@@ -61,14 +61,15 @@ class TestCuentas(unittest.TestCase):
         self.assertEqual(anon.get("/api/lotes").status_code, 200)
         self.assertEqual(anon.post("/api/lotes", json={"mes": 1, "anio": 2030}).status_code, 403)
         self.assertEqual(anon.get("/consultar", follow_redirects=False).status_code, 200)
-        r = anon.get("/monitor", follow_redirects=False)
-        self.assertEqual((r.status_code, r.headers["location"]), (302, "/consultar?denegado=monitor"))
+        self.assertEqual(anon.get("/monitor", follow_redirects=False).status_code, 200)   # v1.3.44: consola de escritorio (solo lectura)
         self.assertEqual(anon.get("/api/admin/usuarios").status_code, 403)
         # v1.3.42: cada rechazo explica el motivo (el frontend muestra el aviso "Acceso restringido")
         r = anon.post("/api/lotes", json={"mes": 1, "anio": 2030})
         self.assertEqual((r.headers.get("x-acceso"), r.json()["zona"]), ("rol", "accion"))
         self.assertIn("consulta", r.json()["detail"])
-        for ruta, zona in (("/", "recibir"), ("/static/emparejar.html", "emparejar"), ("/programar", "programar"), ("/dymo", "dymo"), ("/admin", "admin"), ("/static/admin.html", "admin")):
+        r = anon.get("/", follow_redirects=False)   # v1.3.44: su inicio es Consultar; en PC/tablet consultar.html sigue a /monitor
+        self.assertEqual((r.status_code, r.headers["location"]), (302, "/consultar?inicio=1"))
+        for ruta, zona in (("/static/emparejar.html", "emparejar"), ("/programar", "programar"), ("/dymo", "dymo"), ("/admin", "admin"), ("/static/admin.html", "admin")):
             r = anon.get(ruta, follow_redirects=False)
             self.assertEqual((r.status_code, r.headers["location"]), (302, f"/consultar?denegado={zona}"), ruta)
         self.assertEqual(anon.get("/static/js/common.js").status_code, 200)

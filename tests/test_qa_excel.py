@@ -685,7 +685,8 @@ class TestApiRutas(unittest.TestCase):
         self.assertEqual(structure_counts(str(copia)), structure_counts(mensual))
         self.assertEqual(self.client.get("/api/admin/export/excel").status_code in (200, 404), True)
         sin = TestClient(app).get("/api/admin/export/excel", params={"lote_id": lote["id"]})
-        self.assertEqual(sin.status_code, 401)
+        self.assertEqual(sin.status_code, 200)   # v1.3.44: la descarga ya no pide la clave de administración
+        self.assertEqual(TestClient(app).get("/api/admin/export/excel", params={"lote_id": lote["id"], "ruta": "x"}).status_code, 401)
 
 
 # ============================================================================ IMPORT

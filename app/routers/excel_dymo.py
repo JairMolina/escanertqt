@@ -1,5 +1,6 @@
 """Endpoints REST para Sincronización Excel e Impresión DYMO LabelWriter 550."""
 import logging
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -98,7 +99,8 @@ async def ejecutar_sync_excel(lote_id: Optional[int], excel_path: Optional[str])
         ruta_permitida(ruta)  # la ruta guardada en el lote también debe estar en una carpeta permitida (nunca escribir donde sea)
     if not ruta or not Path(ruta).exists():
         try:
-            ruta = await run_in_threadpool(excel_engine.create_monthly_excel, lote["mes"], lote["anio"], ruta if excel_path else None)
+            ruta = await run_in_threadpool(excel_engine.create_monthly_excel, lote["mes"], lote["anio"],
+                                          ruta if excel_path else str(excel_engine.lote_path(lote)))
             await run_in_threadpool(db.set_ruta_excel, lote_id, ruta)
         except Exception as e:
             raise HTTPException(
@@ -310,29 +312,39 @@ def get_dymo_archivo(
 NOMBRE_R3 = r"^TQT-R3-V[0-9]{1,3}-[0-9]{4}$"
 
 
-def _r3(nombre: str) -> Dict[str, Any]:
-    return {"_lineas": [nombre], "id_tarjeta_num": nombre.rsplit("-", 1)[-1]}
+def _nombres_r3(nombre: List[str]) -> List[str]:
+    """1 o 2 nombres TQT-R3-Vxx-0000 (v1.3.44: dos R3 por etiqueta, una por mitad)."""
+    if not 1 <= len(nombre) <= 2:
+        raise HTTPException(400, "Indica una o dos R3 por etiqueta.")
+    return nombre
 
 
-@router.get("/dymo/r3/xml", summary="XML de la etiqueta de una R3 (QR + nombre TQT-R3-Vxx-0000) para DYMO")
+@router.get("/dymo/r3/xml", summary="XML de la etiqueta R3 doble (1 o 2 R3, una por mitad) para DYMO")
 def get_dymo_r3_xml(
-    nombre: str = Query(..., pattern=NOMBRE_R3, description="ej. TQT-R3-V30-0084"),
+    nombre: List[str] = Query(..., description="1 o 2 veces, ej. ?nombre=TQT-R3-V30-0084&nombre=TQT-R3-V30-0085"),
     label_format: str = Query("30334", description=FORMATO_DOC),
     tipo: str = Query("dymo", pattern="^(dymo|label)$"),
 ):
+    for n in nombre:
+        if not re.fullmatch(NOMBRE_R3, n):
+            raise HTTPException(422, f"Nombre de R3 inválido: {n}")
     fmt = _formato_o_400(label_format)
-    xml = DymoService.generate_dcd_xml(_r3(nombre), fmt) if tipo == "dymo" else DymoService.generate_dymo_xml(_r3(nombre), fmt)
+    nombres = _nombres_r3(nombre)
+    xml = DymoService.generate_r3_dcd_xml(nombres, fmt) if tipo == "dymo" else DymoService.generate_r3_label_xml(nombres, fmt)
     return Response(content=xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
-@router.get("/dymo/r3/archivo", summary="Descarga la etiqueta de una R3 como archivo .dymo o .label")
+@router.get("/dymo/r3/archivo", summary="Descarga la etiqueta R3 doble como archivo .dymo o .label")
 def get_dymo_r3_archivo(
-    nombre: str = Query(..., pattern=NOMBRE_R3),
+    nombre: List[str] = Query(...),
     label_format: str = Query("30334", description=FORMATO_DOC),
     tipo: str = Query("dymo", pattern="^(dymo|label)$"),
 ):
-    datos, _ = DymoService.archivo_dymo(_r3(nombre), _formato_o_400(label_format), tipo)
-    return _adjunto(datos, f"{nombre}.{tipo}")
+    for n in nombre:
+        if not re.fullmatch(NOMBRE_R3, n):
+            raise HTTPException(422, f"Nombre de R3 inválido: {n}")
+    datos, archivo = DymoService.archivo_r3(_nombres_r3(nombre), _formato_o_400(label_format), tipo)
+    return _adjunto(datos, archivo)
 
 
 class ImpresasRequest(BaseModel):

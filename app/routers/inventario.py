@@ -136,9 +136,10 @@ def listar_pcb(
     sin_tarjeta: bool = Query(False, description="PCB que no están en ninguna tarjeta"),
     limit: int = Query(100, ge=1, le=5000),
     offset: int = Query(0, ge=0),
+    sin_firmware: bool = Query(False, description="PCB activas sin firmware (con tipo=R3: R3 por programar)"),
 ):
     try:
-        return inv.listar_pcb(tipo, estado_ciclo, q, sin_mac, sin_tarjeta, limit, offset)
+        return inv.listar_pcb(tipo, estado_ciclo, q, sin_mac, sin_tarjeta, limit, offset, sin_firmware=sin_firmware)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -229,7 +230,7 @@ async def post_programacion_lote(payload: ProgramacionLote):
     return res
 
 
-@router.put("/pcb/{pcb_id}/firmware", summary="Guardar (o borrar) el firmware de una R1/R2 (la R3 no lleva firmware)")
+@router.put("/pcb/{pcb_id}/firmware", summary="Guardar (o borrar) el firmware de una R1, R2 o R3 (la R3 lleva firmware pero no MAC)")
 async def put_firmware(pcb_id: int, payload: FirmwareUpdate):
     pcb = await _run(inv.set_firmware, pcb_id, payload.firmware, payload.operador)
     await manager.broadcast("PCB_ACTUALIZADA", {"pcb": pcb, "conteos": await run_in_threadpool(_conteos)})
@@ -238,7 +239,7 @@ async def put_firmware(pcb_id: int, payload: FirmwareUpdate):
     return pcb
 
 
-@router.get("/firmware", summary="Catálogo de versiones de firmware (R1 = Principal, R2 = Respaldo)")
+@router.get("/firmware", summary="Catálogo de versiones de firmware (R1 = Principal, R2 = Respaldo, R3)")
 async def get_firmware():
     return await _run(inv.listar_firmware)
 

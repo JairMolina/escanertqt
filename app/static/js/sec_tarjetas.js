@@ -26,9 +26,9 @@
                 onchange: (e) => { try { localStorage.setItem('tqt.r3modo', e.target.value); } catch (er) { /* sin almacenamiento */ } cargarSug(); } },
                 h('option', { value: 'manual' }, 'R3 manual'), h('option', { value: 'auto' }, 'R3 automática (par e impar)'));
             selR3.value = r3Guardado();
-            const btnEmp = h('button', { class: 'btn btn-primary', type: 'button', onclick: emparejarTodas }, icon('link'), 'Emparejar completas');
-            const btnTodas = h('button', { class: 'btn btn-danger', type: 'button', onclick: () => desemparejar(null) }, icon('unlink'), 'Desemparejar todas');
-            const btnSel = h('button', { class: 'btn btn-danger', type: 'button', onclick: () => desemparejar([...st.sel]) }, icon('unlink'), 'Desemparejar');
+            const btnEmp = h('button', { class: 'btn btn-primary', type: 'button', 'data-escribe': true, onclick: emparejarTodas }, icon('link'), 'Emparejar completas');
+            const btnTodas = h('button', { class: 'btn btn-danger', type: 'button', 'data-escribe': true, onclick: () => desemparejar(null) }, icon('unlink'), 'Desemparejar todas');
+            const btnSel = h('button', { class: 'btn btn-danger', type: 'button', 'data-escribe': true, onclick: () => desemparejar([...st.sel]) }, icon('unlink'), 'Desemparejar');
             const btnLimpiar = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { st.sel.clear(); lista(); } }, 'Quitar selección');
             const barSel = h('div', { class: 'esc-sel', hidden: true }, h('b', { class: 'cnt' }), h('div', { class: 'grow' }), btnSel, btnLimpiar);
             q.addEventListener('input', T.debounce(() => { st.q = q.value; st.limit = 200; lista(); }, 180));
@@ -62,6 +62,7 @@
             }
             /** Fechas de llegada / finalizado / entrega y gabinete (Quintalock o Translock) de la tarjeta; se guardan en la base y salen al Excel. */
             function bloqueEntrega(t) {
+                if (T.acceso.rol === 'consultor') return h('p', { class: 'hint' }, icon('lock'), ' Las fechas y la entrega las registra una cuenta General o Administrador.');   // v1.3.44: solo lectura
                 const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
                 const fecha = (id, etq, v) => h('div', { class: 'field' }, h('label', { for: id }, etq), h('input', { class: 'input mono', type: 'date', id, value: v || '' }));
                 const iLle = fecha('entLle', 'Llegada', t.fecha_llegada), iFin = fecha('entFin', 'Finalizado', t.fecha_finalizado), iEnt = fecha('entEnt', 'Entrega', t.fecha_real);
@@ -96,7 +97,7 @@
                         bloqueEntrega(t),
                         window.TQTMateriales ? window.TQTMateriales.bloque(t.id, ctx) : null,
                         h('div', { class: 'acciones' },
-                            ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'row', style: 'gap:6px' },
+                            ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'row', style: 'gap:6px', 'data-escribe': true },
                                 h('button', { class: 'btn btn-sm', type: 'button', onclick: () => elegirPlaca(sl, `${t[sl.toLowerCase()] ? 'Cambiar' : 'Asignar'} ${sl} de la tarjeta ${t.id_tarjeta_num}`, async (np) => {
                                     const r = await api(`/api/tarjetas/${t.id}/asignar`, { method: 'PUT', body: { ranura: sl, pcb_id: np.id } });
                                     if (!r.ok) { toast(r.error, { kind: 'bad' }); return; } toast(`${sl} ${t[sl.toLowerCase()] ? 'cambiada' : 'asignada'}: ${np.nombre}`, { kind: 'ok' }); ctx.actualizar();
@@ -107,7 +108,7 @@
                                 } }, icon('unlink'), 'Quitar') : null)),
                             h('a', { class: 'btn btn-primary', href: `/dymo?tarjeta_id=${t.id}` }, icon('printer'), 'Etiqueta DYMO'),
                             h('a', { class: 'btn', href: `#/consultar?codigo=${encodeURIComponent((t.r1 || t.r2 || t.r3 || {}).nombre || String(t.id_tarjeta_num))}` }, icon('consultar'), 'Ver ficha'),
-                            h('button', { class: 'btn btn-danger', type: 'button', onclick: () => desemparejar([t.id]) }, icon('unlink'), 'Desemparejar'),
+                            h('button', { class: 'btn btn-danger', type: 'button', 'data-escribe': true, onclick: () => desemparejar([t.id]) }, icon('unlink'), 'Desemparejar'),
                             h('button', { class: 'btn', type: 'button', onclick: () => util.copiar(util.resumenTarjeta(Object.assign({}, t, { r1: conFw(t, 'r1'), r2: conFw(t, 'r2') })), 'Datos copiados') }, icon('paste'), 'Copiar datos'))));
                 split.append(panel);
                 if (enfocar) panel.focus({ preventScroll: true });
@@ -141,7 +142,7 @@
                     { id: 'r1', titulo: 'R1', cel: (x) => util.placaCelda(x.r1, 'R1'), sortable: false },
                     { id: 'r2', titulo: 'R2', cel: (x) => util.placaCelda(x.r2, 'R2'), sortable: false },
                     { id: 'r3', titulo: 'R3', cls: 'c-2', cel: (x) => (x.r3 ? util.placaCelda(x.r3, 'R3') : h('span', { class: 'muted' }, selR3.value === 'auto' ? 'sin R3' : 'a mano')), sortable: false },
-                    { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (x) => (x.tipo === 'Pareja' ? h('button', { class: 'btn btn-sm', type: 'button', 'aria-label': `Unir la tarjeta ${x.id_tarjeta_num}`, onclick: () => unir(x.serie) }, icon('link'), 'Unir') : null) },
+                    { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (x) => (x.tipo === 'Pareja' ? h('button', { class: 'btn btn-sm', type: 'button', 'data-escribe': true, 'aria-label': `Unir la tarjeta ${x.id_tarjeta_num}`, onclick: () => unir(x.serie) }, icon('link'), 'Unir') : null) },
                 ];
                 const tabla = h('div');
                 const pl = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
@@ -151,7 +152,7 @@
                         + (g.r3_pendientes && g.r3_pendientes.length ? `, y se montarán ${g.r3_pendientes.length} R3 en tarjetas existentes` : '') + '. '
                         + (selR3.value === 'manual' ? 'La R3 se asigna a mano en cada tarjeta.' : '')),
                     filas.length ? tabla : h('p', { class: 'muted' }, sueltas[0] + sueltas[1] + sueltas[2] ? 'No hay R1 y R2 por emparejar; las sueltas se pueden armar a mano.' : 'No hay placas sueltas: recíbelas y confírmalas con el celular.'),
-                    h('div', { class: 'row wrap' }, h('button', { class: 'btn', type: 'button', onclick: armarMano }, icon('plus'), 'Armar a mano (impar)')));
+                    h('div', { class: 'row wrap' }, h('button', { class: 'btn', type: 'button', 'data-escribe': true, onclick: armarMano }, icon('plus'), 'Armar a mano (impar)')));
                 if (filas.length) util.pintarTabla(tabla, { cols, rows: filas, key: (x) => x.id_tarjeta_num, sort: { id: 'n', dir: 'asc' }, onSort: () => {}, label: (x) => `Tarjeta ${x.id_tarjeta_num}`, limit: 50, onMas: () => {}, caption: 'Tarjetas que se crearán al emparejar' });
             }
             async function unir(serie) {

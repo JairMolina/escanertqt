@@ -47,8 +47,8 @@ class TestCorreoExcel(unittest.TestCase):
         muchos = [f"p{i}@b.com" for i in range(11)]
         self.assertEqual(self.c.post("/api/correo/excel", json={"tipo": "inventario_tqtr", "para": muchos}).status_code, 422)
 
-    def test_lote_exige_sesion_de_administracion(self):
-        self.assertIn(self.c.post("/api/correo/excel", json={"tipo": "lote", "para": ["a@b.com"]}).status_code, (401, 503))
+    def test_lote_ya_no_exige_sesion_de_administracion(self):   # v1.3.44: mismo permiso que su descarga (solo sesión de usuario)
+        self.assertNotIn(self.c.post("/api/correo/excel", json={"tipo": "lote", "para": ["a@b.com"]}).status_code, (401, 403))
 
     def test_smtp_caido_y_sin_configurar(self):
         with mock.patch.object(correo, "enviar", side_effect=OSError("red")):

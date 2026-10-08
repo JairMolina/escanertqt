@@ -28,7 +28,18 @@
 
         const scanner = new window.TQTScanner(video, {
             repeatMs: opts.repeatMs || 3000,
-            onCode: (text, meta) => { if (opts.onCode) opts.onCode(text, meta); },
+            onCode: (text, meta) => {
+                // v1.3.44: el QR del "Botón de escaneo" de la consola se reconoce desde CUALQUIER cámara (Recibir, Emparejar,
+                // Programar, Consultar): se pasa directo al modo escáner vinculado, sin ir antes a "Escáner para la consola".
+                const vinc = /\/escaner\?(?:[^#\s]*&)?s=([A-Za-z0-9_-]{10,})/.exec(String(text || ''));
+                if (vinc && !opts.vinculo) {
+                    scanner.lock(); el.dataset.state = 'locked';
+                    if (window.TQT && window.TQT.toast) window.TQT.toast('QR de la consola: vinculando este celular…', { kind: 'ok' });
+                    location.href = '/escaner?s=' + encodeURIComponent(vinc[1]);
+                    return;
+                }
+                if (opts.onCode) opts.onCode(text, meta);
+            },
             onState: (s) => {
                 if (s === 'scanning' || s === 'ready') { clearFail(); el.dataset.state = 'scanning'; }
                 else if (s === 'starting') el.dataset.state = 'idle';

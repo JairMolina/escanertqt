@@ -51,11 +51,9 @@ class TestSoloAdminPideClave(unittest.TestCase):
         c = self.cliente()
         self.assertEqual(c.get("/admin").status_code, 200)                         # la página abre y muestra el login
         for metodo, ruta, cuerpo in (("get", "/api/admin/resumen", None), ("get", "/api/admin/movimientos", None),
-                                     ("get", "/api/admin/export/excel", None),
                                      ("delete", "/api/admin/tarjetas", {"ids": [1]}), ("delete", "/api/admin/pcb", {"ids": [1]}),
                                      ("post", "/api/admin/lote/1/vaciar", {"confirmar": "VACIAR"}),
                                      ("post", "/api/admin/reset", {"confirmar": "BORRAR TODO"}),
-                                     ("get", "/api/export/excel", None),
                                      ("post", "/api/excel/import", {"excel_path": "x.xlsx"})):
             r = c.request(metodo.upper(), ruta, json=cuerpo) if cuerpo is not None else c.request(metodo.upper(), ruta)
             self.assertEqual(r.status_code, 401, ruta)

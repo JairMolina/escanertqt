@@ -386,15 +386,20 @@ def _exportar(lote: Dict[str, Any], destino: Path) -> Dict[str, Any]:
 async def export_excel(
     lote_id: Optional[int] = Query(None, description="Por defecto el lote activo"),
     ruta: Optional[str] = Query(None, max_length=500, description="Carpeta o archivo .xlsx permitido donde guardarlo (en vez de descargar)"),
-    _: Dict = Depends(admin_requerido),
+    x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"),
+    tqt_admin: Optional[str] = Cookie(None, alias=COOKIE_SESION),
 ):
     """Genera una copia nueva desde la plantilla (Producción / Catálogo PCB / Pruebas / Etiquetas con fórmulas intactas) con los
     datos del lote. NO toca el archivo mensual en uso. Sin `ruta` responde el archivo como descarga; con `ruta` lo guarda ahí
-    (solo carpetas permitidas) y responde su ubicación."""
-    lote = await run_in_threadpool(db.get_lote_by_id, lote_id) if lote_id else await run_in_threadpool(db.get_active_lote)
+    (solo carpetas permitidas) y responde su ubicación.
+    v1.3.44: la DESCARGA solo pide sesión de usuario (cualquier rol; el middleware deja pasar este GET). Guardar en una
+    carpeta del servidor (`ruta`) escribe en disco: sigue pidiendo la clave de administración."""
+    if ruta:
+        admin_requerido(x_admin_token, tqt_admin)
+    lote =await run_in_threadpool(db.get_lote_by_id, lote_id) if lote_id else await run_in_threadpool(db.get_active_lote)
     if not lote:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote no encontrado o sin lote activo.")
-    nombre = f"Control_Produccion_TQT_{MESES_ES[lote['mes'] - 1]}_{lote['anio']}.xlsx"
+    nombre = db.archivo_excel_lote(lote)   # v1.3.44: semana/día llevan su código en el nombre
 
     try:
         if ruta:

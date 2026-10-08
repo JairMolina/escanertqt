@@ -121,6 +121,76 @@ def nombre_lote(anio: int, mes: int) -> str:
     return f"{MESES_ES[mes - 1]} {anio}"
 
 
+# v1.3.44: un lote puede ser de un MES, una SEMANA (ISO, empieza en lunes) o un DÍA. `anio`/`mes` siguen llenos con el
+# mes de la fecha de inicio para que reportes y filtros por mes funcionen igual; `codigo_lote` sigue siendo único.
+TIPOS_LOTE = ("mes", "semana", "dia")
+_MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+
+def normalizar_lote(tipo: Optional[str] = None, fecha_inicio: Optional[str] = None,
+                    anio: Optional[int] = None, mes: Optional[int] = None) -> Dict[str, Any]:
+    """Devuelve {tipo_lote, fecha_inicio, anio, mes, codigo_lote}. Mes: '2026-09' (inicio día 1); semana: '2026-S40'
+    (inicio en el lunes de esa semana ISO); día: '2026-09-15'. ValueError si los datos no alcanzan o son inválidos."""
+    from datetime import date, timedelta
+    tipo = (tipo or "mes").strip().lower()
+    if tipo not in TIPOS_LOTE:
+        raise ValueError(f"Tipo de lote inválido: {tipo}. Usa mes, semana o dia.")
+    if fecha_inicio:
+        try:
+            f = date.fromisoformat(str(fecha_inicio)[:10])
+        except ValueError:
+            raise ValueError(f"Fecha de inicio inválida: {fecha_inicio}. Usa AAAA-MM-DD.") from None
+    elif anio and mes:
+        f = date(int(anio), int(mes), 1)
+    else:
+        raise ValueError("Indica la fecha de inicio (o el mes y año).")
+    if tipo == "mes":
+        f = f.replace(day=1)
+        codigo = f"{f.year}-{f.month:02d}"
+    elif tipo == "semana":
+        f = f - timedelta(days=f.weekday())
+        iso = f.isocalendar()
+        codigo = f"{iso[0]}-S{iso[1]:02d}"
+    else:
+        codigo = f.isoformat()
+    if not (2020 <= f.year <= 2100):
+        raise ValueError("El año debe estar entre 2020 y 2100.")
+    return {"tipo_lote": tipo, "fecha_inicio": f.isoformat(), "anio": f.year, "mes": f.month, "codigo_lote": codigo}
+
+
+def nombre_lote_de(lote: Optional[Dict[str, Any]]) -> str:
+    """Nombre visible de un lote según su tipo: 'Septiembre 2026', 'Semana 40 · 28 sep–4 oct 2026' o '15 sep 2026'."""
+    from datetime import date, timedelta
+    if not lote:
+        return "Sin lote"
+    tipo = lote.get("tipo_lote") or "mes"
+    try:
+        f = date.fromisoformat(str(lote.get("fecha_inicio"))[:10])
+    except (TypeError, ValueError):
+        f = None
+    if tipo == "semana" and f:
+        fin = f + timedelta(days=6)
+        ini = f"{f.day} {_MES_CORTO[f.month - 1]}" + (f" {f.year}" if f.year != fin.year else "")
+        return f"Semana {f.isocalendar()[1]} · {ini}–{fin.day} {_MES_CORTO[fin.month - 1]} {fin.year}"
+    if tipo == "dia" and f:
+        return f"{f.day} {_MES_CORTO[f.month - 1]} {f.year}"
+    if lote.get("mes") and lote.get("anio"):
+        return nombre_lote(int(lote["anio"]), int(lote["mes"]))
+    return lote.get("codigo_lote") or "Lote"
+
+
+def archivo_excel_lote(lote: Dict[str, Any]) -> str:
+    """Nombre del Excel del lote. Los lotes de mes conservan el nombre histórico (Control_Produccion_TQT_Septiembre_2026.xlsx);
+    los de semana/día llevan su código para que dos lotes del mismo mes nunca escriban el mismo archivo."""
+    base = f"Control_Produccion_TQT_{MESES_ES[int(lote['mes']) - 1]}_{lote['anio']}"
+    tipo = lote.get("tipo_lote") or "mes"
+    if tipo == "semana":
+        base += "_Semana" + str(lote.get("codigo_lote", "")).split("-S")[-1]
+    elif tipo == "dia":
+        base += "_Dia" + str(lote.get("fecha_inicio") or lote.get("codigo_lote", ""))[8:10]
+    return base + ".xlsx"
+
+
 # ============================================================================
 # Inicialización y migraciones
 # ============================================================================
@@ -336,10 +406,25 @@ def _asegurar_columnas(conn: sqlite3.Connection) -> None:
     if cols and "sesion" not in cols:
         conn.execute("ALTER TABLE pcb_inventario ADD COLUMN sesion TEXT")
     _asegurar_fechas_entrega(conn)
+    lcols = {r[1] for r in conn.execute("PRAGMA table_info(lotes_mensuales)")}
+    if lcols and "tipo_lote" not in lcols:   # v1.3.44: lotes de mes, semana o día; los existentes quedan como 'mes'
+        conn.execute("ALTER TABLE lotes_mensuales ADD COLUMN tipo_lote TEXT NOT NULL DEFAULT 'mes'")
+    if lcols and "fecha_inicio" not in lcols:
+        conn.execute("ALTER TABLE lotes_mensuales ADD COLUMN fecha_inicio TEXT")
+    if lcols:
+        conn.execute("UPDATE lotes_mensuales SET fecha_inicio = printf('%04d-%02d-01', anio, mes) WHERE fecha_inicio IS NULL")
     tcols = {r[1] for r in conn.execute("PRAGMA table_info(tarjetas_produccion)")}
     if tcols and "etiqueta_firma" not in tcols:   # firma (estado + pareja) de la etiqueta DYMO impresa; vacía = nunca impresa
         conn.execute("ALTER TABLE tarjetas_produccion ADD COLUMN etiqueta_firma TEXT")
-    if conn.execute("SELECT name FROM sqlite_master WHERE name='firmware_catalogo'").fetchone()             and conn.execute("SELECT COUNT(*) FROM firmware_catalogo").fetchone()[0] == 0:
+    fw_sql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='firmware_catalogo'").fetchone()
+    if fw_sql and "'R3'" not in (fw_sql[0] or ""):   # bases anteriores: el catálogo solo aceptaba R1/R2; la R3 también lleva firmware
+        conn.execute("ALTER TABLE firmware_catalogo RENAME TO firmware_catalogo_old")
+        conn.execute("CREATE TABLE firmware_catalogo (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                     "rol TEXT NOT NULL CHECK (rol IN ('R1','R2','R3')), version TEXT NOT NULL, "
+                     "orden INTEGER NOT NULL DEFAULT 0, UNIQUE (rol, version))")
+        conn.execute("INSERT INTO firmware_catalogo (id, rol, version, orden) SELECT id, rol, version, orden FROM firmware_catalogo_old")
+        conn.execute("DROP TABLE firmware_catalogo_old")
+    if conn.execute("SELECT name FROM sqlite_master WHERE name='firmware_catalogo'").fetchone()            and conn.execute("SELECT COUNT(*) FROM firmware_catalogo").fetchone()[0] == 0:
         for rol, versiones in FIRMWARE_CATALOGO_INICIAL.items():
             for i, v in enumerate(versiones, 1):
                 conn.execute("INSERT OR IGNORE INTO firmware_catalogo (rol, version, orden) VALUES (?,?,?)", (rol, v, i))
@@ -371,8 +456,8 @@ def init_db(db_path: Optional[Path] = None) -> None:
         if not conn.execute("SELECT id FROM lotes_mensuales LIMIT 1").fetchone():
             now = datetime.now()
             conn.execute(
-                "INSERT INTO lotes_mensuales (codigo_lote, mes, anio, activo) VALUES (?, ?, ?, 1)",
-                (f"{now.year}-{now.month:02d}", now.month, now.year),
+                "INSERT INTO lotes_mensuales (codigo_lote, mes, anio, activo, tipo_lote, fecha_inicio) VALUES (?, ?, ?, 1, 'mes', ?)",
+                (f"{now.year}-{now.month:02d}", now.month, now.year, f"{now.year}-{now.month:02d}-01"),
             )
 
 
@@ -412,9 +497,13 @@ def get_lote_by_codigo(codigo: str, conn: Optional[sqlite3.Connection] = None, d
 
 
 def list_lotes(conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
-    """Lista todos los lotes ordenados por año y mes descendente."""
+    """Lista todos los lotes, del más reciente al más antiguo por fecha de inicio (cada uno con su `nombre` visible)."""
     def _q(c):
-        return [dict(r) for r in c.execute("SELECT l.*, (SELECT COUNT(*) FROM tarjetas_produccion t WHERE t.lote_id = l.id) AS tarjetas FROM lotes_mensuales l ORDER BY l.anio DESC, l.mes DESC, l.id DESC").fetchall()]
+        filas = [dict(r) for r in c.execute("SELECT l.*, (SELECT COUNT(*) FROM tarjetas_produccion t WHERE t.lote_id = l.id) AS tarjetas FROM lotes_mensuales l "
+                                            "ORDER BY COALESCE(l.fecha_inicio, printf('%04d-%02d-01', l.anio, l.mes)) DESC, l.id DESC").fetchall()]
+        for f in filas:
+            f["nombre"] = nombre_lote_de(f)
+        return filas
     return _con_conn(conn, db_path, _q)
 
 
@@ -426,28 +515,30 @@ def create_lote(
     activo: bool = True,
     conn: Optional[sqlite3.Connection] = None,
     db_path: Optional[Path] = None,
+    tipo_lote: str = "mes",
+    fecha_inicio: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Crea un nuevo lote mensual. Si activo=True, desactiva los demás."""
+    """Crea un nuevo lote (mes, semana o día). Si activo=True, desactiva los demás."""
     def _exec(c):
         if activo:
             c.execute("UPDATE lotes_mensuales SET activo = 0")
         lote_id = c.execute(
-            "INSERT INTO lotes_mensuales (codigo_lote, mes, anio, ruta_excel, activo) VALUES (?, ?, ?, ?, ?)",
-            (codigo_lote, mes, anio, ruta_excel, 1 if activo else 0),
+            "INSERT INTO lotes_mensuales (codigo_lote, mes, anio, ruta_excel, activo, tipo_lote, fecha_inicio) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (codigo_lote, mes, anio, ruta_excel, 1 if activo else 0, tipo_lote or "mes", fecha_inicio or f"{anio}-{mes:02d}-01"),
         ).lastrowid
         return dict(c.execute("SELECT * FROM lotes_mensuales WHERE id = ?", (lote_id,)).fetchone())
     return _con_conn(conn, db_path, _exec, escribe=True)
 
 
 def crear_lote(conn: sqlite3.Connection, anio: int, mes: int, activar: bool = True) -> int:
-    """Crea o retorna el lote por año y mes (compatibilidad)."""
-    row = conn.execute("SELECT id FROM lotes_mensuales WHERE anio = ? AND mes = ?", (anio, mes)).fetchone()
+    """Crea o retorna el lote MENSUAL por año y mes (compatibilidad; ignora lotes de semana/día de ese mes)."""
+    row = conn.execute("SELECT id FROM lotes_mensuales WHERE codigo_lote = ?", (f"{anio}-{mes:02d}",)).fetchone()
     if row:
         lote_id = row["id"]
     else:
         lote_id = conn.execute(
-            "INSERT INTO lotes_mensuales (codigo_lote, mes, anio, activo) VALUES (?, ?, ?, ?)",
-            (f"{anio}-{mes:02d}", mes, anio, 1 if activar else 0),
+            "INSERT INTO lotes_mensuales (codigo_lote, mes, anio, activo, tipo_lote, fecha_inicio) VALUES (?, ?, ?, ?, 'mes', ?)",
+            (f"{anio}-{mes:02d}", mes, anio, 1 if activar else 0, f"{anio}-{mes:02d}-01"),
         ).lastrowid
     if activar:
         conn.execute("UPDATE lotes_mensuales SET activo = (id = ?)", (lote_id,))
@@ -536,6 +627,7 @@ _SELECT_TARJETA = f"""
         t.id, t.lote_id, t.id_tarjeta_num,
         t.pcb_r1_id, t.pcb_r2_id, t.pcb_r3_id,
         COALESCE(p1.firmware, t.firmware_r1) AS firmware_r1, COALESCE(p2.firmware, t.firmware_r2) AS firmware_r2,
+        p3.firmware AS firmware_r3,
         t.semana_produccion, t.fecha_proyectada, t.fecha_real, t.fecha_llegada, t.fecha_finalizado, t.gabinete, t.etiqueta_firma,
         t.created_at, t.updated_at,
         {_cols_pcb('p1', 'R1')},

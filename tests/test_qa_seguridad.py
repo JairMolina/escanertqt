@@ -84,9 +84,9 @@ class Base(unittest.TestCase):
 class TestAdminAuth(Base):
     RUTAS_ADMIN = [("GET", "/api/admin/resumen", None), ("DELETE", "/api/admin/tarjetas", {"ids": [1]}),
                    ("DELETE", "/api/admin/pcb", {"ids": [1]}), ("POST", "/api/admin/lote/1/vaciar", {"confirmar": "VACIAR"}),
-                   ("POST", "/api/admin/reset", {"confirmar": "BORRAR TODO"}), ("GET", "/api/admin/export/excel", None),
+                   ("POST", "/api/admin/reset", {"confirmar": "BORRAR TODO"}), ("GET", "/api/admin/export/excel?ruta=x", None),
                    ("POST", "/api/admin/cambiar-clave", {"actual": CLAVE, "nueva": "OtraClave-99"}),
-                   ("GET", "/api/export/excel", None), ("POST", "/api/excel/import", {"excel_path": "x.xlsx"}),
+                   ("POST", "/api/excel/import", {"excel_path": "x.xlsx"}),
                    ("POST", "/api/excel/create-monthly", {"mes": 1, "anio": 2027})]
 
     def test_toda_ruta_sensible_exige_token(self):

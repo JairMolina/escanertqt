@@ -339,67 +339,184 @@ document.addEventListener('DOMContentLoaded', () => {
     const ancho = Math.min(window.innerWidth, 1100) - 72;
     const zFit = Math.max(1, Math.min(3, Math.floor(ancho / (57 * 96 / 25.4))));
     state.zoom = zFit; $('selZoom').value = String(zFit);
-    // ------------------------------------------------------------------ etiquetas R3 (v1.3.36): solo el nombre TQT-R3-Vxx-0000
+    // ------------------------------------------------------------------ etiquetas R3 (v1.3.44): DOS R3 por etiqueta, una por mitad
+    // La R3 es muy pequeña: la etiqueta se corta por la mitad y cada mitad lleva el QR y el nombre de una R3.
+    // Origen: las R3 de las tarjetas de un lote (como el lote de R1/R2) o un rango de series.
     const soloDig = (e) => { e.target.value = e.target.value.replace(/\D/g, ''); };
     const r3Serie = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 && n <= 9999 ? n : null; };
+    const r3st = { lote: [], cargando: false, error: '' };
+    const esLote = () => $('r3Origen').value === 'lote';
     function r3Nombres() {
         const ver = ($('r3Ver').value || '').replace(/\D/g, '') || '30';
+        if (esLote()) return { ver, lista: r3st.lote.map((x) => x.nombre), error: r3st.error || (r3st.cargando ? 'Cargando las R3 del lote…' : (!r3st.lote.length && $('r3Lote').value ? 'No hay R3 en las tarjetas del lote ni R3 sueltas.' : '')) };
         const d = r3Serie($('r3Desde').value); if (d === null) return { ver, lista: [] };
         const hRaw = $('r3Hasta').value.trim(); const hh = hRaw ? r3Serie(hRaw) : d;
         if (hh === null || hh < d) return { ver, lista: [], error: '"Serie hasta" debe ser mayor o igual que "desde".' };
-        if (hh - d >= 500) return { ver, lista: [], error: 'Máximo 500 etiquetas por tanda.' };
+        if (hh - d >= 1000) return { ver, lista: [], error: 'Máximo 1000 R3 (500 etiquetas) por tanda.' };
         const lista = []; for (let n = d; n <= hh; n++) lista.push(`TQT-R3-V${ver}-${String(n).padStart(4, '0')}`);
         return { ver, lista };
     }
+    const pares = (lista) => { const out = []; for (let i = 0; i < lista.length; i += 2) out.push(lista.slice(i, i + 2)); return out; };
+    function mitad(nombre) {
+        if (!nombre) return h('div', { class: 'r3m' }, h('span', { class: 'r3m-vacia' }, 'Mitad libre'));
+        const svg = qrSvg(nombre);
+        const total = +svg.getAttribute('viewBox').split(' ')[2];
+        let ppm = 6; while (ppm > 3 && total * ppm / 11.811 > 13) ppm--;   // igual que calcular_diseno_r3 del servidor (tira de 16 mm)
+        const mm = (total * ppm / 11.811).toFixed(2) + 'mm'; svg.setAttribute('width', mm); svg.setAttribute('height', mm);
+        return h('div', { class: 'r3m' }, h('div', { class: 'dymo-qr' }, svg), h('span', { class: 'dymo-l n' }, nombre));
+    }
     function r3Vista() {
+        document.querySelectorAll('.r3-serie').forEach((e) => { e.hidden = esLote(); });
+        document.querySelectorAll('.r3-lote').forEach((e) => { e.hidden = !esLote(); });
         const { ver, lista, error } = r3Nombres();
-        const nombre = lista[0] || `TQT-R3-V${ver}-0000`;
-        $('r3Ejemplo').textContent = nombre;
-        $('r3Label').replaceChildren(h('div', { class: 'dymo-label', role: 'img', 'aria-label': `Etiqueta ${nombre}` },
-            h('div', { class: 'dymo-qr' }, qrSvg(nombre)), h('div', { class: 'dymo-trama' }, h('span', { class: 'dymo-l n r3' }, nombre))));
+        const par = lista.length ? lista.slice(0, 2) : [`TQT-R3-V${ver}-0000`];
+        $('r3Ejemplo').textContent = par.join(' + ');
+        $('r3Label').replaceChildren(h('div', { class: 'dymo-label r3doble', role: 'img', 'aria-label': `Etiqueta R3: ${par.join(' y ')}` }, mitad(par[0]), mitad(par[1])));
         $('r3ZoomHost').style.transform = `scale(${state.zoom})`;
         const lbl = $('r3Label').firstChild; $('r3ZoomHost').style.width = `${lbl.offsetWidth * state.zoom}px`; $('r3ZoomHost').style.height = `${lbl.offsetHeight * state.zoom}px`;
-        $('r3Info').textContent = error || (lista.length > 1 ? `${lista.length} etiquetas: ${lista[0]} … ${lista[lista.length - 1]}` : 'Vista previa · 57 × 32 mm');
+        const n = pares(lista).length;
+        $('r3Info').textContent = error || (lista.length ? `${lista.length} R3 → ${n} etiqueta${n === 1 ? '' : 's'} (${lista[0]} … ${lista[lista.length - 1]})${lista.length % 2 ? ' · la última lleva una sola R3' : ''}` : 'Vista previa · 57 × 32 mm, dos mitades');
         $('btnR3Print').disabled = $('btnR3Open').disabled = !lista.length || state.busy;
+        $('btnR3Print').lastChild.textContent = esLote() ? ' Imprimir lote R3 en DYMO…' : ' Imprimir R3 en DYMO';
     }
+    async function cargarLotesR3() {
+        const [rl, st] = await Promise.all([api('/api/lotes'), api('/api/status')]);
+        const sel = $('r3Lote');
+        if (!rl.ok) { sel.replaceChildren(h('option', { value: '' }, 'No se pudieron cargar los lotes')); return; }
+        const activo = st.ok && st.data && st.data.active_lote ? st.data.active_lote.id : null;
+        const lotes = T.ordenarLotes ? T.ordenarLotes(rl.data || []) : (rl.data || []);
+        sel.replaceChildren(...lotes.map((l) => h('option', { value: String(l.id), selected: l.id === activo ? '' : null }, T.loteNombre(l) + (l.activo ? ' (activo)' : ''))));
+        if (!lotes.length) sel.replaceChildren(h('option', { value: '' }, 'Todavía no hay lotes'));
+        await cargarR3Lote();
+    }
+    async function cargarR3Lote() {
+        const id = $('r3Lote').value; r3st.lote = []; r3st.error = '';
+        if (!id) { r3Vista(); return; }
+        r3st.cargando = true; r3Vista();
+        // v1.3.44: las R3 de las tarjetas del lote y TODAS las R3 sueltas (registradas pero sin emparejar)
+        const [r, rp] = await Promise.all([api(`/api/tarjetas?lote_id=${encodeURIComponent(id)}&limit=500`), api('/api/pcb?tipo=R3&limit=5000', { timeout: 20000 })]);
+        r3st.cargando = false;
+        if (!r.ok) r3st.error = r.error || 'No se pudieron cargar las tarjetas del lote.';
+        else {
+            const vistos = new Set();
+            r3st.lote = (r.data.items || []).map((t) => ({ nombre: (t.r3 && t.r3.nombre) || t.nombre_r3, num: t.id_tarjeta_num, prog: !!(t.r3 && t.r3.firmware) }))
+                .filter((x) => /^TQT-R3-V\d{1,3}-\d{4}$/.test(x.nombre || '') && !vistos.has(x.nombre) && vistos.add(x.nombre))
+                .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+            const sueltas = (rp.ok && rp.data && rp.data.items ? rp.data.items : [])
+                .filter((p) => p.tipo === 'R3' && !p.tarjeta_id && !['BAJA', 'FALLA'].includes(p.estado_ciclo) && !vistos.has(p.nombre) && vistos.add(p.nombre))
+                .map((p) => ({ nombre: p.nombre, num: null, suelta: true, prog: !!p.firmware }))
+                .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+            r3st.lote = r3st.lote.concat(sueltas);
+        }
+        r3Vista();
+    }
+    $('r3Origen').addEventListener('change', r3Vista);
+    $('r3Lote').addEventListener('change', cargarR3Lote);
     ['r3Ver', 'r3Desde', 'r3Hasta', 'r3Copias'].forEach((id) => $(id).addEventListener('input', (e) => { soloDig(e); r3Vista(); }));
     $('selZoom').addEventListener('change', r3Vista);
-    async function xmlR3(nombre, tipo) {
+    const qsR3 = (par) => par.map((n) => `nombre=${encodeURIComponent(n)}`).join('&');
+    async function xmlR3(par, tipo) {
         let res;
-        try { res = await fetch(`/api/dymo/r3/xml?nombre=${encodeURIComponent(nombre)}&tipo=${tipo}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        try { res = await fetch(`/api/dymo/r3/xml?${qsR3(par)}&tipo=${tipo}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
         if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`);
         const txt = await res.text();
         if (!D.esXmlEtiqueta(txt)) throw new Error('El servidor no devolvió un XML de etiqueta válido.');
         return txt;
     }
-    async function imprimirR3(printer, nombre, c) {
+    async function imprimirR3(printer, par, c) {
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
-            try { await D.print(printer, await xmlR3(nombre, tipo), c); return; }
+            try { await D.print(printer, await xmlR3(par, tipo), c); return; }
             catch (e) { if (/no respondi|no encuentra|Elige|cargó|Sin conexión/i.test(e.message)) throw e; if (!primero) primero = e; }
         }
         throw primero;
     }
-    $('btnR3Print').addEventListener('click', async () => {
-        const { lista } = r3Nombres(); if (!lista.length) return;
+    async function imprimirParesR3(lista) {
+        const etiquetas = pares(lista);
         const printer = $('selPrinter').value; const c = Math.max(1, Math.min(99, parseInt($('r3Copias').value || '1', 10) || 1));
         state.busy = true; refrescarBotones(); r3Vista(); let hechas = 0; const fallos = [];
-        for (const n of lista) {
-            progreso(hechas, lista.length, `Imprimiendo ${hechas + 1} de ${lista.length}: ${n}…`);
-            try { await imprimirR3(printer, n, c); hechas++; }
-            catch (e) { fallos.push(`${n}: ${e.message}`); if (/no respondió|DYMO Connect|servicio/i.test(e.message)) break; }
+        for (const par of etiquetas) {
+            progreso(hechas, etiquetas.length, `Imprimiendo ${hechas + 1} de ${etiquetas.length}: ${par.join(' + ')}…`);
+            try { await imprimirR3(printer, par, c); hechas++; }
+            catch (e) { fallos.push(`${par.join(' + ')}: ${e.message}`); if (/no respondió|DYMO Connect|servicio/i.test(e.message)) break; }
         }
-        progreso(hechas, lista.length, `${hechas} de ${lista.length} etiquetas R3 enviadas.`);
-        if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} R3 sin imprimir. `), fallos.slice(0, 4).join(' · ')));
-        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} R3 enviada${hechas === 1 ? '' : 's'} a la DYMO`, { kind: 'ok' });
+        progreso(hechas, etiquetas.length, `${hechas} de ${etiquetas.length} etiquetas R3 enviadas.`);
+        if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} etiqueta${fallos.length === 1 ? '' : 's'} R3 sin imprimir. `), fallos.slice(0, 4).join(' · ')));
+        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} R3 (${lista.length} placas) enviada${hechas === 1 ? '' : 's'} a la DYMO`, { kind: 'ok' });
         ocultarProg(4000); state.busy = false; refrescarBotones(); r3Vista();
+    }
+    // Lote: hoja con TODAS las R3 del lote para marcar cuáles imprimir (igual que "Imprimir lote en DYMO…" de R1/R2)
+    function hojaLoteR3() {
+        const todas = r3st.lote.slice();
+        if (!todas.length) { toast('No hay R3 en el lote ni sueltas', { kind: 'bad' }); return; }
+        const marcadas = new Set(todas.map((x) => x.nombre));
+        const cajas = new Map();
+        const cuenta = h('b', { 'aria-live': 'polite' });
+        const filtro = h('input', { class: 'input mono', type: 'search', inputmode: 'numeric', placeholder: 'Buscar (ej. 21)', 'aria-label': 'Buscar R3 o tarjeta', autocomplete: 'off', maxlength: '4' });
+        const lista = h('div', { role: 'group', 'aria-label': 'R3 a imprimir', style: 'display:flex;flex-direction:column;gap:6px;max-height:min(52vh,420px);overflow:auto;padding:2px' });
+        const sinCeros = (v) => String(v || '').replace(/^0+/, '');
+        const visibles = () => { const f = sinCeros(filtro.value.replace(/\D/g, '')); return todas.filter((x) => !f || sinCeros(x.nombre.slice(-4)).includes(f) || sinCeros(x.num).includes(f)); };
+        let btnImp = null;
+        const actualizarCuenta = () => {
+            const n = marcadas.size, et = Math.ceil(n / 2);
+            cuenta.textContent = `${n} de ${todas.length} R3 seleccionada${n === 1 ? '' : 's'} → ${et} etiqueta${et === 1 ? '' : 's'}${n % 2 ? ' (la última con una sola R3)' : ''}`;
+            if (btnImp) btnImp.disabled = !n;
+        };
+        function pintarLista() {
+            lista.replaceChildren(); cajas.clear();
+            const v = visibles();
+            if (!v.length) { lista.append(h('p', { class: 'muted' }, 'Ninguna R3 coincide.')); return; }
+            v.forEach((x) => {
+                const cb = h('input', { type: 'checkbox', checked: marcadas.has(x.nombre) ? '' : null, style: 'width:22px;height:22px;flex:none;accent-color:var(--accent,#D9A441)',
+                    onchange: (e) => { if (e.target.checked) marcadas.add(x.nombre); else marcadas.delete(x.nombre); actualizarCuenta(); } });
+                cajas.set(x.nombre, cb);
+                lista.append(h('label', { style: 'display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2,transparent)' },
+                    cb, h('b', { class: 'mono', style: 'min-width:54px' }, x.num ? `#${x.num}` : '—'), h('span', { class: 'mono grow' }, x.nombre),
+                    x.suelta ? T.badge('Suelta', 'info') : null,
+                    T.badge(x.prog ? 'Programada' : 'Sin firmware', x.prog ? 'ok' : 'warn')));
+            });
+        }
+        const marcarVisibles = (on) => { visibles().forEach((x) => { if (on) marcadas.add(x.nombre); else marcadas.delete(x.nombre); const cb = cajas.get(x.nombre); if (cb) cb.checked = on; }); actualizarCuenta(); };
+        filtro.addEventListener('input', pintarLista);
+        const c = Math.max(1, Math.min(99, parseInt($('r3Copias').value || '1', 10) || 1));
+        const nomLote = $('r3Lote').selectedOptions[0] ? $('r3Lote').selectedOptions[0].textContent : '';
+        const cuerpo = h('div', { class: 'stack', style: 'display:flex;flex-direction:column;gap:12px' },
+            h('p', { class: 'muted' }, `Lote ${nomLote}. Aparecen las R3 de sus tarjetas y las R3 sueltas (sin emparejar). Marca las que quieres imprimir: van dos por etiqueta, en orden (${c} copia${c === 1 ? '' : 's'} de cada etiqueta).`),
+            h('div', { class: 'row wrap', style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, filtro,
+                h('button', { class: 'btn btn-sm', type: 'button', onclick: () => marcarVisibles(true) }, 'Marcar todas'),
+                h('button', { class: 'btn btn-sm', type: 'button', onclick: () => marcarVisibles(false) }, 'Quitar todas'),
+                h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { todas.forEach((x) => { if (x.prog) marcadas.add(x.nombre); else marcadas.delete(x.nombre); }); pintarLista(); actualizarCuenta(); } }, 'Solo programadas'),
+                h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { todas.forEach((x) => { if (!x.suelta) marcadas.add(x.nombre); else marcadas.delete(x.nombre); }); pintarLista(); actualizarCuenta(); } }, 'Solo de tarjetas'),
+                h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { todas.forEach((x) => { if (x.suelta) marcadas.add(x.nombre); else marcadas.delete(x.nombre); }); pintarLista(); actualizarCuenta(); } }, 'Solo sueltas')),
+            cuenta, lista);
+        pintarLista();
+        const hoja = T.sheet({
+            title: 'Imprimir lote de R3 en DYMO', body: cuerpo,
+            actions: [
+                { label: 'Cancelar', onClick: () => true },
+                { label: 'Imprimir seleccionadas', kind: 'primary', icon: 'layers', onClick: () => {
+                    const elegidas = todas.filter((x) => marcadas.has(x.nombre)).map((x) => x.nombre);
+                    if (!elegidas.length) return false;
+                    imprimirParesR3(elegidas);
+                    return true;
+                } },
+            ],
+        });
+        btnImp = hoja.el.querySelector('.actions .btn-primary');
+        actualizarCuenta();
+    }
+    $('btnR3Print').addEventListener('click', () => {
+        if (esLote()) { hojaLoteR3(); return; }
+        const { lista } = r3Nombres(); if (lista.length) imprimirParesR3(lista);
     });
     $('btnR3Open').addEventListener('click', () => {
         const { lista } = r3Nombres(); if (!lista.length) return;
-        lista.slice(0, 20).forEach((n, i) => setTimeout(() => bajar(`/api/dymo/r3/archivo?nombre=${encodeURIComponent(n)}&tipo=label`, `${n}.label`), i * 300));
-        toast(lista.length > 20 ? 'Se descargaron las primeras 20. Para más, imprime directo en DYMO.' : 'Archivo .label descargado. Ábrelo con DYMO Label (o DYMO Connect).', { ms: 4000 });
+        const etiquetas = pares(lista);
+        etiquetas.slice(0, 20).forEach((par, i) => setTimeout(() => bajar(`/api/dymo/r3/archivo?${qsR3(par)}&tipo=label`, `TQT_R3_${par.map((n) => n.slice(-4)).join('_')}.label`), i * 300));
+        toast(etiquetas.length > 20 ? 'Se descargaron las primeras 20. Para más, imprime directo en DYMO.' : 'Archivo .label descargado. Ábrelo con DYMO Label (o DYMO Connect).', { ms: 4000 });
     });
     r3Vista();
+    cargarLotesR3();
 
     load().then(() => { state.listo = true; }); conectar(false);
 });

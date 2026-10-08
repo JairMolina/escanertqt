@@ -1,5 +1,23 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.44 — 2026-10-07
+- **Vincular el celular desde cualquier cámara.** El QR del "Botón de escaneo" de la consola se reconoce en Recibir, Emparejar, Programar y Consultar (y con la cámara del teléfono): el celular pasa directo a modo escáner vinculado, sin entrar antes a "Escáner para la consola".
+- **R3 programada (sin MAC).** La R3 ya guarda su versión de firmware y queda "Programada" al tenerla. Al escanearla (Consultar, ficha de la consola, Inventario) se ve si está programada y con qué firmware. Se programa en el celular (Programar: selector de firmware para R3) y en la consola (MAC y firmware › pestaña "R3 firmware"; el escáner remoto la ubica ahí). Catálogo de firmware propio para R3. La R3 sigue sin aceptar MAC.
+- **Lotes por mes, semana o día.** Al crear un lote se elige el tipo: Mes ("Septiembre 2026"), Semana ("Semana 40 · 28 sep–4 oct 2026") o Día ("15 sep 2026"); puede haber varios lotes en el mismo mes. Cada lote tiene su propio Excel (los de semana y día llevan sufijo). Los lotes existentes quedan como mensuales.
+- **Rol Consultor en escritorio.** El consultor entra a la vista móvil (Consultar) y a la consola de escritorio, donde solo ve Dashboard, Tarjetas, Inventario de PCB, Consultar y Excel; las demás secciones no aparecen y los botones que modifican datos se ocultan. Sigue siendo de solo lectura.
+- **Excel sin contraseña de administración.** Descargar el Excel ya no pide la clave de administración (solo la sesión). Importar, crear y sincronizar siguen protegidos. Enviar por correo el Excel del lote tampoco la pide (cuentas General y Administrador).
+- **Etiquetas DYMO R3: dos por etiqueta.** La etiqueta de 57 × 32 mm se divide en dos tiras horizontales de 57 × 16 mm (se corta a lo largo) con una R3 en cada una: QR a la izquierda y nombre a la derecha. Si queda una sola R3, va en la tira de arriba. Selector "Imprimir: R3 de un lote" o "Rango de series"; con lote, "Imprimir lote R3 en DYMO…" abre una hoja con todas las R3 del lote para marcar cuáles imprimir (Marcar todas, Quitar todas, Solo programadas), igual que el lote de R1/R2. La hoja incluye también las R3 sueltas (registradas pero sin emparejar), con filtros "Solo de tarjetas" y "Solo sueltas".
+- **Firmware a mano en Inventario de PCB.** El editor de una placa permite "Otra versión…" cuando la versión no está en el catálogo (p. ej. R3 sin catálogo), en lugar de solo las del catálogo.
+
+## v1.3.43 — 2026-10-07
+- **Consultar muestra el estatus de la tarjeta** (celular y escritorio): pasos Emparejada → Programada → Completa → Entregada con sus fechas, y datos de Llegada, Finalizada, Proyectada, Entrega y Gabinete. Cuando la tarjeta está **Completa**, ahí mismo se elige la **fecha real de entrega y el gabinete** (como la hoja "¿cuándo se entrega?" de la consola) y se puede corregir después. Las cuentas Consultor solo lo ven.
+- **Tablets en vista de escritorio:** al abrir la app en una tablet (lado corto de 700 px o más: iPad, Galaxy Tab) se abre la consola de escritorio; los celulares siguen en la vista con cámara (también en horizontal).
+- **Botón de escaneo (escáner remoto).** En la cabecera de la consola, en todas las secciones, el botón muestra un QR. El celular lo escanea (con su cámara o desde la app en *Más opciones › Escáner para la consola*), queda vinculado y lo que escanea aparece en la PC:
+  - **MAC y firmware:** ubica la placa escaneada en Pendientes (o en "Con MAC" si ya tiene) y deja el cursor en su MAC; si después se escanea una MAC, se pone en esa placa.
+  - **Inventario de PCB:** filtra la placa. **Tarjetas:** abre la tarjeta. **Consultar:** muestra la ficha.
+  - **Dashboard, Inventario TQTR, Lotes, Excel y demás:** abre una ficha rápida con el estatus y las placas (con atajos a Tarjetas, Inventario o Consultar). Un código que no es de una placa va al buscador de la sección.
+  - El celular ve en qué sección está la PC y qué hizo la consola con cada lectura. Solo quien escaneó el QR puede enviar códigos (el token no viaja por WebSocket); la vinculación caduca tras 12 h sin uso o con "Desvincular".
+
 ## v1.3.42 — 2026-10-07
 - **Avisos de "Acceso restringido" por rol.** Cuando una cuenta General o Consultor intenta entrar a una zona sin permiso, ya no se le regresa sin explicación: aparece una hoja que dice a qué no tiene acceso, qué sí puede hacer su rol y que lo pida a un administrador. Aplica a:
   - **General:** Administración (página, menú "Más opciones", barra lateral de la consola, atajo de teclado), Movimientos, Excel protegido, y cambiar o crear lotes (la hoja de Lotes ya no muestra los botones; lo explica).

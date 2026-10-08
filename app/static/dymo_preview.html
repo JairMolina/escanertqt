@@ -10,7 +10,7 @@
     <meta name="color-scheme" content="dark light">
     <title>Etiquetas DYMO · Escáner TQT</title>
     <script>try{document.documentElement.dataset.theme=localStorage.getItem('tqt.tema')==='light'?'light':'dark'}catch(e){document.documentElement.dataset.theme='dark'}</script>
-    <link rel="stylesheet" href="/static/css/app.css?v=1342">
+    <link rel="stylesheet" href="/static/css/app.css?v=1343">
     <style>
         /* Vista previa de la etiqueta DYMO 30334 · 57 × 32 mm apaisada · 300 dpi · térmica blanco/negro.
            Solo negro sobre blanco, texto ≥ 7 pt, zona segura de 1.5 mm. Se imprime con DYMO Connect, no con el navegador. */
@@ -29,6 +29,12 @@
         .dymo-l.n { font-weight: 700; }
         .dymo-l.m { font-weight: 700; }
         .dymo-l.r3 { font-size: 11pt; }
+        /* R3 doble (v1.3.44): dos tiras horizontales de 57 x 16 mm (QR a la izquierda, nombre a la derecha); la línea punteada azul marca el corte */
+        .dymo-label.r3doble { padding: 0; gap: 0; display: grid; grid-template-rows: 1fr 1fr; grid-template-columns: 1fr; }
+        .r3m { position: relative; min-height: 0; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 1.5mm; padding: 1.5mm; box-sizing: border-box; }
+        .r3m + .r3m::before { content: ""; position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed #1d63c2; }
+        .r3m .dymo-l { font-size: 10pt; }
+        .r3m-vacia { color: #8a93a6; font: 600 7pt/1.2 system-ui, sans-serif; text-align: center; }
         .zoomhost { transform-origin: top left; }
         .stage-preview { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-2); padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; overflow-x: auto; }
         .pill { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
@@ -94,12 +100,15 @@
         <section class="panel pad stack" aria-labelledby="hR3" id="r3Box">
             <div class="row wrap" style="justify-content:space-between;gap:8px">
                 <h2 class="silk grow" id="hR3" style="min-width:200px">Etiquetas R3</h2>
-                <span class="hint">Solo llevan el nombre de la placa (texto y QR): <b class="mono" id="r3Ejemplo">TQT-R3-V30-0000</b></span>
+                <span class="hint">Dos R3 por etiqueta (se corta a lo largo en dos tiras); cada tira lleva el QR y el nombre: <b class="mono" id="r3Ejemplo">TQT-R3-V30-0000</b></span>
             </div>
             <div class="tools-row">
-                <div class="field" style="width:110px"><label for="r3Ver">Versión</label><input class="input mono" id="r3Ver" inputmode="numeric" maxlength="3" value="30" autocomplete="off"></div>
-                <div class="field" style="width:130px"><label for="r3Desde">Serie desde</label><input class="input mono" id="r3Desde" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
-                <div class="field" style="width:130px"><label for="r3Hasta">Serie hasta</label><input class="input mono" id="r3Hasta" inputmode="numeric" maxlength="4" placeholder="(igual)" autocomplete="off"></div>
+                <div class="field" style="width:170px"><label for="r3Origen">Imprimir</label>
+                    <select class="input" id="r3Origen"><option value="lote">R3 del lote y sueltas</option><option value="serie">Rango de series</option></select></div>
+                <div class="field r3-lote" style="min-width:240px"><label for="r3Lote">Lote</label><select class="input" id="r3Lote"><option value="">Cargando lotes…</option></select></div>
+                <div class="field r3-serie" style="width:110px"><label for="r3Ver">Versión</label><input class="input mono" id="r3Ver" inputmode="numeric" maxlength="3" value="30" autocomplete="off"></div>
+                <div class="field r3-serie" style="width:130px"><label for="r3Desde">Serie desde</label><input class="input mono" id="r3Desde" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
+                <div class="field r3-serie" style="width:130px"><label for="r3Hasta">Serie hasta</label><input class="input mono" id="r3Hasta" inputmode="numeric" maxlength="4" placeholder="(igual)" autocomplete="off"></div>
                 <div class="field" style="width:110px"><label for="r3Copias">Copias</label><input class="input mono" id="r3Copias" inputmode="numeric" maxlength="2" value="1"></div>
             </div>
             <div class="stage-preview" role="region" aria-label="Vista previa de la etiqueta R3">
@@ -115,10 +124,10 @@
     </main>
 </div>
 
-<script src="/static/js/common.js?v=1342"></script>
+<script src="/static/js/common.js?v=1344"></script>
 <script src="/static/js/qrcode-generator.js?v=1316"></script>
 <script src="/static/js/vendor/dymo.connect.framework.js?v=1316"></script>
 <script src="/static/js/dymo_connect.js?v=1316"></script>
-<script src="/static/js/dymo.js?v=1336"></script>
+<script src="/static/js/dymo.js?v=1346"></script>
 </body>
 </html>

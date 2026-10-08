@@ -430,7 +430,8 @@ class TestExportacion(AdminBase):
         self.assertEqual(self.client.get("/api/admin/export/excel", params={"ruta": str(fuera)}, headers=h).status_code, 400)
         self.assertEqual(self.client.get("/api/admin/export/excel", params={"ruta": r"C:\Windows\x.xlsx"}, headers=h).status_code, 400)
         self.assertFalse(fuera.exists())
-        self.assertEqual(self.client.get("/api/admin/export/excel").status_code, 401)
+        self.assertIn(self.client.get("/api/admin/export/excel").status_code, (200, 404))   # v1.3.44: la descarga no pide clave
+        self.assertEqual(self.client.get("/api/admin/export/excel", params={"ruta": str(fuera)}).status_code, 401)   # guardar en disco sí
         self.assertEqual(self.client.get("/api/admin/export/excel?lote_id=987654", headers=h).status_code, 404)
 
 

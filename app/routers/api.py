@@ -59,9 +59,14 @@ def list_lotes():
 
 @router.post("/lotes", summary="Crear un nuevo lote mensual", status_code=status.HTTP_201_CREATED)
 async def create_lote(payload: LoteCreate, _: Optional[Dict] = Depends(admin_si_habilitado)):
-    """Crea un lote mensual y, salvo `crear_excel=false`, su Excel mensual a partir de la plantilla."""
-    if await run_in_threadpool(db.get_lote_by_codigo, payload.codigo_lote):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe un lote con el código '{payload.codigo_lote}'.")
+    """Crea un lote de mes, semana o día y, salvo `crear_excel=false`, su Excel a partir de la plantilla (un archivo por lote)."""
+    try:
+        norm = db.normalizar_lote(payload.tipo_lote, payload.fecha_inicio, payload.anio, payload.mes)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    codigo = payload.codigo_lote or norm["codigo_lote"]
+    if await run_in_threadpool(db.get_lote_by_codigo, codigo):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe el lote {db.nombre_lote_de(norm)} (código '{codigo}').")
 
     ruta_excel = payload.ruta_excel
     if ruta_excel:
@@ -69,22 +74,24 @@ async def create_lote(payload: LoteCreate, _: Optional[Dict] = Depends(admin_si_
     excel_error = None
     if payload.crear_excel and not ruta_excel:
         try:
-            ruta_excel = await run_in_threadpool(excel_engine.create_monthly_excel, payload.mes, payload.anio)
+            ruta_excel = await run_in_threadpool(excel_engine.create_monthly_excel, norm["mes"], norm["anio"],
+                                                 str(excel_engine.lote_path({**norm, "codigo_lote": codigo})))
         except Exception as e:  # el lote se crea igual; el Excel se generará en la primera sincronización
             excel_error = str(e)
             logger.warning("No se pudo crear el Excel mensual: %s", e)
 
     try:
         nuevo = await run_in_threadpool(
-            db.create_lote, payload.codigo_lote, payload.mes, payload.anio, ruta_excel, payload.activo
+            db.create_lote, codigo, norm["mes"], norm["anio"], ruta_excel, payload.activo, None, None, norm["tipo_lote"], norm["fecha_inicio"]
         )
     except sqlite3.IntegrityError:  # dos peticiones simultáneas con el mismo código
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe un lote con el código '{payload.codigo_lote}'.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe un lote con el código '{codigo}'.")
     except Exception as e:
         logger.error("Error al crear lote: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-    await run_in_threadpool(db.log_evento, "LOTE_CREADO", nuevo["id"], nuevo["codigo_lote"], f"Lote creado{' y activado' if payload.activo else ''}", "supervisor")
+    nuevo["nombre"] = db.nombre_lote_de(nuevo)
+    await run_in_threadpool(db.log_evento, "LOTE_CREADO", nuevo["id"], nuevo["codigo_lote"], f"Lote {nuevo['nombre']} creado{' y activado' if payload.activo else ''}", "supervisor")
     if excel_error:
         nuevo["excel_error"] = excel_error
     if payload.activo:
@@ -172,8 +179,8 @@ async def sync_excel(lote_id: Optional[int] = Query(None, description="ID del lo
 
 
 @router.get("/export/excel", summary="Descargar el Excel mensual del lote")
-def export_excel(lote_id: Optional[int] = Query(None, description="ID del lote a descargar"), _: Dict = Depends(admin_token)):
-    """Descarga el archivo Excel mensual del lote especificado o activo."""
+def export_excel(lote_id: Optional[int] = Query(None, description="ID del lote a descargar")):
+    """Descarga el archivo Excel mensual del lote especificado o activo. v1.3.44: solo pide sesión de usuario (sin clave de admin)."""
     lote = db.get_active_lote() if lote_id is None else db.get_lote_by_id(lote_id)
     if not lote:
         raise HTTPException(status_code=404, detail="Lote no encontrado.")

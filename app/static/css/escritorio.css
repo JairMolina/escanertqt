@@ -50,19 +50,20 @@
 .esc-titulo:focus { outline: none; }
 .esc-titulo:focus-visible { outline: none; }
 .esc-hb { min-height: 36px; background: transparent; border-color: var(--line-2); font-weight: 600; }
-.esc-lotewrap { position: relative; }
-.esc-lote { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 8px 2px 12px; border: 1px solid var(--line-2); background: var(--surface); border-radius: var(--r-1); color: var(--text); text-align: left; }
+.esc-lotewrap { position: relative; min-width: 0; max-width: 340px; }
+.esc-lote { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; min-height: 40px; padding: 2px 8px 2px 12px; border: 1px solid var(--line-2); background: var(--surface); border-radius: var(--r-1); color: var(--text); text-align: left; }
 .esc-lote:hover { border-color: var(--muted); }
-.esc-lote .tx { display: flex; flex-direction: column; line-height: 1.1; }
+.esc-lote .tx { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
 .esc-lote .lbl { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-.esc-lote .nm { font-weight: 700; font-size: 14.5px; white-space: nowrap; }
+.esc-lote .nm { font-weight: 700; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* v1.3.44: "Semana 40 · 28 sep–4 oct 2026" */
+.esc-lote .est, .esc-lote .chev { flex: none; }
 .esc-lote .est { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line-2); border-radius: 3px; padding: 1px 6px; }
 .esc-lote .est:empty { display: none; }
 .esc-lote .est[data-a="1"] { color: var(--ok); border-color: currentColor; }
 .esc-lote .chev { width: 14px; height: 14px; transform: rotate(90deg); color: var(--muted); }
-.esc-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 300px; max-height: 60vh; overflow: auto; padding: 6px; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-2); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 2px; }
+.esc-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 340px; max-width: min(440px, 92vw); max-height: 60vh; overflow: auto; padding: 6px; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-2); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 2px; }
 .esc-mi { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border: 0; border-radius: var(--r-1); background: transparent; color: var(--text); text-align: left; width: 100%; font-weight: 600; }
-.esc-mi .nm { flex: 1; }
+.esc-mi .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .esc-mi .t2 { font-size: 12px; color: var(--muted); }
 .esc-mi:hover, .esc-mi:focus-visible { background: var(--surface-2); }
 .esc-mi[aria-checked="true"] { box-shadow: inset 3px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
@@ -309,10 +310,33 @@ button.esc-det-fila:hover { background: var(--surface-2); }
 @media (max-width: 640px) {
   .esc-top { height: auto; min-height: var(--top-h); flex-wrap: wrap; row-gap: 6px; padding: 8px 12px; }
   .esc-top > .grow { flex: 1 1 0; min-width: 0; }
-  .esc-top .esc-lotewrap { order: 10; flex: 1 1 100%; }
+  .esc-top .esc-lotewrap { order: 10; flex: 1 1 100%; max-width: none; }
   .esc-top .esc-lote { width: 100%; }
   .esc-top .iconbtn { width: 36px; height: 36px; }
   .esc-top .conn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .esc-main { padding: 12px 12px 40px; }
   .esc-3 { grid-template-columns: minmax(0, 1fr); }   /* Dashboard: avance por tipo R1/R2/R3 en una columna */
 }
+
+/* ---------- Botón de escaneo / escáner remoto (v1.3.43) ---------- */
+.esc-escbtn { position: relative; min-height: 36px; font-weight: 700; border-color: var(--accent); color: var(--accent-text); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.esc-escbtn .esc-escdot { display: none; position: absolute; top: 4px; right: 4px; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--surface); }
+.esc-escbtn[data-on="esp"] .esc-escdot { display: block; }
+.esc-escbtn[data-on="1"] { border-color: var(--ok); color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.esc-escbtn[data-on="1"] .esc-escdot { display: block; background: var(--ok); }
+.esc-qr-hoja { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; align-items: start; }
+.esc-qr { background: #fff; padding: 10px; border-radius: var(--r-2); border: 1px solid var(--line); width: 240px; aspect-ratio: 1; }
+.esc-qr svg { display: block; width: 100%; height: 100%; }
+.esc-qr-txt { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.esc-qr-txt ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.esc-qr-est { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r-2); border: 1px solid var(--line); background: var(--surface-2); font-weight: 600; }
+.esc-qr-est[data-on="1"] { border-color: var(--ok); color: var(--ok); }
+.esc-qr-pulso { width: 12px; height: 12px; border-radius: 50%; background: var(--warn); flex: none; animation: escPulso 1.2s ease-in-out infinite; }
+@keyframes escPulso { 50% { opacity: .3; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .esc-qr-pulso { animation: none; } }
+.esc-qr-url { display: block; margin: 6px 0; overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 1180px) { .esc-escbtn .hb-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .esc-escbtn { width: 40px; padding: 0; } }
+@media (max-width: 640px) { .esc-qr-hoja { grid-template-columns: 1fr; justify-items: center; } }
+@media (min-width: 700px) { .sheet.esc-hoja-ancha { width: min(880px, 94vw); max-width: none; } }
+/* v1.3.44: cuenta de consulta (solo lectura) en la consola: se ocultan los botones que crean, editan, envían o borran */
+:root[data-rol="consultor"] [data-escribe] { display: none !important; }

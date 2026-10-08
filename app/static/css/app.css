@@ -548,3 +548,46 @@ a.acceso-bloq::after { content: ""; position: absolute; top: 6px; right: 6px; wi
 .tab.acceso-bloq::after { top: 8px; right: calc(50% - 22px); }
 .brand.acceso-bloq, .brand-logo.acceso-bloq { opacity: 1; }
 .brand.acceso-bloq::after, .brand-logo.acceso-bloq::after { display: none; }
+
+/* ---------- estatus de la tarjeta (v1.3.43, Consultar móvil y escritorio) ---------- */
+.estatus { border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.estatus-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.estatus-pasos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; counter-reset: none; }
+.estatus-pasos li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; font-size: 13px; color: var(--muted); min-width: 0; }
+.estatus-pasos li:not(:first-child)::before { content: ""; position: absolute; top: 14px; right: calc(50% + 16px); width: calc(100% - 26px); height: 2px; background: var(--line); }
+.estatus-pasos li[data-ok="1"]:not(:first-child)::before { background: var(--ok); }
+.estatus-pasos i { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-family: var(--font-mono); font-size: 13px; font-weight: 600; border: 2px solid var(--line); background: var(--surface-2); color: var(--muted); }
+.estatus-pasos i .svg-i { width: 16px; height: 16px; }
+.estatus-pasos li[data-ok="1"] { color: var(--text); font-weight: 600; }
+.estatus-pasos li[data-ok="1"] i { border-color: var(--ok); background: var(--ok); color: #fff; }
+.estatus-pasos li[data-sig="1"] i { border-color: var(--accent); color: var(--accent-text); }
+.estatus-pasos small { font-size: 11px; color: var(--muted); font-weight: 400; overflow-wrap: anywhere; }
+.estatus-datos { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px 12px; }
+.estatus-datos dt { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.estatus-datos dd { margin: 2px 0 0; font-family: var(--font-mono); font-size: 14px; }
+.estatus-entrega { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.estatus-entrega-t { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 2px; }
+.estatus-entrega-b { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.estatus-entrega-b .btn { flex: 1 1 200px; }
+.estatus .input { width: 100%; min-height: var(--tap); }
+@media (min-width: 900px) { .estatus-entrega { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; } .estatus-entrega-b { grid-column: auto; } .estatus-entrega-b .btn { flex: 0 0 auto; } }
+@media (max-width: 480px) { .estatus-entrega { grid-template-columns: 1fr; } }
+@media (max-width: 380px) { .estatus-pasos li { font-size: 12px; } }
+
+/* ---------- escáner para la consola (v1.3.43, /escaner) ---------- */
+.remoto { padding: 12px var(--gutter) calc(var(--tab-h) + 24px); }
+.rem-estado { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); }
+.rem-estado p { margin: 2px 0 0; }
+.rem-estado[data-e="ok"] { border-color: var(--ok); box-shadow: inset 4px 0 0 var(--ok); }
+.rem-estado[data-e="error"] { border-color: var(--bad); box-shadow: inset 4px 0 0 var(--bad); }
+.rem-estado[data-e="emparejar"], .rem-estado[data-e="uniendo"] { box-shadow: inset 4px 0 0 var(--accent); }
+.rem-ico { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); }
+.rem-ico .svg-i { width: 22px; height: 22px; }
+.rem-estado[data-e="ok"] .rem-ico { color: var(--ok); }
+.rem-lista { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rem-lista li { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); box-shadow: inset 4px 0 0 var(--line-2); }
+.rem-lista li[data-e="ok"] { box-shadow: inset 4px 0 0 var(--ok); }
+.rem-lista li[data-e="warn"] { box-shadow: inset 4px 0 0 var(--warn); }
+.rem-lista li[data-e="bad"] { box-shadow: inset 4px 0 0 var(--bad); }
+.rem-cod { font-size: 14px; overflow-wrap: anywhere; }
+.rem-lista:empty::after { content: "Todavía no has enviado nada."; color: var(--muted); font-size: 14px; }

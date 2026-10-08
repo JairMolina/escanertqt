@@ -21,7 +21,7 @@
 
         // ------------------------------------------------------------ estado
         const S = {
-            tab: 'pend', fw: { R1: [], R2: [] }, macBD: new Map(), vivo: true,
+            tab: 'pend', fw: { R1: [], R2: [], R3: [] }, macBD: new Map(), vivo: true,
             sonido: T.store.get('tqt.macs.sonido', '0') === '1',
             hoy: { n: 0 },
         };
@@ -220,6 +220,7 @@
                     class: 'macs-in', type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: '12 dígitos',
                     'aria-label': `MAC de ${pcb.nombre}`, 'aria-describedby': 'st' + r.uid, dataset: { e: 'vacia' },
                 });
+                r.inp.addEventListener('focus', () => { S.ultFila = r; });   // escáner remoto: una MAC leída va a la última fila tocada
                 r.fw = fwWidget(pcb.tipo, pcb.firmware || (modo === 'pend' ? ultimoFw(pcb.tipo) : ''), pcb.nombre, (val) => {
                     if (modo === 'pend') { recordarFw(pcb.tipo, val); return; }
                     guardarFw(r, val);
@@ -419,15 +420,16 @@
         let cargandoFw = null;
         async function cargarFw() {
             const res = await api('/api/firmware');
-            if (res.ok && res.data) { S.fw = { R1: res.data.R1 || [], R2: res.data.R2 || [] }; }
+            if (res.ok && res.data) { S.fw = { R1: res.data.R1 || [], R2: res.data.R2 || [], R3: res.data.R3 || [] }; }
         }
 
         const cont = { pend: h('div', { class: 'stack', role: 'tabpanel', id: 'macs-p-pend', 'aria-labelledby': 'macs-t-pend' }),
             pegar: h('div', { class: 'stack', role: 'tabpanel', id: 'macs-p-pegar', 'aria-labelledby': 'macs-t-pegar', hidden: true }),
-            mac: h('div', { class: 'stack', role: 'tabpanel', id: 'macs-p-mac', 'aria-labelledby': 'macs-t-mac', hidden: true }) };
-        const nPend = h('span', { class: 'n' }, '–'), nMac = h('span', { class: 'n' }, '–');
+            mac: h('div', { class: 'stack', role: 'tabpanel', id: 'macs-p-mac', 'aria-labelledby': 'macs-t-mac', hidden: true }),
+            r3: h('div', { class: 'stack', role: 'tabpanel', id: 'macs-p-r3', 'aria-labelledby': 'macs-t-r3', hidden: true }) };
+        const nPend = h('span', { class: 'n' }, '–'), nMac = h('span', { class: 'n' }, '–'), nR3 = h('span', { class: 'n' }, '–');
         const tabBtn = (id, txt, extra) => h('button', { type: 'button', role: 'tab', id: 'macs-t-' + id, 'aria-controls': 'macs-p-' + id, 'aria-selected': 'false', tabindex: '-1', dataset: { tab: id } }, txt, extra || null);
-        const tabs = { pend: tabBtn('pend', 'Pendientes ', nPend), pegar: tabBtn('pegar', 'Pegar varias'), mac: tabBtn('mac', 'Con MAC ', nMac) };
+        const tabs = { pend: tabBtn('pend', 'Pendientes ', nPend), pegar: tabBtn('pegar', 'Pegar varias'), mac: tabBtn('mac', 'Con MAC ', nMac), r3: tabBtn('r3', 'R3 firmware ', nR3) };
         const contFaltan = h('b', null, '0'), contHoy = h('b', null, String(S.hoy.n)), contErr = h('span', { class: 'err' });
         const contador = h('div', { class: 'macs-counter' },
             h('span', null, 'Faltan ', contFaltan), h('span', { class: 'ok' }, 'Guardadas hoy ', contHoy), contErr);
@@ -445,10 +447,10 @@
         }
 
         const head = h('div', { class: 'macs-head' },
-            h('div', { class: 'macs-tabs', role: 'tablist', 'aria-label': 'Vistas de MAC y firmware' }, tabs.pend, tabs.pegar, tabs.mac),
+            h('div', { class: 'macs-tabs', role: 'tablist', 'aria-label': 'Vistas de MAC y firmware' }, tabs.pend, tabs.pegar, tabs.mac, tabs.r3),
             contador);
         tabs.pend.parentNode.addEventListener('keydown', (ev) => {
-            const ids = ['pend', 'pegar', 'mac'], i = ids.indexOf(S.tab);
+            const ids = ['pend', 'pegar', 'mac', 'r3'], i = ids.indexOf(S.tab);
             if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') {
                 ev.preventDefault();
                 const n = ids[(i + (ev.key === 'ArrowRight' ? 1 : ids.length - 1)) % ids.length];
@@ -462,6 +464,7 @@
             Object.entries(tabs).forEach(([k, b]) => { b.setAttribute('aria-selected', String(k === id)); b.tabIndex = k === id ? 0 : -1; cont[k].hidden = k !== id; });
             T.store.set('tqt.macs.tab', id);
             if (id === 'mac' && !vMac.cargado) vMac.cargar();
+            if (id === 'r3' && !R3.cargado) cargarR3();
             if (id === 'pegar') actualizarPegar();
         }
 
@@ -547,6 +550,62 @@
                 h('span', null, 'Cambia la MAC y pulsa ', h('kbd', null, 'Enter'), ' para guardarla'), h('span', null, h('kbd', null, 'Esc'), ' vuelve al valor guardado'),
                 h('span', null, 'El firmware se guarda al elegirlo.'));
             cont.mac.append(bar, vMac.aviso, wrap, pie);
+        }
+
+        // ---- pestaña R3 (v1.3.44): la R3 no lleva MAC pero sí se programa; aquí se registra su firmware (programada = con firmware)
+        const R3 = { cargado: false, items: [], soloSin: true, q: '', tbody: h('tbody'), aviso: h('div'), filas: new Map() };
+        async function cargarR3() {
+            const res = await api('/api/pcb?tipo=R3&limit=5000');
+            if (!S.vivo) return;
+            if (!res.ok) { R3.aviso.replaceChildren(T.banner('bad', 'alert', res.error || 'No se pudieron cargar las R3.')); return; }
+            R3.aviso.replaceChildren();
+            R3.items = ((res.data && res.data.items) || []).filter((p) => p.estado_ciclo !== 'BAJA' && p.estado_ciclo !== 'FALLA')
+                .sort((a, b) => String(a.serie).localeCompare(String(b.serie)) || String(a.version).localeCompare(String(b.version)));
+            R3.cargado = true; pintarR3();
+        }
+        function filaR3(p) {
+            const st = h('div', { class: 'macs-st', dataset: { e: p.firmware ? 'guardada' : 'vacia' } }, p.firmware ? 'Programada' : 'Sin firmware');
+            const fw = fwWidget('R3', p.firmware, p.nombre, async (val) => {
+                if (!val || val === p.firmware) return;
+                st.dataset.e = 'guardando'; st.textContent = 'Guardando firmware…';
+                const res = await api(`/api/pcb/${p.id}/firmware`, { method: 'PUT', body: { firmware: val } });
+                if (!S.vivo) return;
+                if (res.ok) {
+                    Object.assign(p, res.data || { firmware: val });
+                    if (!(S.fw.R3 || []).includes(val)) cargarFw();
+                    recordarFw('R3', val);
+                    st.dataset.e = 'guardada'; st.textContent = `Firmware ${val} guardado · programada`; pitar(true);
+                    anunciar(`${p.nombre}: firmware ${val}`); nR3.textContent = String(R3.items.filter((x) => !x.firmware).length);
+                } else {
+                    st.dataset.e = 'error'; st.textContent = res.network ? 'Sin conexión con el servidor: el firmware no se guardó.' : res.error; pitar(false);
+                    anunciar(`${p.nombre}: ${st.textContent}`);
+                }
+            });
+            const tr = h('tr', { dataset: { id: String(p.id) } },
+                h('td', { class: 'c-placa mono' }, p.nombre), h('td', { class: 'c-tj mono' }, tarjetaTxt(p)), h('td', { class: 'c-hw mono' }, 'V' + p.version),
+                h('td', { class: 'c-fw' }, fw.el), h('td', { class: 'c-est' }, st));
+            const f = { p, tr, fw };
+            R3.filas.set(p.id, f);
+            return f;
+        }
+        function pintarR3() {
+            const q = R3.q.trim().toLowerCase();
+            R3.filas.clear();
+            const vis = R3.items.filter((p) => (!R3.soloSin || !p.firmware) && (!q || p.nombre.toLowerCase().includes(q) || String(p.serie).includes(q) || String(p.id_tarjeta_num || '').includes(q)));
+            R3.tbody.replaceChildren(...vis.map((p) => filaR3(p).tr));
+            if (!vis.length) R3.tbody.appendChild(h('tr', null, h('td', { colspan: 5, class: 'muted' }, R3.soloSin ? 'Todas las R3 tienen firmware.' : 'Sin coincidencias.')));
+            nR3.textContent = String(R3.items.filter((p) => !p.firmware).length);
+        }
+        function montarR3() {
+            const q = h('input', { class: 'input', type: 'search', id: 'macs-q-r3', autocomplete: 'off', placeholder: 'Placa, serie o tarjeta…', oninput: (e) => { R3.q = e.target.value; pintarR3(); } });
+            const solo = h('input', { type: 'checkbox', id: 'macs-r3-solo', checked: true, onchange: (e) => { R3.soloSin = e.target.checked; pintarR3(); } });
+            const bar = h('div', { class: 'macs-bar', role: 'search' },
+                h('div', { class: 'field' }, h('label', { for: q.id }, 'Buscar'), q),
+                h('div', { class: 'field' }, h('label', { for: solo.id }, solo, ' Solo sin firmware')),
+                h('div', { class: 'row macs-acts' }, h('button', { class: 'btn', type: 'button', onclick: () => cargarR3() }, icon('refresh'), 'Actualizar')));
+            const th = (c, t) => h('th', { class: c, scope: 'col' }, t);
+            const tbl = h('table', { class: 'macs-tbl' }, h('thead', null, h('tr', null, th('c-placa', 'Placa'), th('c-tj', 'Tarjeta'), th('c-hw', 'Hardware'), th('c-fw', 'Firmware'), th('c-est', 'Estado'))), R3.tbody);
+            cont.r3.append(T.banner('info', 'info', 'La R3 no lleva MAC: queda programada al registrar su firmware (se guarda al elegirlo).'), bar, R3.aviso, h('div', { class: 'macs-wrap' }, tbl));
         }
 
         // ------------------------------------------------------------ pestaña Pegar varias
@@ -665,7 +724,7 @@
                 const previa = visto.get(L.mac);
                 if (previa) { L.err = `misma MAC que la línea ${previa}.`; L.codigoCli = 409; return; }
                 visto.set(L.mac, L.n);
-                if (L.tipo === 'R3') { L.err = 'las R3 no llevan MAC ni firmware.'; L.codigoCli = 'r3'; return; }
+                if (L.tipo === 'R3') { L.err = 'las R3 no llevan MAC (su firmware se registra en la pestaña R3 firmware).'; L.codigoCli = 'r3'; return; }
                 if (!L.fw) L.fw = (fwPeg[L.tipo] && fwPeg[L.tipo].sel.value) || '';
             });
             const enviar = lineas.filter((L) => !L.err);
@@ -772,9 +831,9 @@
         }
 
         // ------------------------------------------------------------ montaje
-        montarPend(); montarMac(); montarPegar();
+        montarPend(); montarMac(); montarPegar(); montarR3();
         host.classList.add('macs');
-        host.append(head, cont.pend, cont.pegar, cont.mac, vivo);
+        host.append(head, cont.pend, cont.pegar, cont.mac, cont.r3, vivo);
         vPend.pintar(); vMac.pintar();
         let inicial = T.store.get('tqt.macs.tab', 'pend'); if (!tabs[inicial]) inicial = 'pend';
         irTab(inicial);
@@ -793,7 +852,7 @@
         let tRec = null;
         function recargarSuave() {
             clearTimeout(tRec);
-            tRec = setTimeout(() => { timers.delete(tRec); if (!S.vivo) return; vPend.cargar(); if (vMac.cargado) vMac.cargar(); }, 250);
+            tRec = setTimeout(() => { timers.delete(tRec); if (!S.vivo) return; vPend.cargar(); if (vMac.cargado) vMac.cargar(); if (R3.cargado && !cont.r3.contains(document.activeElement)) cargarR3(); }, 250);
             timers.add(tRec);
         }
         const wsc = ctx.ws || (T.ws && T.ws());
@@ -801,8 +860,61 @@
         if (ctx.alCambiarLote) ctx.alCambiarLote(() => recargarSuave());
         cargarHoy();
 
+        // ------------------------------------------------------------ escáner remoto (v1.3.43): el celular lee la PCB y aquí se ubica su fila
+        function ubicar(V, tab, r) {
+            irTab(tab);
+            const panel = cont[tab];
+            if (V.filtro.tipo) { const todas = panel.querySelector('.seg button'); if (todas) todas.click(); }
+            V.filtro.tj = ''; const tj = panel.querySelector('#macs-tj'); if (tj) tj.value = '';
+            V.filtro.q = r.pcb.nombre; const q = panel.querySelector('#macs-q-' + V.modo); if (q) q.value = r.pcb.nombre;
+            V.pintar();
+            r.tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            r.tr.classList.remove('macs-flash'); void r.tr.offsetWidth; r.tr.classList.add('macs-flash');
+            r.inp.focus({ preventScroll: true }); r.inp.select();
+            S.ultFila = r;
+        }
+        // R3: no lleva MAC; se ubica en la pestaña "R3 firmware" y se enfoca su selector de firmware
+        async function ubicarR3(ver, serie, verTxt) {
+            if (!R3.cargado) await cargarR3();
+            const p = R3.items.find((x) => Number(x.serie) === serie && Number(String(x.version).replace(/\D/g, '')) === ver);
+            if (!p) return { ok: false, texto: `TQT-R3-V${verTxt}-${String(serie).padStart(4, '0')} no aparece entre las R3 activas (¿está registrada?).` };
+            irTab('r3');
+            R3.soloSin = false; const solo = cont.r3.querySelector('#macs-r3-solo'); if (solo) solo.checked = false;
+            R3.q = p.nombre; const q = cont.r3.querySelector('#macs-q-r3'); if (q) q.value = p.nombre;
+            pintarR3();
+            const f = R3.filas.get(p.id);
+            if (f) {
+                f.tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                f.tr.classList.remove('macs-flash'); void f.tr.offsetWidth; f.tr.classList.add('macs-flash');
+                f.fw.sel.focus({ preventScroll: true });
+            }
+            return { ok: true, texto: p.firmware ? `${p.nombre} ya tiene firmware ${p.firmware} (programada): puedes cambiarlo.` : `${p.nombre} ubicada: elige su firmware en la consola. La R3 no lleva MAC.` };
+        }
+        async function escaneo(codigo) {
+            const txt = String(codigo || '');
+            const nm = NOMBRE_RE.exec(txt);
+            const mac = extraerMac(txt);
+            if (!nm && mac && mac.mac) {   // se leyó una MAC: va a la placa ubicada antes
+                const r = S.ultFila;
+                if (!r || r.saved || !r.tr.isConnected) return { ok: false, texto: 'Escanea primero el QR de la placa y después su MAC.' };
+                r.inp.value = mac.mac; r.inp.dispatchEvent(new Event('input', { bubbles: true })); r.inp.focus();
+                return { ok: true, texto: `MAC ${mac.mac.toLowerCase()} puesta en ${r.pcb.nombre}: revisa y pulsa Enter para guardar.` };
+            }
+            if (!nm) return null;   // no es una placa: lo resuelve la consola (ficha)
+            const tipo = 'R' + nm[1], ver = Number(nm[2]), serie = Number(nm[3]);
+            if (tipo === 'R3') return ubicarR3(ver, serie, nm[2]);
+            const buscar = (V) => [...V.rows.values()].find((r) => r.pcb.tipo === tipo && Number(r.pcb.serie) === serie && Number(String(r.pcb.version).replace(/\D/g, '')) === ver);
+            let r = buscar(vPend);
+            if (r && !r.saved) { ubicar(vPend, 'pend', r); return { ok: true, texto: `${r.pcb.nombre} ubicada: captura su MAC en la consola.` }; }
+            if (!vMac.cargado) await vMac.cargar();
+            r = buscar(vMac);
+            if (r) { ubicar(vMac, 'mac', r); return { ok: true, texto: `${r.pcb.nombre} ya tiene MAC ${String(r.orig || '').toLowerCase()}: puedes corregirla.` }; }
+            return { ok: false, texto: `TQT-${tipo}-V${nm[2]}-${String(serie).padStart(4, '0')} no aparece en MAC y firmware (¿está registrada?).` };
+        }
+
         return {
-            actualizar() { vPend.cargar(); if (vMac.cargado) vMac.cargar(); cargarFw(); },
+            escaneo,
+            actualizar() { vPend.cargar(); if (vMac.cargado) vMac.cargar(); if (R3.cargado) cargarR3(); cargarFw(); },
             desmontar() {
                 S.vivo = false;
                 timers.forEach((t) => clearTimeout(t)); timers.clear();

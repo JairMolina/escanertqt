@@ -53,12 +53,12 @@ class TestConsulta(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.text)
         t = self.c.get(f"/api/tarjetas/{self.t['id']}").json()
         self.assertEqual([t["r1"]["firmware"], t["r2"]["firmware"], t["r3"].get("firmware")], ["4.1", "2.1", None])
-        # el firmware es de la PCB: se guarda también con la programación (MAC + firmware) y la R3 lo rechaza
+        # el firmware es de la PCB: se guarda también con la programación (MAC + firmware); la R3 también lleva firmware (v1.3.44)
         p1 = self.c.put(f"/api/pcb/{self.ids[f'TQT-R1-V30-{self.a}']}/programacion", json={"mac": self.mac1, "firmware": "4.2"})
         self.assertEqual((p1.status_code, p1.json()["firmware"]), (200, "4.2"))
         self.assertEqual(self.c.get(f"/api/tarjetas/{self.t['id']}").json()["firmware_r1"], "4.2")
         r3 = self.c.put(f"/api/pcb/{self.ids[f'TQT-R3-V30-{self.a}']}/firmware", json={"firmware": "1.0"})
-        self.assertEqual(r3.status_code, 400)
+        self.assertEqual((r3.status_code, r3.json()["firmware"]), (200, "1.0"))
         self.assertEqual(self.c.put(f"/api/pcb/{self.ids[f'TQT-R1-V30-{self.a}']}/firmware", json={"firmware": "<b>x</b>"}).status_code, 400)
         self.assertEqual(self.c.patch(f"/api/tarjetas/{self.t['id']}", json={"firmware_r1": "x" * 41}).status_code, 422)
 
@@ -70,7 +70,8 @@ class TestConsulta(unittest.TestCase):
             self.assertIn(v, cat["R2"])
         self.c.put(f"/api/pcb/{self.ids[f'TQT-R2-V30-{self.b}']}/firmware", json={"firmware": "2.9-beta"})
         self.assertIn("2.9-beta", self.c.get("/api/firmware").json()["R2"])         # una versión nueva entra al catálogo sola
-        self.assertEqual(self.c.post("/api/firmware", json={"rol": "R3", "version": "1"}).status_code, 400)
+        self.assertEqual(self.c.post("/api/firmware", json={"rol": "R4", "version": "1"}).status_code, 400)
+        self.assertIn("1", self.c.post("/api/firmware", json={"rol": "R3", "version": "1"}).json()["R3"])
 
     def test_03_etiqueta_de_4_lineas_devuelve_la_ficha_completa(self):
         self.programar_todo()
@@ -154,7 +155,8 @@ class TestPruebasEliminado(unittest.TestCase):
         self.assertIn("/api/firmware", prog)
         cons = (st / "consultar.js").read_text(encoding="utf-8")
         self.assertNotIn("firmware_r3", cons)
-        self.assertIn("La R3 no lleva MAC ni firmware", cons)
+        self.assertIn("La R3 no lleva MAC", cons)
+        self.assertNotIn("ni firmware", cons)
         self.assertIn("'Hardware'", cons)
         com = (st / "common.js").read_text(encoding="utf-8")
         self.assertIn("button", com[com.index("const sub = h("):com.index("const sub = h(") + 80])

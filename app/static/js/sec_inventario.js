@@ -21,8 +21,8 @@
             const selVer = h('select', { class: 'input', id: 'invVer', 'aria-label': 'Versión de hardware', onchange: (e) => { st.ver = e.target.value; st.limit = 200; lista(); } }, h('option', { value: '' }, 'Todo el hardware'));
             const chkMac = h('input', { type: 'checkbox', id: 'invSinMac', checked: st.sinMac ? '' : null, onchange: (e) => { st.sinMac = e.target.checked; st.limit = 200; lista(); } });
             const info = h('span', { class: 'info', role: 'status', 'aria-live': 'polite' });
-            const btnVer = h('button', { class: 'btn', type: 'button', onclick: versionMasa }, icon('edit'), 'Cambiar hardware');
-            const btnDel = h('button', { class: 'btn btn-danger', type: 'button', onclick: eliminarMasa }, icon('trash'), 'Eliminar');
+            const btnVer = h('button', { class: 'btn', type: 'button', 'data-escribe': true, onclick: versionMasa }, icon('edit'), 'Cambiar hardware');
+            const btnDel = h('button', { class: 'btn btn-danger', type: 'button', 'data-escribe': true, onclick: eliminarMasa }, icon('trash'), 'Eliminar');
             const btnLimpiar = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { st.sel.clear(); lista(); } }, 'Quitar selección');
             const barSel = h('div', { class: 'esc-sel', hidden: true }, h('b', { class: 'cnt' }), h('div', { class: 'grow' }), btnVer, btnDel, btnLimpiar);
             const tw = h('div');
@@ -39,12 +39,12 @@
                 { id: 'tipo', titulo: 'Tipo', cel: (p) => T.tipoChip(p.tipo), valor: (p) => p.tipo },
                 { id: 'nombre', titulo: 'Nombre', cel: (p) => h('span', { class: 'mono' }, p.nombre), sort: (a, b) => util.cmp(a.serie, b.serie) || util.cmp(a.tipo, b.tipo) },
                 { id: 'version', titulo: 'Hardware', cel: (p) => h('span', { class: 'mono' }, 'V' + p.version), sort: (a, b) => (+a.version) - (+b.version) },
-                { id: 'firmware', titulo: 'Firmware', cel: (p) => (p.tipo === 'R3' ? h('span', { class: 'muted' }, 'no aplica') : p.firmware ? h('span', { class: 'mono' }, p.firmware) : h('span', { class: 'muted' }, 'sin firmware')), valor: (p) => (p.tipo === 'R3' ? '' : p.firmware) },
+                { id: 'firmware', titulo: 'Firmware', cel: (p) => (p.firmware ? h('span', { class: 'mono' }, p.firmware) : h('span', { class: 'muted' }, 'sin firmware')), valor: (p) => p.firmware || '' },
                 { id: 'mac', titulo: 'MAC', cel: (p) => (p.tipo === 'R3' ? h('span', { class: 'muted' }, 'no aplica') : p.mac ? h('span', { class: 'mono' }, String(p.mac).toLowerCase()) : h('span', { class: 'muted' }, 'sin MAC')), valor: (p) => (p.tipo === 'R3' ? '' : p.mac) },
                 { id: 'estado_ciclo', titulo: 'Estado', cel: (p) => T.cicloBadge(p.estado_ciclo, p) },
                 { id: 'tarjeta', titulo: 'Tarjeta', cls: 'c-3', cel: (p) => (p.id_tarjeta_num ? h('a', { class: 'mono', href: `#/tarjetas?id=${p.tarjeta_id}` }, p.id_tarjeta_num) : h('span', { class: 'muted' }, '—')), valor: (p) => p.id_tarjeta_num },
                 { id: 'recibida_en', titulo: 'Recibida', cls: 'c-2', cel: (p) => h('span', { class: 'mono' }, util.fecha(p.recibida_en)), valor: (p) => p.recibida_en },
-                { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (p) => h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Editar ${p.nombre}`, onclick: () => editar(p) }, icon('edit'), 'Editar') },
+                { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (p) => h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'data-escribe': true, 'aria-label': `Editar ${p.nombre}`, onclick: () => editar(p) }, icon('edit'), 'Editar') },
             ];
             function pintarInfo(n) {
                 const s = st.sel.size;
@@ -67,8 +67,9 @@
 
             // ---- editar una placa
             async function editar(p) {
+                if (T.acceso.rol === 'consultor') { T.avisoAcceso('accion', 'Tu cuenta es de consulta: puede ver el inventario, pero no editar ni eliminar placas.'); return; }   // v1.3.44
                 let tipo = p.tipo; let armado = false;
-                const cat = p.tipo === 'R3' ? null : await api('/api/firmware');
+                const cat = await api('/api/firmware');   // la R3 también lleva firmware (no MAC)
                 const opciones = cat && cat.ok && cat.data ? (cat.data[p.tipo] || []) : [];
                 const inVer = h('input', { class: 'input mono', id: 'eVer', inputmode: 'numeric', maxlength: 3, value: p.version });
                 const inSer = h('input', { class: 'input mono', id: 'eSer', inputmode: 'numeric', maxlength: 4, value: p.serie });
@@ -82,15 +83,21 @@
                 upd();
                 const macIn = p.tipo === 'R3' ? null : h('input', { class: 'input mono', id: 'eMac', maxlength: 17, placeholder: 'sin MAC', value: p.mac ? String(p.mac).toLowerCase() : '' });
                 if (macIn) macIn.addEventListener('input', () => { macIn.value = T.formatMacProgress(macIn.value).toLowerCase(); });
-                const fwSel = p.tipo === 'R3' ? null : h('select', { class: 'input', id: 'eFw' }, h('option', { value: '' }, 'Sin firmware'),
-                    [...new Set([...opciones, ...(p.firmware ? [p.firmware] : [])])].map((v) => h('option', { value: v, selected: v === p.firmware ? '' : null }, v)));
+                const fwSel = h('select', { class: 'input', id: 'eFw' }, h('option', { value: '' }, 'Sin firmware'),
+                    [...new Set([...opciones, ...(p.firmware ? [p.firmware] : [])])].map((v) => h('option', { value: v, selected: v === p.firmware ? '' : null }, v)),
+                    h('option', { value: '__otra' }, 'Otra versión…'));
+                // v1.3.44: si el catálogo no tiene la versión (p. ej. R3 sin catálogo), se escribe a mano
+                const fwOtra = h('input', { class: 'input mono', id: 'eFwOtra', maxlength: 40, placeholder: 'Versión de firmware, ej. 2.1', hidden: true, autocomplete: 'off', 'aria-label': 'Otra versión de firmware' });
+                fwSel.addEventListener('change', () => { fwOtra.hidden = fwSel.value !== '__otra'; if (!fwOtra.hidden) fwOtra.focus(); });
+                const fwValor = () => (fwSel.value === '__otra' ? fwOtra.value.trim() : fwSel.value);
                 const s = sheet({
                     title: `Editar ${p.nombre}`,
                     body: [
                         h('div', { class: 'field' }, h('span', { class: 'lbl' }, 'Tipo'), h('div', { class: 'seg', role: 'group', 'aria-label': 'Tipo de placa' }, segB)),
                         h('div', { class: 'row' }, h('div', { class: 'field grow' }, h('label', { for: 'eVer' }, 'Hardware (V)'), inVer), h('div', { class: 'field grow' }, h('label', { for: 'eSer' }, 'Serie'), inSer)),
                         macIn ? h('div', { class: 'field' }, h('label', { for: 'eMac' }, 'MAC'), macIn) : null,
-                        fwSel ? h('div', { class: 'field' }, h('label', { for: 'eFw' }, 'Firmware'), fwSel) : h('p', { class: 'hint' }, 'La R3 no lleva MAC ni firmware.'),
+                        h('div', { class: 'field' }, h('label', { for: 'eFw' }, 'Firmware'), fwSel, fwOtra),
+                        macIn ? null : h('p', { class: 'hint' }, 'La R3 no lleva MAC.'),
                         h('div', { class: 'field' }, h('span', { class: 'lbl' }, 'Quedará como'), prev),
                         montada ? h('p', { class: 'hint' }, `Está en la tarjeta ${p.id_tarjeta_num}: el cambio se refleja allí y en el Excel.`) : null, aviso, err,
                     ],
@@ -116,7 +123,8 @@
                                 if (macIn.value && !m) { err.textContent = 'La MAC está incompleta: son 12 dígitos (0-9, A-F).'; return false; }
                                 const r = await api(`/api/pcb/${p.id}/mac`, { method: 'PUT', body: { mac: m } }); if (!r.ok) { err.textContent = r.error; return false; }
                             }
-                            if (fwSel && (fwSel.value || '') !== (p.firmware || '')) { const r = await api(`/api/pcb/${p.id}/firmware`, { method: 'PUT', body: { firmware: fwSel.value || null } }); if (!r.ok) { err.textContent = r.error; return false; } }
+                            if (fwSel.value === '__otra' && !fwValor()) { err.textContent = 'Escribe la versión de firmware.'; fwOtra.focus(); return false; }
+                            if (fwSel && (fwValor() || '') !== (p.firmware || '')) { const r = await api(`/api/pcb/${p.id}/firmware`, { method: 'PUT', body: { firmware: fwValor() || null } }); if (!r.ok) { err.textContent = r.error; return false; } }
                             toast('Cambios guardados', { kind: 'ok' }); ctx.actualizar(); return true;
                         } },
                     ],

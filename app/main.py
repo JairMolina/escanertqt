@@ -17,7 +17,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from app.config import settings
 from app.database import db
-from app.routers import admin, api, auth, correo_excel, ws, excel_dymo, inventario, inventario_tqtr
+from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.ssl_cert import ensure_ssl_certificates
 
@@ -121,7 +121,7 @@ RUTAS_PUBLICAS = {"/login", "/invitacion", "/api/auth/invitacion", "/api/auth/in
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js")
 
 
-PAGINAS_CONSULTOR = {"/consultar", "/favicon.ico", "/api/health"}
+PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health"}
 ROL_NOMBRE = {"general": "General", "consultor": "Consultor"}
 # Páginas (y sus copias bajo /static) → zona que se nombra en el aviso "sin acceso" (v1.3.42)
 ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "emparejar", "/static/emparejar.html": "emparejar",
@@ -130,6 +130,10 @@ ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "e
 ZONAS_ADMIN = ("/admin", "/static/admin.html")
 # Lo único que un consultor puede ENVIAR (POST): cerrar sesión y cambiar su propia contraseña
 POST_CONSULTOR = {"/api/auth/logout", "/api/auth/cambiar-clave"}
+# v1.3.44: descargas de Excel bajo /api/admin/ que cualquier rol puede hacer (GET, solo sesión de usuario; sin clave de admin)
+DESCARGAS_ADMIN_LIBRES = {"/api/admin/export/excel"}
+# v1.3.44: el consultor también entra a la consola de escritorio (en ella solo ve Dashboard, Tarjetas, Inventario, Consultar y Excel)
+PAGINAS_ESCRITORIO = {"/monitor", "/static/monitor.html"}
 
 
 def _sin_acceso(rol: Optional[str], ruta: str, metodo: str, zona: str, detalle: str):
@@ -148,17 +152,23 @@ def _permiso_rol(rol: Optional[str], ruta: str, metodo: str):
         return None
     nombre = ROL_NOMBRE.get(rol or "", rol or "sin rol")
     if ruta in ZONAS_ADMIN or ruta.startswith(("/api/admin/", "/static/js/admin.js")):
-        if ruta == "/api/admin/estado":
+        if ruta == "/api/admin/estado" or (ruta in DESCARGAS_ADMIN_LIBRES and metodo in ("GET", "HEAD")):
             return None
         return _sin_acceso(rol, ruta, metodo, "admin",
                            f"Tu cuenta ({nombre}) no tiene acceso a Administración: solo los administradores pueden entrar. Pide ayuda a un administrador.")
     if rol != "consultor":
         return None
     if ruta.startswith("/api/") or ruta.startswith("/ws"):
-        if metodo in ("GET", "HEAD", "OPTIONS") or ruta in POST_CONSULTOR or ruta.startswith("/ws"):
+        if metodo in ("GET", "HEAD", "OPTIONS") or ruta in POST_CONSULTOR or ruta.startswith(("/ws", "/api/escaner/")):
             return None
         return _sin_acceso(rol, ruta, metodo, "accion",
                            "Tu cuenta es de consulta: puede ver y escanear, pero no crear, editar, mover, enviar ni borrar datos. Pide a un administrador que cambie tu rol si lo necesitas.")
+    if ruta in PAGINAS_ESCRITORIO:
+        return None
+    if ruta in ("/", "/static/index.html") and metodo in ("GET", "HEAD"):
+        # Su inicio es Consultar; `?inicio=1` le dice a consultar.html que, en PC/tablet, siga a /monitor (sin bucles:
+        # /monitor no redirige a "/" y la marca solo existe en esta redirección).
+        return RedirectResponse("/consultar?inicio=1", status_code=302)
     if ruta in ZONA_PAGINA:
         return _sin_acceso(rol, ruta, metodo, ZONA_PAGINA[ruta], "")
     if ruta.startswith("/static/") or ruta in PAGINAS_CONSULTOR:
@@ -225,6 +235,7 @@ app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(ws.router)
 app.include_router(excel_dymo.router)
+app.include_router(escaner_remoto.router)
 
 
 def _serve_file(file_path: Path, fallback_path: Path = None) -> FileResponse:
@@ -262,6 +273,12 @@ async def serve_programar():
 async def serve_consultar():
     """Consultar: escanea una etiqueta, el QR de una PCB o una MAC y muestra la ficha completa de la tarjeta."""
     return _serve_file(settings.STATIC_DIR / "consultar.html")
+
+
+@app.get("/escaner", include_in_schema=False)
+async def serve_escaner():
+    """Escáner remoto: el celular se vincula a la consola de escritorio (QR) y le envía lo que escanea (v1.3.43)."""
+    return _serve_file(settings.STATIC_DIR / "escaner.html")
 
 
 @app.get("/monitor", include_in_schema=False)

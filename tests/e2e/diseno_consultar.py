@@ -131,7 +131,7 @@ def fase_con_clave(p):
                 pg.wait_for_selector(".fichagrid .pcbf .nm", timeout=15000); pg.wait_for_timeout(500)
                 txt = pg.inner_text("#ficha")
                 for esperado in ("0021", "TQT-R1-V30-0021", "TQT-R2-V30-0010", "TQT-R3-V30-0021", "70:4b:ca:5b:9f:6e", "70:4b:ca:5b:9c:a2",
-                                 "Hardware", "V30", "Firmware", "4.1", "2.1", "La R3 no lleva MAC ni firmware", "Etiqueta DYMO"):
+                                 "Hardware", "V30", "Firmware", "4.1", "2.1", "La R3 no lleva MAC", "Etiqueta DYMO"):
                     check(f"[{tag}] la ficha muestra '{esperado}'", esperado.lower() in txt.lower(), txt[:160].replace("\n", " | "))
                 r3 = pg.inner_text(".pcbf[data-t='R3']")
                 check(f"[{tag}] la R3 no muestra el rótulo Firmware ni MAC como dato", "Firmware\n" not in r3 and "\nMAC\n" not in r3, r3)
@@ -203,7 +203,7 @@ def fase_con_clave(p):
         # R3 escaneada: solo aviso amable
         pg.evaluate("__showQR('TQT-R3-V30-0021', false, 380)"); pg.wait_for_timeout(2500)
         act = pg.inner_text("#activo")
-        check("al escanear una R3: aviso 'La R3 no lleva MAC ni firmware'", "La R3 no lleva MAC ni firmware" in act, act[:200])
+        check("al escanear una R3: aviso 'La R3 no lleva MAC'", "La R3 no lleva MAC" in act, act[:200])
         check("la R3 no ofrece MAC ni firmware", pg.locator("#macIn, #fwSel, #fwIn").count() == 0)
         pg.screenshot(path=str(SHOTS / "programar_r3_390.png"))
         axe(pg, "programar R3")

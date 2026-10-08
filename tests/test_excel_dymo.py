@@ -49,7 +49,7 @@ class TestExcelIntegration(unittest.TestCase):
     def test_00_rutas_de_base_de_datos_exigen_contrasena(self):
         """Descarga completa, importación y creación de mensuales sin token de admin => 401."""
         c = self.client_sin_token
-        self.assertEqual(c.get("/api/export/excel").status_code, 401)
+        self.assertNotEqual(c.get("/api/export/excel").status_code, 401)   # v1.3.44: la descarga solo pide sesión de usuario
         self.assertEqual(c.post("/api/excel/import", json={"excel_path": "x.xlsx"}).status_code, 401)
         self.assertEqual(c.post("/api/excel/create-monthly", json={"mes": 10, "anio": 2026}).status_code, 401)
         self.assertEqual(c.get("/docs").status_code, 404)          # explorador de API apagado por defecto

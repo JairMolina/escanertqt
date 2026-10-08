@@ -50,11 +50,11 @@ def _excel_lote(lote_id: Optional[int]) -> Tuple[str, bytes, str, Kpis]:
     lote = db.get_lote_by_id(lote_id) if lote_id else db.get_active_lote()
     if not lote:
         raise LookupError("Lote no encontrado o sin lote activo.")
-    nombre = f"Control_Produccion_TQT_{MESES_ES[lote['mes'] - 1]}_{lote['anio']}.xlsx"
+    nombre = db.archivo_excel_lote(lote)
     carpeta = Path(tempfile.mkdtemp(prefix="tqt_correo_"))
     try:
         _exportar(lote, carpeta / nombre)
-        return nombre, (carpeta / nombre).read_bytes(), f"Control de producción TQT · {MESES_ES[lote['mes'] - 1]} {lote['anio']}", []
+        return nombre, (carpeta / nombre).read_bytes(), f"Control de producción TQT · {db.nombre_lote_de(lote)}", []
     finally:
         shutil.rmtree(carpeta, ignore_errors=True)
 
@@ -79,9 +79,8 @@ async def enviar_excel(p: EnvioExcelIn, request: Request,
                        x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"), tqt_admin: Optional[str] = Cookie(None)) -> Dict[str, Any]:
     if p.tipo not in TIPOS:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Tipo de reporte no válido.")
-    if p.tipo == "lote":   # mismo permiso que su descarga
-        from app.routers.admin import admin_requerido
-        admin_requerido(x_admin_token, tqt_admin)
+    # v1.3.44: el Excel del lote ya no pide la clave de administración (mismo permiso que su descarga: sesión de usuario).
+    # El consultor no llega aquí: es un POST y el middleware de roles lo rechaza con 403.
     para = sorted({usuarios.normalizar(x) for x in p.para if x and x.strip()})
     malos = [x for x in para if not usuarios._EMAIL.match(x)]
     if malos or not para:

@@ -323,13 +323,15 @@ CREATE TABLE IF NOT EXISTS lotes_mensuales (
     anio INTEGER NOT NULL,
     ruta_excel TEXT,
     activo INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tipo_lote TEXT NOT NULL DEFAULT 'mes',  -- 'mes' | 'semana' | 'dia' (v1.3.44)
+    fecha_inicio TEXT                       -- 'YYYY-MM-DD' (mes: día 1; semana: lunes)
 );
 
 {DDL_PCB_INVENTARIO};
 CREATE TABLE IF NOT EXISTS firmware_catalogo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    rol TEXT NOT NULL CHECK (rol IN ('R1','R2')),   -- R1 = Principal, R2 = Respaldo (como los catálogos del Excel)
+    rol TEXT NOT NULL CHECK (rol IN ('R1','R2','R3')),   -- R1 = Principal, R2 = Respaldo (como el Excel), R3 = firmware de la R3
     version TEXT NOT NULL,
     orden INTEGER NOT NULL DEFAULT 0,
     UNIQUE (rol, version)
@@ -389,7 +391,15 @@ class LoteBase(BaseModel):
     ruta_excel: Optional[str] = Field(None, max_length=500, description="Ruta al archivo Excel asociado")
 
 
-class LoteCreate(LoteBase):
+class LoteCreate(BaseModel):
+    """v1.3.44: lote de mes (mes+anio), semana o día (fecha_inicio). Sin `codigo_lote` el servidor lo genera
+    (2026-09, 2026-S40, 2026-09-15)."""
+    tipo_lote: str = Field("mes", pattern="^(mes|semana|dia)$", description="mes | semana | dia")
+    fecha_inicio: Optional[str] = Field(None, max_length=10, description="YYYY-MM-DD (semana: cualquier día de ella; se usa su lunes)")
+    codigo_lote: Optional[str] = Field(None, min_length=1, max_length=40, description="Identificador único; por defecto se genera")
+    mes: Optional[int] = Field(None, ge=1, le=12, description="Mes del lote (1 a 12) si es de tipo mes")
+    anio: Optional[int] = Field(None, ge=2020, le=2100, description="Año del lote si es de tipo mes")
+    ruta_excel: Optional[str] = Field(None, max_length=500, description="Ruta al archivo Excel asociado")
     activo: bool = Field(True, description="Indica si debe marcarse como activo de inmediato")
     crear_excel: bool = Field(True, description="Crea Control_Produccion_TQT_[Mes]_[Año].xlsx desde la plantilla")
 
@@ -453,7 +463,7 @@ class ProgramacionUpdate(BaseModel):
 
 class FirmwareCompilarRequest(BaseModel):
     """Compilar el firmware ESP32 de una R1/R2 para flashearla por USB desde el navegador (no toca la BD)."""
-    tipo: str = Field(..., min_length=2, max_length=2, description="R1 o R2 (la R3 no lleva firmware)")
+    tipo: str = Field(..., min_length=2, max_length=2, description="R1 o R2 (el firmware de la R3 no se compila aquí)")
     numero: Optional[str] = Field(None, max_length=10, description="Número de la tarjeta; obligatorio para R2 (se graba en el nombre BLE)")
 
 
@@ -477,7 +487,7 @@ class FirmwareUpdate(BaseModel):
 
 
 class FirmwareCatalogoIn(BaseModel):
-    rol: str = Field(..., max_length=2, description="R1 (Principal) o R2 (Respaldo)")
+    rol: str = Field(..., max_length=2, description="R1 (Principal), R2 (Respaldo) o R3")
     version: str = Field(..., min_length=1, max_length=40)
 
 

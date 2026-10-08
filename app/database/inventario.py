@@ -213,7 +213,7 @@ def listar_recepcion(conn: Optional[sqlite3.Connection] = None, db_path: Optiona
 def listar_pcb(
     tipo: Optional[str] = None, estado_ciclo: Optional[str] = None, q: Optional[str] = None,
     sin_mac: bool = False, sin_tarjeta: bool = False, limit: int = 100, offset: int = 0,
-    conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None,
+    conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None, sin_firmware: bool = False,
 ) -> Dict[str, Any]:
     def _q(c):
         where, params = [], []
@@ -231,6 +231,8 @@ def listar_pcb(
             params.extend([like, like, like, plano])
         if sin_mac:
             where.append("p.tipo IN ('R1','R2') AND p.mac IS NULL AND p.estado_ciclo IN ('RECIBIDA','DISPONIBLE','ASIGNADA')")
+        if sin_firmware:   # p. ej. R3 por programar (la R3 no lleva MAC: programada = con firmware)
+            where.append("(p.firmware IS NULL OR p.firmware = '') AND p.estado_ciclo IN ('RECIBIDA','DISPONIBLE','ASIGNADA')")
         if sin_tarjeta:
             where.append("t.id IS NULL")
         w = ("WHERE " + " AND ".join(where)) if where else ""
@@ -685,7 +687,7 @@ def crear_tarjeta(lote_id: Optional[int] = None, id_tarjeta_num: Optional[str] =
 
 
 # ============================================================================
-# Firmware (versión con la que se programó cada R1/R2; la R3 no lleva firmware) y su catálogo
+# Firmware (versión con la que se programó cada R1/R2/R3; la R3 no lleva MAC pero sí firmware) y su catálogo
 # ============================================================================
 _FW_RE = re.compile(r"^[A-Za-z0-9._+ -]{1,40}$")
 
@@ -701,8 +703,6 @@ def _validar_firmware(valor: Optional[str]) -> Optional[str]:
 
 def _set_firmware_tx(c: sqlite3.Connection, pcb_id: int, firmware: Optional[str], operador: Optional[str]) -> Dict[str, Any]:
     p = _pcb_o_error(c, pcb_id)
-    if p["tipo"] not in TIPOS_CON_MAC:
-        raise ValueError(f"{p['nombre']} es R3: la R3 no lleva firmware.")
     if p["estado_ciclo"] == "BAJA":
         raise ConflictoError(f"{p['nombre']} está dada de baja.")
     fw = _validar_firmware(firmware)
@@ -795,9 +795,9 @@ def programar_lote(items: List[Dict[str, Any]], simular: bool = False, operador:
 
 
 def listar_firmware(conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> Dict[str, List[str]]:
-    """Catálogo de versiones de firmware: {'R1': [...Principal...], 'R2': [...Respaldo...]}."""
+    """Catálogo de versiones de firmware: {'R1': [...Principal...], 'R2': [...Respaldo...], 'R3': [...]}."""
     def _q(c):
-        r: Dict[str, List[str]] = {"R1": [], "R2": []}
+        r: Dict[str, List[str]] = {"R1": [], "R2": [], "R3": []}
         for f in c.execute("SELECT rol, version FROM firmware_catalogo ORDER BY rol, orden, id"):
             r[f["rol"]].append(f["version"])
         return r
@@ -806,8 +806,8 @@ def listar_firmware(conn: Optional[sqlite3.Connection] = None, db_path: Optional
 
 def agregar_firmware(rol: str, version: str, conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> Dict[str, List[str]]:
     rol = (rol or "").strip().upper()
-    if rol not in TIPOS_CON_MAC:
-        raise ValueError("El rol del firmware debe ser R1 (Principal) o R2 (Respaldo).")
+    if rol not in TIPOS_PCB:
+        raise ValueError("El rol del firmware debe ser R1 (Principal), R2 (Respaldo) o R3.")
     v = _validar_firmware(version)
     if not v:
         raise ValueError("Escribe la versión de firmware.")
