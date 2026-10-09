@@ -434,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
         throw primero;
     }
     async function imprimirParesR3(lista) {
-        const etiquetas = pares(lista);
+        const etiquetas = pares(lista); const tq = lista.every((n) => /-R3-/.test(n)) ? 'R3' : 'individual';
         const printer = $('selPrinter').value; const c = Math.max(1, Math.min(99, parseInt($('r3Copias').value || '1', 10) || 1));
         state.busy = true; refrescarBotones(); r3Vista(); let hechas = 0; const fallos = [];
         for (const par of etiquetas) {
@@ -442,9 +442,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try { await imprimirR3(printer, par, c); hechas++; }
             catch (e) { fallos.push(`${par.join(' + ')}: ${e.message}`); if (/no respondió|DYMO Connect|servicio/i.test(e.message)) break; }
         }
-        progreso(hechas, etiquetas.length, `${hechas} de ${etiquetas.length} etiquetas R3 enviadas.`);
-        if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} etiqueta${fallos.length === 1 ? '' : 's'} R3 sin imprimir. `), fallos.slice(0, 4).join(' · ')));
-        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} R3 (${lista.length} placas) enviada${hechas === 1 ? '' : 's'} a la DYMO`, { kind: 'ok' });
+        progreso(hechas, etiquetas.length, `${hechas} de ${etiquetas.length} etiquetas ${tq} enviadas.`);
+        if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} etiqueta${fallos.length === 1 ? '' : 's'} ${tq} sin imprimir. `), fallos.slice(0, 4).join(' · ')));
+        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} ${tq} (${lista.length} placas) enviada${hechas === 1 ? '' : 's'} a la DYMO`, { kind: 'ok' });
         ocultarProg(4000); state.busy = false; refrescarBotones(); r3Vista();
     }
     // Lote: hoja con TODAS las R3 del lote para marcar cuáles imprimir (igual que "Imprimir lote en DYMO…" de R1/R2)
@@ -577,9 +577,15 @@ document.addEventListener('DOMContentLoaded', () => {
             ESC.r3.push(p.nombre); escPintar();
             return { ok: true, texto: `${p.nombre} agregada (etiqueta R3)` };
         }
-        if (!t) return { ok: false, texto: p ? `${p.nombre} no está emparejada: no tiene etiqueta de tarjeta.` : `"${txt}" no es una placa ni una tarjeta.` };
+        // v1.3.53: R1/R2 sin tarjeta con R1 + R2 se imprimen sueltas, en la misma tira doble que las R3
+        const suelta = () => {
+            if (ESC.r3.includes(p.nombre)) return { ok: true, texto: `${p.nombre} ya estaba en la lista` };
+            ESC.r3.push(p.nombre); escPintar();
+            return { ok: true, texto: `${p.nombre} agregada (etiqueta individual ${p.tipo})` };
+        };
+        if (!t) return p && /^R[12]$/.test(p.tipo) ? suelta() : { ok: false, texto: `"${txt}" no es una placa ni una tarjeta.` };
         const tj = state.tarjetas.find((x) => x.id === t.id) || t;
-        if (modo(tj).k === 'NO') return { ok: false, texto: `Tarjeta ${tj.id_tarjeta_num}: falta R1 o R2, no se puede etiquetar.` };
+        if (modo(tj).k === 'NO') return p && /^R[12]$/.test(p.tipo) ? suelta() : { ok: false, texto: `Tarjeta ${tj.id_tarjeta_num}: falta R1 o R2, no se puede etiquetar.` };
         if (ESC.tarjetas.has(tj.id)) return { ok: true, texto: `Tarjeta ${tj.id_tarjeta_num} ya estaba en la lista` };
         ESC.tarjetas.set(tj.id, tj); escPintar();
         return { ok: true, texto: `Tarjeta ${tj.id_tarjeta_num} agregada (R1 + R2)` };
@@ -594,12 +600,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 h('span', { class: 'hint' }, fin ? 'final' : 'identificación'), quitar(() => ESC.tarjetas.delete(t.id), `Quitar tarjeta ${t.id_tarjeta_num}`));
         });
         pares(ESC.r3).forEach((par, i) => {
-            filas.push(fila(T.tipoChip('R3'), h('span', { class: 'mono grow', style: 'min-width:0;overflow-wrap:anywhere' }, `Etiqueta R3 ${i + 1} · ${par.join(' + ')}${par.length === 1 ? ' (mitad libre)' : ''}`),
+            const tipos = [...new Set(par.map((n) => (/-R([123])-/.exec(n) || [])[1]).filter(Boolean))];
+            filas.push(fila(T.tipoChip(tipos.length === 1 ? 'R' + tipos[0] : 'R3'), h('span', { class: 'mono grow', style: 'min-width:0;overflow-wrap:anywhere' }, `Etiqueta individual ${i + 1} · ${par.join(' + ')}${par.length === 1 ? ' (mitad libre)' : ''}`),
                 ...par.map((n) => quitar(() => { ESC.r3 = ESC.r3.filter((x) => x !== n); }, `Quitar ${n}`))));
         });
         const nR3 = pares(ESC.r3).length;
         $('escLista').replaceChildren(...(filas.length ? filas : [h('p', { class: 'muted', style: 'margin:0' }, 'Todavía no has escaneado nada.')]));
-        $('escResumen').textContent = filas.length ? `${tj.length} tarjeta${tj.length === 1 ? '' : 's'} (R1 + R2) · ${ESC.r3.length} R3 en ${nR3} etiqueta${nR3 === 1 ? '' : 's'} → ${tj.length + nR3} etiqueta${tj.length + nR3 === 1 ? '' : 's'} en total` : '';
+        $('escResumen').textContent = filas.length ? `${tj.length} tarjeta${tj.length === 1 ? '' : 's'} (R1 + R2) · ${ESC.r3.length} placa${ESC.r3.length === 1 ? '' : 's'} individual${ESC.r3.length === 1 ? '' : 'es'} en ${nR3} etiqueta${nR3 === 1 ? '' : 's'} → ${tj.length + nR3} etiqueta${tj.length + nR3 === 1 ? '' : 's'} en total` : '';
         refrescarBotones();
     }
     $('btnEscVinc').addEventListener('click', escVincular);

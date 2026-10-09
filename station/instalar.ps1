@@ -8,10 +8,6 @@ if (-not $python) {
     $candidate = Get-Command python -ErrorAction SilentlyContinue
     if ($candidate -and $candidate.Source -notmatch 'WindowsApps') { $python = $candidate.Source }
 }
-if (-not $python) {
-    $candidate = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
-    if (Test-Path -LiteralPath $candidate) { $python = $candidate }
-}
 if (-not $python) { throw 'Se necesita Python 3.10 o superior. Instala Python desde python.org y vuelve a ejecutar este instalador.' }
 $python = [string]$python
 & $python -c 'import sys; assert sys.version_info >= (3,10)'

@@ -88,7 +88,7 @@
     const ESTADOS = { ok: ['Con existencia', 'ok', 'check'], bajo: ['Bajo mínimo', 'warn', 'alert'], insuficiente: ['No alcanza para 1', 'warn', 'alert'], agotado: ['Agotado', 'bad', 'x'] };
 
     E.registrar({
-        id: 'inventario_tqtr', titulo: 'Inventario TQTR', icono: 'tag', grupo: 'operacion', orden: 25,
+        id: 'inventario_tqtr', titulo: 'Inventario TQTR', icono: 'tag', grupo: 'gestion', orden: 55,
         montar(host, ctx) {
             const { T, api, h, icon, toast, sheet, util } = ctx;
             const P = ctx.params ? ctx.params() : new URLSearchParams();

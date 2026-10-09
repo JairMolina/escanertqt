@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ------------------------------------------------------------------ tarjetas
     $('tEstado').append(...T.TARJETA_ESTADOS.map((g) => h('option', { value: g.key }, g.label)));
     const tVis = () => { const est = $('tEstado').value, q = $('tQ').value.trim().toLowerCase();
-        return S.tarjetas.filter((t) => (!est || T.estadoTarjeta(t).key === est) && (!q || [t.id_tarjeta_num, t.nombre_r1, t.nombre_r2, t.nombre_r3, t.mac_r1, t.mac_r2].some((v) => String(v || '').toLowerCase().includes(q)))); };
+        return S.tarjetas.filter((t) => T.cumpleEstado(t, est) && (!q || [t.id_tarjeta_num, t.nombre_r1, t.nombre_r2, t.nombre_r3, t.mac_r1, t.mac_r2].some((v) => String(v || '').toLowerCase().includes(q)))); };
     function pintarTarjetas() {
         const rows = tVis(); const host = $('tTabla'); host.replaceChildren();
         if (!rows.length) host.append(T.empty('box', 'No hay tarjetas con esos filtros'));

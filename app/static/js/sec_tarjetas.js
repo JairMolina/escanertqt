@@ -1,5 +1,5 @@
 /**
- * sec_tarjetas.js - Tarjetas del lote: búsqueda, estado (completa / incompleta / sin MAC), detalle en panel lateral
+ * sec_tarjetas.js - Tarjetas del lote: búsqueda, estado (incompleta / sin MAC / programada / completa), detalle en panel lateral
  * con las placas R1/R2/R3 (Hardware, Firmware y MAC), etiqueta DYMO y ficha.
  * Emparejar (todas las completas) y desemparejar (una, varias o todas).
  * API: GET /api/tarjetas?lote_id= · POST /api/emparejar/auto · POST /api/tarjetas/disolver
@@ -8,11 +8,11 @@
     'use strict';
     const E = window.TQTEscritorio;
     E.registrar({
-        id: 'tarjetas', titulo: 'Tarjetas', icono: 'card', grupo: 'operacion', orden: 30,
+        id: 'tarjetas', titulo: 'Tarjetas', icono: 'card', grupo: 'operacion', orden: 20,
         montar(host, ctx) {
             const { T, api, h, icon, toast, sheet, util } = ctx;
             const P = ctx.params();
-            const st = { tars: null, error: '', estado: ['completa', 'incompleta', 'sin_mac'].includes(P.get('estado')) ? P.get('estado') : '', q: P.get('q') || '', sort: { id: 'num', dir: 'asc' }, sug: null, limit: 200, abierta: P.get('id') ? +P.get('id') : null, sel: new Set() };
+            const st = { tars: null, error: '', estado: ['completa', 'incompleta', 'sin_mac', 'programada'].includes(P.get('estado')) ? P.get('estado') : '', q: P.get('q') || '', sort: { id: 'num', dir: 'asc' }, sug: null, limit: 200, abierta: P.get('id') ? +P.get('id') : null, sel: new Set() };
             const conFw = (t, s) => { const p = t[s]; return p ? Object.assign({}, p, { firmware: p.firmware || t['firmware_' + s] || null }) : null; };
 
             const q = h('input', { class: 'input', type: 'search', id: 'tarQ', placeholder: 'Número, serie o MAC', 'aria-label': 'Buscar tarjeta por número, nombre de placa o MAC', 'data-buscar': '1', value: st.q, autocomplete: 'off' });
@@ -36,7 +36,7 @@
             const norm = (s) => String(s || '').toLowerCase();
             function filtradas() {
                 const txt = norm(st.q).trim(); const hex = txt.replace(/[^0-9a-f]/g, '');
-                return st.tars.filter((t) => (!st.dia || st.dia.has(t.id)) && (!st.estado || T.estadoTarjeta(t).key === st.estado)
+                return st.tars.filter((t) => (!st.dia || st.dia.has(t.id)) && T.cumpleEstado(t, st.estado)
                     && (!txt || String(t.id_tarjeta_num).includes(txt) || [t.nombre_r1, t.nombre_r2, t.nombre_r3].some((n) => norm(n).includes(txt)) || (hex.length >= 2 && [t.mac_r1, t.mac_r2].some((m) => norm(m).replace(/:/g, '').includes(hex)))));
             }
             const COLS = [

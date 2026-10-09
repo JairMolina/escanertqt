@@ -1,5 +1,18 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.54 — 2026-10-09
+- **Programar ESP32 R1 desde el panel STM32.** Botón junto a «Programar STM32 con J-Link» que abre el flujo ESP32 (USB serial) con la misma R1 elegida: compila el firmware ESP32_BLE_SERIAL de R1, flashea y guarda la MAC de la R1. Si el STM32 aún no está programado y verificado, avisa del orden (ESP32 R2 → STM32 R1 → ESP32 R1) antes de seguir.
+- **Subir HEX.** Junto a «Descargar HEX», lee un .hex de STM32 (`POST /api/stm32/hex/analizar`, sin guardarlo) y muestra MCU, HW, versión FW, tamaño e identidad, comparado con el firmware base de la app.
+
+## v1.3.53 — 2026-10-09
+- **Etiquetas DYMO: escanear R1 y R2 para imprimir.** En "Escanear para imprimir", una R1/R2 sin tarjeta con R1 + R2 ya no se rechaza: se imprime individual en la misma tira doble (QR + nombre) que las R3, de dos en dos. Las R1/R2 de una tarjeta completa siguen sacando la etiqueta de su tarjeta. `/api/dymo/r3/xml|archivo` acepta nombres R1, R2 y R3.
+
+## v1.3.52 — 2026-10-09
+- **Menú de la consola por flujo de la tarjeta.** Operación: Dashboard → Tarjetas → Programación → MAC y firmware → Consultar. Inventario de PCB e Inventario TQTR pasan a Gestión.
+- **Estado Programada en Tarjetas.** Una tarjeta completa con R1/R2 (MAC + firmware) y R3 (firmware) se marca "Completa · programada"; filtro "Programadas" en Tarjetas y Administración, KPI en el Dashboard y paso Programada en la ficha de estatus.
+- **R1 STM32 / J-Link con el diseño de ESP32.** Paneles, lista de selección, pasos y barra de avance con el mismo estilo (claro/oscuro y móvil).
+- **Instalador del agente STM32.** Se borra la carpeta temporal con la credencial al terminar, avisa borrar el archivo descargado y se quitó una ruta de Python local del desarrollador.
+
 ## v1.3.51 — 2026-10-09
 - **J-Link sin ventana de consola.** El agente inicia Commander con CREATE_NO_WINDOW en Windows y conserva la salida en su diagnóstico.
 - **Avance de programación en la web.** Indicador animado y etapas reales de preparación, conexión/grabación, lectura/verificación, reinicio y reporte. El avance requiere la credencial de la estación asignada y no registra firmware ni sustituye la verificación final. Al terminar correctamente, la web indica que ya se puede desconectar la R1.

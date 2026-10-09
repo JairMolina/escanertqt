@@ -7,7 +7,7 @@
     'use strict';
     const E = window.TQTEscritorio;
     E.registrar({
-        id: 'inventario', titulo: 'Inventario de PCB', icono: 'box', grupo: 'operacion', orden: 20,
+        id: 'inventario', titulo: 'Inventario de PCB', icono: 'box', grupo: 'gestion', orden: 52,
         montar(host, ctx) {
             const { T, api, h, icon, toast, sheet, util } = ctx;
             const P = ctx.params();

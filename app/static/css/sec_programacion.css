@@ -38,3 +38,25 @@
 .prog-resultado { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .prog-mac-row { display: flex; align-items: center; gap: 10px; }
 .prog-mac { font-family: var(--font-mono); font-size: 20px; font-weight: 700; letter-spacing: .02em; user-select: all; }
+
+/* R1 STM32 / J-Link */
+.prog-dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0 0 12px; padding: 10px; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-1); font-family: var(--font-mono); font-size: 12.5px; }
+.prog-dl dt { color: var(--muted); }
+.prog-dl dd { margin: 0; overflow-wrap: anywhere; }
+.prog-cab .dim { color: var(--muted); font-size: 12px; }
+.prog-panel-detalle > .field, .prog-panel-detalle > details { margin-top: 14px; }
+.prog-panel-detalle > .row { margin-top: 10px; }
+.prog-config { border: 1px solid var(--line); border-radius: var(--r-1); padding: 8px 10px; background: var(--bg-2); }
+.prog-config summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.prog-config .field, .prog-config .row, .prog-config .hint { margin-top: 10px; }
+.prog-avance { width: 100%; }
+.prog-avance .prog-pasos { margin: 8px 0; }
+.prog-resultado:empty { display: none; }
+@media (max-width: 640px) {
+  .prog-panel { padding: 10px; }
+  .prog-lista { max-height: 40vh; }
+  .prog-paso { flex-basis: 100%; }
+  .prog-dl { grid-template-columns: 1fr; gap: 0; }
+  .prog-dl dd { margin-bottom: 6px; }
+  .prog-panel-detalle > .row .btn { flex: 1 1 100%; }
+}

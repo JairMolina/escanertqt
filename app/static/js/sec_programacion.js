@@ -285,7 +285,8 @@
 
         const espHost = host.lastElementChild;
         const stmHost = h('div');
-        const stm = window.TQTSTM32(stmHost, ctx);
+        // v1.3.54: «Programar ESP32 R1» del panel STM32 abre el flujo ESP32 con la misma R1 elegida
+        const stm = window.TQTSTM32(stmHost, Object.assign({}, ctx, { programarEsp32(p) { if (S.busy) return; modo(false); seleccionar(p); } }));
         const btnStm = h('button', { class: 'btn btn-primary', type: 'button', 'aria-pressed': 'true', onclick: () => modo(true) }, 'R1 · STM32 / J-Link');
         const btnEsp = h('button', { class: 'btn', type: 'button', 'aria-pressed': 'false', onclick: () => modo(false) }, 'ESP32 · USB serial');
         function modo(isStm) {
@@ -319,7 +320,7 @@
         };
     }
 
-    const def = { id: 'programacion', titulo: 'Programación', icono: 'flash', grupo: 'operacion', orden: 35, montar };
+    const def = { id: 'programacion', titulo: 'Programación', icono: 'flash', grupo: 'operacion', orden: 30, montar };
     if (window.TQTEscritorio && window.TQTEscritorio.registrar) window.TQTEscritorio.registrar(def);
     else { (window.__TQTSecciones = window.__TQTSecciones || []).push(def); }
 })();

@@ -309,7 +309,8 @@ def get_dymo_archivo(
 
 
 # ---------------------------------------------------------------- etiquetas sueltas de R3 (v1.3.36): solo el nombre TQT-R3-V30-0000
-NOMBRE_R3 = r"^TQT-R3-V[0-9]{1,3}-[0-9]{4}$"
+# v1.3.53: la tira doble también sirve para R1/R2 sueltas (escaneadas sin tarjeta completa)
+NOMBRE_R3 = r"^TQT-R[123]-V[0-9]{1,3}-[0-9]{4}$"
 
 
 def _nombres_r3(nombre: List[str]) -> List[str]:
@@ -327,7 +328,7 @@ def get_dymo_r3_xml(
 ):
     for n in nombre:
         if not re.fullmatch(NOMBRE_R3, n):
-            raise HTTPException(422, f"Nombre de R3 inválido: {n}")
+            raise HTTPException(422, f"Nombre de placa inválido: {n}")
     fmt = _formato_o_400(label_format)
     nombres = _nombres_r3(nombre)
     xml = DymoService.generate_r3_dcd_xml(nombres, fmt) if tipo == "dymo" else DymoService.generate_r3_label_xml(nombres, fmt)
@@ -342,7 +343,7 @@ def get_dymo_r3_archivo(
 ):
     for n in nombre:
         if not re.fullmatch(NOMBRE_R3, n):
-            raise HTTPException(422, f"Nombre de R3 inválido: {n}")
+            raise HTTPException(422, f"Nombre de placa inválido: {n}")
     datos, archivo = DymoService.archivo_r3(_nombres_r3(nombre), _formato_o_400(label_format), tipo)
     return _adjunto(datos, archivo)
 

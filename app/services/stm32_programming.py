@@ -28,6 +28,23 @@ def firmware():
     return mem, starts, hx.leer_perfil(mem)
 
 
+def analizar_hex(texto):
+    """v1.3.54: lee un HEX subido por el operador y extrae su perfil (MCU/HW/FW) sin guardarlo."""
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix='tqt_hex_') as tmp:
+        path = Path(tmp)/'subido.hex'
+        path.write_text(texto, encoding='ascii', errors='strict')
+        mem, _ = hx.leer_hex(path)
+    identidad = hx.leer_identidad(mem)
+    app = {a: b for a, b in mem.items() if a < hx.IDENTITY_BEGIN}
+    profile = hx.leer_perfil(app)
+    base = firmware()[2]
+    return dict(mcu=profile['mcu'], hw=profile['hw'], fw=profile['fw'], bytes=len(app),
+                sha256=hashlib.sha256(texto.encode('ascii')).hexdigest(),
+                identidad=identidad.get('nombre') if identidad else None,
+                base_fw=base['fw'], base_hw=base['hw'])
+
+
 def preview(pcb_id, conn=None):
     def read(c):
         p = inv.get_pcb(pcb_id, conn=c)

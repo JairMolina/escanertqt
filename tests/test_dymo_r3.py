@@ -30,7 +30,8 @@ class TestDymoR3(unittest.TestCase):
         self.assertEqual(DymoService.trama_lineas({"_lineas": ["TQT-R3-V30-0001"]}), ["TQT-R3-V30-0001"])
 
     def test_nombre_invalido_y_archivo(self):
-        self.assertEqual(self.c.get("/api/dymo/r3/xml?nombre=TQT-R1-V30-0001").status_code, 422)
+        self.assertEqual(self.c.get("/api/dymo/r3/xml?nombre=TQT-R1-V30-0001").status_code, 200)   # v1.3.53: R1/R2 sueltas
+        self.assertEqual(self.c.get("/api/dymo/r3/xml?nombre=TQT-R4-V30-0001").status_code, 422)
         self.assertEqual(self.c.get("/api/dymo/r3/xml?nombre=TQT-R3-V30-84").status_code, 422)
         r = self.c.get("/api/dymo/r3/archivo?nombre=TQT-R3-V30-0007&tipo=label")
         self.assertEqual(r.status_code, 200)

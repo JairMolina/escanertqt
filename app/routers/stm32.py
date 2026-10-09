@@ -47,8 +47,20 @@ class Result(BaseModel):
     error: str = Field(default='', max_length=1000)
 
 
+class HexSubido(BaseModel):
+    contenido: str = Field(min_length=20, max_length=4_000_000)
+
+
 class Progress(BaseModel):
     stage: str = Field(pattern='^(preparing|writing|reading|restarting|reporting)$')
+
+
+@router.post('/hex/analizar')
+def analizar_hex(body: HexSubido):
+    try:
+        return run(svc.analizar_hex, body.contenido)
+    except UnicodeError:
+        raise HTTPException(400, 'El archivo no es un Intel HEX de texto.')
 
 
 @router.get('/preview/{pcb_id}')

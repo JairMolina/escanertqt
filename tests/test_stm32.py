@@ -245,3 +245,16 @@ class STM32Tests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class AnalizarHexTest(unittest.TestCase):
+    """v1.3.54: «Subir HEX» lee la versión del firmware sin guardarlo."""
+    def test_base_y_errores(self):
+        from app.services import stm32_programming as svc
+        d = svc.analizar_hex(svc.BASE.read_text(encoding='ascii'))
+        self.assertEqual((d['mcu'], d['fw'], d['hw']), ('STM32F103RET6', d['base_fw'], d['base_hw']))
+        self.assertIsNone(d['identidad'])
+        with self.assertRaises(ValueError):
+            svc.analizar_hex(':00000001FF\n')
+        with self.assertRaises(ValueError):
+            svc.analizar_hex('esto no es un hex')

@@ -2,7 +2,7 @@
 
 Aplicación web local para la planta de tarjetas electrónicas TQT. Registra las PCB con la cámara del celular, las empareja en tarjetas (R1 + R2 + R3), captura las MAC y el firmware de R1/R2, imprime etiquetas DYMO y sincroniza el Excel mensual de control de producción.
 
-**Versión actual: v1.3.51** · historial en [`CHANGELOG.md`](CHANGELOG.md) (la versión también se muestra en la app).
+**Versión actual: v1.3.54** · historial en [`CHANGELOG.md`](CHANGELOG.md) (la versión también se muestra en la app).
 
 ## Qué hace
 
