@@ -1,5 +1,14 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.56 — 2026-10-09
+- **Desemparejar una sola placa.** Al desemparejar UNA tarjeta, la hoja pregunta qué desemparejar: toda la tarjeta o solo su R1, R2 o R3 (la placa elegida queda suelta y las demás siguen emparejadas, conservando las pruebas). Con varias tarjetas se desemparejan completas como antes.
+- **Tarjetas: diseño y revisión.** Mejoras de diseño y estilo en la lista y el detalle, y revisión de las funciones compartidas con otras secciones.
+
+## v1.3.55 — 2026-10-09
+- **Programación con tres modos:** «R1 · STM32 / J-Link», «R2 · ESP32 · USB serial» (la lista muestra solo R2; la R1 llega con «Programar ESP32 R1») y nuevo **«R3 · STM32 / J-Link»**.
+- **R3 desde la app.** Firmware PCB_TQT_R3_TIMER_WH-V3.0_FW-V1.0 (STM32F103RET6) convertido del .elf a `firmware/stm32_r3/r3_fw10.hex` (+ .json con hashes). Imagen fija sin identidad; el agente graba, lee toda la imagen de vuelta, compara su huella y el UID, y al verificarse registra FW 1.0 en la R3 (queda Programada). «Subir HEX» en R3 reconoce el firmware si es idéntico al de la app.
+- **Agente 1.3.55.** Las estaciones deben reinstalar el agente (botón «Instalar agente en esta laptop») para programar R3; un agente anterior rechaza el trabajo sin grabar.
+
 ## v1.3.54 — 2026-10-09
 - **Programar ESP32 R1 desde el panel STM32.** Botón junto a «Programar STM32 con J-Link» que abre el flujo ESP32 (USB serial) con la misma R1 elegida: compila el firmware ESP32_BLE_SERIAL de R1, flashea y guarda la MAC de la R1. Si el STM32 aún no está programado y verificado, avisa del orden (ESP32 R2 → STM32 R1 → ESP32 R1) antes de seguir.
 - **Subir HEX.** Junto a «Descargar HEX», lee un .hex de STM32 (`POST /api/stm32/hex/analizar`, sin guardarlo) y muestra MCU, HW, versión FW, tamaño e identidad, comparado con el firmware base de la app.

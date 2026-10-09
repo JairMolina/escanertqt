@@ -11,6 +11,24 @@ from app.services import tqt_hex as hx
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = ROOT / 'firmware/stm32_r1/fw43_base.hex'
+# v1.3.55: la R3 (STM32F103RET6 «TIMER») lleva una imagen fija, sin identidad por unidad.
+R3_BASE = ROOT / 'firmware/stm32_r3/r3_fw10.hex'
+
+
+def firmware_r3():
+    meta = json.loads(R3_BASE.with_suffix('.hex.json').read_text(encoding='utf-8'))
+    texto = R3_BASE.read_text(encoding='ascii')
+    if hashlib.sha256(texto.encode('ascii')).hexdigest() != meta['hex_sha256']:
+        raise ValueError('El firmware R3 no coincide con su registro.')
+    mem, _ = hx.leer_hex(R3_BASE)
+    if any(not hx.FLASH_BEGIN <= a < hx.IDENTITY_BEGIN for a in mem):
+        raise ValueError('El firmware R3 escribe fuera de la Flash de aplicación.')
+    return texto, mem, meta
+
+
+def huella(mem):
+    """SHA-256 de los bytes de la imagen en orden de dirección; el agente la recalcula sobre la lectura de Flash."""
+    return hashlib.sha256(bytes(mem[a] for a in sorted(mem))).hexdigest()
 
 
 def init():
@@ -28,13 +46,20 @@ def firmware():
     return mem, starts, hx.leer_perfil(mem)
 
 
-def analizar_hex(texto):
+def analizar_hex(texto, tipo='R1'):
     """v1.3.54: lee un HEX subido por el operador y extrae su perfil (MCU/HW/FW) sin guardarlo."""
     import tempfile
     with tempfile.TemporaryDirectory(prefix='tqt_hex_') as tmp:
         path = Path(tmp)/'subido.hex'
         path.write_text(texto, encoding='ascii', errors='strict')
         mem, _ = hx.leer_hex(path)
+    if tipo == 'R3':
+        _, r3mem, meta = firmware_r3()
+        igual = mem == r3mem
+        return dict(mcu=meta['mcu'], hw=meta['hw'] if igual else '?', fw=meta['fw'] if igual else 'desconocida', bytes=len(mem),
+                    sha256=hashlib.sha256(texto.encode('ascii')).hexdigest(), identidad=None,
+                    base_fw=meta['fw'], base_hw=meta['hw'],
+                    aviso=None if igual else 'El firmware R3 no trae perfil de versión: solo se reconoce si es idéntico al de la app.')
     identidad = hx.leer_identidad(mem)
     app = {a: b for a, b in mem.items() if a < hx.IDENTITY_BEGIN}
     profile = hx.leer_perfil(app)
@@ -46,10 +71,26 @@ def analizar_hex(texto):
 
 
 def preview(pcb_id, conn=None):
+    def read_r3(c, p):
+        texto, mem, meta = firmware_r3()
+        hw = p['version']
+        if hw == meta['hw'].replace('.', ''):
+            hw = meta['hw']
+        identity = dict(nombre='TQT_R3_V'+hw.replace('.', '')+'_'+p['serie'], hw=hw, fw=meta['fw'])
+        result = dict(kind='R3', pcb_id=p['id'], tarjeta_id=p['tarjeta_id'], nombre=p['nombre'], r1=p['nombre'],
+                      identity=identity, profile=dict(mcu=meta['mcu'], hw=meta['hw'], fw=meta['fw']),
+                      base_sha256=meta['hex_sha256'], hex_sha256=meta['hex_sha256'],
+                      identity_sha256=huella(mem), bytes=len(mem))
+        return result, texto
+
     def read(c):
         p = inv.get_pcb(pcb_id, conn=c)
+        if p and p['tipo'] == 'R3':
+            if p['estado_ciclo'] in ('FALLA', 'BAJA'):
+                raise ValueError('La R3 está marcada como FALLA o BAJA.')
+            return read_r3(c, p)
         if not p or p['tipo'] != 'R1':
-            raise ValueError('Selecciona una PCB R1 registrada.')
+            raise ValueError('Selecciona una PCB R1 o R3 registrada.')
         if p['estado_ciclo'] in ('FALLA', 'BAJA'):
             raise ValueError('La R1 está marcada como FALLA o BAJA.')
         t = db.get_tarjeta_by_id(p['tarjeta_id'], c) if p['tarjeta_id'] else None
@@ -67,7 +108,7 @@ def preview(pcb_id, conn=None):
         hx.comprobar_perfil(identity, profile)
         mem.update({hx.IDENTITY_BEGIN+i: b for i, b in enumerate(raw)})
         image = hx.emitir_hex(mem, starts)
-        result = dict(pcb_id=p['id'], tarjeta_id=t['id'], r1=p['nombre'], r2=r2['nombre'],
+        result = dict(kind='R1', pcb_id=p['id'], tarjeta_id=t['id'], r1=p['nombre'], nombre=p['nombre'], r2=r2['nombre'],
                       r2_id=r2['id'], identity=identity, profile=profile,
                       base_sha256=hashlib.sha256(BASE.read_bytes()).hexdigest(),
                       hex_sha256=hashlib.sha256(image.encode('ascii')).hexdigest(),
@@ -108,7 +149,7 @@ def stations():
 
 def create_job(pcb, station, expected, operator, physical_confirmed=False):
     if physical_confirmed is not True:
-        raise ValueError('Confirma desde la web que la R1 seleccionada está conectada al J-Link.')
+        raise ValueError('Confirma desde la web que la placa seleccionada está conectada al J-Link.')
     init()
     with db.transaction() as c:
         st = c.execute('SELECT * FROM stm32_stations WHERE id=?', (station,)).fetchone()
@@ -205,5 +246,5 @@ def finish(sid, jid, result):
             inv.set_firmware(r['pcb'], p['identity']['fw'], r['operator'], conn=c)
         c.execute('UPDATE stm32_jobs SET state=?,updated=?,result=? WHERE id=?',
                   (state, time.time(), json.dumps(result), jid))
-        db.log_evento('STM32_PROGRAMACION', None, None, f"R1 PCB {r['pcb']} FW {p['identity']['fw']} {state}; job={jid}", r['operator'], conn=c)
+        db.log_evento('STM32_PROGRAMACION', None, None, f"{p.get('kind', 'R1')} PCB {r['pcb']} FW {p['identity']['fw']} {state}; job={jid}", r['operator'], conn=c)
     return job(jid)

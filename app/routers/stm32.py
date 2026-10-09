@@ -49,6 +49,7 @@ class Result(BaseModel):
 
 class HexSubido(BaseModel):
     contenido: str = Field(min_length=20, max_length=4_000_000)
+    tipo: str = Field(default='R1', pattern='^R[13]$')
 
 
 class Progress(BaseModel):
@@ -58,7 +59,7 @@ class Progress(BaseModel):
 @router.post('/hex/analizar')
 def analizar_hex(body: HexSubido):
     try:
-        return run(svc.analizar_hex, body.contenido)
+        return run(svc.analizar_hex, body.contenido, body.tipo)
     except UnicodeError:
         raise HTTPException(400, 'El archivo no es un Intel HEX de texto.')
 

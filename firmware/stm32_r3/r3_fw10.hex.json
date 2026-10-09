@@ -1,0 +1,9 @@
+{
+  "mcu": "STM32F103RET6",
+  "hw": "3.0",
+  "fw": "1.0",
+  "source": "PCB_TQT_R3_TIMER_WH-V3.0_FW-V1.0 (Debug .elf)",
+  "elf_sha256": "35175a1d918ca912058784876ff31dca313dd3fa50230d54e533f00488126a26",
+  "hex_sha256": "390933baab2c026cc0b2f6ee62dc7cde8cd30cd79ed6203d078ff5b3da746fb9",
+  "bytes": 11576
+}

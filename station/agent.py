@@ -12,7 +12,7 @@ import time
 import urllib.request
 import tqt_hex as hx
 
-USER_AGENT = 'TQT-Station/1.3.51'
+USER_AGENT = 'TQT-Station/1.3.55'
 
 
 def web_confirmation(work):
@@ -46,6 +46,10 @@ def find_jlink():
     raise ValueError('No se encontró JLink.exe en SEGGER ni STM32CubeIDE. Instala J-Link o indica su ruta en config.json.')
 
 
+def image_hash(mem):
+    return hashlib.sha256(bytes(mem[a] for a in sorted(mem))).hexdigest()
+
+
 def validate(work, directory):
     image = directory/'firmware.hex'
     data = work['payload']
@@ -53,6 +57,13 @@ def validate(work, directory):
     if hashlib.sha256(image.read_bytes()).hexdigest() != data['hex_sha256']:
         raise ValueError('El hash del HEX recibido no coincide.')
     mem, _ = hx.leer_hex(image)
+    if data.get('kind') == 'R3':
+        # R3: fixed image without per-unit identity; never write the reserved identity page.
+        if any(not hx.FLASH_BEGIN <= a < hx.IDENTITY_BEGIN for a in mem):
+            raise ValueError('El firmware R3 escribe fuera de la Flash de aplicación.')
+        if image_hash(mem) != data['identity_sha256']:
+            raise ValueError('Hash de imagen R3 incorrecto.')
+        return image, mem
     identity = hx.leer_identidad(mem)
     hx.comprobar_perfil(identity, hx.leer_perfil(mem))
     if identity != data['identity']:
@@ -96,8 +107,14 @@ def flash(work, exe, serial='', progress=lambda stage: None):
         for address, expected in mem.items():
             if readback[address-hx.FLASH_BEGIN] != expected:
                 raise ValueError(f'La verificación difiere en 0x{address:08X}.')
-        raw = readback[hx.IDENTITY_BEGIN-hx.FLASH_BEGIN:hx.IDENTITY_BEGIN-hx.FLASH_BEGIN+hx.SIZE]
-        hx.parsear_identidad(raw)
+        r3 = work['payload'].get('kind') == 'R3'
+        if r3:
+            raw = None
+            proof = hashlib.sha256(bytes(readback[a-hx.FLASH_BEGIN] for a in sorted(mem))).hexdigest()
+        else:
+            raw = readback[hx.IDENTITY_BEGIN-hx.FLASH_BEGIN:hx.IDENTITY_BEGIN-hx.FLASH_BEGIN+hx.SIZE]
+            hx.parsear_identidad(raw)
+            proof = hashlib.sha256(raw).hexdigest()
         uid = (directory/'uid.bin').read_bytes()
         if len(uid)!=12 or uid in (bytes(12), bytes([255])*12):
             raise ValueError(f'UID STM32 inválido o lectura incompleta: se recibieron {len(uid)} bytes; se esperaban 12.')
@@ -105,7 +122,7 @@ def flash(work, exe, serial='', progress=lambda stage: None):
         trace += commander(exe, directory, ['r', 'g', 'q'], serial)
         progress('reporting')
         return dict(verified=True, hex_sha256=work['payload']['hex_sha256'],
-                    identity_sha256=hashlib.sha256(raw).hexdigest(), uid=uid.hex().upper(), trace=trace[-16000:])
+                    identity_sha256=proof, uid=uid.hex().upper(), trace=trace[-16000:])
 
 
 def main():

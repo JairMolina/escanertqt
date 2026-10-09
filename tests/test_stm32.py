@@ -258,3 +258,39 @@ class AnalizarHexTest(unittest.TestCase):
             svc.analizar_hex(':00000001FF\n')
         with self.assertRaises(ValueError):
             svc.analizar_hex('esto no es un hex')
+
+
+class R3Test(unittest.TestCase):
+    """v1.3.55: R3 STM32 con firmware fijo (sin identidad) por el mismo agente J-Link."""
+    def test_firmware_y_analisis(self):
+        texto, mem, meta = s.firmware_r3()
+        self.assertEqual((meta['fw'], meta['hw']), ('1.0', '3.0'))
+        self.assertTrue(all(hx.FLASH_BEGIN <= a < hx.IDENTITY_BEGIN for a in mem))
+        d = s.analizar_hex(texto, 'R3')
+        self.assertEqual((d['fw'], d['hw'], d['aviso']), ('1.0', '3.0', None))
+
+    def test_agente_valida_y_verifica_r3(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'station'))
+        import agent
+        texto, mem, meta = s.firmware_r3()
+        work = dict(id='j', hex=texto, payload=dict(kind='R3', hex_sha256=meta['hex_sha256'], identity_sha256=s.huella(mem),
+                                                    identity=dict(nombre='TQT_R3_V30_0001', hw='3.0', fw='1.0')))
+        with tempfile.TemporaryDirectory() as tmp:
+            _, m2 = agent.validate(work, Path(tmp))
+        self.assertEqual(m2, mem)
+        flash = bytearray(b'\xff' * 0x80000)
+        for a, b in mem.items():
+            flash[a - hx.FLASH_BEGIN] = b
+        def fake(exe, directory, commands, serial=''):
+            if any(c.startswith('savebin') for c in commands):
+                (directory / 'readback.bin').write_bytes(bytes(flash))
+                (directory / 'uid.bin').write_bytes(bytes(range(1, 13)))
+            return ''
+        with patch.object(agent, 'commander', side_effect=fake):
+            r = agent.flash(work, 'JLink.exe')
+        self.assertTrue(r['verified'])
+        self.assertEqual(r['identity_sha256'], s.huella(mem))
+        bad = dict(work, payload=dict(work['payload'], identity_sha256='0' * 64))
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError):
+            agent.validate(bad, Path(tmp))

@@ -47,7 +47,7 @@
             const r = await api('/api/pcb?sin_mac=1&limit=500');
             if (!S.vivo) return;
             if (!r.ok) { lista.replaceChildren(T.banner('bad', 'alert', r.network ? 'Sin conexión con el servidor.' : `No se pudo cargar: ${r.error}`)); return; }
-            S.pendientes = ((r.data && r.data.items) || []).filter((p) => p.tipo === 'R1' || p.tipo === 'R2');
+            S.pendientes = ((r.data && r.data.items) || []).filter((p) => p.tipo === 'R2');   // v1.3.55: este modo es el de R2; la R1 llega con «Programar ESP32 R1»
             if (S.tarjeta && !S.pendientes.some((p) => p.id === S.tarjeta.id)) { S.tarjeta = null; pintarDetalle(); }
             pintarLista();
         }
@@ -286,17 +286,25 @@
         const espHost = host.lastElementChild;
         const stmHost = h('div');
         // v1.3.54: «Programar ESP32 R1» del panel STM32 abre el flujo ESP32 con la misma R1 elegida
-        const stm = window.TQTSTM32(stmHost, Object.assign({}, ctx, { programarEsp32(p) { if (S.busy) return; modo(false); seleccionar(p); } }));
-        const btnStm = h('button', { class: 'btn btn-primary', type: 'button', 'aria-pressed': 'true', onclick: () => modo(true) }, 'R1 · STM32 / J-Link');
-        const btnEsp = h('button', { class: 'btn', type: 'button', 'aria-pressed': 'false', onclick: () => modo(false) }, 'ESP32 · USB serial');
-        function modo(isStm) {
-            if (S.busy || stm.ocupada()) return;
-            stmHost.hidden = !isStm; espHost.hidden = isStm;
-            btnStm.classList.toggle('btn-primary', isStm); btnEsp.classList.toggle('btn-primary', !isStm);
-            btnStm.setAttribute('aria-pressed', String(isStm)); btnEsp.setAttribute('aria-pressed', String(!isStm));
+        const stm = window.TQTSTM32(stmHost, Object.assign({}, ctx, { tipo: 'R1', programarEsp32(p) { if (S.busy) return; modo('esp'); seleccionar(p); } }));
+        // v1.3.55: R3 (STM32 «TIMER») con el mismo agente J-Link y firmware fijo
+        const r3Host = h('div');
+        const stm3 = window.TQTSTM32(r3Host, Object.assign({}, ctx, { tipo: 'R3' }));
+        const MODOS = {
+            stm: { host: stmHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('stm') }, 'R1 · STM32 / J-Link') },
+            esp: { host: espHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('esp') }, 'R2 · ESP32 · USB serial') },
+            r3: { host: r3Host, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('r3') }, 'R3 · STM32 / J-Link') },
+        };
+        let actual = 'stm';
+        function modo(id) {
+            if (S.busy || stm.ocupada() || stm3.ocupada()) return;
+            actual = id;
+            Object.entries(MODOS).forEach(([k, m]) => {
+                m.host.hidden = k !== id; m.btn.classList.toggle('btn-primary', k === id); m.btn.setAttribute('aria-pressed', String(k === id));
+            });
         }
-        host.prepend(h('div', { class: 'row wrap' }, btnStm, btnEsp));
-        host.append(stmHost); modo(true);
+        host.prepend(h('div', { class: 'row wrap' }, MODOS.stm.btn, MODOS.esp.btn, MODOS.r3.btn));
+        host.append(stmHost, r3Host); modo('stm');
 
         cargarPendientes();
         refrescarPuertosAutorizados();
@@ -308,11 +316,11 @@
         if (navigator.serial) { const onConn = () => refrescarPuertosAutorizados(); navigator.serial.addEventListener('connect', onConn); navigator.serial.addEventListener('disconnect', onConn); unsubs.push(() => { navigator.serial.removeEventListener('connect', onConn); navigator.serial.removeEventListener('disconnect', onConn); }); }
 
         return {
-            actualizar() { stm.actualizar(); if (!S.busy) cargarPendientes(); },
-            escaneo(codigo) { modo(true); return stm.escaneo(codigo); },
+            actualizar() { stm.actualizar(); stm3.actualizar(); if (!S.busy) cargarPendientes(); },
+            escaneo(codigo) { if (actual === 'r3') return stm3.escaneo(codigo); modo('stm'); return stm.escaneo(codigo); },
             desmontar() {
                 S.vivo = false;
-                stm.desmontar();
+                stm.desmontar(); stm3.desmontar();
                 timers.forEach((t) => clearTimeout(t)); timers.clear();
                 unsubs.forEach((u) => { try { u(); } catch (e) { /* nada */ } });
                 host.replaceChildren();

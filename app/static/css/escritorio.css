@@ -340,3 +340,32 @@ button.esc-det-fila:hover { background: var(--surface-2); }
 @media (min-width: 700px) { .sheet.esc-hoja-ancha { width: min(880px, 94vw); max-width: none; } }
 /* v1.3.44: cuenta de consulta (solo lectura) en la consola: se ocultan los botones que crean, editan, envían o borran */
 :root[data-rol="consultor"] [data-escribe] { display: none !important; }
+
+/* ---------- Tarjetas: panel de detalle, acciones por grupo y hoja de desemparejar ---------- */
+.esc-panel .esc-acc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.esc-panel .esc-acc-prim .btn { flex: 1 1 auto; justify-content: center; }
+.esc-panel .esc-acc-slots { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--bg-2); }
+.esc-panel .esc-acc-slots .row { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+.esc-panel .esc-acc-peligro { padding-top: 12px; border-top: 1px dashed var(--line-2); justify-content: flex-end; }
+.esc-entrega { padding: 12px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--bg-2); }
+.esc-entrega .silk { color: var(--muted); }
+.esc-error .btn { margin-top: 8px; }
+fieldset.des-que { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; padding: 10px 12px 12px; border: 1px solid var(--line-2); border-radius: var(--r-2); min-width: 0; }
+fieldset.des-que legend { padding: 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+label.esc-chk.des-op { display: flex; width: 100%; min-height: 44px; padding: 8px 12px; overflow-wrap: anywhere; font-family: var(--font-ui); transition: border-color .12s, background-color .12s; }
+label.esc-chk.des-op:hover { border-color: var(--accent); }
+label.esc-chk.des-op:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); box-shadow: inset 3px 0 0 var(--accent); }
+label.esc-chk.des-op:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+label.esc-chk.des-op input { flex: none; }
+@media (prefers-reduced-motion: reduce) { label.esc-chk.des-op { transition: none; } }
+@media (max-width: 900px) {
+  .esc-split[data-panel="1"] { grid-template-columns: minmax(0, 1fr); }
+  .esc-panel { position: static; max-height: none; }
+  .esc-bar > .esc-buscar, .esc-bar .esc-seg { max-width: 100%; }
+  .esc-seg { flex-wrap: wrap; }
+}
+@media (max-width: 640px) {
+  [data-sec="tarjetas"] .esc-entrega > div[style*="grid"] { grid-template-columns: minmax(0, 1fr) !important; }
+  [data-sec="tarjetas"] .esc-bar .input, [data-sec="tarjetas"] .esc-bar .btn { max-width: 100%; }
+  .esc-panel .esc-acc-peligro .btn { width: 100%; justify-content: center; }
+}

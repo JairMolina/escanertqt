@@ -43,7 +43,7 @@
                 { id: 'num', titulo: 'Tarjeta', cel: (t) => h('span', { class: 'mono', style: 'font-size:15px;font-weight:600' }, t.id_tarjeta_num), sort: (a, b) => util.cmp(a.id_tarjeta_num, b.id_tarjeta_num) },
                 { id: 'r1', titulo: 'R1', cel: (t) => util.placaCelda(conFw(t, 'r1'), 'R1'), valor: (t) => t.nombre_r1 },
                 { id: 'r2', titulo: 'R2', cel: (t) => util.placaCelda(conFw(t, 'r2'), 'R2'), valor: (t) => t.nombre_r2 },
-                { id: 'r3', titulo: 'R3', cls: 'c-2', cel: (t) => util.placaCelda(t.r3, 'R3'), valor: (t) => t.nombre_r3 },
+                { id: 'r3', titulo: 'R3', cls: 'c-2', cel: (t) => util.placaCelda(conFw(t, 'r3'), 'R3'), valor: (t) => t.nombre_r3 },
                 { id: 'entrega', titulo: 'Entrega', cls: 'c-3', cel: (t) => (t.fecha_real ? h('span', { class: 'mono' }, t.fecha_real) : h('span', { class: 'muted' }, '—')), valor: (t) => t.fecha_real || '' },
                 { id: 'gab', titulo: 'Gabinete', cls: 'c-3', cel: (t) => (t.gabinete ? T.badge(t.gabinete, 'info') : h('span', { class: 'muted' }, '—')), valor: (t) => t.gabinete || '' },
                 { id: 'estado', titulo: 'Estado', cel: (t) => T.tarjetaBadge(t), valor: (t) => T.estadoTarjeta(t).label },
@@ -96,20 +96,25 @@
                         h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => util.placaCard(s.toUpperCase(), conFw(t, s)))),
                         bloqueEntrega(t),
                         window.TQTMateriales ? window.TQTMateriales.bloque(t.id, ctx) : null,
-                        h('div', { class: 'acciones' },
-                            ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'row', style: 'gap:6px', 'data-escribe': true },
+                        h('div', { class: 'esc-acc esc-acc-prim' },
+                            h('a', { class: 'btn btn-primary', href: `/dymo?tarjeta_id=${t.id}` }, icon('printer'), 'Etiqueta DYMO'),
+                            h('a', { class: 'btn', href: `#/consultar?codigo=${encodeURIComponent((t.r1 || t.r2 || t.r3 || {}).nombre || String(t.id_tarjeta_num))}` }, icon('consultar'), 'Ver ficha'),
+                            h('button', { class: 'btn', type: 'button', onclick: () => util.copiar(util.resumenTarjeta(Object.assign({}, t, { r1: conFw(t, 'r1'), r2: conFw(t, 'r2'), r3: conFw(t, 'r3') })), 'Datos copiados') }, icon('paste'), 'Copiar datos')),
+                        h('div', { class: 'esc-acc esc-acc-slots', 'data-escribe': true },
+                            h('div', { class: 'silk' }, 'Placas de la tarjeta'),
+                            ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'row' },
+                                T.tipoChip(sl),
+                                h('div', { class: 'grow' }),
                                 h('button', { class: 'btn btn-sm', type: 'button', onclick: () => elegirPlaca(sl, `${t[sl.toLowerCase()] ? 'Cambiar' : 'Asignar'} ${sl} de la tarjeta ${t.id_tarjeta_num}`, async (np) => {
                                     const r = await api(`/api/tarjetas/${t.id}/asignar`, { method: 'PUT', body: { ranura: sl, pcb_id: np.id } });
                                     if (!r.ok) { toast(r.error, { kind: 'bad' }); return; } toast(`${sl} ${t[sl.toLowerCase()] ? 'cambiada' : 'asignada'}: ${np.nombre}`, { kind: 'ok' }); ctx.actualizar();
-                                }) }, icon('link'), `${t[sl.toLowerCase()] ? 'Cambiar' : 'Asignar'} ${sl}`),
+                                }) }, icon('link'), t[sl.toLowerCase()] ? 'Cambiar' : 'Asignar'),
                                 t[sl.toLowerCase()] ? h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Quitar la ${sl} de la tarjeta ${t.id_tarjeta_num}`, onclick: async () => {
                                     const r = await api(`/api/tarjetas/${t.id}/asignar`, { method: 'PUT', body: { ranura: sl, pcb_id: null } });
                                     if (!r.ok) { toast(r.error, { kind: 'bad' }); return; } toast(`${sl} quitada: quedó suelta`, { kind: 'ok' }); ctx.actualizar();
-                                } }, icon('unlink'), 'Quitar') : null)),
-                            h('a', { class: 'btn btn-primary', href: `/dymo?tarjeta_id=${t.id}` }, icon('printer'), 'Etiqueta DYMO'),
-                            h('a', { class: 'btn', href: `#/consultar?codigo=${encodeURIComponent((t.r1 || t.r2 || t.r3 || {}).nombre || String(t.id_tarjeta_num))}` }, icon('consultar'), 'Ver ficha'),
-                            h('button', { class: 'btn btn-danger', type: 'button', 'data-escribe': true, onclick: () => desemparejar([t.id]) }, icon('unlink'), 'Desemparejar'),
-                            h('button', { class: 'btn', type: 'button', onclick: () => util.copiar(util.resumenTarjeta(Object.assign({}, t, { r1: conFw(t, 'r1'), r2: conFw(t, 'r2') })), 'Datos copiados') }, icon('paste'), 'Copiar datos'))));
+                                } }, icon('unlink'), 'Quitar') : null))),
+                        h('div', { class: 'esc-acc esc-acc-peligro', 'data-escribe': true },
+                            h('button', { class: 'btn btn-danger', type: 'button', onclick: () => desemparejar([t.id]) }, icon('unlink'), 'Desemparejar'))));
                 split.append(panel);
                 if (enfocar) panel.focus({ preventScroll: true });
             }
@@ -216,11 +221,29 @@
                 const err = h('div', { class: 'hint err', role: 'alert' });
                 const nums = items.slice(0, 12).map((t) => t.id_tarjeta_num).join(', ') + (items.length > 12 ? ` y ${items.length - 12} más` : '');
                 const n = items.length;
+                // v1.3.56: con UNA tarjeta se elige qué desemparejar: toda, o solo su R1, R2 o R3 (las demás siguen emparejadas)
+                const uno = n === 1 ? items[0] : null;
+                const opciones = uno ? [['todo', 'Toda la tarjeta (R1, R2 y R3)'], ...['R1', 'R2', 'R3'].filter((sl) => uno[sl.toLowerCase()])
+                    .map((sl) => [sl, `Solo la ${sl} · ${uno[sl.toLowerCase()].nombre}`])] : [];
+                const radios = opciones.map(([v, txt], i) => h('label', { class: 'esc-chk des-op' },
+                    h('input', { type: 'radio', name: 'desQue', value: v, checked: i === 0, onchange: () => { chkForzar.hidden = v !== 'todo'; boton(); } }), txt));
+                const que = () => (radios.find((l) => l.firstChild.checked) || { firstChild: { value: 'todo' } }).firstChild.value;
+                const chkForzar = h('label', { class: 'esc-chk', for: 'desForzar' }, forzar, 'Incluir las que ya tienen pruebas registradas');
+                let btnOk = null;
+                const boton = () => { if (!btnOk) btnOk = [...document.querySelectorAll('.sheet .actions .btn-danger')].pop(); if (btnOk) btnOk.textContent = que() === 'todo' ? `Desemparejar ${n}` : `Quitar ${que()}`; };
                 sheet({ title: ids ? `¿Desemparejar ${n} tarjeta${n === 1 ? '' : 's'}?` : `¿Desemparejar TODAS las tarjetas (${n})?`, body: [
                     h('p', null, 'Las placas R1/R2/R3 vuelven al inventario como sueltas y se pueden emparejar otra vez. Las placas y sus MAC no se borran.'),
                     h('p', { class: 'mono muted', style: 'max-height:96px;overflow:auto' }, nums),
-                    h('label', { class: 'esc-chk', for: 'desForzar' }, forzar, 'Incluir las que ya tienen pruebas registradas'), err],
+                    radios.length > 1 ? h('fieldset', { class: 'des-que' }, h('legend', null, '¿Qué quieres desemparejar?'), ...radios) : null,
+                    chkForzar, err],
                 actions: [{ label: 'Conservar', kind: 'ghost', onClick: () => true }, { label: `Desemparejar ${n}`, kind: 'danger', keepOpen: true, onClick: async () => {
+                    const q = que();
+                    if (uno && q !== 'todo') {
+                        const r = await api(`/api/tarjetas/${uno.id}/asignar`, { method: 'PUT', body: { ranura: q, pcb_id: null } });
+                        if (!r.ok) { err.textContent = r.error; return false; }
+                        toast(`${q} quitada de la tarjeta ${uno.id_tarjeta_num}: ${uno[q.toLowerCase()].nombre} quedó suelta`, { kind: 'ok' });
+                        ctx.actualizar(); return true;
+                    }
                     const body = ids ? { ids, forzar: forzar.checked } : { todas: true, lote_id: loteId(), forzar: forzar.checked };
                     const r = await api('/api/tarjetas/disolver', { method: 'POST', body });
                     if (!r.ok) { err.textContent = r.error; return false; }
