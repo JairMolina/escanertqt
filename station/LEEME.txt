@@ -15,4 +15,5 @@ Conserva los resultados locales en resultados/. Si se pierde la conexión al rep
 Usa una R1 de laboratorio para la primera prueba. Una identidad no identifica por sí sola la PCB física: debes comprobar la unidad conectada.
 Referencia de comandos: https://kb.segger.com/J-Link_Commander
 
+Bluetooth LE (Pruebas y validación): el agente usa bleak (lo instala instalar.ps1; manual: python -m pip install --user "bleak>=0.22,<3") y el Bluetooth de este PC.
 Diagnóstico sin programar: python agent.py --check

@@ -13,9 +13,6 @@ window.TQTSTM32 = function (host, ctx) {
     const station = h('select', { class: 'input', id: ID + '-est' });
     const stationName = h('input', { class: 'input', value: 'PC de programación', id: ID + '-est-nombre', maxlength: 60 });
     const btnProgram = h('button', { class: 'btn btn-primary', type: 'button', disabled: true, onclick: program }, 'Programar STM32 con J-Link');
-    const btnHex = h('button', { class: 'btn', type: 'button', disabled: true, onclick: async () => {
-        try { await download('/api/stm32/hex/' + current.pcb_id); } catch (e) { message(e.message, true); }
-    } }, 'Descargar HEX de esta ' + K);
     // v1.3.54: orden de programación de la pareja: ESP32 de R2 (MAC) → STM32 de R1 → ESP32 de R1 (MAC de R1)
     const btnEsp = K !== 'R1' ? null : h('button', { class: 'btn', type: 'button', disabled: true, onclick: async () => {
         if (busy || !selectedPcb) return;
@@ -59,7 +56,7 @@ window.TQTSTM32 = function (host, ctx) {
             h('div', { class: 'field' }, h('label', { for: ID + '-est-nombre' }, 'Nombre de estación Windows'), stationName),
             h('div', { class: 'row wrap' }, bundleBtn),
             h('p', { class: 'hint' }, 'Abre el archivo Instalar_TQT descargado una sola vez: instala el agente y lo deja iniciando con Windows en segundo plano. Después, todas las grabaciones se controlan desde esta pantalla. Usa Python 3.10+ y J-Link de SEGGER o STM32CubeIDE ya instalados.')),
-          h('div', { class: 'row wrap' }, btnProgram, btnEsp, btnHex, btnSubir, hexIn),
+          h('div', { class: 'row wrap' }, btnProgram, btnEsp, btnSubir, hexIn),
           h('p', { class: 'hint' }, K === 'R1' ? 'Orden de la pareja: 1) ESP32 de la R2 (da su MAC) · 2) STM32 de la R1 con la MAC y número de la R2 · 3) ESP32 de la R1 (da la MAC de la R1).' : 'La R3 lleva un firmware fijo (sin MAC ni identidad por unidad). Al verificarse queda registrada como programada.'), status)));
     function message(text, bad = false) { status.replaceChildren(T.banner(bad ? 'bad' : 'info', bad ? 'alert' : 'info', text)); }
     function progress(job) {
@@ -88,7 +85,6 @@ window.TQTSTM32 = function (host, ctx) {
     function enable() {
         btnProgram.textContent = busy ? 'Programando…' : current ? 'Programar ' + K + ' ' + current.identity.nombre.slice(-4) + ' con J-Link' : 'Programar STM32 con J-Link';
         btnProgram.disabled = busy || !current || !station.value || station.selectedOptions[0]?.dataset.online !== 'true';
-        btnHex.disabled = busy || !current;
         if (btnEsp) btnEsp.disabled = busy || !current;
         btnSubir.disabled = busy;
         search.disabled = busy; lookup.disabled = busy; station.disabled = busy; bundleBtn.disabled = busy;

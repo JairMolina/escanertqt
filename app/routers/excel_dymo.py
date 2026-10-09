@@ -352,12 +352,34 @@ class ImpresasRequest(BaseModel):
     marcas: List[Dict[str, Any]] = Field(..., max_length=500, description="[{id, firma}] de las etiquetas enviadas con éxito a la DYMO")
 
 
+def _firma_etiqueta(t: Dict[str, Any]) -> str:
+    """Misma firma que calcula dymo.js (modo|R1|R2) a partir del estado ACTUAL de la tarjeta en la base."""
+    r1, r2 = t.get("r1"), t.get("r2")
+    if not (r1 and r2):
+        k = "NO"
+    else:
+        k = "FINAL" if (r1.get("mac") and r2.get("mac")) else "IDENTIFICACION"
+    return f"{k}|{t.get('nombre_r1') or ''}|{t.get('nombre_r2') or ''}"
+
+
 @router.post("/dymo/impresas", summary="Registrar etiquetas DYMO impresas (se muestran en color en el lote)")
 def marcar_impresas(payload: ImpresasRequest):
-    pares = [(str(m["firma"])[:120], int(m["id"])) for m in payload.marcas if m.get("firma") and str(m.get("id", "")).isdigit()]
+    """Marca cada tarjeta como impresa. La firma se calcula aquí con el estado actual de la tarjeta (así coincide con lo que
+    la lista compara aunque el navegador tuviera datos viejos); si la tarjeta no existe se usa la firma enviada. Devuelve
+    las firmas guardadas para que la pantalla se actualice de inmediato."""
+    ids = [int(m["id"]) for m in payload.marcas if str(m.get("id", "")).isdigit()]
+    enviadas = {int(m["id"]): str(m.get("firma") or "")[:120] for m in payload.marcas if str(m.get("id", "")).isdigit()}
+    firmas: Dict[int, str] = {}
     with db.transaction() as c:
-        c.executemany("UPDATE tarjetas_produccion SET etiqueta_firma = ? WHERE id = ?", pares)
-    return {"ok": True, "n": len(pares)}
+        for tid in dict.fromkeys(ids):
+            t = db.get_tarjeta_by_id(tid, c)
+            f = _firma_etiqueta(t) if t else ""
+            if t and f.startswith("NO|"):
+                f = enviadas.get(tid, "")
+            if f:
+                firmas[tid] = f[:120]
+        c.executemany("UPDATE tarjetas_produccion SET etiqueta_firma = ? WHERE id = ?", [(f, i) for i, f in firmas.items()])
+    return {"ok": True, "n": len(firmas), "firmas": {str(i): f for i, f in firmas.items()}}
 
 
 @router.get("/dymo/lote/archivo", summary="ZIP con un .dymo por tarjeta (ids de tarjeta separados por coma)")

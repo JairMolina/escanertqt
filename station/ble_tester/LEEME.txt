@@ -1,0 +1,56 @@
+TQT BLE TESTER v1.1
+===================
+Programa para Windows 10/11 con Bluetooth Low Energy (BLE).
+
+FUNCIONES
+- Busca dispositivos BLE y SOLO muestra los que contienen 'TQT' en su nombre.
+- Muestra nombre anunciado y direccion Bluetooth/MAC que reporta Windows.
+- Incluye boton COPIAR MAC para la fila seleccionada, sin conectar a BLE.
+- Selecciona un dispositivo y se conecta por BLE.
+- Permite enviar exactamente PPON y POFF (sin \r ni \n).
+- Recibe notificaciones BLE si la caracteristica del firmware las admite.
+- Registra intentos de conexion, comandos y errores.
+
+UUID TQT R2 (de firmware previo)
+Servicio:        4fafc201-1fb5-459e-8fcc-c5c9c331914b
+Caracteristica:  beb5483e-36e1-4688-b7f5-ea07361b26a8
+
+COMO OBTENER EL EXE
+1. En Windows 10/11 instala Python 3 desde python.org (si aun no lo tienes).
+   Es recomendable Python 3.12 o 3.13 y marcar Add Python to PATH.
+2. Enciende Bluetooth en tu laptop.
+3. Descomprime la carpeta en una ruta local.
+4. Haz doble clic en CREAR_EXE_WINDOWS.bat. Requiere internet la primera vez
+   para descargar las dependencias. Puede tardar unos minutos.
+5. El resultado estara en: dist\TQT_BLE_Tester.exe
+6. Usa el EXE directamente. No necesita Python instalado en la PC de destino,
+   pero si necesita Bluetooth BLE y que Windows permita buscar dispositivos.
+
+USO
+1. Enciende la tarjeta TQT y dejala anunciandose mediante BLE.
+2. Abre la aplicacion. Escaneara automaticamente durante 7 segundos.
+3. Selecciona una fila que muestre nombre y MAC.
+4. Si solo necesitas la MAC, pulsa COPIAR MAC y pegala con Ctrl+V donde quieras.
+   No es necesario conectarse a la TQT para copiar la MAC.
+5. Para ejecutar pruebas, pulsa CONECTAR y espera a que muestre CONECTADO.
+6. Pulsa PPON o POFF. El panel de registro mostrara si GATT envio el comando.
+7. Pulsa DESCONECTAR para volver a buscar.
+
+NOTAS IMPORTANTES
+- Los botones actuan sobre salidas fisicas segun el firmware: prueba la tarjeta
+  en un banco seguro y no con cargas peligrosas conectadas.
+- 'TX BLE' confirma la escritura/cola GATT, NO garantiza que el firmware haya
+  ejecutado la accion, salvo que este envie una confirmacion por notificacion.
+- La direccion BLE que Windows reporta puede diferir de la MAC Wi-Fi o ser
+  una direccion aleatoria del dispositivo, segun la configuracion BLE.
+- Solo sirve directamente con firmware TQT que use el servicio/caracteristica
+  UUID indicados y acepte PPON/POFF tal cual, sin terminadores.
+- Si el escaneo no encuentra nada, revisa Bluetooth y que la tarjeta anuncie
+  un nombre que contenga 'TQT'.
+- En una laptop que no tenga BLE integrado se necesita adaptador USB BLE.
+
+ARCHIVOS
+TQT_BLE_Tester.py           Codigo fuente completo
+requirements.txt            Dependencia Bleak
+CREAR_EXE_WINDOWS.bat       Compila el EXE en la laptop Windows
+INICIAR_PRUEBA_WINDOWS.bat  Ejecuta el codigo Python (tras preparar entorno)

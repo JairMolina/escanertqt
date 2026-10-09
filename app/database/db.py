@@ -628,6 +628,8 @@ _SELECT_TARJETA = f"""
         t.pcb_r1_id, t.pcb_r2_id, t.pcb_r3_id,
         COALESCE(p1.firmware, t.firmware_r1) AS firmware_r1, COALESCE(p2.firmware, t.firmware_r2) AS firmware_r2,
         p3.firmware AS firmware_r3,
+        (SELECT GROUP_CONCAT(DISTINCT v.comando) FROM validaciones_ble v WHERE v.resultado = 'ok' AND v.comando IN ('PPON', 'POFF')
+           AND (v.tarjeta_id = t.id OR v.pcb_id IN (t.pcb_r1_id, t.pcb_r2_id, t.pcb_r3_id))) AS _validacion,
         t.semana_produccion, t.fecha_proyectada, t.fecha_real, t.fecha_llegada, t.fecha_finalizado, t.gabinete, t.etiqueta_firma,
         t.created_at, t.updated_at,
         {_cols_pcb('p1', 'R1')},
@@ -659,6 +661,10 @@ def _fila_a_tarjeta(row: sqlite3.Row) -> Dict[str, Any]:
             "firmware": d.get(f"firmware_{r}"),
         }
     d["completa"] = bool(d["r1"] and d["r2"])
+    # v1.3.59: validada = PPON y POFF enviados con éxito por BLE (sección Pruebas y validación)
+    ok = {x for x in (d.pop("_validacion", None) or "").split(",") if x}
+    d["validacion"] = sorted(ok)
+    d["validada"] = {"PPON", "POFF"} <= ok
     d["sin_mac"] = [r.upper() for r in ("r1", "r2") if d[r] and not d[r]["mac"]]
     return d
 

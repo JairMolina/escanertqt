@@ -12,10 +12,15 @@ if (-not $python) { throw 'Se necesita Python 3.10 o superior. Instala Python de
 $python = [string]$python
 & $python -c 'import sys; assert sys.version_info >= (3,10)'
 if ($LASTEXITCODE -ne 0) { throw 'Se necesita Python 3.10 o superior.' }
+# BLE para Pruebas y validacion (opcional): si falla, el resto del agente sigue funcionando.
+try {
+    & $python -m pip install --user --disable-pip-version-check -q "bleak>=0.22,<3"
+    if ($LASTEXITCODE -ne 0) { throw 'pip fallo' }
+} catch { Write-Warning 'No se pudo instalar bleak; Pruebas y validacion por Bluetooth no estara disponible.' }
 Push-Location -LiteralPath $PSScriptRoot
 try {
     & $python -c 'import agent; print(agent.find_jlink())'
-    if ($LASTEXITCODE -ne 0) { throw 'No se encontro J-Link. Instala SEGGER J-Link o STM32CubeIDE y vuelve a ejecutar el instalador.' }
+    if ($LASTEXITCODE -ne 0) { Write-Output 'Aviso: no se encontro J-Link. El agente funcionara para pruebas Bluetooth; para programar STM32 instala SEGGER J-Link o STM32CubeIDE.' }
 } finally { Pop-Location }
 $destination = Join-Path $env:LOCALAPPDATA ('TQT\STM32Agent\' + $cfg.station_id)
 New-Item -ItemType Directory -Path $destination -Force | Out-Null

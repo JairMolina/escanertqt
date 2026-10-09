@@ -1,5 +1,30 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.63 — 2026-10-09
+- **Pruebas y validación:** se quitó el aviso «No hay ninguna laptop con el agente conectada»; si no hay laptops conectadas, el selector lo indica y aparece «Instalar agente en esta laptop» en la misma sección. El Bluetooth lo usa el agente de la laptop (el navegador no ve la radio de la PC), por eso la lista sale vacía hasta instalarlo.
+- **Agente 1.3.63:** J-Link pasa a ser opcional (antes el agente y el instalador se detenían sin J-Link, así que una laptop solo para Bluetooth nunca aparecía conectada); sin J-Link solo rechaza trabajos STM32.
+
+## v1.3.62 — 2026-10-09
+- **Etiquetas DYMO: impresas que no se marcaban.** La firma de «impresa» la calculaba el navegador con datos viejos (p. ej. MAC registrada después de abrir la página o tarjeta de otro lote) y no coincidía con la etiqueta real; ahora `POST /api/dymo/impresas` la calcula con el estado actual en la base y la devuelve. El registro se espera, reintenta y avisa si falla; cada etiqueta se marca en cuanto sale y la vista se actualiza al momento; el escaneo usa la ficha fresca. Las R3 y R1/R2 sueltas se imprimen pero no quedan registradas (se avisa).
+- **Programación ESP32 de R2 con firmware V3.1 (FW 3.1.2)** según la especificación «Programador Web TQT R2 Arduino CLI»: solo se sustituye la directiva `#define Nombre_Del_Ble` en una copia temporal, con nombre calculado del inventario (`TQT_R2_V30_` + 4 dígitos, sin editar el prefijo); se rechazan números inválidos y fuentes sin la directiva, duplicada o dinámica, y se aborta si cambia otra línea. Hashes SHA-256 de fuente y copia. Asistente de BOOT/RESET manual antes y después de grabar; tras el arranque se envía `MAC` y se valida que el nombre BLE reportado sea exactamente el esperado («Identidad incorrecta» si no); si la placa ya tenía otra MAC pide autorización explícita. Se registra FW 3.1.2. La versión V2.1 anterior se conserva.
+
+## v1.3.61 — 2026-10-09
+- **Pruebas y validación sin ventana emergente.** La búsqueda y conexión Bluetooth la hace el agente Windows de la laptop (bleak, como el tester v1.1) y todo se muestra dentro de la página: selector de laptop, «Buscar placas», lista con dirección Bluetooth y RSSI, Conectar/Desconectar y ON/OFF. Se quitó Web Bluetooth. Servidor: cola de trabajos `/api/validacion/ble/trabajos|estado` y rutas del agente `/api/stm32/agent/ble/claim|evento|{id}/resultado`; cada conexión, comando, notificación y desconexión se registra solo en el historial (evento BLE_ESTADO).
+- **Agente 1.3.61.** Reinstalar desde Programación › «Instalar agente en esta laptop»: instala bleak y atiende Bluetooth en un hilo aparte sin afectar la programación STM32.
+
+## v1.3.60 — 2026-10-09
+- **Pruebas y validación.** Botones renombrados a «ON · Meter perno» y «OFF · Sacar perno» (por BLE se siguen enviando PPON/POFF; el historial también muestra los nombres nuevos). Se quitaron los avisos de seguridad y de la MAC BLE. Las placas ya permitidas se listan y conectan dentro de la página (`navigator.bluetooth.getDevices`); el selector del navegador solo aparece con «Buscar placa nueva».
+
+## v1.3.59 — 2026-10-09
+- **Nuevo estado «Validada» en Tarjetas.** Una tarjeta es validada cuando en «Pruebas y validación» se enviaron con éxito PPON y POFF a ella o a cualquiera de sus placas. Badge «Completa · validada», filtro «Validadas» (orden: Falta placa → Sin MAC → Programadas → Validadas → Completas) y refresco automático de la consola al registrar una prueba BLE (evento VALIDACION_BLE). La tabla `validaciones_ble` ahora se crea con el esquema principal.
+
+## v1.3.58 — 2026-10-09
+- **Nueva sección «Pruebas y validación»** (Operación, debajo de Consultar). Prueba por Bluetooth LE desde Chrome/Edge (Web Bluetooth): conecta al dispositivo «TQT…», envía PPON/POFF exactos, muestra notificaciones y un registro; se vincula a una placa/tarjeta por código, QR o escáner remoto. Cada conexión, comando y respuesta queda en la tabla `validaciones_ble` (`/api/validacion/registros`, `/resumen`) con historial, KPIs del día y aviso por WebSocket. Botón para descargar el tester Windows v1.1 (`/api/validacion/tester.zip`, en `station/ble_tester/`) cuando el navegador no tiene Bluetooth; el navegador no expone la MAC BLE.
+
+## v1.3.57 — 2026-10-09
+- **Tarjetas: «Reporte por fecha» desplegable.** Se muestra cerrado; recuerda si lo dejaste abierto y se abre solo si ya hay fechas elegidas.
+- **Programación: se quitó «Descargar HEX»** en R1 y R3 (sigue «Subir HEX» para leer la versión de un firmware).
+
 ## v1.3.56 — 2026-10-09
 - **Desemparejar una sola placa.** Al desemparejar UNA tarjeta, la hoja pregunta qué desemparejar: toda la tarjeta o solo su R1, R2 o R3 (la placa elegida queda suelta y las demás siguen emparejadas, conservando las pruebas). Con varias tarjetas se desemparejan completas como antes.
 - **Tarjetas: diseño y revisión.** Mejoras de diseño y estilo en la lista y el detalle, y revisión de las funciones compartidas con otras secciones.

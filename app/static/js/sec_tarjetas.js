@@ -12,7 +12,7 @@
         montar(host, ctx) {
             const { T, api, h, icon, toast, sheet, util } = ctx;
             const P = ctx.params();
-            const st = { tars: null, error: '', estado: ['completa', 'incompleta', 'sin_mac', 'programada'].includes(P.get('estado')) ? P.get('estado') : '', q: P.get('q') || '', sort: { id: 'num', dir: 'asc' }, sug: null, limit: 200, abierta: P.get('id') ? +P.get('id') : null, sel: new Set() };
+            const st = { tars: null, error: '', estado: ['completa', 'incompleta', 'sin_mac', 'programada', 'validada'].includes(P.get('estado')) ? P.get('estado') : '', q: P.get('q') || '', sort: { id: 'num', dir: 'asc' }, sug: null, limit: 200, abierta: P.get('id') ? +P.get('id') : null, sel: new Set() };
             const conFw = (t, s) => { const p = t[s]; return p ? Object.assign({}, p, { firmware: p.firmware || t['firmware_' + s] || null }) : null; };
 
             const q = h('input', { class: 'input', type: 'search', id: 'tarQ', placeholder: 'Número, serie o MAC', 'aria-label': 'Buscar tarjeta por número, nombre de placa o MAC', 'data-buscar': '1', value: st.q, autocomplete: 'off' });
@@ -311,14 +311,18 @@
             desdeIn.addEventListener('change', () => { if (hastaIn.value && hastaIn.value < desdeIn.value) hastaIn.value = ''; hastaIn.min = desdeIn.value; reporteDia(); });
             hastaIn.addEventListener('change', reporteDia);
             hastaIn.min = desdeIn.value;
-            const diaBox = h('section', { class: 'esc-blk esc-dia', 'aria-label': 'Reporte por fecha' },
+            // v1.3.57: desplegable; se recuerda abierto/cerrado y se abre solo si ya hay fechas elegidas
+            let diaAbierto = false; try { diaAbierto = localStorage.getItem('tqt.tar.reporte') === '1'; } catch (e) { /* nada */ }
+            const diaBox = h('details', { class: 'esc-blk esc-dia', open: diaAbierto || !!desdeIn.value },
+                h('summary', { class: 'esc-dia-sum' }, h('span', { class: 'esc-dia-lbl' }, icon('clock'), 'Reporte por fecha'),
+                    h('span', { class: 'muted esc-dia-sum-h' }, 'Tarjetas completadas o entregadas por día o rango')),
                 h('div', { class: 'esc-dia-bar' },
-                    h('span', { class: 'esc-dia-lbl' }, icon('clock'), 'Reporte por fecha'),
                     h('label', { class: 'esc-dia-campo' }, h('span', { class: 'muted' }, 'Desde'), desdeIn),
                     h('label', { class: 'esc-dia-campo' }, h('span', { class: 'muted' }, 'Hasta'), hastaIn),
                     h('div', { class: 'esc-dia-atajos', role: 'group', 'aria-label': 'Rangos rápidos' }, atajoBtns),
                     h('div', { class: 'grow' }), btnQuitarDia, btnXls, btnMailDia),
                 diaRes);
+            diaBox.addEventListener('toggle', () => { try { localStorage.setItem('tqt.tar.reporte', diaBox.open ? '1' : '0'); } catch (e) { /* nada */ } });
             host.append(h('div', { class: 'esc-bar' }, h('div', { class: 'esc-buscar' }, icon('search'), q), h('div', { class: 'esc-seg', role: 'group', 'aria-label': 'Estado de la tarjeta' }, segBtns), h('div', { class: 'grow' }), selR3, btnEmp, btnTodas, info), diaBox, barSel, sugBox, split);
             reporteDia();
             cargar(true);

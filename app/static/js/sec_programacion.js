@@ -14,9 +14,11 @@
     const PASOS = [
         { id: 'compilar', t: 'Compilar firmware' },
         { id: 'puerto', t: 'Puerto elegido' },
+        { id: 'boot', t: 'BOOT + RESET (manual)' },
         { id: 'sync', t: 'Modo programador' },
         { id: 'flash', t: 'Flashear' },
-        { id: 'mac', t: 'Leer MAC' },
+        { id: 'arranque', t: 'Soltar BOOT + RESET' },
+        { id: 'mac', t: 'Leer nombre y MAC' },
     ];
 
     function hexDe(s) { return String(s || '').replace(/[^0-9A-Fa-f]/g, ''); }
@@ -143,12 +145,14 @@
                 try { const j = await resp.json(); msg = (j && j.detail) || msg; } catch (e) { /* sin cuerpo JSON */ }
                 throw new Error('No se pudo compilar el firmware: ' + msg);
             }
-            return new Uint8Array(await resp.arrayBuffer());
+            // v1.3.62: el servidor devuelve el nombre BLE esperado y la versión para validar tras el arranque
+            const hd = (k) => resp.headers.get('X-TQT-' + k) || '';
+            return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), sha: hd('Fuente-Sha256') };
         }
         async function leerMacPorSerial(port) {
             try { if (port.readable || port.writable) await port.close(); } catch (e) { /* ya estaba cerrado */ }
             await port.open({ baudRate: 115200 });
-            let mac = null;
+            let mac = null, nombre = null;
             try {
                 await new Promise((res) => setTimeout(res, 300));
                 const writer = port.writable.getWriter();
@@ -166,7 +170,10 @@
                         buffer += paso.value || '';
                         const lineas = buffer.split('\n');
                         buffer = lineas.pop();
-                        for (const linea of lineas) { const m = extraerMac(linea); if (m) { mac = m; break; } }
+                        for (const linea of lineas) {
+                            // v1.3.62: la R2 responde «<nombre> MAC: AA:BB:…»; se guarda la línea completa para validar el nombre
+                            const m = extraerMac(linea); if (m) { mac = m; nombre = (/^\s*(\S+)\s+MAC:/i.exec(linea) || [])[1] || null; break; }
+                        }
                     }
                 } finally {
                     try { await reader.cancel(); } catch (e) { /* nada */ }
@@ -175,7 +182,15 @@
             } finally {
                 try { await port.close(); } catch (e) { /* nada */ }
             }
-            return mac;
+            return { mac, nombre };
+        }
+        /** Hoja de confirmación dentro del flujo (sin confirm()): resuelve true al continuar, false al cancelar. */
+        function confirmar(titulo, texto, ok) {
+            return new Promise((res) => {
+                let hecho = false; const fin = (v) => { if (!hecho) { hecho = true; res(v); } return true; };
+                T.sheet({ title: titulo, body: h('p', null, texto), onClose: () => fin(false),
+                    actions: [{ label: 'Cancelar', kind: 'ghost', onClick: () => fin(false) }, { label: ok || 'Listo, continuar', kind: 'primary', onClick: () => fin(true) }] });
+            });
         }
 
         function mostrarResultado(pcb, mac) {
@@ -199,11 +214,16 @@
             try {
                 marcarPaso('compilar', 'activo');
                 escribir(`Compilando firmware de ${pcb.tipo}…`);
-                const binario = await compilarFirmware(pcb);
+                const fw = await compilarFirmware(pcb); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
                 marcarPaso('compilar', 'ok');
-                escribir(`Firmware listo (${(binario.length / 1024).toFixed(0)} KB).`);
+                escribir(`Firmware listo (${(binario.length / 1024).toFixed(0)} KB)${fw.firmware ? ' · FW ' + fw.firmware : ''}${fw.nombreBle ? ' · nombre BLE ' + fw.nombreBle : ''}.`);
 
                 marcarPaso('puerto', 'ok');
+                if (esR2) {
+                    marcarPaso('boot', 'activo');
+                    if (!await confirmar('Modo descarga de la R2', 'Conecta el USB–TTL, mantén GPIO0 (BOOT) en bajo y haz RESET. Confirma cuando esté listo.', 'Ya está en BOOT')) throw new Error('Cancelado antes de programar: no se grabó nada.');
+                }
+                marcarPaso('boot', 'ok');
                 const esptool = await cargarEsptool();
                 const transport = new esptool.Transport(port, true);
                 const loader = new esptool.ESPLoader({
@@ -229,14 +249,22 @@
                 try { await transport.disconnect(); } catch (e) { /* ya se cerró al reiniciar */ }
                 marcarPaso('flash', 'ok');
 
+                if (esR2) {
+                    marcarPaso('arranque', 'activo');
+                    if (!await confirmar('Arranque normal', 'Suelta BOOT (GPIO0) y haz RESET para que arranque el firmware. Confirma cuando esté listo.', 'Ya reinicié')) throw new Error('Grabado, pero sin verificar: falta arrancar en modo normal y leer nombre/MAC.');
+                }
+                marcarPaso('arranque', 'ok');
                 marcarPaso('mac', 'activo');
-                escribir('Leyendo la MAC por USB…');
-                const mac = await leerMacPorSerial(port);
-                if (!mac) throw new Error('No se detectó la MAC por USB. Puedes teclearla a mano en «MAC y firmware».');
+                escribir('Leyendo nombre y MAC por USB…');
+                const leido = await leerMacPorSerial(port); const mac = leido.mac;
+                if (!mac) throw new Error('No se detectó la MAC por USB (sin comunicación). Revisa que soltaste BOOT y reiniciaste; puedes teclearla en «MAC y firmware».');
+                if (esR2 && fw.nombreBle && leido.nombre !== fw.nombreBle) throw new Error(`Identidad incorrecta: la placa respondió «${leido.nombre || 'sin nombre'}» y se esperaba «${fw.nombreBle}». No se guardó la MAC.`);
+                if (pcb.mac && pcb.mac.toUpperCase() !== mac && !await confirmar('MAC diferente', `${pcb.nombre} ya tiene la MAC ${pcb.mac} y la placa respondió ${mac}. ¿Reemplazarla? Hazlo solo si confirmaste que es la misma placa física.`, 'Reemplazar MAC')) throw new Error('MAC en conflicto: no se cambió el registro.');
                 marcarPaso('mac', 'ok');
-                escribir('MAC leída: ' + mac);
+                escribir('MAC leída: ' + mac + (leido.nombre ? ' · nombre ' + leido.nombre : ''));
 
-                const res = await api(`/api/pcb/${pcb.id}/programacion`, { method: 'PUT', body: { mac } });   // sin firmware: aquí no se elige versión
+                const cuerpo = { mac }; if (esR2 && fw.firmware) cuerpo.firmware = fw.firmware;   // R1: aquí no se elige versión
+                const res = await api(`/api/pcb/${pcb.id}/programacion`, { method: 'PUT', body: cuerpo });
                 if (!res.ok) throw new Error(res.network ? 'Sin conexión con el servidor: no se guardó.' : res.error);
                 escribir('Guardado ✓');
                 toast(`${pcb.nombre}: MAC ${mac} guardada`, { kind: 'ok' });

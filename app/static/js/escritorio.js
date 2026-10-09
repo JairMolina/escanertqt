@@ -587,6 +587,8 @@
         PCB_ELIMINADA: (d) => ['warn', d && d.nombre ? `Eliminada ${d.nombre}` : 'Placa eliminada'],
         RECEPCION_CONFIRMADA: (d) => ['ok', `Recepción confirmada${d && d.confirmadas ? ` (${d.confirmadas} placas)` : ''}`],
         TARJETA_EMPAREJADA: (d) => ['ok', d && d.tarjeta ? `Tarjeta ${d.tarjeta.id_tarjeta_num} emparejada` : 'Tarjeta emparejada'],
+        // v1.3.59: una prueba BLE puede volver «Validada» una tarjeta
+        VALIDACION_BLE: (d) => [d && d.resultado === 'error' ? 'warn' : 'info', `Prueba BLE ${d && d.comando ? d.comando : ''}${d && d.tarjeta ? ' · tarjeta ' + d.tarjeta.id_tarjeta_num : ''}`],
         TARJETA_ACTUALIZADA: (d) => ['info', d && d.tarjeta ? `Tarjeta ${d.tarjeta.id_tarjeta_num} actualizada` : (d && d.eliminada ? `Tarjeta ${d.id_tarjeta_num || ''} eliminada` : 'Tarjeta actualizada')],
         ADMIN_CAMBIO: () => ['warn', 'Cambio de administración'],
         EXCEL_IMPORTADO: () => ['info', 'Excel importado'],

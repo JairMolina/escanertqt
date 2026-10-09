@@ -369,3 +369,14 @@ label.esc-chk.des-op input { flex: none; }
   [data-sec="tarjetas"] .esc-bar .input, [data-sec="tarjetas"] .esc-bar .btn { max-width: 100%; }
   .esc-panel .esc-acc-peligro .btn { width: 100%; justify-content: center; }
 }
+
+/* v1.3.57: «Reporte por fecha» desplegable */
+details.esc-dia > summary.esc-dia-sum { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; cursor: pointer; list-style: none; padding: 2px 0; }
+details.esc-dia > summary.esc-dia-sum::-webkit-details-marker { display: none; }
+details.esc-dia > summary.esc-dia-sum::after { content: ''; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .15s; opacity: .7; }
+details.esc-dia[open] > summary.esc-dia-sum::after { transform: rotate(-135deg); }
+details.esc-dia > summary.esc-dia-sum:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; border-radius: 6px; }
+details.esc-dia[open] > summary.esc-dia-sum { margin-bottom: 10px; }
+.esc-dia-sum-h { font-size: .85em; }
+@media (max-width: 640px) { .esc-dia-sum-h { display: none; } }
+@media (prefers-reduced-motion: reduce) { details.esc-dia > summary.esc-dia-sum::after { transition: none; } }

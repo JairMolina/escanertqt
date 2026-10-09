@@ -174,11 +174,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // si la tarjeta cambia después de imprimir, vuelve a figurar pendiente.
     const firma = (t) => `${modo(t).k}|${t.nombre_r1 || ''}|${t.nombre_r2 || ''}`;
     const yaImpresa = (t) => !!t.etiqueta_firma && t.etiqueta_firma === firma(t);
-    function marcarImpresa(t) { t.etiqueta_firma = firma(t); api('/api/dymo/impresas', { method: 'POST', body: { marcas: [{ id: t.id, firma: t.etiqueta_firma }] } }); }
+    /** Marca la tarjeta como impresa. Se espera la respuesta: el servidor devuelve la firma que guardó (calculada con el estado
+     *  actual de la base) y se aplica a TODAS las copias locales (lista del lote, escaneo) para que la vista cambie al instante. */
+    async function marcarImpresa(t) {
+        const local = firma(t); let guardada = local;
+        let r = await api('/api/dymo/impresas', { method: 'POST', body: { marcas: [{ id: t.id, firma: local }] } });
+        if (!r.ok) r = await api('/api/dymo/impresas', { method: 'POST', body: { marcas: [{ id: t.id, firma: local }] } });   // un reintento
+        if (r.ok && r.data && r.data.firmas && r.data.firmas[t.id]) guardada = r.data.firmas[t.id];
+        else if (!r.ok) toast(`La etiqueta de la tarjeta ${t.id_tarjeta_num} salió, pero no se pudo registrar como impresa (${r.error || 'sin conexión'}).`, { kind: 'warn', ms: 6000 });
+        t.etiqueta_firma = guardada;
+        const g = state.tarjetas.find((x) => x.id === t.id); if (g && g !== t) g.etiqueta_firma = guardada;
+        const e = ESC.tarjetas.get(t.id); if (e && e !== t) e.etiqueta_firma = guardada;
+        const op = [...$('selTarjeta').options].find((o) => o.value === String(t.id));
+        if (op) op.textContent = `#${t.id_tarjeta_num} · ${modo(t).k === 'FINAL' ? 'final' : 'identificación'} · impresa`;
+    }
     async function imprimirTarjeta(printer, t, c) {
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
-            try { await D.print(printer, await xmlDe(t, tipo), c); marcarImpresa(t); return; }
+            try { await D.print(printer, await xmlDe(t, tipo), c); await marcarImpresa(t); return; }
             catch (e) { if (/no respondi|no encuentra|Elige|cargó|Sin conexión/i.test(e.message)) throw e; if (!primero) primero = e; }
         }
         throw primero;
@@ -325,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sel = $('selTarjeta'); const f = ($('inFiltro').value || '').replace(/\D/g, '');
         const lista = state.tarjetas.filter((t) => !f || String(t.id_tarjeta_num).replace(/^0+/, '').includes(f.replace(/^0+/, '') || '0'));
         sel.replaceChildren();
-        lista.forEach((t) => { const k = modo(t).k; sel.append(h('option', { value: String(t.id) }, `#${t.id_tarjeta_num} · ${k === 'FINAL' ? 'final' : k === 'NO' ? 'incompleta' : 'identificación'}`)); });
+        lista.forEach((t) => { const k = modo(t).k; sel.append(h('option', { value: String(t.id) }, `#${t.id_tarjeta_num} · ${k === 'FINAL' ? 'final' : k === 'NO' ? 'incompleta' : 'identificación'}${yaImpresa(t) ? ' · impresa' : ''}`)); });
         $('filtroInfo').textContent = f ? `${lista.length} de ${state.tarjetas.length}` : '';
         if (!lista.length) { sel.append(h('option', { value: '' }, 'Sin coincidencias')); return; }
         const actual = lista.find((t) => state.cur && t.id === state.cur.id) || lista[0];
@@ -444,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         progreso(hechas, etiquetas.length, `${hechas} de ${etiquetas.length} etiquetas ${tq} enviadas.`);
         if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} etiqueta${fallos.length === 1 ? '' : 's'} ${tq} sin imprimir. `), fallos.slice(0, 4).join(' · ')));
-        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} ${tq} (${lista.length} placas) enviada${hechas === 1 ? '' : 's'} a la DYMO`, { kind: 'ok' });
+        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} ${tq} (${lista.length} placas) enviada${hechas === 1 ? '' : 's'} a la DYMO. Las etiquetas de placas sueltas no quedan registradas como impresas.`, { kind: 'ok', ms: 5000 });
         ocultarProg(4000); state.busy = false; refrescarBotones(); r3Vista();
     }
     // Lote: hoja con TODAS las R3 del lote para marcar cuáles imprimir (igual que "Imprimir lote en DYMO…" de R1/R2)
@@ -584,7 +597,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return { ok: true, texto: `${p.nombre} agregada (etiqueta individual ${p.tipo})` };
         };
         if (!t) return p && /^R[12]$/.test(p.tipo) ? suelta() : { ok: false, texto: `"${txt}" no es una placa ni una tarjeta.` };
-        const tj = state.tarjetas.find((x) => x.id === t.id) || t;
+        // La ficha de /api/consulta es la más reciente: se vuelca sobre la copia del lote (MAC nuevas, firma guardada) para que
+        // la firma de impresión y la marca "Impresa" de la lista usen los mismos datos.
+        const prev = state.tarjetas.find((x) => x.id === t.id); if (prev) Object.assign(prev, t);
+        const tj = prev || t;
         if (modo(tj).k === 'NO') return p && /^R[12]$/.test(p.tipo) ? suelta() : { ok: false, texto: `Tarjeta ${tj.id_tarjeta_num}: falta R1 o R2, no se puede etiquetar.` };
         if (ESC.tarjetas.has(tj.id)) return { ok: true, texto: `Tarjeta ${tj.id_tarjeta_num} ya estaba en la lista` };
         ESC.tarjetas.set(tj.id, tj); escPintar();

@@ -47,6 +47,37 @@ class TestFirmwareBuildValidaciones(unittest.TestCase):
             firmware_build.compilar_firmware("R2", "abcd")
 
 
+class TestPersonalizadorR2(unittest.TestCase):
+    """v1.3.62: especificación R2 (§7 y matriz 01–04): solo cambia Nombre_Del_Ble, nombre desde inventario."""
+    def setUp(self):
+        self.src = (firmware_build.SKETCHES["R2"] / "TQT_R2_V3_1.ino").read_bytes().decode("utf-8")
+
+    def test_01_nombre_y_resto_intacto(self):
+        nuevo, d = firmware_build.personalizar_r2(self.src, "0025")
+        self.assertEqual(d["nombre_ble"], "TQT_R2_V30_0025")
+        self.assertIn('#define Nombre_Del_Ble      "TQT_R2_V30_0025"', nuevo)
+        self.assertEqual(nuevo.replace("TQT_R2_V30_0025", d["anterior"], 1), self.src)
+        self.assertNotEqual(d["sha256_fuente"], d["sha256_copia"])
+
+    def test_02_ceros_iniciales(self):
+        self.assertEqual(firmware_build.nombre_ble_r2("0001"), "TQT_R2_V30_0001")
+
+    def test_03_numeros_invalidos(self):
+        for n in ("", "1", "abcd", " 12", "-001", "12345", "0000", None):
+            with self.assertRaises(firmware_build.FirmwareBuildError, msg=repr(n)):
+                firmware_build.nombre_ble_r2(n)
+
+    def test_04_fuente_sin_define_o_duplicada(self):
+        for texto in (self.src.replace("#define Nombre_Del_Ble", "// #define Otro"),
+                      self.src + '\n#define Nombre_Del_Ble "TQT_R2_V30_9999"\n',
+                      self.src.replace('Nombre_Del_Ble      "TQT_R2_V30_0024"', "Nombre_Del_Ble      NOMBRE_DINAMICO")):
+            with self.assertRaises(firmware_build.FirmwareBuildError):
+                firmware_build.personalizar_r2(texto, "0025")
+
+    def test_metadatos(self):
+        self.assertEqual(firmware_build.metadatos("R2")["version"], "3.1.2")
+
+
 @unittest.skipUnless(_ENV is not None, "arduino-cli no disponible en este entorno (ver _env_compilable)")
 class TestFirmwareBuildCompilaDeVerdad(unittest.TestCase):
     def _compilar(self, tipo, numero=None):
@@ -58,8 +89,9 @@ class TestFirmwareBuildCompilaDeVerdad(unittest.TestCase):
         self.assertGreater(len(binario), 1_000_000)   # imagen combinada de 4MB
         # offset 0x0-0x0FFF es relleno (0xFF) antes del bootloader; su magic byte va en 0x1000.
         self.assertEqual(binario[0x1000], 0xE9)
-        fuente = (firmware_build.SKETCHES["R2"] / "TQT2_RESPALDO_V2_1_CORREGIDO.ino").read_text(encoding="utf-8")
-        self.assertNotIn('"TQT_R2_V2_0_9042"', fuente)  # el .ino original en el repo no se tocó: se parcha una copia
+        fuente = (firmware_build.SKETCHES["R2"] / "TQT_R2_V3_1.ino").read_text(encoding="utf-8")
+        self.assertNotIn('"TQT_R2_V30_9042"', fuente)  # el .ino original en el repo no se tocó: se parcha una copia
+        self.assertIn(b"TQT_R2_V30_9042", binario)      # v1.3.62: el nombre BLE de la unidad quedó en el binario
 
     def test_r1_compila_sin_numero(self):
         binario = self._compilar("R1")

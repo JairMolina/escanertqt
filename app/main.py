@@ -19,7 +19,7 @@ from app.config import settings
 from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
-from app.routers import stm32
+from app.routers import stm32, validacion
 from app.ssl_cert import ensure_ssl_certificates
 
 # Configurar logging
@@ -238,6 +238,8 @@ app.include_router(ws.router)
 app.include_router(excel_dymo.router)
 app.include_router(escaner_remoto.router)
 app.include_router(stm32.router)
+app.include_router(validacion.router)
+app.include_router(validacion.agent_router)
 
 
 def _serve_file(file_path: Path, fallback_path: Path = None) -> FileResponse:

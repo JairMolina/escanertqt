@@ -1,0 +1,10 @@
+{
+  "version": "3.1.2",
+  "archivo_original": "TQT_R2_V3_1_30_09_2026.ino",
+  "fecha": "2026-09-30",
+  "hardware": "ESP32-WROOM-32E-N4",
+  "fqbn": "esp32:esp32:esp32doit-devkit-v1",
+  "estado": "aprobado",
+  "nota": "Cabecera V3.1.1 y banner V3.1.2; se registra 3.1.2 (banner de arranque).",
+  "sha256": "6233bcd40df00286c6f5f32e144bdb4fbabadc80ac86f3406cb9e059c4db2e7f"
+}

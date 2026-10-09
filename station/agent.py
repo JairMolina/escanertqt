@@ -8,11 +8,199 @@ from pathlib import Path
 import ssl
 import subprocess
 import tempfile
+import threading
 import time
 import urllib.request
 import tqt_hex as hx
 
-USER_AGENT = 'TQT-Station/1.3.55'
+USER_AGENT = 'TQT-Station/1.3.63'
+
+
+# ---------------------------------------------------------------------------
+# Bluetooth LE opcional (bleak). Hilo propio con su event loop: nunca bloquea STM32/J-Link.
+# ---------------------------------------------------------------------------
+BLE_SERVICE = '4fafc201-1fb5-459e-8fcc-c5c9c331914b'
+BLE_CHAR = 'beb5483e-36e1-4688-b7f5-ea07361b26a8'
+BLE_FALTA = 'Instala bleak: python -m pip install --user "bleak>=0.22,<3"'
+try:
+    import bleak
+except Exception:  # bleak ausente o sin backend Bluetooth
+    bleak = None
+
+
+class BleWorker:
+    """Ejecuta los trabajos BLE de la web. `api(path, body)` ya autentica con el bearer de estación."""
+
+    def __init__(self, api, lib=None):
+        self.api = api
+        self.lib = lib if lib is not None else bleak
+        self.client = None
+        self.nombre = None
+        self.address = None
+        self.loop = None
+
+    @property
+    def disponible(self):
+        return self.lib is not None
+
+    @property
+    def conectado(self):
+        return bool(self.client is not None and self.client.is_connected)
+
+    def _evento(self, tipo, texto, nombre=None, address=None):
+        try:
+            self.api('ble/evento', {'tipo': tipo, 'texto': (texto or '')[:1000], 'nombre': nombre, 'address': address})
+        except Exception as e:
+            print('Evento BLE no reportado:', str(e)[:200])
+
+    def _evento_async(self, *args):
+        # Fuera del event loop para no bloquearlo con la red.
+        threading.Thread(target=self._evento, args=args, daemon=True).start()
+
+    async def escanear(self):
+        found = await self.lib.BleakScanner.discover(timeout=6.0, return_adv=True)
+        out = []
+        for address, pair in found.items():
+            device, adv = pair
+            name = device.name or getattr(adv, 'local_name', None) or ''
+            if 'TQT' in name.upper():
+                out.append({'nombre': name, 'address': address, 'rssi': getattr(adv, 'rssi', None)})
+        out.sort(key=lambda d: d['rssi'] if d['rssi'] is not None else -999, reverse=True)
+        return {'dispositivos': out}
+
+    async def desconectar(self):
+        client, self.client = self.client, None
+        self.nombre = self.address = None
+        if client is not None:
+            try:
+                client.disconnected_callback = None
+            except Exception:
+                pass
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+        return {'conectado': False}
+
+    async def conectar(self, address):
+        if not address:
+            raise ValueError('Falta la dirección del dispositivo.')
+        await self.desconectar()
+        nombre = address
+        try:
+            dev = await self.lib.BleakScanner.find_device_by_address(address, timeout=6.0)
+            if dev is not None and dev.name:
+                nombre = dev.name
+        except Exception:
+            pass
+
+        def lost(_client):
+            if self.client is not None and self.address == address:
+                self.client = None
+                self.nombre = self.address = None
+                self._evento_async('desconexion', 'El dispositivo se desconectó.', nombre, address)
+
+        client = self.lib.BleakClient(address, disconnected_callback=lost)
+        await client.connect()
+        try:
+            char = None
+            for svc in client.services:
+                if svc.uuid.lower() == BLE_SERVICE:
+                    for ch in svc.characteristics:
+                        if ch.uuid.lower() == BLE_CHAR:
+                            char = ch
+            if char is None:
+                raise ValueError('El dispositivo no tiene el servicio/característica TQT esperados.')
+            props = set(p.lower() for p in char.properties)
+            if props & {'notify', 'indicate'}:
+                def on_notify(_sender, data):
+                    self._evento_async('notificacion', bytes(data).decode('utf-8', errors='replace'), nombre, address)
+                await client.start_notify(char, on_notify)
+        except Exception:
+            try:
+                client.disconnected_callback = None
+                await client.disconnect()
+            except Exception:
+                pass
+            raise
+        self.client, self.nombre, self.address = client, nombre, address
+        return {'conectado': True, 'nombre': nombre, 'address': address}
+
+    async def enviar(self, comando):
+        if comando not in ('PPON', 'POFF'):
+            raise ValueError('Comando no permitido.')
+        if not self.conectado:
+            raise ValueError('No hay dispositivo conectado.')
+        char = self.client.services.get_characteristic(BLE_CHAR)
+        if char is None:
+            raise ValueError('Característica TQT no disponible.')
+        props = set(p.lower() for p in char.properties)
+        if not props & {'write', 'write-without-response'}:
+            raise ValueError('La característica no admite escritura.')
+        await self.client.write_gatt_char(char, comando.encode('ascii'), response='write' in props)
+        return {'comando': comando}
+
+    async def ejecutar(self, work):
+        if not self.disponible:
+            raise ValueError(BLE_FALTA)
+        accion = work.get('accion')
+        if accion == 'escanear':
+            return await self.escanear()
+        if accion == 'conectar':
+            return await self.conectar(work.get('address'))
+        if accion == 'enviar':
+            return await self.enviar(work.get('comando'))
+        if accion == 'desconectar':
+            return await self.desconectar()
+        raise ValueError('Acción BLE desconocida.')
+
+    async def paso(self):
+        """Un ciclo: informa estado, toma un trabajo y reporta su resultado. Los errores de red no salen de aquí."""
+        import asyncio
+        try:
+            work = await asyncio.to_thread(self.api, 'ble/claim', {
+                'ble_disponible': self.disponible, 'conectado': self.conectado,
+                'nombre': self.nombre, 'address': self.address})
+        except Exception as e:
+            print('BLE sin conexión al servidor:', str(e)[:200])
+            return None
+        if not work:
+            return None
+        try:
+            body = {'ok': True, 'resultado': await self.ejecutar(work)}
+        except Exception as e:
+            body = {'ok': False, 'error': (str(e) or e.__class__.__name__)[:1000]}
+        for _ in range(3):
+            try:
+                await asyncio.to_thread(self.api, 'ble/'+work['id']+'/resultado', body)
+                break
+            except Exception as e:
+                print('Resultado BLE no reportado:', str(e)[:200])
+                await asyncio.sleep(1)
+        return body
+
+    async def bucle(self):
+        import asyncio
+        while True:
+            try:
+                await self.paso()
+            except Exception as e:
+                print('Error BLE:', str(e)[:200])
+            await asyncio.sleep(0.7)
+
+    def hilo(self):
+        import asyncio
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_until_complete(self.bucle())
+
+
+def start_ble(api, lib=None):
+    worker = BleWorker(api, lib)
+    if not worker.disponible:
+        print('BLE no disponible.', BLE_FALTA)
+    threading.Thread(target=worker.hilo, name='tqt-ble', daemon=True).start()
+    return worker
 
 
 def web_confirmation(work):
@@ -25,6 +213,8 @@ def web_confirmation(work):
 
 
 def execute(work, exe, serial='', progress=lambda stage: None):
+    if not exe:
+        raise ValueError('Esta laptop no tiene J-Link (SEGGER o STM32CubeIDE): solo puede hacer pruebas Bluetooth.')
     web_confirmation(work)
     return flash(work, exe, serial, progress)
 
@@ -154,7 +344,12 @@ def main():
               data=json.dumps(body).encode(), headers={'Authorization': 'Bearer '+cfg['token'], 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': USER_AGENT})
         with urllib.request.urlopen(req, timeout=20, context=ctx) as response:
             return json.load(response)
-    exe = cfg.get('jlink') or find_jlink()
+    # v1.3.63: J-Link es opcional; una laptop solo para pruebas Bluetooth también queda conectada.
+    try:
+        exe = cfg.get('jlink') or find_jlink()
+    except ValueError as e:
+        exe = None
+        print('Sin J-Link:', e)
     serial = cfg.get('jlink_serial', '')
     print('Estación:', cfg['station_id'], '\nServidor:', server, '\nJ-Link:', exe)
     if args.check:
@@ -177,6 +372,7 @@ def main():
         if ctypes.get_last_error() == 183:
             print('La estación ya está en ejecución. Usa el botón de la web.')
             return
+    start_ble(api)
     print('Estación lista. Selecciona y programa la R1 desde la web; no se requiere escribir en esta consola.')
     pending_result = None
     while True:

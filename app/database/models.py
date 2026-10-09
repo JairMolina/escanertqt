@@ -314,6 +314,15 @@ CREATE TABLE IF NOT EXISTS pcb_inventario (
 )"""
 
 SCHEMA = f"""
+-- v1.3.59: pruebas BLE (sección Pruebas y validación); aquí para que exista antes de leer tarjetas (estado «validada»)
+CREATE TABLE IF NOT EXISTS validaciones_ble (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pcb_id INTEGER, tarjeta_id INTEGER,
+    dispositivo TEXT NOT NULL, ble_id TEXT,
+    comando TEXT NOT NULL, resultado TEXT NOT NULL,
+    detalle TEXT, respuesta TEXT, operador TEXT,
+    creado_en TEXT NOT NULL DEFAULT (datetime('now','localtime')));
+
 PRAGMA journal_mode = WAL;
 PRAGMA busy_timeout = 10000;
 PRAGMA foreign_keys = ON;

@@ -213,11 +213,14 @@ async def get_programacion_hoy():
 @router.post("/firmware/compilar", summary="Compilar el firmware ESP32 de una R1/R2 (con su número) para flashearla por USB desde el navegador")
 async def compilar_firmware(payload: FirmwareCompilarRequest):
     try:
-        datos = await run_in_threadpool(firmware_build.compilar_firmware, payload.tipo, payload.numero)
+        datos, info = await run_in_threadpool(firmware_build.compilar_firmware_meta, payload.tipo, payload.numero)
     except firmware_build.FirmwareBuildError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     nombre = f"{payload.tipo.strip().upper()}_{(payload.numero or 'firmware').strip()}.bin"
-    return Response(content=datos, media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+    # v1.3.62: trazabilidad para validar después del arranque (nombre BLE esperado, versión y hashes de la fuente)
+    extra = {"X-TQT-" + k: str(v) for k, v in {"Nombre-Ble": info.get("nombre_ble", ""), "Firmware": info.get("firmware", ""),
+             "Fuente-Sha256": info.get("sha256_fuente", ""), "Copia-Sha256": info.get("sha256_copia", "")}.items() if v}
+    return Response(content=datos, media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{nombre}"', **extra})
 
 
 @router.post("/programacion/lote", summary="MAC (+ firmware) de muchas R1/R2 de una vez, con resultado por fila (simular = solo validar)")
