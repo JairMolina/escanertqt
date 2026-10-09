@@ -1,0 +1,14 @@
+{
+  "profile": {
+    "mcu": "STM32F103RET6",
+    "fw": "4.3",
+    "hw": "3.0",
+    "schema": 2,
+    "identity_size": 76,
+    "identity_address": 134739968
+  },
+  "identity": null,
+  "source_sha256": "04c2389c3efbf3cfa1da2aeb0df77f49802c531007fc1e048c38d90ccf860473",
+  "hex_sha256": "dbfda7b5dcd59e2c9f29e845792f11d6c0f5135400fa5ac14d1a180868193742",
+  "identity_sha256": null
+}

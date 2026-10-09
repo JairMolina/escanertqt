@@ -43,3 +43,12 @@ Thumbs.db
 
 # Datos reales del inventario TQTR (precios, costos, proveedores): no se publican en el repositorio público
 app/data_seed/
+
+# Credenciales y resultados locales del agente de programación
+station/config.json
+station/ca.crt
+station/resultados/
+# Builds STM32 generados por CubeIDE
+firmware/stm32_r1/CubeIDE/**/Debug/
+firmware/stm32_r1/CubeIDE/**/Release/
+*.launch

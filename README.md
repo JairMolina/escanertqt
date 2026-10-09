@@ -2,7 +2,7 @@
 
 Aplicación web local para la planta de tarjetas electrónicas TQT. Registra las PCB con la cámara del celular, las empareja en tarjetas (R1 + R2 + R3), captura las MAC y el firmware de R1/R2, imprime etiquetas DYMO y sincroniza el Excel mensual de control de producción.
 
-**Versión actual: v1.3.18** · historial en [`CHANGELOG.md`](CHANGELOG.md) (la versión también se muestra en la app).
+**Versión actual: v1.3.47** · historial en [`CHANGELOG.md`](CHANGELOG.md) (la versión también se muestra en la app).
 
 ## Qué hace
 
@@ -80,3 +80,9 @@ El arnés `tests/_aislamiento.py` inicia sesión solo en las pruebas; `cliente_s
 ## Datos y secretos (NO van al repositorio)
 
 `.env` (contraseña de admin e IP), `certs/` (llaves privadas), `*.db` (base real), `respaldos/`, `excel_mensual/`, `exports/`. Ver `.gitignore`. Las contraseñas iniciales de las cuentas no se documentan aquí: cámbialas al primer ingreso.
+
+## Programación STM32 de R1
+
+En la consola, Programación → R1 · STM32 / J-Link permite cargar una tarjeta manualmente o por QR remoto, obtener su R2 vinculada y generar el HEX individual. El agente Windows descargable programa con J-Link y confirma el resultado por lectura. La primera prueba física de este flujo sigue pendiente. Se conserva el flujo ESP32 y la programación offline desde CubeIDE.
+
+Guía: [Programación STM32](docs/PROGRAMACION_STM32.md). Fuente local FW 4.3: `firmware/stm32_r1/CubeIDE/PCB_TQT_R1_PRINCIPA_WH-V3.0_FW-V4.3`. Configuración del servidor sin secretos: [devsky](deploy/devsky/README.md).

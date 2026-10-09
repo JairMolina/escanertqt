@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.47 — 2026-10-08
+- **R1 STM32 / J-Link en Programación.** Selección manual o por QR remoto, carga automática de la R2 vinculada y su MAC, identidad con HW/FW/CRC y HEX individual sin recompilar por unidad. R1 y R2 pueden tener números distintos.
+- **Agente Windows descargable.** Conexión saliente autenticada, confirmación de la PCB física, lectura de verificación de Flash y UID, trabajos persistentes y protección contra operaciones simultáneas. Se registra firmware solo después de la verificación; queda pendiente la primera prueba de hardware.
+- **Proyecto STM32CubeIDE FW 4.3.** Fuente completa, dependencias locales, Datos_editar.h y generador offline. Corrige el contador del timeout Debug y la consulta de sobrecorriente; conserva EEPROM y tramas.
+- **Despliegue devsky.** Ejemplos sin secretos con montajes de código en solo lectura para evitar reconstrucciones grandes en la partición de desarrollo.
+
 ## v1.3.46 — 2026-10-08
 - **QR de otras versiones.** Se reconocen etiquetas como `PCB_TQT_R3_V2_0_TIMER_0073` (versión con decimal "2_0" = V20 y texto entre la versión y el número) en Recibir, Consultar, MAC y firmware, DYMO y el servidor.
 - **Recibir: ¿lote nuevo?** Si se escanea una placa de otra versión que la de la recepción actual, pregunta si es un lote nuevo: "Sí" confirma lo ya escaneado como su propio lote, cambia la versión por defecto e inicia el registro nuevo; "No" solo registra esa versión.

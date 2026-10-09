@@ -1,0 +1,16 @@
+AGENTE TQT R1 STM32 / J-LINK
+1. Extrae este ZIP en una carpeta privada de tu PC Windows.
+2. Instala SEGGER J-Link y conecta un solo J-Link por USB y la R1 por SWD.
+3. Abre iniciar.cmd. Se necesita Python 3.10 o superior.
+4. En Programación > R1 STM32 elige esa estación y revisa R1, R2, MAC, HW y FW.
+5. Pulsa Programar. En la ventana del agente confirma la R1 conectada escribiendo PROGRAMAR.
+6. Espera el resultado verificado en la web; no desconectes durante la grabación.
+
+config.json contiene una credencial privada de estación: no compartir ni subir a Git.
+Con varios J-Link, agrega "jlink_serial": "NUMERO" a config.json y usa el serial del J-Link elegido.
+Puedes indicar "jlink": "C:/Program Files/SEGGER/JLink_V958/JLink.exe" si no se detecta.
+El agente no borra la EEPROM externa ni cambia option bytes. Graba la aplicación y la identidad del HEX completo.
+Verifica por lectura todos los bytes definidos en HEX y registra UID STM32. No repite automáticamente una grabación fallida.
+Conserva los resultados locales en resultados/. Si se pierde la conexión al reportar, mantén abierto el agente.
+Usa una R1 de laboratorio para la primera prueba. Una identidad no identifica por sí sola la PCB física: debes comprobar la unidad conectada.
+Referencia de comandos: https://kb.segger.com/J-Link_Commander

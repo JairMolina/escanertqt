@@ -283,6 +283,20 @@
             h('div', { class: 'prog-panel' }, h('h2', null, 'Elige una tarjeta'), h('div', { class: 'field' }, h('label', { for: 'prog-q' }, 'Buscar'), buscar), lista),
             h('div', { class: 'prog-panel prog-panel-detalle' }, vacio, detalle)));
 
+        const espHost = host.lastElementChild;
+        const stmHost = h('div');
+        const stm = window.TQTSTM32(stmHost, ctx);
+        const btnStm = h('button', { class: 'btn btn-primary', type: 'button', 'aria-pressed': 'true', onclick: () => modo(true) }, 'R1 · STM32 / J-Link');
+        const btnEsp = h('button', { class: 'btn', type: 'button', 'aria-pressed': 'false', onclick: () => modo(false) }, 'ESP32 · USB serial');
+        function modo(isStm) {
+            if (S.busy) return;
+            stmHost.hidden = !isStm; espHost.hidden = isStm;
+            btnStm.classList.toggle('btn-primary', isStm); btnEsp.classList.toggle('btn-primary', !isStm);
+            btnStm.setAttribute('aria-pressed', String(isStm)); btnEsp.setAttribute('aria-pressed', String(!isStm));
+        }
+        host.prepend(h('div', { class: 'row wrap' }, btnStm, btnEsp));
+        host.append(stmHost); modo(true);
+
         cargarPendientes();
         refrescarPuertosAutorizados();
 
@@ -293,9 +307,11 @@
         if (navigator.serial) { const onConn = () => refrescarPuertosAutorizados(); navigator.serial.addEventListener('connect', onConn); navigator.serial.addEventListener('disconnect', onConn); unsubs.push(() => { navigator.serial.removeEventListener('connect', onConn); navigator.serial.removeEventListener('disconnect', onConn); }); }
 
         return {
-            actualizar() { if (!S.busy) cargarPendientes(); },
+            actualizar() { stm.actualizar(); if (!S.busy) cargarPendientes(); },
+            escaneo(codigo) { modo(true); return stm.escaneo(codigo); },
             desmontar() {
                 S.vivo = false;
+                stm.desmontar();
                 timers.forEach((t) => clearTimeout(t)); timers.clear();
                 unsubs.forEach((u) => { try { u(); } catch (e) { /* nada */ } });
                 host.replaceChildren();

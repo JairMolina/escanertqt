@@ -5,3 +5,4 @@
 *.xlsx binary
 *.dymo binary
 *.ico binary
+*.hex binary

@@ -36,6 +36,7 @@ RUN useradd --create-home --uid 10001 tqt \
 COPY --chown=tqt:tqt app ./app
 COPY --chown=tqt:tqt templates ./templates
 COPY --chown=tqt:tqt firmware ./firmware
+COPY --chown=tqt:tqt station ./station
 COPY --chown=tqt:tqt run_server.py main.py ./
 USER tqt
 
