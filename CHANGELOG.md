@@ -1,5 +1,22 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.51 — 2026-10-09
+- **J-Link sin ventana de consola.** El agente inicia Commander con CREATE_NO_WINDOW en Windows y conserva la salida en su diagnóstico.
+- **Avance de programación en la web.** Indicador animado y etapas reales de preparación, conexión/grabación, lectura/verificación, reinicio y reporte. El avance requiere la credencial de la estación asignada y no registra firmware ni sustituye la verificación final. Al terminar correctamente, la web indica que ya se puede desconectar la R1.
+
+## v1.3.50 — 2026-10-09
+- **Programación con un botón desde la web.** El botón identifica la R1 y confirma la unidad conectada. El trabajo registra operador y confirmación vinculada a la PCB. El agente graba y verifica sin pedir PROGRAMAR en consola; rechaza trabajos antiguos sin confirmación web.
+- **Instalador único para Windows.** La web genera un archivo Instalar_TQT que contiene el agente y su configuración privada, evita extraer ZIP manualmente y crea el inicio automático en segundo plano para el usuario actual. Usa Python y J-Link/STM32CubeIDE instalados y avisa si faltan. No requiere permisos de administrador. El agente evita procesos duplicados por estación y guarda diagnóstico en agente.log.
+
+## v1.3.49 — 2026-10-09
+- **Lectura del UID con J-Link corregida.** Commander interpreta las longitudes en hexadecimal: `12` leía 18 bytes y el agente rechazaba una lectura correcta después de grabar. Ahora solicita explícitamente `0xC` (12 bytes). Reproducido y comprobado por lectura real en la R1 0031. La prueba de regresión simula el formato numérico de Commander.
+
+## v1.3.48 — 2026-10-09
+- **STM32 desde la laptop.** El agente detecta también J-Link incluido con STM32CubeIDE. La web actualiza automáticamente las estaciones y los datos de la R2 vinculada cuando cambia el inventario, y admite buscar la serie de una R1 cuyo número de tarjeta es diferente.
+- **Firmware probado.** Se actualiza el HEX base desde el proyecto FW 4.3 probado por el operador el 9 de octubre. La aplicación conserva todos sus bytes; la web añade únicamente la identidad individual. La grabación desde la web sigue requiriendo la confirmación física y la lectura de verificación del agente.
+- **Diagnóstico del agente.** `python agent.py --check` verifica acceso HTTPS al servidor y localiza J-Link sin abrir la sonda ni tomar trabajos.
+- **Conexión al dominio público.** Las peticiones del agente se identifican como TQT-Station para evitar el rechazo HTTP 403 del cliente Python genérico.
+
 ## v1.3.47 — 2026-10-08
 - **R1 STM32 / J-Link en Programación.** Selección manual o por QR remoto, carga automática de la R2 vinculada y su MAC, identidad con HW/FW/CRC y HEX individual sin recompilar por unidad. R1 y R2 pueden tener números distintos.
 - **Agente Windows descargable.** Conexión saliente autenticada, confirmación de la PCB física, lectura de verificación de Flash y UID, trabajos persistentes y protección contra operaciones simultáneas. Se registra firmware solo después de la verificación; queda pendiente la primera prueba de hardware.

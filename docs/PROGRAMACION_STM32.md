@@ -6,15 +6,21 @@ El firmware base FW 4.3 procede del HEX Debug aportado. La web únicamente añad
 
 ## Primera configuración de Windows
 
-1. Expande Configurar esta computadora por primera vez, escribe el nombre de la PC y descarga el agente.
-2. Extrae el ZIP en una carpeta privada, conecta un J-Link por USB y ejecuta iniciar.cmd. Requiere Python >=3.10 y SEGGER J-Link instalado; en la PC de desarrollo se detectan las instalaciones existentes.
-3. Mantén abierta la ventana, vuelve a la web y pulsa Actualizar estaciones. Elige la PC conectada.
+1. Expande Configurar esta computadora por primera vez, escribe el nombre de la PC y pulsa Instalar agente en esta laptop.
+2. Abre el archivo Instalar_TQT descargado. Instala el agente en LocalAppData del usuario actual, crea su acceso de inicio con Windows y lo inicia en segundo plano. Usa Python >=3.10 y SEGGER J-Link instalado por separado o el incluido con STM32CubeIDE en C:\ST; avisa si faltan. El navegador requiere que el usuario abra el instalador una vez. Si CubeIDE está depurando, termina esa sesión para liberar la sonda.
+3. Vuelve a la web. La lista de estaciones se actualiza automáticamente cada cinco segundos; elige la laptop conectada. No hace falta mantener una terminal abierta.
 4. Conecta la R1 de laboratorio por SWD, revisa los datos y pulsa Programar STM32 con J-Link.
-5. Confirma la PCB física en la ventana del agente escribiendo PROGRAMAR. El agente graba y lee de vuelta todos los bytes presentes en HEX, valida la identidad y obtiene el UID. La web registra FW en inventario solo al recibir verificación válida.
+5. Pulsa Programar R1: este botón identifica y confirma la R1 física conectada. El servidor registra operador y confirmación vinculada al nombre y la PCB; el agente rechaza trabajos sin esa confirmación. Graba y lee de vuelta todos los bytes presentes en HEX, valida la identidad y obtiene el UID. La web muestra el resultado y registra FW en inventario solo al recibir verificación válida. No hay confirmación en consola.
 
 La opción Descargar HEX permite inspección o programación manual en herramientas locales. El flujo ESP32 existente queda en ESP32 · USB serial.
 
+Para comprobar la instalación sin programar, ejecuta `python agent.py --check` desde la carpeta del agente. Comprueba HTTPS y localiza J-Link sin abrir la sonda. Si ya descargaste un agente anterior a v1.3.48, descarga y extrae el nuevo paquete para recibir la detección de CubeIDE.
+
+El firmware base se actualizó el 2026-10-09 desde el HEX FW 4.3 probado por el operador. La prueba de escritura/lectura desde la web debe realizarse con la R1 física seleccionada y su R2 correctamente emparejada en inventario; el ID y la MAC proceden de esa R2, aunque los números de R1 y R2 sean distintos.
+
 ## Registro y recuperación
+
+La web muestra un indicador de actividad y la etapa reportada por el agente: preparación, conexión/grabación, lectura/verificación, reinicio y reporte. No representa un porcentaje estimado. Commander se ejecuta sin ventana de consola en Windows. Solo el resultado final verificado permite desconectar la tarjeta; los avisos de avance no registran firmware.
 
 La base SQLite conserva estaciones y trabajos en stm32_stations / stm32_jobs. Cada trabajo registra operador, estación, tarjeta, identidad, firmware, hashes, UID y resultado. No modifica la EEPROM externa ni los option bytes.
 

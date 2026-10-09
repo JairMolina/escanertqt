@@ -1,5 +1,6 @@
 """Session endpoints for operators; separate bearer authentication for Windows stations."""
 import io
+import base64
 import json
 import zipfile
 from pathlib import Path
@@ -34,6 +35,7 @@ class Job(BaseModel):
     pcb_id: int = Field(gt=0)
     station_id: str = Field(min_length=24, max_length=24)
     hex_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    physical_confirmed: bool = False
 
 
 class Result(BaseModel):
@@ -43,6 +45,10 @@ class Result(BaseModel):
     uid: str = Field(default='', max_length=24)
     trace: str = Field(default='', max_length=16000)
     error: str = Field(default='', max_length=1000)
+
+
+class Progress(BaseModel):
+    stage: str = Field(pattern='^(preparing|writing|reading|restarting|reporting)$')
 
 
 @router.get('/preview/{pcb_id}')
@@ -63,28 +69,50 @@ def stations():
     return svc.stations()
 
 
-@router.post('/stations/bundle')
-def bundle(body: Station, req: Request):
-    st = svc.station_create(body.name.strip(), operator(req))
-    config = dict(server=str(req.base_url).rstrip('/'), station_id=st['id'], token=st['token'])
+def station_archive(st, server):
+    config = dict(server=server, station_id=st['id'], token=st['token'])
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as z:
         z.writestr('config.json', json.dumps(config, indent=2))
-        for name in ('agent.py', 'iniciar.ps1', 'iniciar.cmd', 'LEEME.txt'):
+        for name in ('agent.py', 'iniciar.ps1', 'iniciar.cmd', 'LEEME.txt', 'instalar.ps1'):
             z.write(svc.ROOT/'station'/name, name)
         z.write(Path(svc.hx.__file__), 'tqt_hex.py')
         from app.ssl_cert import ca_paths
         ca = ca_paths()[0]
         if ca.is_file():
             z.write(ca, 'ca.crt')
-    return Response(stream.getvalue(), media_type='application/zip', headers={
+    return stream.getvalue()
+
+
+def station_installer(st, server):
+    command = (svc.ROOT/'station/bootstrap_installer.ps1').read_text(encoding='utf-8')
+    encoded = base64.b64encode(command.encode('utf-16le')).decode('ascii')
+    payload = base64.b64encode(station_archive(st, server)).decode('ascii')
+    return ('@echo off\r\nset "TQT_INSTALLER=%~f0"\r\n'
+            f'powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}\r\n'
+            'set "TQT_EXIT=%errorlevel%"\r\npause\r\nexit /b %TQT_EXIT%\r\n'
+            '::TQT_PAYLOAD::\r\n'+payload+'\r\n').encode('ascii')
+
+
+@router.post('/stations/bundle')
+def bundle(body: Station, req: Request):
+    st = svc.station_create(body.name.strip(), operator(req))
+    return Response(station_archive(st, str(req.base_url).rstrip('/')), media_type='application/zip', headers={
         'Content-Disposition': f'attachment; filename="Agente_TQT_{st["id"]}.zip"',
+        'Cache-Control': 'no-store'})
+
+
+@router.post('/stations/installer')
+def installer(body: Station, req: Request):
+    st = svc.station_create(body.name.strip(), operator(req))
+    return Response(station_installer(st, str(req.base_url).rstrip('/')), media_type='application/octet-stream', headers={
+        'Content-Disposition': f'attachment; filename="Instalar_TQT_{st["id"]}.cmd"',
         'Cache-Control': 'no-store'})
 
 
 @router.post('/jobs')
 def create(body: Job, req: Request):
-    return run(svc.create_job, body.pcb_id, body.station_id, body.hex_sha256, operator(req))
+    return run(svc.create_job, body.pcb_id, body.station_id, body.hex_sha256, operator(req), body.physical_confirmed)
 
 
 @router.get('/jobs/{jid}')
@@ -114,3 +142,8 @@ async def finish(jid: str, body: Result, st=Depends(station_token)):
         pcb = await run_in_threadpool(inv.get_pcb, j['pcb'])
         await manager.broadcast('PCB_ACTUALIZADA', {'pcb': pcb})
     return result
+
+
+@router.post('/agent/jobs/{jid}/progress')
+def progress(jid: str, body: Progress, st=Depends(station_token)):
+    return run(svc.progress, st['id'], jid, body.stage)

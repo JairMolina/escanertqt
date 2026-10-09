@@ -89,7 +89,9 @@ def stations():
                 for r in c.execute('SELECT * FROM stm32_stations ORDER BY name')]
 
 
-def create_job(pcb, station, expected, operator):
+def create_job(pcb, station, expected, operator, physical_confirmed=False):
+    if physical_confirmed is not True:
+        raise ValueError('Confirma desde la web que la R1 seleccionada está conectada al J-Link.')
     init()
     with db.transaction() as c:
         st = c.execute('SELECT * FROM stm32_stations WHERE id=?', (station,)).fetchone()
@@ -101,6 +103,8 @@ def create_job(pcb, station, expected, operator):
         if c.execute("SELECT 1 FROM stm32_jobs WHERE (pcb=? OR station=?) AND state IN ('queued','running')", (pcb, station)).fetchone():
             raise ValueError('La tarjeta o estación ya tiene un trabajo en curso.')
         jid, now = secrets.token_hex(16), time.time()
+        data['confirmation'] = dict(source='web', operator=operator, pcb_id=pcb,
+                                    nombre=data['identity']['nombre'], at=now)
         c.execute('INSERT INTO stm32_jobs VALUES(?,?,?,?,?,?,?,?,?,NULL)',
                   (jid, station, pcb, 'queued', now, now, operator, json.dumps(data), image))
     return job(jid)
@@ -144,6 +148,25 @@ def claim(sid):
             return None
         c.execute("UPDATE stm32_jobs SET state='running',updated=? WHERE id=?", (now, r['id']))
         return dict(id=r['id'], payload=d, hex=r['image'])
+
+
+def progress(sid, jid, stage):
+    stages = ('preparing', 'writing', 'reading', 'restarting', 'reporting')
+    if stage not in stages:
+        raise ValueError('Etapa de programación inválida.')
+    with db.transaction() as c:
+        r = c.execute("SELECT * FROM stm32_jobs WHERE id=? AND station=? AND state='running'", (jid, sid)).fetchone()
+        if not r:
+            raise ValueError('El trabajo no está activo en esta estación.')
+        payload = json.loads(r['payload'])
+        previous = payload.get('progress', {}).get('stage')
+        if previous in stages and stages.index(stage) < stages.index(previous):
+            raise ValueError('El avance no puede retroceder.')
+        now = time.time()
+        payload['progress'] = dict(stage=stage, at=now)
+        c.execute('UPDATE stm32_jobs SET payload=?,updated=? WHERE id=?', (json.dumps(payload), now, jid))
+        c.execute('UPDATE stm32_stations SET last_seen=? WHERE id=?', (now, sid))
+    return dict(ok=True)
 
 
 def finish(sid, jid, result):

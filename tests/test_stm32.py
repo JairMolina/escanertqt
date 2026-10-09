@@ -37,7 +37,7 @@ class STM32Tests(unittest.TestCase):
 
     def queued(self):
         d, _ = self.prepared()
-        return s.create_job(self.t['r1']['id'], self.st['id'], d['hex_sha256'], 'operador@test.mx')
+        return s.create_job(self.t['r1']['id'], self.st['id'], d['hex_sha256'], 'operador@test.mx', True)
 
     def test_r1_r2_independientes_y_hex_real(self):
         d, image = self.prepared()
@@ -65,7 +65,28 @@ class STM32Tests(unittest.TestCase):
     def test_stale_preview_rejected(self):
         d,_=self.prepared()
         inv.set_mac(self.t['r2']['id'],iso.mac_unica())
-        with self.assertRaises(ValueError):s.create_job(self.t['r1']['id'],self.st['id'],d['hex_sha256'],'test')
+        with self.assertRaises(ValueError):s.create_job(self.t['r1']['id'],self.st['id'],d['hex_sha256'],'test',True)
+
+    def test_confirmation_from_web_replaces_console_input(self):
+        d, _ = self.prepared()
+        with self.assertRaises(ValueError):
+            s.create_job(self.t['r1']['id'], self.st['id'], d['hex_sha256'], 'test')
+        j = self.queued()
+        work = s.claim(self.st['id'])
+        self.assertEqual(work['payload']['confirmation']['pcb_id'], self.t['r1']['id'])
+        with patch('builtins.input', side_effect=AssertionError('No console input allowed')), patch.object(agent, 'flash', return_value={'verified': True}) as flash:
+            self.assertTrue(agent.execute(work, 'mock')['verified'])
+            flash.assert_called_once()
+        work['payload']['confirmation']['nombre'] = 'TQT_R1_V30_9999'
+        with patch.object(agent, 'flash') as flash:
+            with self.assertRaises(ValueError): agent.execute(work, 'mock')
+            flash.assert_not_called()
+
+    def test_legacy_job_without_web_confirmation_never_flashes(self):
+        d, image = self.prepared()
+        with patch.object(agent, 'flash') as flash:
+            with self.assertRaises(ValueError): agent.execute(dict(payload=d, hex=image), 'mock')
+            flash.assert_not_called()
 
     def test_claim_once_concurrency_and_changed_inventory(self):
         j=self.queued()
@@ -93,16 +114,47 @@ class STM32Tests(unittest.TestCase):
         j=self.queued();s.claim(self.st['id'])
         with self.assertRaises(ValueError):s.finish('different',j['id'],{})
 
+    def test_progress_is_owned_monotonic_and_does_not_confirm_firmware(self):
+        j = self.queued()
+        c = iso.cliente_sin_sesion(app)
+        url = '/api/stm32/agent/jobs/'+j['id']+'/progress'
+        self.assertEqual(c.post(url, json={'stage':'reading'}).status_code, 401)
+        headers = {'Authorization':'Bearer '+self.st['token']}
+        self.assertEqual(c.post(url, headers=headers, json={'stage':'reading'}).status_code, 400)
+        s.claim(self.st['id'])
+        with self.assertRaises(ValueError): s.progress('another', j['id'], 'writing')
+        self.assertEqual(c.post(url, headers=headers, json={'stage':'reading'}).status_code, 200)
+        self.assertEqual(s.job(j['id'])['payload']['progress']['stage'], 'reading')
+        self.assertEqual(s.job(j['id'])['state'], 'running')
+        self.assertNotEqual(inv.get_pcb(self.t['r1']['id'])['firmware'], '4.3')
+        self.assertEqual(c.post(url, headers=headers, json={'stage':'writing'}).status_code, 400)
+        self.assertEqual(c.post(url, headers=headers, json={'stage':'invalid'}).status_code, 422)
+        s.finish(self.st['id'], j['id'], {'verified':False})
+        self.assertEqual(c.post(url, headers=headers, json={'stage':'reporting'}).status_code, 400)
+
+    def test_commander_hides_windows_console(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as temp, patch.object(agent.subprocess, 'run', return_value=SimpleNamespace(returncode=0,stdout='ok',stderr='')) as run:
+            agent.commander('JLink.exe', Path(temp), ['q'])
+            if agent.os.name == 'nt':
+                self.assertEqual(run.call_args.kwargs['creationflags'], agent.subprocess.CREATE_NO_WINDOW)
+            self.assertIn('-NoGui', run.call_args.args[0])
+
     def test_agent_checks_readback_without_hardware(self):
         d,image=self.prepared();work=dict(payload=d,hex=image)
         def fake(exe,directory,commands,serial):
-            if any('loadfile' in x for x in commands):
+            if any('savebin readback.bin' in x for x in commands):
                 mem,_=hx.leer_hex(directory/'firmware.hex'); raw=bytearray([255])*0x80000
                 for a,b in mem.items():raw[a-hx.FLASH_BEGIN]=b
                 (directory/'readback.bin').write_bytes(raw)
-                (directory/'uid.bin').write_bytes(bytes(range(1,13)))
+                # Commander parses sizes as hexadecimal, including an unprefixed 12.
+                uid_command = next(x for x in commands if x.startswith('savebin uid.bin'))
+                size = int(uid_command.rsplit(',', 1)[1].strip(), 16)
+                (directory/'uid.bin').write_bytes(bytes(range(1, size+1)))
             return 'mock J-Link'
-        with patch.object(agent,'commander',side_effect=fake):self.assertTrue(agent.flash(work,'mock')['verified'])
+        stages = []
+        with patch.object(agent,'commander',side_effect=fake):self.assertTrue(agent.flash(work,'mock',progress=stages.append)['verified'])
+        self.assertEqual(stages, ['preparing','writing','reading','restarting','reporting'])
         def corrupt(*args):
             text=fake(*args)
             p=args[1]/'readback.bin'
@@ -111,6 +163,35 @@ class STM32Tests(unittest.TestCase):
             return text
         with patch.object(agent,'commander',side_effect=corrupt):
             with self.assertRaises(ValueError):agent.flash(work,'mock')
+
+    def test_agent_detects_cubeide_jlink_without_standalone_install(self):
+        cube = Path('C:/ST/STM32CubeIDE_1.19.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.jlink.win32/tools/bin/JLink.exe')
+        def installed(path, pattern):
+            return [cube] if 'STM32CubeIDE' in pattern and path.as_posix() == 'C:/ST' else []
+        with patch.object(agent.shutil, 'which', return_value=None), patch.object(Path, 'glob', autospec=True, side_effect=installed):
+            self.assertEqual(agent.find_jlink(), str(cube))
+
+    def test_agent_diagnostics_identify_client_without_claiming_or_flashing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            cfg = Path(temp)/'config.json'
+            cfg.write_text(json.dumps(dict(server='https://inventariotqt.site', station_id='test', token='private')))
+            with patch.object(sys, 'argv', ['agent.py', '--config', str(cfg), '--check']), patch.object(agent, 'find_jlink', return_value='JLink.exe'), patch.object(agent.urllib.request, 'urlopen') as request, patch.object(agent, 'flash') as flash:
+                request.return_value.__enter__.return_value.read.return_value = b'{"ok": true}'
+                agent.main()
+                sent = request.call_args.args[0]
+                self.assertEqual(sent.full_url, 'https://inventariotqt.site/api/health')
+                self.assertEqual(sent.get_header('User-agent'), agent.USER_AGENT)
+                self.assertIsNone(sent.get_header('Authorization'))
+                flash.assert_not_called()
+
+    def test_numeric_lookup_of_r1_in_different_numbered_card(self):
+        # Serial search can return `serie.r1` when the assembly has another number.
+        with db.get_db() as c:
+            c.execute('UPDATE tarjetas_produccion SET id_tarjeta_num=? WHERE id=?', ('9999', self.t['id']))
+        result = inv.consulta(self.t['r1']['serie'])
+        self.assertEqual(result['serie']['r1']['id'], self.t['r1']['id'])
+        preview, _ = s.preview(result['serie']['r1']['id'])
+        self.assertEqual(preview['identity']['id_r'], self.t['r2']['serie'])
 
     def test_agent_api_auth_without_cookie(self):
         c=iso.cliente_sin_sesion(app)
@@ -132,7 +213,8 @@ class STM32Tests(unittest.TestCase):
             self.assertIn('agent.py',z.namelist())
             self.assertEqual(s.station_auth(cfg['token'])['id'],cfg['station_id'])
         d,_=self.prepared()
-        response=c.post('/api/stm32/jobs',json={'pcb_id':pid,'station_id':self.st['id'],'hex_sha256':d['hex_sha256']})
+        self.assertEqual(c.post('/api/stm32/jobs',json={'pcb_id':pid,'station_id':self.st['id'],'hex_sha256':d['hex_sha256']}).status_code,400)
+        response=c.post('/api/stm32/jobs',json={'pcb_id':pid,'station_id':self.st['id'],'hex_sha256':d['hex_sha256'],'physical_confirmed':True})
         self.assertEqual(response.status_code,200)
         jid=response.json()['id']
         self.assertEqual(c.get('/api/stm32/jobs/'+jid).status_code,200)
@@ -144,6 +226,22 @@ class STM32Tests(unittest.TestCase):
             ack=station.post('/api/stm32/agent/jobs/'+jid+'/result',headers=headers,json=result)
             self.assertEqual(ack.status_code,200)
             self.assertEqual(ack.json()['state'],'verified')
+
+    def test_self_contained_installer_contains_station_and_startup_scripts(self):
+        import base64, io, zipfile
+        c=TestClient(app,base_url='https://testserver')
+        response=c.post('/api/stm32/stations/installer',json={'name':'Laptop installer'})
+        self.assertEqual(response.status_code,200)
+        text=response.content.decode('ascii')
+        self.assertTrue(text.startswith('@echo off\r\n'))
+        self.assertLess(max(len(line) for line in text.split('::TQT_PAYLOAD::')[0].splitlines()), 8191)
+        encoded=text.split('::TQT_PAYLOAD::\r\n',1)[1].strip()
+        with zipfile.ZipFile(io.BytesIO(base64.b64decode(encoded))) as z:
+            cfg=json.loads(z.read('config.json'))
+            self.assertEqual(cfg['server'],'https://testserver')
+            self.assertEqual(s.station_auth(cfg['token'])['id'],cfg['station_id'])
+            self.assertIn('instalar.ps1',z.namelist())
+            self.assertIn(b'--background',z.read('instalar.ps1'))
 
 
 if __name__=='__main__':unittest.main()

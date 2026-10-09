@@ -289,7 +289,7 @@
         const btnStm = h('button', { class: 'btn btn-primary', type: 'button', 'aria-pressed': 'true', onclick: () => modo(true) }, 'R1 · STM32 / J-Link');
         const btnEsp = h('button', { class: 'btn', type: 'button', 'aria-pressed': 'false', onclick: () => modo(false) }, 'ESP32 · USB serial');
         function modo(isStm) {
-            if (S.busy) return;
+            if (S.busy || stm.ocupada()) return;
             stmHost.hidden = !isStm; espHost.hidden = isStm;
             btnStm.classList.toggle('btn-primary', isStm); btnEsp.classList.toggle('btn-primary', !isStm);
             btnStm.setAttribute('aria-pressed', String(isStm)); btnEsp.setAttribute('aria-pressed', String(!isStm));
