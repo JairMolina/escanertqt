@@ -378,10 +378,25 @@ def _recordar_ip(sid: str, request: Request) -> None:
 async def estaciones(request: Request):
     en_linea = [e for e in await run_in_threadpool(svc.stations) if e["online"]]
     ip = _ip_cliente(request)
-    mias = [e for e in en_linea if ip and _ips.get(e["id"]) == ip]
+    mias = [e for e in en_linea if _misma_red(ip, _ips.get(e["id"]))]
     if mias:
-        return {"estaciones": [dict(id=e["id"], name=e["name"], online=True, esta_laptop=True) for e in mias], "coincide": True}
-    return {"estaciones": [dict(id=e["id"], name=e["name"], online=True, esta_laptop=False) for e in en_linea], "coincide": False}
+        return {"estaciones": [dict(id=e["id"], name=e["name"], online=True, esta_laptop=True, ip=_ips.get(e["id"])) for e in mias], "coincide": True, "ip": ip}
+    return {"estaciones": [dict(id=e["id"], name=e["name"], online=True, esta_laptop=False, ip=_ips.get(e["id"])) for e in en_linea], "coincide": False, "ip": ip}
+
+
+def _misma_red(a: Optional[str], b: Optional[str]) -> bool:
+    """v1.3.66: misma IP; en IPv6 basta el mismo prefijo /64 (las direcciones temporales cambian el resto)."""
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    if ":" in a and ":" in b:
+        import ipaddress
+        try:
+            return ipaddress.ip_network(a + "/64", strict=False) == ipaddress.ip_network(b + "/64", strict=False)
+        except ValueError:
+            return False
+    return False
 
 
 def _mac_norm(m) -> str:

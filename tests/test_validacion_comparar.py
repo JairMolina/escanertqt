@@ -133,5 +133,11 @@ class CompararTests(unittest.TestCase):
         self.assertEqual((t['validada'], t['validada_modo']), (True, 'pruebas'))
 
 
+    def test_misma_red_ipv6(self):
+        self.assertTrue(val._misma_red('2806:2f0:1:2:aaaa::1', '2806:2f0:1:2:bbbb::9'))
+        self.assertFalse(val._misma_red('2806:2f0:1:3::1', '2806:2f0:1:2::1'))
+        self.assertFalse(val._misma_red('1.2.3.4', None))
+
+
 if __name__ == '__main__':
     unittest.main()

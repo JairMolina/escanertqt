@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.66 — 2026-10-12
+- **Pruebas y validación:** «esta laptop» ya no depende solo de la IP: se recuerda en el navegador al descargar el instalador o con el botón «Sí, es esta laptop»; en IPv6 basta el mismo prefijo /64. El aviso muestra la IP del navegador y la del agente para diagnosticar.
+- Si la búsqueda no encuentra placas, se indica qué laptop buscó y qué revisar (placa encendida, no conectada al celular u otra app, cerca de esa laptop).
+
 ## v1.3.65 — 2026-10-12
 - **Pruebas y validación › Placas validadas:** nueva sección con solo las placas escaneadas, probadas y validadas (automática o manual), su tarjeta, quién probó (usuario · ID) y el estado de la tarjeta. Se seleccionan las tarjetas y «Marcar como validadas» las cambia a «Validada» en Tarjetas (`GET /api/validacion/placas-validadas`, `POST /api/validacion/tarjetas/validar`, registro TARJETA_VALIDADA).
 - «Validada» de la tarjeta ahora se confirma explícitamente; la validación automática/manual es por placa. Las pruebas ON/OFF anteriores al 12-oct-2026 siguen contando como validadas.

@@ -26,6 +26,7 @@
                 const resp = await fetch('/api/stm32/stations/installer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Laptop pruebas BLE' }) });
                 if (!resp.ok) { let m = 'Error ' + resp.status; try { m = (await resp.json()).detail || m; } catch (e) { /* nada */ } throw new Error(m); }
                 const nombre = /filename="([^"]+)"/.exec(resp.headers.get('Content-Disposition') || '')?.[1] || 'Instalar_TQT.cmd';
+                const sid = /([0-9a-f]{24})/i.exec(nombre)?.[1]; if (sid) guardarMia(sid);
                 const u = URL.createObjectURL(await resp.blob()); const a = h('a', { href: u, download: nombre });
                 document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000);
                 toast('Abre ' + nombre + ' una vez: la laptop aparecerá aquí en unos segundos.', { kind: 'ok', ms: 6000 });
@@ -40,7 +41,11 @@
         const btnOff = h('button', { class: 'btn val-big val-off', type: 'button', 'data-escribe': true, onclick: () => enviar('POFF') }, icon('x'), NOMBRE.POFF);
         const logUl = h('ol', { class: 'val-log', 'aria-label': 'Registro de la sesión' });
          const avisos = h('div', { class: 'stack' });
-        const estHostAy = h('p', { class: 'hint', hidden: true });
+        const estHostAy = h('div', { class: 'hint val-lapay', hidden: true });
+        // v1.3.66: «esta laptop» recordada en este navegador (al instalar el agente o al confirmarla)
+        const LS_MIA = 'tqt.val.laptop';
+        const leerMia = () => { try { return localStorage.getItem(LS_MIA) || ''; } catch (e) { return ''; } };
+        function guardarMia(id) { try { localStorage.setItem(LS_MIA, id); } catch (e) { /* nada */ } }
         const lista = h('div', { class: 'val-devs', 'aria-live': 'polite' });
         function agregarLog(txt, kind) {
             if (txt != null) { S.log.unshift({ t: T.hora(), txt, kind: kind || '', u: S.yo }); S.log = S.log.slice(0, 80); }
@@ -72,8 +77,13 @@
                 nodes.push(selEst, btnBus, btnInst);
             }
             estHost.replaceChildren(...nodes);
-            estHostAy.textContent = hay && !S.coincide ? 'No se pudo confirmar que sea esta laptop; revisa que sea la que tiene el celular y la placa cerca.' : '';
-            estHostAy.hidden = !estHostAy.textContent;
+            const st = S.estaciones.find((x) => x.id === S.station) || (S.estaciones.length === 1 ? S.estaciones[0] : null);
+            const avisar = hay && !S.coincide && st;
+            estHostAy.replaceChildren(...(avisar ? [
+                h('span', null, 'No se pudo confirmar que «' + st.name + '» sea esta laptop' + (S.ip || st.ip ? ' (IP del navegador ' + (S.ip || '—') + ' · IP del agente ' + (st.ip || '—') + ')' : '') +
+                    '. Si la placa está junto a otra laptop, instala el agente en ella. '),
+                h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { guardarMia(st.id); S.station = st.id; S.coincide = true; pintarEstaciones(); } }, 'Sí, es esta laptop')] : []));
+            estHostAy.hidden = !avisar;
         }
         function pintarAvisos() {
             const a = [];
@@ -90,7 +100,14 @@
             if (S.devs === null && !S.conectado) { lista.replaceChildren(h('p', { class: 'hint', style: 'margin:0' }, 'Pulsa «Buscar placas» para ver las placas TQT cercanas a la laptop.')); return; }
             let devs = S.devs || [];
             if (S.conectado && S.address && !devs.some((d) => d.address === S.address)) devs = [{ nombre: S.nombre, address: S.address, rssi: null }, ...devs];
-            if (!devs.length) { lista.replaceChildren(T.empty ? T.empty('wifi', 'No se encontraron placas TQT. Enciéndela y vuelve a buscar.') : h('p', { class: 'hint' }, 'No se encontraron placas TQT. Enciéndela y vuelve a buscar.')); return; }
+            if (!devs.length) {
+                const lap = (S.estaciones.find((x) => x.id === S.station) || {}).name || 'La laptop';
+                lista.replaceChildren(h('div', { class: 'val-vacio' }, h('b', null, '«' + lap + '» no encontró placas TQT por Bluetooth.'),
+                    h('ul', { class: 'val-tips' }, h('li', null, 'La placa debe estar encendida y cerca de esa laptop (no de esta, si son distintas).'),
+                        h('li', null, 'Que no esté conectada al celular ni a otra app Bluetooth: mientras está conectada no se anuncia.'),
+                        h('li', null, 'Espera 5 s tras encenderla y pulsa «Buscar placas» otra vez.'))));
+                return;
+            }
             lista.replaceChildren(...devs.map((d) => {
                 const act = S.conectado && d.address === S.address;
                 return h('div', { class: 'prog-item val-dev', 'aria-pressed': String(act) },
@@ -202,7 +219,11 @@
             const r = await api('/api/validacion/estaciones'); if (!S.vivo) return;
             const antes = S.station;
             if (r.ok && r.data && Array.isArray(r.data.estaciones)) {
-                S.estaciones = r.data.estaciones; S.coincide = r.data.coincide !== false;
+                S.estaciones = r.data.estaciones; S.coincide = r.data.coincide !== false; S.ip = r.data.ip || '';
+                const mia = leerMia();
+                if (!S.coincide && mia && S.estaciones.some((x) => x.id === mia)) {   // la recordada en este navegador
+                    S.estaciones = S.estaciones.filter((x) => x.id === mia); S.coincide = true;
+                }
                 if (!S.estaciones.some((s) => s.id === S.station)) S.station = '';
                 if (!S.station && S.estaciones.length === 1) { S.station = S.estaciones[0].id; sondearEstado(); }
             } else { S.estaciones = []; S.coincide = true; S.station = ''; }
