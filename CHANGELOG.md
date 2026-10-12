@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.69 — 2026-10-12
+- **Administración › Resumen:** botón «Descargar copia de la base (.db)» (solo con clave de administración): copia completa y verificada hecha en caliente (`GET /api/admin/respaldo/descargar`, `sqlite3.backup` + `integrity_check`), queda registrada en Movimientos (BD_DESCARGADA). Sirve para restaurar la base en otro equipo, p. ej. el Docker local.
+
 ## v1.3.68 — 2026-10-12
 - **Inventario TQTR › Stock mínimo:** «Comprar» ahora es botón: se indica cantidad y llegada estimada (por defecto hoy + tiempo de entrega, editable) y el material pasa a «Comprado · faltan N días». Al cumplirse la fecha aparece «¿Llegó el material?»: Sí registra la Entrada en el inventario (suma al disponible); No vuelve a preguntar en 7 días. El pedido se puede editar o cancelar (`inv_tqtr_pedidos`, `POST /stock-minimo/{id}/pedido`, `PATCH /pedidos/{id}`, `POST /pedidos/{id}/llegada`).
 - El contador de Stock mínimo cuenta solo lo pendiente (por comprar + llegadas por confirmar); el KPI muestra cuántos van en camino.

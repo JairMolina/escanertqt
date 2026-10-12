@@ -201,6 +201,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 h('thead', null, h('tr', null, h('th', null, 'Tipo'), ciclos.map((c) => h('th', null, bonito(c.toLowerCase()))))),
                 h('tbody', null, tipos.map((t) => h('tr', null, h('td', { class: 'mono' }, t), ciclos.map((c) => h('td', { class: 'mono' }, String(inv[t][c] || 0)))))))))); }
         const resp = Array.isArray(d.respaldos) ? d.respaldos : [];
+        // v1.3.69: copia completa de la base para restaurarla en otro equipo (p. ej. el Docker local)
+        const btnBd = h('button', { class: 'btn', type: 'button', onclick: async () => {
+            btnBd.disabled = true;
+            const r = await adm('/api/admin/respaldo/descargar', { raw: true, timeout: 120000 });
+            btnBd.disabled = false;
+            if (!r.ok) { if (r.status !== 401) toast('No se pudo descargar la base: ' + (r.error || r.status), { kind: 'bad' }); return; }
+            const cd = r.res.headers.get('Content-Disposition') || ''; const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+            const nombre = m ? decodeURIComponent(m[1]) : 'tqt_produccion.db';
+            const url = URL.createObjectURL(await r.res.blob()); const a = h('a', { href: url, download: nombre, style: 'display:none' }); document.body.append(a); a.click();
+            setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 2000);
+            toast(`Descargado: ${nombre}. Contiene datos y cuentas reales: guárdalo en un lugar seguro.`, { kind: 'ok', ms: 6000 });
+        } }, 'Descargar copia de la base (.db)');
+        box.append(h('div', null, tit('Copia de la base de datos'), h('p', { class: 'muted' }, 'Copia completa y verificada de la base, hecha al momento (incluye usuarios y contraseñas cifradas). Úsala para restaurar en otro equipo.'), btnBd));
         box.append(h('div', null, tit('Últimos respaldos'), resp.length
             ? h('div', { class: 'tablewrap', tabindex: '0', role: 'region', 'aria-label': 'Tabla de respaldos' }, h('table', { class: 'grid' }, h('thead', null, h('tr', null, h('th', null, 'Archivo'), h('th', null, 'Tamaño'))),
                 h('tbody', null, resp.map((x) => h('tr', null, h('td', { class: 'mono' }, x.nombre), h('td', { class: 'mono' }, kb(x.bytes)))))))

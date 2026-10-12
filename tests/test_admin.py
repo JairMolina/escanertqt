@@ -435,5 +435,17 @@ class TestExportacion(AdminBase):
         self.assertEqual(self.client.get("/api/admin/export/excel?lote_id=987654", headers=h).status_code, 404)
 
 
+
+
+class TestDescargarBD(AdminBase):
+    """v1.3.69: copia completa de la base, solo con clave de administración."""
+    def test_descarga_bd(self):
+        self.assertEqual(self.client.get("/api/admin/respaldo/descargar").status_code, 401)
+        r = self.client.get("/api/admin/respaldo/descargar", headers=self.token())
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.content.startswith(b"SQLite format 3"))
+        self.assertIn(".db", r.headers.get("content-disposition", ""))
+
+
 if __name__ == "__main__":
     unittest.main()

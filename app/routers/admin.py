@@ -438,3 +438,31 @@ async def export_excel(
         raise HTTPException(status_code=status.HTTP_423_LOCKED, detail=str(e))
     except ExcelIntegrityError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+# v1.3.69: descarga de una copia consistente de la base (backup en caliente, incluye el WAL) para restaurarla en otro equipo
+def _copia_bd(destino: Path) -> None:
+    src = sqlite3.connect(str(settings.DB_PATH))
+    dst = sqlite3.connect(str(destino))
+    try:
+        src.backup(dst)
+        if dst.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise RuntimeError("La copia no pasó la verificación de integridad.")
+    finally:
+        dst.close()
+        src.close()
+
+
+@router.get("/respaldo/descargar", summary="Descargar una copia completa de la base de datos (solo administración)")
+async def descargar_bd(_: Dict = Depends(admin_requerido)):
+    from datetime import datetime
+    carpeta = Path(tempfile.mkdtemp(prefix="tqt_bd_"))
+    nombre = f"tqt_produccion_{settings.APP_VERSION}_{datetime.now():%Y%m%d-%H%M}.db"
+    try:
+        await run_in_threadpool(_copia_bd, carpeta / nombre)
+    except Exception as e:
+        shutil.rmtree(carpeta, ignore_errors=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"No se pudo copiar la base: {e}")
+    await run_in_threadpool(db.log_evento, "BD_DESCARGADA", None, nombre, "copia completa de la base", "admin")
+    return FileResponse(carpeta / nombre, media_type="application/vnd.sqlite3", filename=nombre,
+                        background=BackgroundTask(shutil.rmtree, carpeta, True))
