@@ -258,7 +258,9 @@ async def ble_estado(station_id: str = Query(min_length=1, max_length=24)):
         if not e:
             return {"ble_disponible": False, "conectado": False, "nombre": None, "address": None, "visto": None, "eventos": []}
         return {"ble_disponible": e["ble_disponible"], "conectado": e["conectado"], "nombre": e["nombre"],
-                "address": e["address"], "visto": round(time.time() - e["visto"], 1), "eventos": list(e["eventos"][-20:])}
+                "address": e["address"], "visto": round(time.time() - e["visto"], 1), "eventos": list(e["eventos"][-20:]),
+                # v1.3.67: varios usuarios prueban a la vez; quién usa la conexión de esta laptop
+                "en_uso_por": (_ultimo.get(station_id) or {}).get("operador") if e["conectado"] else None}
 
 
 def _estado_de(sid: str) -> Dict[str, Any]:

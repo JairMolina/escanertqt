@@ -1,5 +1,14 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.68 — 2026-10-12
+- **Inventario TQTR › Stock mínimo:** «Comprar» ahora es botón: se indica cantidad y llegada estimada (por defecto hoy + tiempo de entrega, editable) y el material pasa a «Comprado · faltan N días». Al cumplirse la fecha aparece «¿Llegó el material?»: Sí registra la Entrada en el inventario (suma al disponible); No vuelve a preguntar en 7 días. El pedido se puede editar o cancelar (`inv_tqtr_pedidos`, `POST /stock-minimo/{id}/pedido`, `PATCH /pedidos/{id}`, `POST /pedidos/{id}/llegada`).
+- El contador de Stock mínimo cuenta solo lo pendiente (por comprar + llegadas por confirmar); el KPI muestra cuántos van en camino.
+- La hoja de Stock mínimo explica la diferencia entre stock mínimo y punto de reorden.
+
+## v1.3.67 — 2026-10-12
+- **Tarjetas:** los botones Cambiar/Quitar de cada placa ahora aparecen junto a su R1/R2/R3, arriba en el panel (antes al final).
+- **Pruebas y validación (varios usuarios):** si la conexión BLE de una laptop la abrió otro usuario se muestra «En uso por <usuario>» y no se pueden mandar comandos; sin confirmar «esta laptop» tampoco se puede buscar/conectar (evita mover la placa de otro compañero).
+
 ## v1.3.66 — 2026-10-12
 - **Pruebas y validación:** «esta laptop» ya no depende solo de la IP: se recuerda en el navegador al descargar el instalador o con el botón «Sí, es esta laptop»; en IPv6 basta el mismo prefijo /64. El aviso muestra la IP del navegador y la del agente para diagnosticar.
 - Si la búsqueda no encuentra placas, se indica qué laptop buscó y qué revisar (placa encendida, no conectada al celular u otra app, cerca de esa laptop).

@@ -79,7 +79,7 @@
         b.setAttribute('aria-label', b.title);
     }
     async function revisarBadge() {
-        try { const r = await fetch(`${B}/stock-minimo`, { headers: { Accept: 'application/json' } }); if (r.ok) badgeLateral((await r.json()).a_comprar.length); } catch (e) { /* sin conexión: sin contador */ }
+        try { const r = await fetch(`${B}/stock-minimo`, { headers: { Accept: 'application/json' } }); if (r.ok) { const j = await r.json(); badgeLateral(j.pendientes ?? j.a_comprar.length); }; } catch (e) { /* sin conexión: sin contador */ }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(revisarBadge, 1500)); else setTimeout(revisarBadge, 1500);
     setInterval(revisarBadge, 10 * 60 * 1000);
@@ -131,7 +131,7 @@
                     else if (st.tab === 'registro') {
                         const q = new URLSearchParams({ limit: '5000' }); Object.entries(st.f).forEach(([k, v]) => { if (v) q.set(k, v); });
                         st.regs = await obtener(`${B}/registros?${q}`);
-                    } else if (st.tab === 'stock') { st.stock = await obtener(`${B}/stock-minimo`); contarStock(st.stock.a_comprar.length); }
+                    } else if (st.tab === 'stock') { st.stock = await obtener(`${B}/stock-minimo`); contarStock(st.stock.pendientes ?? st.stock.a_comprar.length); }
                     else if (st.tab === 'consumo') { st.cons = await obtener(`${B}/consumos`); }
                     else if (st.tab === 'costos') { st.costos = await obtener(`${B}/costos`); if (!st.comps) st.comps = await obtener(`${B}/componentes`); }
                     else if (st.tab === 'componentes') { st.comps = await obtener(`${B}/componentes`); if (!st.dash) st.dash = await obtener(`${B}/dashboard`); }
@@ -541,7 +541,7 @@
                 const dias = (x) => (x.dias_cobertura === null ? muted('sin consumo') : h('span', { class: 'mono', dataset: { k: x.margen_dias !== null && x.margen_dias <= 0 ? 'bad' : '' } }, `${fmt(x.dias_cobertura)} d`));
                 const entrega = (x) => (x.entrega_dias ? h('span', null, h('span', { class: 'mono' }, `${x.entrega_dias} d`), x.entrega_nota ? muted(` · ${x.entrega_nota}`) : null) : muted('sin definir'));
                 const COLS = [
-                    { id: 'descripcion', titulo: 'Material', cel: (x) => h('span', null, h('div', { class: 'itq-mat' }, x.descripcion), x.bajo_minimo ? T.badge(x.disponible <= 0 ? 'Agotado' : 'Comprar', x.disponible <= 0 ? 'bad' : 'warn', 'alert') : null) },
+                    { id: 'descripcion', titulo: 'Material', cel: (x) => h('span', null, h('div', { class: 'itq-mat' }, x.descripcion), estadoCompra(x)) },
                     { id: 'disponible', titulo: 'Disponible', cls: 'num', cel: (x) => h('span', { class: 'mono' }, fmt(x.disponible), ' ', muted(x.unidad || '')) },
                     { id: 'stock_minimo', titulo: 'Mínimo', cls: 'num', cel: (x) => h('span', { class: 'mono' }, x.stock_minimo ? fmt(x.stock_minimo) : '—') },
                     { id: 'punto_reorden', titulo: 'Reorden', cls: 'num', cel: (x) => h('span', { class: 'mono' }, x.punto_reorden ? fmt(x.punto_reorden) : '—') },
@@ -551,12 +551,20 @@
                     { id: 'proveedor', titulo: 'Proveedor', cls: 'c-3', cel: (x) => x.proveedor || muted('—') },
                     { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (x) => h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Editar stock mínimo de ${x.descripcion}`, onclick: () => editarStock(x) }, icon('edit'), 'Editar') },
                 ];
-                const out = [h('div', { class: 'esc-bar' },
+                const enCamino = sm.items.filter((x) => x.pedido).length, porComprar = comprar.filter((x) => !x.pedido).length;
+                const out = [];
+                // v1.3.68: pedidos cuya fecha estimada ya llegó -> ¿llegó el material?
+                (sm.llegadas || []).forEach((x) => out.push(T.banner('warn', 'status', h('b', null, '¿Llegó el material? '),
+                    `${x.descripcion}: ${fmt(x.pedido.cantidad)} ${x.unidad || ''} pedido el ${x.pedido.pedido_en}, llegada estimada ${x.pedido.llegada}. `,
+                    h('span', { class: 'row', style: 'gap:6px;display:inline-flex;flex-wrap:wrap' },
+                        h('button', { class: 'btn btn-sm btn-primary', type: 'button', 'data-escribe': true, onclick: () => llegada(x, true) }, icon('check'), 'Sí, llegó'),
+                        h('button', { class: 'btn btn-sm', type: 'button', 'data-escribe': true, onclick: () => llegada(x, false) }, 'No, aún no')))));
+                out.push(h('div', { class: 'esc-bar' },
                     h('p', { class: 'muted grow' }, `Cobertura = disponible ÷ consumo diario de los últimos ${sm.dias_ritmo} días. "Comprar" cubre los armados objetivo más el mínimo. Al cruzar el mínimo se avisa por correo a los administradores (una vez por cruce).`),
                     h('label', { class: 'itq-fecha', for: 'itqObj' }, h('span', { class: 'muted' }, 'Armados objetivo'), objIn),
-                    h('button', { class: 'btn', type: 'button', onclick: aplicarObj }, 'Aplicar'))];
+                    h('button', { class: 'btn', type: 'button', onclick: aplicarObj }, 'Aplicar')));
                 out.push(h('div', { class: 'esc-kpis', dataset: { n: 4 } },
-                    kpi('A comprar', comprar.length, comprar.length ? 'warn' : 'ok', comprar.length ? 'en o bajo el mínimo' : 'nada pendiente'),
+                    kpi('A comprar', porComprar, porComprar ? 'warn' : 'ok', (porComprar ? 'en o bajo el mínimo' : 'nada pendiente') + (enCamino ? ` · ${enCamino} en camino` : '')),
                     kpi('Agotados', comprar.filter((x) => x.disponible <= 0).length, comprar.some((x) => x.disponible <= 0) ? 'bad' : 'ok'),
                     kpi('Sin cubrir la entrega', comprar.filter((x) => x.margen_dias !== null && x.margen_dias <= 0).length, '', 'cobertura ≤ tiempo de entrega'),
                     kpi('Con mínimo definido', sm.items.filter((x) => x.stock_minimo || x.punto_reorden).length, 'info', `de ${sm.items.length} componentes`)));
@@ -570,6 +578,60 @@
                 out.push(bloque('Materiales a comprar (por urgencia)', tc), bloque('Todos los componentes', ta));
                 return out;
             }
+            // v1.3.68: Comprar -> Comprado (cuenta regresiva) -> ¿llegó?
+            const masDias = (n) => { const d = new Date(); d.setDate(d.getDate() + (Number(n) || 0)); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+            const recargarStock = () => { st.stock = null; st.dash = null; st.comps = null; cargar(); };
+            function estadoCompra(x) {
+                const p = x.pedido;
+                if (p) {
+                    const n = p.dias_restantes;
+                    const txt = n > 0 ? `Comprado · faltan ${n} ${n === 1 ? 'día' : 'días'}` : '¿Llegó? · ' + (n === 0 ? 'hoy' : `hace ${-n} d`);
+                    return h('button', { class: 'btn btn-sm itq-compra', type: 'button', dataset: { k: n > 0 ? 'info' : 'warn' }, 'data-escribe': true,
+                        title: `Llegada estimada ${p.llegada}`, onclick: (e) => { e.stopPropagation(); verPedido(x); } }, icon(n > 0 ? 'clock' : 'alert'), txt);
+                }
+                if (!x.bajo_minimo) return null;
+                return h('button', { class: 'btn btn-sm itq-compra', type: 'button', dataset: { k: x.disponible <= 0 ? 'bad' : 'warn' }, 'data-escribe': true,
+                    title: 'Marcar como comprado', onclick: (e) => { e.stopPropagation(); comprar(x); } }, icon('alert'), x.disponible <= 0 ? 'Agotado · Comprar' : 'Comprar');
+            }
+            function comprar(x) {
+                const cant = h('input', { class: 'input mono', type: 'number', id: 'pCant', min: '0', step: 'any', value: x.sugerida || '' });
+                const fecha = h('input', { class: 'input mono', type: 'date', id: 'pLle', min: masDias(0), value: masDias(x.entrega_dias) });
+                const nota = h('input', { class: 'input', id: 'pNota', maxlength: 300, placeholder: 'Orden de compra, proveedor…' });
+                const err = h('div', { class: 'hint err', role: 'alert' });
+                sheet({ title: `Comprar · ${x.descripcion}`, body: [
+                    h('p', { class: 'muted' }, `Disponible ${fmt(x.disponible)} ${x.unidad || ''}. Sugerido: ${fmt(x.sugerida)}. La llegada estimada parte del tiempo de entrega (${x.entrega_dias || 0} días); puedes cambiarla.`),
+                    h('div', { class: 'row wrap itq-form' }, campo('pCant', `Cantidad comprada (${x.unidad || 'unidades'})`, cant), campo('pLle', 'Llegada estimada', fecha)),
+                    campo('pNota', 'Nota (opcional)', nota), err],
+                    actions: [{ label: 'Cancelar', kind: 'ghost', onClick: () => true }, { label: 'Marcar como comprado', kind: 'primary', keepOpen: true, onClick: async () => {
+                        const r = await api(`${B}/stock-minimo/${x.id}/pedido`, { method: 'POST', body: { cantidad: Number(cant.value || 0), llegada: fecha.value || null, nota: nota.value } });
+                        if (!r.ok) { err.textContent = r.error; return false; }
+                        toast(`Comprado: llega en ${r.data.dias_restantes} días`, { kind: 'ok' }); recargarStock(); return true;
+                    } }] });
+            }
+            function verPedido(x) {
+                const p = x.pedido;
+                const cant = h('input', { class: 'input mono', type: 'number', id: 'pCant', min: '0', step: 'any', value: p.cantidad });
+                const fecha = h('input', { class: 'input mono', type: 'date', id: 'pLle', value: p.llegada });
+                const err = h('div', { class: 'hint err', role: 'alert' });
+                const enviar = async (body, msg) => {
+                    const r = await api(`${B}/pedidos/${p.id}`, { method: 'PATCH', body });
+                    if (!r.ok) { err.textContent = r.error; return false; } toast(msg, { kind: 'ok' }); recargarStock(); return true;
+                };
+                sheet({ title: `Pedido · ${x.descripcion}`, body: [
+                    h('p', { class: 'muted' }, `Pedido el ${p.pedido_en}${p.operador ? ' por ' + p.operador : ''}. ` + (p.dias_restantes > 0 ? `Faltan ${p.dias_restantes} días.` : 'La fecha estimada ya llegó.') + (p.nota ? ` · ${p.nota}` : '')),
+                    h('div', { class: 'row wrap itq-form' }, campo('pCant', `Cantidad (${x.unidad || 'unidades'})`, cant), campo('pLle', 'Llegada estimada', fecha)), err],
+                    actions: [
+                        { label: 'Cancelar pedido', kind: 'ghost', keepOpen: true, onClick: () => enviar({ cancelar: true }, 'Pedido cancelado') },
+                        { label: 'Ya llegó', keepOpen: true, onClick: () => llegada(x, true, Number(cant.value || 0)) },
+                        { label: 'Guardar', kind: 'primary', keepOpen: true, onClick: () => enviar({ llegada: fecha.value, cantidad: Number(cant.value || 0) }, 'Pedido actualizado') }] });
+            }
+            async function llegada(x, llego, cantidad) {
+                const body = { llego }; if (cantidad) body.cantidad = cantidad;
+                const r = await api(`${B}/pedidos/${x.pedido.id}/llegada`, { method: 'POST', body });
+                if (!r.ok) { toast(r.error, { kind: 'bad' }); return false; }
+                toast(llego ? `Entrada registrada: ${x.descripcion}` : 'Se volverá a preguntar en 7 días (puedes cambiar la fecha en el pedido)', { kind: 'ok' });
+                recargarStock(); return true;
+            }
             function editarStock(x) {
                 const num = (id, v, paso) => h('input', { class: 'input mono', type: 'number', id, min: '0', step: paso || 'any', inputmode: 'decimal', value: v ?? '' });
                 const c = { stock_minimo: num('sMin', x.stock_minimo), punto_reorden: num('sReo', x.punto_reorden), armados_objetivo: num('sObj', x.objetivo_propio ? x.armados_objetivo : '', '1'),
@@ -579,6 +641,7 @@
                 sheet({ title: `Stock mínimo · ${x.descripcion}`, body: [
                     h('p', { class: 'muted' }, `Disponible: ${fmt(x.disponible)} ${x.unidad || ''} · ${fmt(x.cantidad_por_armado)} por armado · consumo ${fmt(x.consumo_diario)} por día.`),
                     h('div', { class: 'row wrap itq-form' }, campo('sMin', `Stock mínimo (${x.unidad || 'unidades'})`, c.stock_minimo), campo('sReo', 'Punto de reorden', c.punto_reorden)),
+                    h('p', { class: 'hint' }, 'Stock mínimo: la cantidad de la que nunca deberías bajar. Punto de reorden: el nivel al que conviene volver a pedir para que el material llegue antes de caer al mínimo. «Comprar» aparece al llegar a cualquiera de los dos; normalmente el reorden es MAYOR que el mínimo (≈ mínimo + consumo diario × días de entrega).'),
                     h('div', { class: 'row wrap itq-form' }, campo('sObj', 'Armados objetivo (vacío = general)', c.armados_objetivo), campo('sDias', 'Tiempo de entrega (días)', c.entrega_dias)),
                     campo('sNota', 'Nota de entrega', c.entrega_nota), campo('sProv', 'Proveedor', c.proveedor), err],
                     actions: [{ label: 'Cancelar', kind: 'ghost', onClick: () => true }, { label: 'Guardar', kind: 'primary', keepOpen: true, onClick: async () => {

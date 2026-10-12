@@ -55,8 +55,10 @@
         }
         const estOnline = () => S.estaciones.find((s) => s.id === S.station && s.online !== false);
         function pintarEstado() {
-            const libre = !S.busy && !S.buscando, ok = !!estOnline();
-            estado.replaceChildren(S.conectado ? T.badge('Conectado · ' + (S.nombre || 'TQT'), 'ok', 'check') : T.badge(S.busy ? 'Trabajando…' : 'Desconectado', S.busy ? 'info' : '', S.busy ? 'clock' : 'circle'));
+            // v1.3.67: varios usuarios a la vez → sin laptop confirmada o con la conexión de otro usuario no se manda nada
+            const ajeno = S.conectado && S.usoPor && S.yo && S.usoPor !== S.yo.email;
+            const libre = !S.busy && !S.buscando && !ajeno, ok = !!estOnline() && S.coincide;
+            estado.replaceChildren(ajeno ? T.badge('En uso por ' + S.usoPor, 'warn', 'alert') : S.conectado ? T.badge('Conectado · ' + (S.nombre || 'TQT'), 'ok', 'check') : T.badge(S.busy ? 'Trabajando…' : 'Desconectado', S.busy ? 'info' : '', S.busy ? 'clock' : 'circle'));
             btnBus.replaceChildren(S.buscando ? h('span', { class: 'val-spin', 'aria-hidden': 'true' }) : icon('wifi'), S.buscando ? 'Buscando placas… ~6 s' : 'Buscar placas');
             btnBus.disabled = !ok || !libre;
             btnDes.disabled = !ok || !libre || !S.conectado;
@@ -281,6 +283,7 @@
         function aplicarConexion(d) {
             const antes = S.conectado + '|' + S.address;
             S.conectado = !!d.conectado; S.nombre = d.conectado ? (d.nombre || '') : ''; S.address = d.conectado ? (d.address || '') : '';
+            if ('en_uso_por' in d) S.usoPor = d.en_uso_por || '';
             return antes !== S.conectado + '|' + S.address;
         }
         let sondeando = false;

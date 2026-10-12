@@ -79,3 +79,9 @@
 /* v1.3.39: stock mínimo */
 .itq-nav-badge { margin-left: auto; min-width: 20px; padding: 1px 6px; border-radius: 10px; background: var(--warn); color: var(--bg); font-family: var(--font-mono); font-size: 11px; font-weight: 700; text-align: center; }
 .esc[data-lat="min"] .itq-nav-badge { position: absolute; top: 4px; right: 4px; margin: 0; padding: 0 4px; min-width: 16px; }
+
+/* v1.3.68: Comprar / Comprado como botón */
+.itq-compra { margin-top: 4px; min-height: 28px; font-weight: 700; }
+.itq-compra[data-k="warn"] { border-color: var(--warn); color: var(--warn); }
+.itq-compra[data-k="bad"] { border-color: var(--bad); color: var(--bad); }
+.itq-compra[data-k="info"] { border-color: var(--info, var(--line)); color: var(--info, inherit); }

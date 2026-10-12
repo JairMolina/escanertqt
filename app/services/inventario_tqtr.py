@@ -24,7 +24,7 @@ import json
 import logging
 import re
 import threading
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -1278,6 +1278,10 @@ def _aplicar_conversion(c) -> None:
 
 
 def _migrar_1339(c) -> None:
+    # v1.3.68: pedidos de material (Comprar → Comprado → ¿llegó?)
+    c.execute("CREATE TABLE IF NOT EXISTS inv_tqtr_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, componente_id INTEGER NOT NULL, "
+              "cantidad REAL NOT NULL, pedido_en TEXT NOT NULL, llegada TEXT NOT NULL, estado TEXT NOT NULL DEFAULT 'pedido', "
+              "operador TEXT, cerrado_en TEXT, movimiento_id INTEGER, nota TEXT NOT NULL DEFAULT '')")
     _columnas(c, "inv_tqtr_movimientos", {"cantidad_original": "REAL", "unidad_original": "TEXT"})
     _columnas(c, "inv_tqtr_costos", {"origen_consumo": "TEXT"})
     _columnas(c, "inv_tqtr_componentes", {"punto_reorden": "REAL NOT NULL DEFAULT 0", "armados_objetivo": "INTEGER", "entrega_dias": "INTEGER NOT NULL DEFAULT 0",
@@ -1392,6 +1396,7 @@ def _calcular_stock(c) -> Dict[str, Any]:
     extra = {r["id"]: dict(r) for r in c.execute("SELECT id, punto_reorden, armados_objetivo, entrega_dias, entrega_nota, alerta_minimo, cantidad_ensamble "
                                                  "FROM inv_tqtr_componentes")}
     ritmo = _consumo_diario(c, dash)
+    pedidos = _pedidos_activos(c)
     items = []
     for f in dash["componentes"]:
         e = extra.get(f["id"], {})
@@ -1408,12 +1413,16 @@ def _calcular_stock(c) -> Dict[str, Any]:
         x["sugerida"] = _r(max(0.0, objetivo * por_armado + max(x["stock_minimo"], x["punto_reorden"]) - max(0.0, f["disponible"])))
         x["bajo_minimo"] = _bajo_minimo(x)
         x["margen_dias"] = None if cobertura is None else round(cobertura - dias, 1)
+        x["pedido"] = pedidos.get(f["id"])
         items.append(x)
 
     def urgencia(x):  # agotados primero; luego el menor margen entre días de cobertura y tiempo de entrega
         return (0 if x["disponible"] <= 0 else 1, x["margen_dias"] if x["margen_dias"] is not None else 10 ** 6, -x["entrega_dias"])
     comprar = sorted([x for x in items if x["bajo_minimo"]], key=urgencia)
-    return {"armados_objetivo": objetivo_global, "dias_ritmo": DIAS_RITMO, "items": items, "a_comprar": comprar}
+    return {"armados_objetivo": objetivo_global, "dias_ritmo": DIAS_RITMO, "items": items, "a_comprar": comprar,
+            "llegadas": [x for x in items if x["pedido"] and x["pedido"]["dias_restantes"] <= 0],
+            # pendientes de acción: por comprar (sin pedido) + pedidos cuya fecha ya llegó
+            "pendientes": sum(1 for x in comprar if not x["pedido"]) + sum(1 for x in items if x["pedido"] and x["pedido"]["dias_restantes"] <= 0)}
 
 
 def stock_minimo(db_path: Optional[Path] = None) -> Dict[str, Any]:
@@ -1621,3 +1630,83 @@ def exportar_xlsx(db_path: Optional[Path] = None) -> bytes:
 def _reiniciar_cache() -> None:
     """Solo para pruebas: olvida qué BD ya se preparó."""
     _listas.clear()
+
+
+# ----------------------------------------------------------------------------- v1.3.68: pedidos de material
+def _pedidos_activos(c) -> Dict[int, Dict[str, Any]]:
+    hoy = date.today()
+    out = {}
+    for r in c.execute("SELECT * FROM inv_tqtr_pedidos WHERE estado='pedido' ORDER BY id"):
+        d = dict(r)
+        d["dias_restantes"] = (date.fromisoformat(d["llegada"]) - hoy).days
+        out[d["componente_id"]] = d
+    return out
+
+
+def _comp(c, comp_id: int):
+    r = c.execute("SELECT id, descripcion, categoria, unidad_inventario, entrega_dias FROM inv_tqtr_componentes WHERE id=?", (comp_id,)).fetchone()
+    if not r:
+        raise NoEncontradoError("Ese componente no existe.")
+    return r
+
+
+def crear_pedido(comp_id: int, datos: Dict[str, Any], operador: str = "", db_path: Optional[Path] = None) -> Dict[str, Any]:
+    """Marca un material como Comprado; la llegada estimada por defecto = hoy + tiempo de entrega."""
+    asegurar(db_path)
+    with db.transaction(db_path) as c:
+        comp = _comp(c, comp_id)
+        if c.execute("SELECT 1 FROM inv_tqtr_pedidos WHERE componente_id=? AND estado='pedido'", (comp_id,)).fetchone():
+            raise ConflictoError("Ese material ya tiene un pedido en camino.")
+        cant = _num(datos.get("cantidad"))
+        if cant <= 0:
+            raise ValueError("La cantidad comprada debe ser mayor que cero.")
+        llegada = _fecha(datos.get("llegada"), "fecha de llegada") if datos.get("llegada") else             (date.today() + timedelta(days=int(comp["entrega_dias"] or 0))).isoformat()
+        if llegada < date.today().isoformat():
+            raise ValueError("La fecha de llegada no puede ser anterior a hoy.")
+        c.execute("INSERT INTO inv_tqtr_pedidos (componente_id, cantidad, pedido_en, llegada, operador, nota) VALUES (?,?,?,?,?,?)",
+                  (comp_id, cant, date.today().isoformat(), llegada, operador, _texto(datos.get("nota") or "", 300)))
+        return _pedidos_activos(c)[comp_id]
+
+
+def editar_pedido(ped_id: int, datos: Dict[str, Any], db_path: Optional[Path] = None) -> Dict[str, Any]:
+    asegurar(db_path)
+    with db.transaction(db_path) as c:
+        p = c.execute("SELECT * FROM inv_tqtr_pedidos WHERE id=? AND estado='pedido'", (ped_id,)).fetchone()
+        if not p:
+            raise NoEncontradoError("Ese pedido no existe o ya se cerró.")
+        sets = {}
+        if datos.get("llegada"):
+            sets["llegada"] = _fecha(datos["llegada"], "fecha de llegada")
+        if datos.get("cantidad") is not None:
+            if _num(datos["cantidad"]) <= 0:
+                raise ValueError("La cantidad comprada debe ser mayor que cero.")
+            sets["cantidad"] = _num(datos["cantidad"])
+        if datos.get("cancelar"):
+            sets.update(estado="cancelado", cerrado_en=date.today().isoformat())
+        if sets:
+            c.execute(f"UPDATE inv_tqtr_pedidos SET {', '.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), ped_id])
+        return dict(c.execute("SELECT * FROM inv_tqtr_pedidos WHERE id=?", (ped_id,)).fetchone())
+
+
+def recibir_pedido(ped_id: int, llego: bool, datos: Dict[str, Any], db_path: Optional[Path] = None) -> Dict[str, Any]:
+    """¿Llegó el material? Sí → movimiento de Entrada (suma al disponible) y cierra el pedido. No → nueva fecha (por defecto +7 días)."""
+    asegurar(db_path)
+    if not llego:
+        nueva = datos.get("llegada") or (date.today() + timedelta(days=7)).isoformat()
+        return editar_pedido(ped_id, {"llegada": nueva}, db_path)
+    with db.get_db(db_path) as c:
+        p = c.execute("SELECT * FROM inv_tqtr_pedidos WHERE id=? AND estado='pedido'", (ped_id,)).fetchone()
+        if not p:
+            raise NoEncontradoError("Ese pedido no existe o ya se cerró.")
+        comp = _comp(c, p["componente_id"])
+        mov = c.execute("SELECT valor FROM inv_tqtr_catalogo WHERE tipo='movimiento' AND efecto > 0 AND COALESCE(revision,0)=0 "
+                        "ORDER BY CASE WHEN LOWER(valor)='entrada' THEN 0 ELSE 1 END, orden LIMIT 1").fetchone()
+    if not mov:
+        raise ValueError("No hay un tipo de movimiento de entrada en Configuración.")
+    cant = _num(datos.get("cantidad")) if datos.get("cantidad") is not None else p["cantidad"]
+    reg = crear_registro({"modelo": comp["descripcion"], "categoria": comp["categoria"], "movimiento": mov["valor"], "cantidad": cant,
+                          "unidad": comp["unidad_inventario"], "notas": f"Llegada del pedido #{ped_id} (pedido el {p['pedido_en']})"}, db_path)
+    with db.transaction(db_path) as c:
+        c.execute("UPDATE inv_tqtr_pedidos SET estado='recibido', cerrado_en=?, movimiento_id=?, cantidad=? WHERE id=?",
+                  (date.today().isoformat(), reg["id"], cant, ped_id))
+    return {"pedido": ped_id, "movimiento": reg}

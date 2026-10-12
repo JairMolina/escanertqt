@@ -380,3 +380,5 @@ details.esc-dia[open] > summary.esc-dia-sum { margin-bottom: 10px; }
 .esc-dia-sum-h { font-size: .85em; }
 @media (max-width: 640px) { .esc-dia-sum-h { display: none; } }
 @media (prefers-reduced-motion: reduce) { details.esc-dia > summary.esc-dia-sum::after { transition: none; } }
+.esc-placa-w { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.esc-slot-acts { justify-content: flex-end; gap: 6px; flex-wrap: wrap; }

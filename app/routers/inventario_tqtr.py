@@ -5,7 +5,7 @@ La sesión y los roles los aplica el middleware (los consultores solo pueden hac
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
@@ -277,6 +277,43 @@ async def patch_armados_objetivo(body: ArmadosObjetivoIn):
 @router.patch("/stock-minimo/{comp_id}")
 async def patch_stock_minimo(comp_id: int, body: StockMinimoIn):
     return await _run(svc.editar_stock_minimo, comp_id, _datos(body))
+
+
+# v1.3.68: Comprar → Comprado (cuenta regresiva) → ¿llegó el material?
+class PedidoIn(BaseModel):
+    cantidad: Optional[float] = None
+    llegada: Optional[str] = None
+    nota: Optional[str] = None
+    cancelar: Optional[bool] = None
+
+
+class LlegadaIn(BaseModel):
+    llego: bool
+    cantidad: Optional[float] = None
+    llegada: Optional[str] = None
+
+
+def _quien(request: Request) -> str:
+    from app.services import usuarios
+    try:
+        return usuarios.validar_sesion(request.cookies.get(usuarios.COOKIE))["email"]
+    except Exception:
+        return ""
+
+
+@router.post("/stock-minimo/{comp_id}/pedido")
+async def post_pedido(comp_id: int, body: PedidoIn, request: Request):
+    return await _run(svc.crear_pedido, comp_id, _datos(body), _quien(request))
+
+
+@router.patch("/pedidos/{ped_id}")
+async def patch_pedido(ped_id: int, body: PedidoIn):
+    return await _run(svc.editar_pedido, ped_id, _datos(body))
+
+
+@router.post("/pedidos/{ped_id}/llegada")
+async def post_llegada(ped_id: int, body: LlegadaIn):
+    return await _run(svc.recibir_pedido, ped_id, body.llego, _datos(body))
 
 
 @router.get("/conversiones")

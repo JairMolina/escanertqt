@@ -93,18 +93,10 @@
                 panel = h('section', { class: 'esc-panel', 'aria-labelledby': 'tarPanelT', tabindex: '-1' },
                     h('header', null, h('div', null, h('div', { class: 'silk', style: 'margin-bottom:3px' }, 'Tarjeta'), h('span', { id: 'tarPanelT', class: 'sr-only' }, `Detalle de la tarjeta ${t.id_tarjeta_num}`), num), h('div', { class: 'grow' }), T.tarjetaBadge(t), cerrar),
                     h('div', { class: 'cuerpo' },
-                        h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => util.placaCard(s.toUpperCase(), conFw(t, s)))),
-                        bloqueEntrega(t),
-                        window.TQTMateriales ? window.TQTMateriales.bloque(t.id, ctx) : null,
-                        h('div', { class: 'esc-acc esc-acc-prim' },
-                            h('a', { class: 'btn btn-primary', href: `/dymo?tarjeta_id=${t.id}` }, icon('printer'), 'Etiqueta DYMO'),
-                            h('a', { class: 'btn', href: `#/consultar?codigo=${encodeURIComponent((t.r1 || t.r2 || t.r3 || {}).nombre || String(t.id_tarjeta_num))}` }, icon('consultar'), 'Ver ficha'),
-                            h('button', { class: 'btn', type: 'button', onclick: () => util.copiar(util.resumenTarjeta(Object.assign({}, t, { r1: conFw(t, 'r1'), r2: conFw(t, 'r2'), r3: conFw(t, 'r3') })), 'Datos copiados') }, icon('paste'), 'Copiar datos')),
-                        h('div', { class: 'esc-acc esc-acc-slots', 'data-escribe': true },
-                            h('div', { class: 'silk' }, 'Placas de la tarjeta'),
-                            ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'row' },
-                                T.tipoChip(sl),
-                                h('div', { class: 'grow' }),
+                        h('div', { class: 'esc-placas' }, ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'esc-placa-w' },
+                            util.placaCard(sl, conFw(t, sl.toLowerCase())),
+                            // v1.3.67: Cambiar/Quitar junto a su placa (antes al final del panel)
+                            h('div', { class: 'row esc-slot-acts', 'data-escribe': true },
                                 h('button', { class: 'btn btn-sm', type: 'button', onclick: () => elegirPlaca(sl, `${t[sl.toLowerCase()] ? 'Cambiar' : 'Asignar'} ${sl} de la tarjeta ${t.id_tarjeta_num}`, async (np) => {
                                     const r = await api(`/api/tarjetas/${t.id}/asignar`, { method: 'PUT', body: { ranura: sl, pcb_id: np.id } });
                                     if (!r.ok) { toast(r.error, { kind: 'bad' }); return; } toast(`${sl} ${t[sl.toLowerCase()] ? 'cambiada' : 'asignada'}: ${np.nombre}`, { kind: 'ok' }); ctx.actualizar();
@@ -112,7 +104,13 @@
                                 t[sl.toLowerCase()] ? h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Quitar la ${sl} de la tarjeta ${t.id_tarjeta_num}`, onclick: async () => {
                                     const r = await api(`/api/tarjetas/${t.id}/asignar`, { method: 'PUT', body: { ranura: sl, pcb_id: null } });
                                     if (!r.ok) { toast(r.error, { kind: 'bad' }); return; } toast(`${sl} quitada: quedó suelta`, { kind: 'ok' }); ctx.actualizar();
-                                } }, icon('unlink'), 'Quitar') : null))),
+                                } }, icon('unlink'), 'Quitar') : null)))),
+                        bloqueEntrega(t),
+                        window.TQTMateriales ? window.TQTMateriales.bloque(t.id, ctx) : null,
+                        h('div', { class: 'esc-acc esc-acc-prim' },
+                            h('a', { class: 'btn btn-primary', href: `/dymo?tarjeta_id=${t.id}` }, icon('printer'), 'Etiqueta DYMO'),
+                            h('a', { class: 'btn', href: `#/consultar?codigo=${encodeURIComponent((t.r1 || t.r2 || t.r3 || {}).nombre || String(t.id_tarjeta_num))}` }, icon('consultar'), 'Ver ficha'),
+                            h('button', { class: 'btn', type: 'button', onclick: () => util.copiar(util.resumenTarjeta(Object.assign({}, t, { r1: conFw(t, 'r1'), r2: conFw(t, 'r2'), r3: conFw(t, 'r3') })), 'Datos copiados') }, icon('paste'), 'Copiar datos')),
                         h('div', { class: 'esc-acc esc-acc-peligro', 'data-escribe': true },
                             h('button', { class: 'btn btn-danger', type: 'button', onclick: () => desemparejar([t.id]) }, icon('unlink'), 'Desemparejar'))));
                 split.append(panel);
