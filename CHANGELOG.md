@@ -1,5 +1,16 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.65 — 2026-10-12
+- **Pruebas y validación › Placas validadas:** nueva sección con solo las placas escaneadas, probadas y validadas (automática o manual), su tarjeta, quién probó (usuario · ID) y el estado de la tarjeta. Se seleccionan las tarjetas y «Marcar como validadas» las cambia a «Validada» en Tarjetas (`GET /api/validacion/placas-validadas`, `POST /api/validacion/tarjetas/validar`, registro TARJETA_VALIDADA).
+- «Validada» de la tarjeta ahora se confirma explícitamente; la validación automática/manual es por placa. Las pruebas ON/OFF anteriores al 12-oct-2026 siguen contando como validadas.
+- El «Registro de la sesión» muestra en cada línea el usuario y su ID.
+
+## v1.3.64 — 2026-10-12
+- **Pruebas y validación:** ficha «Tarjeta escaneada»: con el Botón de escaneo el celular escanea la tarjeta y se comparan los datos de la base (nombre BLE, MAC, firmware, tarjeta y pruebas ON/OFF) contra la placa conectada por Bluetooth (`GET /api/validacion/comparar`).
+- Botones «Validar automático» (solo valida si todo coincide; si no, indica qué está mal) y «Validar manual» (valida aunque haya diferencias, con motivo opcional) → `POST /api/validacion/validar` (VALIDACION_AUTO / VALIDACION_MANUAL); ambas cuentan para el estado «Validada».
+- Se quitaron el «Historial de pruebas» y el campo «Tarjeta o placa» (lo sustituye el escaneo).
+- El selector de laptop solo muestra la laptop en uso con el agente conectado (`GET /api/validacion/estaciones`, por IP del agente).
+
 ## v1.3.63 — 2026-10-09
 - **Pruebas y validación:** se quitó el aviso «No hay ninguna laptop con el agente conectada»; si no hay laptops conectadas, el selector lo indica y aparece «Instalar agente en esta laptop» en la misma sección. El Bluetooth lo usa el agente de la laptop (el navegador no ve la radio de la PC), por eso la lista sale vacía hasta instalarlo.
 - **Agente 1.3.63:** J-Link pasa a ser opcional (antes el agente y el instalador se detenían sin J-Link, así que una laptop solo para Bluetooth nunca aparecía conectada); sin J-Link solo rechaza trabajos STM32.

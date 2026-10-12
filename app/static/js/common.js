@@ -149,7 +149,7 @@
      *  Es un avance dentro de «completa» (nunca hay programada sin MAC ni sin las 3 placas). Orden: Falta placa → Sin MAC → Programada → Completa. */
     function tarjetaProgramada(t) { const x = t || {}; return !!(x.r1 && x.r2 && x.r3) && ['r1', 'r2', 'r3'].every((r) => programada(Object.assign({}, x[r], { firmware: x[r].firmware || x['firmware_' + r] || null }))); }
     /** Filtro por estado: 'programada' es derivado; el resto usa estadoTarjeta().key. */
-    // v1.3.59: 'validada' = PPON y POFF probados con éxito por BLE (t.validada, calculado en el backend)
+    // 'validada' = t.validada del backend (v1.3.65: confirmada en Pruebas y validación › Placas validadas)
     const cumpleEstado = (t, key) => !key || (key === 'programada' ? tarjetaProgramada(t) : key === 'validada' ? !!(t && t.validada) : estadoTarjeta(t).key === key);
     const TARJETA_ESTADOS = [{ key: 'incompleta', label: 'Falta placa' }, { key: 'sin_mac', label: 'Sin MAC' }, { key: 'programada', label: 'Programadas' }, { key: 'validada', label: 'Validadas' }, { key: 'completa', label: 'Completas' }];
     // v1.3.44: lote de mes ("Septiembre 2026"), semana ("Semana 40 · 28 sep–4 oct 2026") o día ("15 sep 2026").

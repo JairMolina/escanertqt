@@ -622,13 +622,17 @@ def _cols_pcb(alias: str, ranura: str) -> str:
             f"{alias}.version AS _{r}_version, {alias}.serie AS _{r}_serie, {alias}.estado_ciclo AS _{r}_ciclo")
 
 
+# v1.3.65: antes de esta fecha bastaba PPON+POFF para «Validada»; desde v1.3.65 la tarjeta se valida explícitamente
+_CORTE_VALIDA = "2026-10-12"
+
 _SELECT_TARJETA = f"""
     SELECT
         t.id, t.lote_id, t.id_tarjeta_num,
         t.pcb_r1_id, t.pcb_r2_id, t.pcb_r3_id,
         COALESCE(p1.firmware, t.firmware_r1) AS firmware_r1, COALESCE(p2.firmware, t.firmware_r2) AS firmware_r2,
         p3.firmware AS firmware_r3,
-        (SELECT GROUP_CONCAT(DISTINCT v.comando) FROM validaciones_ble v WHERE v.resultado = 'ok' AND v.comando IN ('PPON', 'POFF')
+        (SELECT GROUP_CONCAT(DISTINCT CASE WHEN v.comando IN ('PPON', 'POFF') AND v.creado_en < '{_CORTE_VALIDA}' THEN v.comando || '_ANT' ELSE v.comando END)
+           FROM validaciones_ble v WHERE v.resultado = 'ok' AND v.comando IN ('PPON', 'POFF', 'VALIDACION_AUTO', 'VALIDACION_MANUAL', 'TARJETA_VALIDADA')
            AND (v.tarjeta_id = t.id OR v.pcb_id IN (t.pcb_r1_id, t.pcb_r2_id, t.pcb_r3_id))) AS _validacion,
         t.semana_produccion, t.fecha_proyectada, t.fecha_real, t.fecha_llegada, t.fecha_finalizado, t.gabinete, t.etiqueta_firma,
         t.created_at, t.updated_at,
@@ -661,10 +665,15 @@ def _fila_a_tarjeta(row: sqlite3.Row) -> Dict[str, Any]:
             "firmware": d.get(f"firmware_{r}"),
         }
     d["completa"] = bool(d["r1"] and d["r2"])
-    # v1.3.59: validada = PPON y POFF enviados con éxito por BLE (sección Pruebas y validación)
     ok = {x for x in (d.pop("_validacion", None) or "").split(",") if x}
-    d["validacion"] = sorted(ok)
-    d["validada"] = {"PPON", "POFF"} <= ok
+    d["validacion"] = sorted({x[:4] for x in ok} & {"PPON", "POFF"})
+    # v1.3.65: «Validada» = TARJETA_VALIDADA (confirmada en Pruebas y validación › Placas validadas);
+    # la validación auto/manual es por placa. Compatibilidad: PPON+POFF anteriores a _CORTE_VALIDA siguen contando.
+    if "TARJETA_VALIDADA" in ok:
+        d["validada_modo"] = "manual" if "VALIDACION_MANUAL" in ok else "auto" if "VALIDACION_AUTO" in ok else "lote"
+    else:
+        d["validada_modo"] = "pruebas" if {"PPON_ANT", "POFF_ANT"} <= ok else None
+    d["validada"] = d["validada_modo"] is not None
     d["sin_mac"] = [r.upper() for r in ("r1", "r2") if d[r] and not d[r]["mac"]]
     return d
 

@@ -40,6 +40,8 @@ class ValidacionBLETests(unittest.TestCase):
         self.c.post('/api/validacion/registros', json=self.body(codigo=nombre, comando='POFF', resultado='error'))
         self.assertEqual((estado()['validada'], estado()['validacion']), (False, ['PPON']))
         self.c.post('/api/validacion/registros', json=self.body(codigo=nombre, comando='POFF'))
+        self.assertEqual((estado()['validada'], estado()['validacion']), (False, ['POFF', 'PPON']))   # v1.3.65: se confirma aparte
+        self.c.post('/api/validacion/tarjetas/validar', json=dict(tarjeta_ids=[self.t['id']]))
         self.assertTrue(estado()['validada'])
 
     def test_alta_por_nombre_de_dispositivo(self):

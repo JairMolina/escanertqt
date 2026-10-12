@@ -1,5 +1,7 @@
 """Pruebas y validación por Bluetooth LE: bitácora de lo que el navegador (Web Bluetooth) hace con las tarjetas TQT."""
 import io
+import json
+import re
 import secrets
 import threading
 import time
@@ -9,13 +11,14 @@ from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from app.database import db, inventario as inv
 from app.routers.ws import manager
 from app.services import usuarios
 from app.routers.stm32 import station_token
+from app.services import stm32_programming as svc
 
 router = APIRouter(prefix="/api/validacion", tags=["Pruebas y validación BLE"])
 
@@ -162,6 +165,7 @@ ONLINE = 20           # s: ventana de estación conectada
 _lock = threading.Lock()
 _jobs: Dict[str, Dict[str, Any]] = {}
 _estados: Dict[str, Dict[str, Any]] = {}
+_ips: Dict[str, str] = {}   # estación -> última IP del agente
 _ultimo: Dict[str, Dict[str, Any]] = {}   # estación -> {operador, codigo}
 
 
@@ -178,6 +182,7 @@ class ReclamoBLE(BaseModel):
     conectado: bool = False
     nombre: Optional[str] = Field(default=None, max_length=200)
     address: Optional[str] = Field(default=None, max_length=64)
+    firmware: Optional[str] = Field(default=None, max_length=40)   # opcional: el agente puede reportarlo
 
 
 class ResultadoBLE(BaseModel):
@@ -279,8 +284,9 @@ def _tocar(sid: str) -> None:
 
 
 @agent_router.post("/claim")
-async def ble_claim(body: ReclamoBLE, st=Depends(station_token)):
+async def ble_claim(body: ReclamoBLE, request: Request, st=Depends(station_token)):
     sid = st["id"]
+    _recordar_ip(sid, request)
     await run_in_threadpool(_tocar, sid)
     ahora = time.time()
     with _lock:
@@ -288,7 +294,8 @@ async def ble_claim(body: ReclamoBLE, st=Depends(station_token)):
         e = _estado_de(sid)
         antes = (e["conectado"], e["nombre"], e["address"])
         e.update(ble_disponible=body.ble_disponible, conectado=body.conectado,
-                 nombre=body.nombre if body.conectado else None, address=body.address if body.conectado else None, visto=ahora)
+                 nombre=body.nombre if body.conectado else None, address=body.address if body.conectado else None,
+                 firmware=body.firmware if body.conectado else None, visto=ahora)
         job = None
         for j in sorted(_jobs.values(), key=lambda x: x["creado"]):
             if j["station"] == sid and j["estado"] == "pendiente":
@@ -300,8 +307,9 @@ async def ble_claim(body: ReclamoBLE, st=Depends(station_token)):
 
 
 @agent_router.post("/evento")
-async def ble_evento(body: EventoBLE, st=Depends(station_token)):
+async def ble_evento(body: EventoBLE, request: Request, st=Depends(station_token)):
     sid = st["id"]
+    _recordar_ip(sid, request)
     with _lock:
         e = _estado_de(sid)
         antes = (e["conectado"], e["nombre"], e["address"])
@@ -322,8 +330,9 @@ async def ble_evento(body: EventoBLE, st=Depends(station_token)):
 
 
 @agent_router.post("/{jid}/resultado")
-async def ble_resultado(jid: str, body: ResultadoBLE, st=Depends(station_token)):
+async def ble_resultado(jid: str, body: ResultadoBLE, request: Request, st=Depends(station_token)):
     sid = st["id"]
+    _recordar_ip(sid, request)
     with _lock:
         j = _jobs.get(jid)
         if not j or j["station"] != sid:
@@ -348,3 +357,275 @@ async def ble_resultado(jid: str, body: ResultadoBLE, st=Depends(station_token))
         await _registrar("DESCONECTAR", body.ok, nombre, address, err, operador=operador, codigo=codigo)
     await _aviso_estado(sid, antes, e)
     return {"ok": True}
+
+
+# ───────── v1.3.64: estaciones, comparación y validación ─────────
+def _ip_cliente(request: Request) -> str:
+    h = request.headers
+    ip = (h.get("cf-connecting-ip") or "").strip()
+    if not ip:
+        ip = (h.get("x-forwarded-for") or "").split(",")[0].strip()
+    return ip or (request.client.host if request.client else "")
+
+
+def _recordar_ip(sid: str, request: Request) -> None:
+    ip = _ip_cliente(request)
+    if ip:
+        _ips[sid] = ip
+
+
+@router.get("/estaciones", summary="Estaciones en línea; marca la que está en la IP de quien consulta")
+async def estaciones(request: Request):
+    en_linea = [e for e in await run_in_threadpool(svc.stations) if e["online"]]
+    ip = _ip_cliente(request)
+    mias = [e for e in en_linea if ip and _ips.get(e["id"]) == ip]
+    if mias:
+        return {"estaciones": [dict(id=e["id"], name=e["name"], online=True, esta_laptop=True) for e in mias], "coincide": True}
+    return {"estaciones": [dict(id=e["id"], name=e["name"], online=True, esta_laptop=False) for e in en_linea], "coincide": False}
+
+
+def _mac_norm(m) -> str:
+    return re.sub(r"[^0-9A-F]", "", (m or "").upper())
+
+
+def _nombre_norm(n) -> str:
+    return re.sub(r"[^0-9A-Z]", "", (n or "").upper())
+
+
+def _version_de_nombre(n) -> Optional[str]:
+    m = re.search(r"_V(\d)(\d)(?:_|$)", (n or "").upper())
+    return f"{m.group(1)}.{m.group(2)}" if m else None
+
+
+def _mayor_menor(fw) -> Optional[str]:
+    m = re.match(r"\s*v?(\d+)(?:\.(\d+))?", str(fw or ""), re.I)
+    return f"{int(m.group(1))}.{int(m.group(2) or 0)}" if m else None
+
+
+def _nombre_ble_esperado(p: Dict[str, Any]) -> Optional[str]:
+    if p.get("tipo") == "R2":
+        m = re.search(r"(\d{4})\s*$", p.get("nombre") or "")
+        if m and m.group(1) != "0000":
+            from app.services.firmware_build import nombre_ble_r2
+            try:
+                return nombre_ble_r2(m.group(1))
+            except Exception:
+                return None
+    return None
+
+
+def _comparar(codigo: str, station_id: str) -> Dict[str, Any]:
+    init()
+    try:
+        r = inv.consulta((codigo or "").strip())
+    except ValueError:
+        raise HTTPException(404, "No reconozco el código.")
+    except db.NoEncontradoError:
+        raise HTTPException(404, "El código no existe.")
+    pcb, tj = r.get("pcb"), r.get("tarjeta")
+    tid = (tj or {}).get("id") or (pcb or {}).get("tarjeta_id")
+    tarjeta = db.get_tarjeta_by_id(tid) if tid else None
+    if not tarjeta and not pcb:
+        raise HTTPException(404, "El código no existe.")
+    placas = []
+    fuente = [tarjeta.get(k) for k in ("r1", "r2", "r3")] if tarjeta else [pcb]
+    for p in fuente:
+        if not p:
+            continue
+        with db.get_db() as c:
+            row = c.execute("SELECT tipo, nombre, mac, firmware FROM pcb_inventario WHERE id=?", (p.get("id"),)).fetchone()
+        d = dict(row) if row else dict(tipo=p.get("tipo"), nombre=p.get("nombre"), mac=p.get("mac"), firmware=p.get("firmware"))
+        d["id"] = p.get("id")
+        d["nombre_ble"] = _nombre_ble_esperado(d)
+        placas.append(d)
+    with _lock:
+        e = dict(_estados.get(station_id) or {})
+    con = bool(e.get("conectado"))
+    ble = dict(conectado=con, nombre=e.get("nombre") if con else None,
+               address=e.get("address") if con else None, firmware=e.get("firmware") if con else None)
+    probada = None
+    if con:
+        for p in placas:
+            if (p["mac"] and _mac_norm(p["mac"]) == _mac_norm(ble["address"])) or \
+               (p["nombre_ble"] and _nombre_norm(p["nombre_ble"]) == _nombre_norm(ble["nombre"])):
+                probada = p
+                break
+    checks: List[Dict[str, Any]] = []
+
+    def chk(campo, etiqueta, esperado, actual, ok, detalle=""):
+        checks.append(dict(campo=campo, etiqueta=etiqueta, esperado=esperado, actual=actual, ok=ok, detalle=detalle))
+
+    esperadas = ", ".join(p["nombre"] or "?" for p in placas)
+    if not con:
+        chk("tarjeta", "Tarjeta", esperadas, None, False, "No hay un dispositivo BLE conectado en la estación.")
+    elif not probada:
+        chk("tarjeta", "Tarjeta", esperadas, ble["nombre"] or ble["address"], False,
+            "El dispositivo conectado no corresponde a ninguna placa de esta tarjeta.")
+    else:
+        chk("tarjeta", "Tarjeta", probada["nombre"], ble["nombre"] or ble["address"], True, f"Placa {probada['tipo']} reconocida.")
+        esp = probada["nombre_ble"]
+        if esp:
+            ok = _nombre_norm(esp) == _nombre_norm(ble["nombre"])
+            chk("nombre", "Nombre BLE", esp, ble["nombre"], ok, "" if ok else "El nombre BLE no coincide con el esperado.")
+        else:
+            chk("nombre", "Nombre BLE", None, ble["nombre"], None, "Sin nombre BLE esperado para esta placa.")
+        if probada["mac"]:
+            ok = _mac_norm(probada["mac"]) == _mac_norm(ble["address"])
+            chk("mac", "MAC", probada["mac"], ble["address"], ok, "" if ok else "La MAC registrada no coincide con la del dispositivo.")
+        else:
+            chk("mac", "MAC", None, ble["address"], None, "La placa no tiene MAC registrada.")
+        act_fw = _mayor_menor(ble["firmware"]) or _version_de_nombre(ble["nombre"])
+        if not probada["firmware"]:
+            chk("firmware", "Firmware", None, act_fw, None, "La placa no tiene firmware registrado.")
+        elif not act_fw:
+            chk("firmware", "Firmware", probada["firmware"], None, None, "No reportado por el dispositivo.")
+        else:
+            ok = _mayor_menor(probada["firmware"]) == act_fw
+            chk("firmware", "Firmware", probada["firmware"], act_fw, ok,
+                "" if ok else "La versión del dispositivo no coincide con el firmware registrado.")
+        with db.get_db() as c:
+            cmds = {x["comando"] for x in c.execute(
+                "SELECT DISTINCT comando FROM validaciones_ble WHERE resultado='ok' AND comando IN ('PPON','POFF') "
+                "AND (pcb_id=? OR (ble_id IS NOT NULL AND UPPER(ble_id)=UPPER(?)))", (probada["id"], ble["address"] or ""))}
+        falta = [x for x in ("PPON", "POFF") if x not in cmds]
+        chk("pruebas", "Pruebas PPON/POFF", "PPON y POFF ok", ", ".join(sorted(cmds)) or "ninguna", not falta,
+            "" if not falta else "Falta: " + ", ".join(falta))
+    ids = [p["id"] for p in placas if p["id"]]
+    with db.get_db() as c:
+        v = c.execute("SELECT comando, creado_en, operador FROM validaciones_ble WHERE resultado='ok' AND comando IN "
+                      "('VALIDACION_AUTO','VALIDACION_MANUAL') AND (tarjeta_id IS ? OR pcb_id IN (%s)) ORDER BY id DESC LIMIT 1"
+                      % ",".join("?" * len(ids)), [tarjeta["id"] if tarjeta else None] + ids).fetchone()
+    validada = dict(modo="auto" if v["comando"].endswith("AUTO") else "manual", creado_en=v["creado_en"], operador=v["operador"]) if v else None
+    return {"codigo": codigo, "tarjeta": tarjeta,
+            "placas": [{k: p[k] for k in ("tipo", "nombre", "mac", "firmware", "nombre_ble")} for p in placas],
+            "ble": ble, "placa_probada": probada["tipo"] if probada else None, "checks": checks,
+            "ok": not any(c["ok"] is False for c in checks), "validada": validada,
+            "_probada_id": probada["id"] if probada else None}
+
+
+@router.get("/comparar", summary="Compara la tarjeta escaneada con el dispositivo BLE conectado")
+async def comparar(codigo: str = Query(min_length=1, max_length=2000), station_id: str = Query(min_length=1, max_length=24)):
+    res = await run_in_threadpool(_comparar, codigo, station_id)
+    res.pop("_probada_id", None)
+    return res
+
+
+class ValidarIn(BaseModel):
+    codigo: str = Field(min_length=1, max_length=2000)
+    station_id: str = Field(min_length=1, max_length=24)
+    modo: Literal["auto", "manual"] = "auto"
+    motivo: Optional[str] = Field(default=None, max_length=300)
+
+
+def _validar(datos: ValidarIn, operador: str):
+    res = _comparar(datos.codigo, datos.station_id)
+    if datos.modo == "auto" and not res["ok"]:
+        fallos = [c["etiqueta"] for c in res["checks"] if c["ok"] is False]
+        return JSONResponse(status_code=409, content={"detail": "No se puede validar: " + ", ".join(fallos), "checks": res["checks"]}), None
+    tj = res["tarjeta"]
+    tid = tj["id"] if tj else None
+    pid = res.pop("_probada_id", None)
+    if not pid and tj:
+        pid = tj.get("pcb_r2_id") or tj.get("pcb_r1_id")
+    if not pid and not tid:
+        return JSONResponse(status_code=409, content={"detail": "No hay tarjeta ni placa que validar.", "checks": res["checks"]}), None
+    manual = datos.modo == "manual"
+    detalle = json.dumps({"motivo": datos.motivo, "fallidos": [c for c in res["checks"] if c["ok"] is False]},
+                         ensure_ascii=False) if manual else None
+    disp = (res["ble"]["nombre"] or res["ble"]["address"] or "BLE")[:100]
+    cmd = "VALIDACION_MANUAL" if manual else "VALIDACION_AUTO"
+    with db.transaction() as c:
+        cur = c.execute(
+            "INSERT INTO validaciones_ble (pcb_id, tarjeta_id, dispositivo, ble_id, comando, resultado, detalle, operador, creado_en) "
+            "VALUES (?,?,?,?,?,'ok',?,?, datetime('now','localtime'))",
+            (pid, tid, disp, res["ble"]["address"], cmd, detalle, operador))
+        reg = _fila(c.execute(_SEL + " WHERE v.id = ?", (cur.lastrowid,)).fetchone())
+    db.log_evento("VALIDACION_BLE", valor=disp, operador=operador, detalle=cmd)
+    nuevo = _comparar(datos.codigo, datos.station_id)
+    nuevo.pop("_probada_id", None)
+    return reg, nuevo
+
+
+@router.post("/validar", summary="Marcar una tarjeta como Validada (automática o manual)")
+async def validar(datos: ValidarIn, request: Request):
+    operador = _operador(request)
+    reg, res = await run_in_threadpool(_validar, datos, operador)
+    if res is None:
+        return reg
+    await manager.broadcast("VALIDACION_BLE", reg)
+    return res
+
+
+# --- v1.3.65: placas validadas (auto/manual) y confirmación de la tarjeta como «Validada» ---
+def _usuario_ids(c) -> Dict[str, int]:
+    """email -> id de usuario (rowid de la tabla usuarios)."""
+    try:
+        return {r["email"]: r["rowid"] for r in c.execute("SELECT rowid, email FROM usuarios")}
+    except Exception:
+        return {}
+
+
+def _placas_validadas(todas: bool) -> Dict[str, Any]:
+    with db.get_db() as c:
+        ids = _usuario_ids(c)
+        filas = c.execute(
+            "SELECT v.id, v.pcb_id, v.comando, v.creado_en, v.operador, p.nombre AS pcb_nombre, p.tipo AS pcb_tipo, "
+            "t.id AS tarjeta_id, t.id_tarjeta_num, "
+            "(SELECT pr.operador FROM validaciones_ble pr WHERE pr.resultado='ok' AND pr.comando IN ('PPON','POFF') AND pr.pcb_id=v.pcb_id ORDER BY pr.id DESC LIMIT 1) AS probo, "
+            "(SELECT tv.creado_en FROM validaciones_ble tv WHERE tv.comando='TARJETA_VALIDADA' AND tv.resultado='ok' AND tv.tarjeta_id=t.id ORDER BY tv.id DESC LIMIT 1) AS tarjeta_validada_en "
+            "FROM validaciones_ble v JOIN pcb_inventario p ON p.id = v.pcb_id "
+            "LEFT JOIN tarjetas_produccion t ON t.id = COALESCE(v.tarjeta_id, (SELECT x.id FROM tarjetas_produccion x WHERE v.pcb_id IN (x.pcb_r1_id, x.pcb_r2_id) LIMIT 1)) "
+            "WHERE v.resultado='ok' AND v.comando IN ('VALIDACION_AUTO','VALIDACION_MANUAL') "
+            "AND v.id = (SELECT MAX(z.id) FROM validaciones_ble z WHERE z.pcb_id=v.pcb_id AND z.resultado='ok' AND z.comando IN ('VALIDACION_AUTO','VALIDACION_MANUAL')) "
+            "ORDER BY v.id DESC LIMIT 300").fetchall()
+    items = []
+    for r in filas:
+        d = dict(r)
+        if not todas and d["tarjeta_validada_en"] and d["tarjeta_validada_en"][:10] < time.strftime("%Y-%m-%d"):
+            continue   # ya confirmadas en días anteriores: no saturar la lista
+        d["modo"] = "manual" if d.pop("comando").endswith("MANUAL") else "auto"
+        d["probo"] = d["probo"] or d["operador"]
+        d["probo_id"], d["operador_id"] = ids.get(d["probo"]), ids.get(d["operador"])
+        d["tarjeta_validada"] = bool(d["tarjeta_validada_en"])
+        items.append(d)
+    return {"items": items}
+
+
+@router.get("/placas-validadas", summary="Placas validadas (auto/manual) y si su tarjeta ya quedó «Validada»")
+async def placas_validadas(request: Request, todas: bool = False):
+    yo = _operador(request)
+    res = await run_in_threadpool(_placas_validadas, todas)
+    with db.get_db() as c:
+        res["yo"] = {"email": yo, "id": _usuario_ids(c).get(yo)}
+    return res
+
+
+class TarjetasValidarIn(BaseModel):
+    tarjeta_ids: List[int] = Field(min_length=1, max_length=200)
+
+
+def _validar_tarjetas(ids: List[int], operador: str) -> Dict[str, Any]:
+    hechas = []
+    with db.transaction() as c:
+        for tid in dict.fromkeys(ids):
+            t = c.execute("SELECT id, id_tarjeta_num FROM tarjetas_produccion WHERE id=?", (tid,)).fetchone()
+            if not t:
+                continue
+            ya = c.execute("SELECT 1 FROM validaciones_ble WHERE comando='TARJETA_VALIDADA' AND resultado='ok' AND tarjeta_id=?", (tid,)).fetchone()
+            if ya:
+                continue
+            c.execute("INSERT INTO validaciones_ble (tarjeta_id, dispositivo, comando, resultado, operador, creado_en) "
+                      "VALUES (?, ?, 'TARJETA_VALIDADA', 'ok', ?, datetime('now','localtime'))",
+                      (tid, ("Tarjeta " + str(t["id_tarjeta_num"]))[:100], operador))
+            hechas.append(tid)
+    for tid in hechas:
+        db.log_evento("VALIDACION_BLE", valor=str(tid), operador=operador, detalle="TARJETA_VALIDADA")
+    return {"validadas": hechas}
+
+
+@router.post("/tarjetas/validar", summary="Cambiar a «Validada» un conjunto de tarjetas")
+async def validar_tarjetas(datos: TarjetasValidarIn, request: Request):
+    operador = _operador(request)
+    res = await run_in_threadpool(_validar_tarjetas, datos.tarjeta_ids, operador)
+    await manager.broadcast("VALIDACION_BLE", {"comando": "TARJETA_VALIDADA", "tarjetas": res["validadas"], "operador": operador})
+    return res

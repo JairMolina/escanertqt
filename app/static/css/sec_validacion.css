@@ -11,7 +11,6 @@
 @media (max-width: 900px) { .val-wrap { grid-template-columns: 1fr; } }
 .val .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .val .grow { flex: 1 1 auto; }
-.val-placa { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; min-height: 28px; }
 .val-cmds { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
 .val-big { min-height: 72px; font-size: 22px; font-weight: 800; letter-spacing: .06em; justify-content: center; }
 .val-on:not(:disabled) { border-color: var(--ok); color: var(--ok); }
@@ -24,12 +23,9 @@
 .val-log li[data-k="ok"] span { color: var(--ok); }
 .val-log li[data-k="bad"] span { color: var(--bad); }
 .val-log li[data-k="warn"] span { color: var(--warn); }
-.val-histp .input[type="search"] { width: 240px; max-width: 100%; }
-.val-hist { margin-top: 10px; overflow-x: auto; }
 .val-pl { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 @media (max-width: 640px) {
     .val-big { min-height: 64px; font-size: 20px; }
-    .val-histp .input[type="search"] { width: 100%; }
     .val .btn { min-height: 44px; }
 }
 
@@ -49,3 +45,32 @@
 @keyframes valspin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .val-spin { animation-duration: 3s; } }
 .val select.input { min-width: 0; flex: 1 1 180px; }
+
+/* v1.3.64: ficha «Tarjeta escaneada» */
+.val-ficha { display: flex; flex-direction: column; gap: 12px; }
+.val-vacio { margin: 0; padding: 14px; border: 1px dashed var(--line); border-radius: var(--r-2); color: var(--muted); }
+.val-cab { gap: 10px; }
+.val-cab > b { font-size: 18px; }
+.val-placas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.val-placas .val-pl { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-2); }
+.val-tabla { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-2); }
+.val-cmp { width: 100%; border-collapse: collapse; font-size: 13px; }
+.val-cmp th, .val-cmp td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.val-cmp thead th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+.val-cmp tbody tr:last-child > * { border-bottom: 0; }
+.val-cmp tr[data-k="bad"] > * { background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.val-cmp tr[data-k="bad"] th { box-shadow: inset 3px 0 0 var(--bad); }
+.val-det { display: block; margin-top: 4px; }
+.val-fallos { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.val-acc { gap: 10px; }
+.val-lap { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.val textarea.input { width: 100%; resize: vertical; min-height: 72px; }
+@media (max-width: 640px) { .val-acc .btn { flex: 1 1 100%; justify-content: center; } .val-cmp { font-size: 12.5px; } }
+
+/* v1.3.65: placas validadas y usuario en el registro */
+.val-pv { margin-top: 8px; }
+.val-pvt td:first-child, .val-pvt th:first-child { width: 36px; }
+.val-pvt input[type="checkbox"] { width: 18px; height: 18px; }
+.val-pvt tr[data-k="ok"] td { color: var(--muted); }
+.val-quien { margin-left: auto; flex: none; color: var(--muted); font-size: 11.5px; }
+@media (max-width: 640px) { .val-quien { margin-left: 0; flex-basis: 100%; } .val-log li { flex-wrap: wrap; } }
