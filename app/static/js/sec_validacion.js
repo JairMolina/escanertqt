@@ -253,21 +253,27 @@
       stationId = sel.value;
     });
     function paintSensors(fields) {
+      const labels = {
+        ON: { 0: "Cierre inactivo", 1: "Sensor de cierre activo" },
+        OFF: { 0: "Apertura inactiva", 1: "Sensor de apertura activo" },
+        PB: { 0: "Sistema", 1: "Serial / plataforma", 2: "Bluetooth" },
+        TQT: { 0: "En espera", 1: "Abriendo", 2: "Abierto", 3: "Cerrando", 4: "Cerrado", 5: "Error" },
+      };
+      const position = fields.ON === undefined || fields.OFF === undefined
+        ? "Sin lectura S29"
+        : fields.ON === "0" && fields.OFF === "1" ? "Perno abierto"
+          : fields.ON === "1" && fields.OFF === "0" ? "Perno cerrado" : "Posición no confirmada por sensores";
       sensors.replaceChildren(
+        h("p", { class: "tqt-sensors-summary" }, position),
         ...(contract.fields.length ? contract.fields : Object.keys(fields)).map(
           (key) =>
             h(
-              "div",
-              { class: "tqt-sensor", title: contract.help[key] || key },
+              "dl",
+              { class: "tqt-sensor", title: contract.help[key] || key,
+                "data-error": (key === "err" && ["3", "4"].includes(fields[key])) || (key === "TQT" && fields[key] === "5") ? "true" : "false" },
               h("dt", null, key),
-              h("dd", { class: "mono" }, fields[key] ?? "—"),
-              key === "err"
-                ? h(
-                    "small",
-                    null,
-                    contract.errors[fields[key]] || "Sin lectura",
-                  )
-                : null,
+              h("dd", { class: "mono" }, fields[key] ?? "—",
+                h("small", { class: "tqt-state-label" }, key === "err" ? contract.errors[fields[key]] || "Sin lectura" : key === "MOV" ? "Movimientos registrados" : labels[key]?.[fields[key]] || "")),
             ),
         ),
       );

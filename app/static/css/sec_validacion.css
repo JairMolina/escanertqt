@@ -101,3 +101,4 @@
  .tqt-log{border-top:1px solid #ccc;white-space:pre-wrap!important;overflow-wrap:anywhere!important;max-height:none!important;color:#000!important;background:#fff!important}
 }
 .tqt-report{scroll-margin-top:76px}.tqt-report:focus{outline:2px solid var(--accent,#d5a436)}
+.tqt-sensors-summary{grid-column:1/-1;margin:4px 0;font-weight:600}.tqt-sensor{margin:0}.tqt-state-label{display:block;font-family:inherit;font-size:11px;opacity:.8}.tqt-sensor[data-error="true"]{border-color:var(--bad,#d64b4b)}
