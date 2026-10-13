@@ -93,6 +93,7 @@
                 panel = h('section', { class: 'esc-panel', 'aria-labelledby': 'tarPanelT', tabindex: '-1' },
                     h('header', null, h('div', null, h('div', { class: 'silk', style: 'margin-bottom:3px' }, 'Tarjeta'), h('span', { id: 'tarPanelT', class: 'sr-only' }, `Detalle de la tarjeta ${t.id_tarjeta_num}`), num), h('div', { class: 'grow' }), T.tarjetaBadge(t), cerrar),
                     h('div', { class: 'cuerpo' },
+                        h('a', { class: 'btn', href: '/monitor#/validacion?tarjeta=' + t.id }, 'Pruebas e historial de esta tarjeta'),
                         h('div', { class: 'esc-placas' }, ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'esc-placa-w' },
                             util.placaCard(sl, conFw(t, sl.toLowerCase())),
                             // v1.3.67: Cambiar/Quitar junto a su placa (antes al final del panel)

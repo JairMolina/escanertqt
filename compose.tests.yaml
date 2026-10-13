@@ -1,0 +1,9 @@
+services:
+  tests:
+    build:
+      context: .
+      dockerfile: deploy/local-tests/Dockerfile.test
+    environment:
+      TQT_HOST_IP: 127.0.0.1
+    profiles: [tests]
+    network_mode: none

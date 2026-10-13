@@ -1,0 +1,8 @@
+
+FROM cm-local-tqt-web-web AS test
+USER root
+RUN pip install --no-cache-dir httpx pytest
+COPY tests /app/tests
+ENV PYTHONPATH=/app/station/test_station:/app/station/test_station/tests
+USER tqt
+CMD ["python","-m","unittest","discover","-s","tests"]

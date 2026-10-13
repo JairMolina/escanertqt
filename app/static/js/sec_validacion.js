@@ -1,410 +1,686 @@
-/**
- * sec_validacion.js - Pruebas y validación: prueba BLE de placas TQT-R2 a través del agente Windows de la laptop.
- * Sin Web Bluetooth ni ventanas emergentes: buscar/conectar/enviar son trabajos del agente (/api/validacion/ble/*).
- * v1.3.64: el código llega por el Botón de escaneo (escaneo(codigo)); la ficha compara BD vs Bluetooth y permite validar (auto/manual).
- * La dirección Bluetooth es la que reporta Windows.
- */
+/* Pruebas TQT: original serial/BLE engine in Windows; inventory and reports in Docker. */
 (function () {
-    'use strict';
-    const E = window.TQTEscritorio;
-    function montar(host, ctx) {
-        const { T, api, h, icon, util } = ctx; const toast = ctx.toast || T.toast;
-        const S = { vivo: true, estaciones: [], coincide: true, station: '', conectado: false, nombre: '', address: '', ble: null, busy: '', buscando: false, devs: null, vistos: null,
-            codigo: '', cmp: null, noRec: false, cargandoCmp: false, validando: '', msgVal: null, log: [], resumen: null, seqCmp: 0 };
-        const unsubs = []; const timers = new Set();
-        // nombres de pantalla; al agente se siguen enviando exactamente PPON / POFF
-        const NOMBRE = { PPON: 'ON · Meter perno', POFF: 'OFF · Sacar perno' };
-        const nom = (c) => NOMBRE[c] || c;
-        const esperar = (ms) => new Promise((ok) => { const t = setTimeout(() => { timers.delete(t); ok(); }, ms); timers.add(t); });
-
-        const kpis = h('div', { class: 'val-kpis', role: 'group', 'aria-label': 'Resumen de pruebas de hoy' });
-        const estado = h('div', { class: 'val-estado', role: 'status', 'aria-live': 'polite' });
-        // v1.3.63: el Bluetooth lo usa el agente de la laptop; si no hay ninguno conectado se instala desde aquí mismo
-        const btnInst = h('button', { class: 'btn', type: 'button', 'data-escribe': true, hidden: true, title: 'Descarga Instalar_TQT y ábrelo una vez en esta laptop', onclick: async () => {
-            btnInst.disabled = true;
-            try {
-                const resp = await fetch('/api/stm32/stations/installer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Laptop pruebas BLE' }) });
-                if (!resp.ok) { let m = 'Error ' + resp.status; try { m = (await resp.json()).detail || m; } catch (e) { /* nada */ } throw new Error(m); }
-                const nombre = /filename="([^"]+)"/.exec(resp.headers.get('Content-Disposition') || '')?.[1] || 'Instalar_TQT.cmd';
-                const sid = /([0-9a-f]{24})/i.exec(nombre)?.[1]; if (sid) guardarMia(sid);
-                const u = URL.createObjectURL(await resp.blob()); const a = h('a', { href: u, download: nombre });
-                document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000);
-                toast('Abre ' + nombre + ' una vez: la laptop aparecerá aquí en unos segundos.', { kind: 'ok', ms: 6000 });
-            } catch (e) { toast('No se pudo descargar el instalador: ' + e.message, { kind: 'bad' }); }
-            btnInst.disabled = false;
-        } }, icon('download'), 'Instalar agente en esta laptop');
-        const selEst = h('select', { class: 'input', id: 'valEst', 'aria-labelledby': 'valEstL', onchange: () => { S.station = selEst.value; S.devs = null; S.vistos = null; pintarTodo(); sondearEstado(); comparar(); } });
-        const estHost = h('div', { class: 'row', 'aria-live': 'polite' });
-        const btnBus = h('button', { class: 'btn btn-primary', type: 'button', 'data-escribe': true, onclick: () => buscar() });
-        const btnDes = h('button', { class: 'btn', type: 'button', 'data-escribe': true, onclick: () => desconectar() }, icon('x'), 'Desconectar');
-        const btnOn = h('button', { class: 'btn val-big val-on', type: 'button', 'data-escribe': true, onclick: () => enviar('PPON') }, icon('flash'), NOMBRE.PPON);
-        const btnOff = h('button', { class: 'btn val-big val-off', type: 'button', 'data-escribe': true, onclick: () => enviar('POFF') }, icon('x'), NOMBRE.POFF);
-        const logUl = h('ol', { class: 'val-log', 'aria-label': 'Registro de la sesión' });
-         const avisos = h('div', { class: 'stack' });
-        const estHostAy = h('div', { class: 'hint val-lapay', hidden: true });
-        // v1.3.66: «esta laptop» recordada en este navegador (al instalar el agente o al confirmarla)
-        const LS_MIA = 'tqt.val.laptop';
-        const leerMia = () => { try { return localStorage.getItem(LS_MIA) || ''; } catch (e) { return ''; } };
-        function guardarMia(id) { try { localStorage.setItem(LS_MIA, id); } catch (e) { /* nada */ } }
-        const lista = h('div', { class: 'val-devs', 'aria-live': 'polite' });
-        function agregarLog(txt, kind) {
-            if (txt != null) { S.log.unshift({ t: T.hora(), txt, kind: kind || '', u: S.yo }); S.log = S.log.slice(0, 80); }
-            // v1.3.65: cada línea indica quién probó (usuario · ID)
-            logUl.replaceChildren(...S.log.map((l) => h('li', { dataset: { k: l.kind } }, h('time', null, l.t), h('span', null, l.txt),
-                l.u ? h('small', { class: 'val-quien' }, l.u.email + (l.u.id != null ? ' · ID ' + l.u.id : '')) : null)));
-        }
-        const estOnline = () => S.estaciones.find((s) => s.id === S.station && s.online !== false);
-        function pintarEstado() {
-            // v1.3.67: varios usuarios a la vez → sin laptop confirmada o con la conexión de otro usuario no se manda nada
-            const ajeno = S.conectado && S.usoPor && S.yo && S.usoPor !== S.yo.email;
-            const libre = !S.busy && !S.buscando && !ajeno, ok = !!estOnline() && S.coincide;
-            estado.replaceChildren(ajeno ? T.badge('En uso por ' + S.usoPor, 'warn', 'alert') : S.conectado ? T.badge('Conectado · ' + (S.nombre || 'TQT'), 'ok', 'check') : T.badge(S.busy ? 'Trabajando…' : 'Desconectado', S.busy ? 'info' : '', S.busy ? 'clock' : 'circle'));
-            btnBus.replaceChildren(S.buscando ? h('span', { class: 'val-spin', 'aria-hidden': 'true' }) : icon('wifi'), S.buscando ? 'Buscando placas… ~6 s' : 'Buscar placas');
-            btnBus.disabled = !ok || !libre;
-            btnDes.disabled = !ok || !libre || !S.conectado;
-            btnOn.disabled = btnOff.disabled = !ok || !libre || !S.conectado;
-            selEst.disabled = !libre;
-            pintarFicha();
-        }
-        function pintarEstaciones() {
-            const hay = S.estaciones.length > 0;
-            btnInst.hidden = hay;
-            const bt = S.ble === false ? 'Bluetooth no disponible' : (S.ble ? 'Bluetooth listo' : 'comprobando Bluetooth…');
-            const nodes = [];
-            if (!hay) nodes.push(h('p', { class: 'hint', style: 'margin:0' }, 'No hay laptops con el agente conectadas.'), btnBus, btnInst);
-            else if (S.estaciones.length === 1) nodes.push(h('p', { class: 'val-lap', style: 'margin:0' }, 'Esta laptop: ', h('b', null, S.estaciones[0].name), ' · ' + bt), btnBus, btnInst);
-            else {
-                selEst.replaceChildren(h('option', { value: '' }, 'Elige una laptop'), ...S.estaciones.map((s) => h('option', { value: s.id }, s.name)));
-                selEst.value = S.station;
-                nodes.push(selEst, btnBus, btnInst);
-            }
-            estHost.replaceChildren(...nodes);
-            const st = S.estaciones.find((x) => x.id === S.station) || (S.estaciones.length === 1 ? S.estaciones[0] : null);
-            const avisar = hay && !S.coincide && st;
-            estHostAy.replaceChildren(...(avisar ? [
-                h('span', null, 'No se pudo confirmar que «' + st.name + '» sea esta laptop' + (S.ip || st.ip ? ' (IP del navegador ' + (S.ip || '—') + ' · IP del agente ' + (st.ip || '—') + ')' : '') +
-                    '. Si la placa está junto a otra laptop, instala el agente en ella. '),
-                h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { guardarMia(st.id); S.station = st.id; S.coincide = true; pintarEstaciones(); } }, 'Sí, es esta laptop')] : []));
-            estHostAy.hidden = !avisar;
-        }
-        function pintarAvisos() {
-            const a = [];
-            if (S.estaciones.length && S.ble === false) a.push(T.banner('warn', 'alert', h('b', null, 'Bluetooth no disponible. '), 'La laptop no tiene Bluetooth listo o falta instalar bleak; reinstala el agente desde Programación › Instalar agente.'));
-            avisos.replaceChildren(...a);
-        }
-        const barras = (rssi) => {
-            const n = rssi == null ? 0 : rssi > -60 ? 4 : rssi > -70 ? 3 : rssi > -80 ? 2 : 1;
-            return h('span', { class: 'val-rssi', title: rssi == null ? 'Sin señal' : rssi + ' dBm' },
-                h('span', { class: 'val-bars', 'aria-hidden': 'true' }, ...[1, 2, 3, 4].map((i) => h('i', { class: i <= n ? 'on' : '' }))), h('span', { class: 'mono' }, rssi == null ? '—' : rssi + ' dBm'));
-        };
-        function pintarLista() {
-            const ocupado = !!S.busy || S.buscando;
-            if (S.devs === null && !S.conectado) { lista.replaceChildren(h('p', { class: 'hint', style: 'margin:0' }, 'Pulsa «Buscar placas» para ver las placas TQT cercanas a la laptop.')); return; }
-            let devs = S.devs || [];
-            if (S.conectado && S.address && !devs.some((d) => d.address === S.address)) devs = [{ nombre: S.nombre, address: S.address, rssi: null }, ...devs];
-            if (!devs.length) {
-                const lap = (S.estaciones.find((x) => x.id === S.station) || {}).name || 'La laptop';
-                lista.replaceChildren(h('div', { class: 'val-vacio' }, h('b', null, '«' + lap + '» no encontró placas TQT por Bluetooth.'),
-                    h('ul', { class: 'val-tips' }, h('li', null, 'La placa debe estar encendida y cerca de esa laptop (no de esta, si son distintas).'),
-                        h('li', null, 'Que no esté conectada al celular ni a otra app Bluetooth: mientras está conectada no se anuncia.'),
-                        h('li', null, 'Espera 5 s tras encenderla y pulsa «Buscar placas» otra vez.'))));
-                return;
-            }
-            lista.replaceChildren(...devs.map((d) => {
-                const act = S.conectado && d.address === S.address;
-                return h('div', { class: 'prog-item val-dev', 'aria-pressed': String(act) },
-                    h('span', { class: 'nm' }, h('b', null, d.nombre || 'TQT'), h('span', { class: 'mono val-addr' }, d.address || '')), barras(d.rssi),
-                    act ? h('button', { class: 'btn btn-sm', type: 'button', 'data-escribe': true, disabled: ocupado, onclick: () => desconectar() }, 'Desconectar')
-                        : h('button', { class: 'btn btn-sm btn-primary', type: 'button', 'data-escribe': true, disabled: ocupado || S.conectado, onclick: () => conectar(d) }, 'Conectar'));
-            }));
-        }
-        function pintarTodo() { pintarEstaciones(); pintarAvisos(); pintarEstado(); pintarLista(); }
-        // --- ficha «Tarjeta escaneada»: BD vs Bluetooth ---
-        const fichaHost = h('div', { class: 'val-ficha' });
-        const msgHost = h('div', { class: 'stack', role: 'alert' });
-        const btnAuto = h('button', { class: 'btn btn-primary', type: 'button', 'data-escribe': true, onclick: () => validarAuto() }, icon('check'), 'Validar automático');
-        const btnMan = h('button', { class: 'btn', type: 'button', 'data-escribe': true, onclick: () => validarManual() }, icon('edit'), 'Validar manual');
-        const checksFallo = (cs) => (cs || []).filter((c) => c.ok === false);
-        const lineaCheck = (c) => h('li', null, h('b', null, c.etiqueta || c.campo), ': esperado ', h('span', { class: 'mono' }, c.esperado == null ? '—' : String(c.esperado)), ', Bluetooth ', h('span', { class: 'mono' }, c.actual == null ? '—' : String(c.actual)), c.detalle ? ' (' + c.detalle + ')' : '');
-        const modoTxt = (m) => (m === 'manual' ? 'manual' : 'automático');
-        function celdaEstado(c) {
-            if (c.ok === true) return T.badge('Coincide', 'ok', 'check');
-            if (c.ok === false) return T.badge('Difiere', 'bad', 'x');
-            return h('span', { class: 'hint' }, 'sin dato');
-        }
-        function pintarFicha() {
-            const c = S.cmp, libre = !S.validando;
-            btnAuto.disabled = btnMan.disabled = !c || !c.tarjeta || !libre || !S.station;
-            btnAuto.replaceChildren(S.validando === 'auto' ? h('span', { class: 'val-spin', 'aria-hidden': 'true' }) : icon('check'), S.validando === 'auto' ? 'Validando…' : 'Validar automático');
-            if (!S.codigo) {
-                fichaHost.replaceChildren(h('p', { class: 'val-vacio' }, 'Pulsa «Botón de escaneo» en la cabecera y escanea la tarjeta con el celular.'));
-                return;
-            }
-            if (S.noRec) { fichaHost.replaceChildren(T.banner('warn', 'alert', h('b', null, 'Código no reconocido: '), h('span', { class: 'mono' }, S.codigo), '. Escanea de nuevo la tarjeta.')); return; }
-            if (!c) { fichaHost.replaceChildren(h('p', { class: 'hint' }, S.cargandoCmp ? 'Comparando ' + S.codigo + '…' : 'No se pudo comparar. Se reintentará al cambiar la conexión Bluetooth.')); return; }
-            const t = c.tarjeta;
-            const cab = h('div', { class: 'row val-cab' }, h('b', { class: 'mono' }, t ? 'Tarjeta ' + t.id_tarjeta_num : c.codigo), t && t.estado ? T.badge(t.estado, '') : null,
-                c.placa_probada ? h('span', { class: 'hint' }, 'Placa en prueba: ' + c.placa_probada) : null, h('span', { class: 'mono hint' }, c.codigo));
-            const placas = (c.placas || []).map((p) => h('li', { class: 'val-pl' }, T.tipoChip(p.tipo), h('b', { class: 'mono' }, p.nombre || '—'),
-                h('span', { class: 'hint mono' }, 'MAC ' + (p.mac || '—')), h('span', { class: 'hint mono' }, 'FW ' + (p.firmware || '—')), p.nombre_ble ? h('span', { class: 'hint mono' }, 'BLE ' + p.nombre_ble) : null));
-            const ble = c.ble && c.ble.conectado ? T.badge('Bluetooth: ' + (c.ble.nombre || 'conectado') + (c.ble.address ? ' · ' + c.ble.address : ''), 'ok', 'check') : T.badge('Bluetooth sin conexión: conecta la placa para comparar', 'warn', 'alert');
-            const filas = (c.checks || []).map((k) => h('tr', { dataset: { k: k.ok === true ? 'ok' : k.ok === false ? 'bad' : '' } },
-                h('th', { scope: 'row' }, k.etiqueta || k.campo), h('td', { class: 'mono' }, k.esperado == null || k.esperado === '' ? '—' : String(k.esperado)),
-                h('td', { class: 'mono' }, k.actual == null || k.actual === '' ? '—' : String(k.actual)), h('td', null, celdaEstado(k), k.ok === false && k.detalle ? h('span', { class: 'hint val-det' }, k.detalle) : null)));
-            const tabla = filas.length ? h('div', { class: 'val-tabla' }, h('table', { class: 'val-cmp' }, h('caption', { class: 'sr-only' }, 'Comparación entre la base de datos y el Bluetooth'),
-                h('thead', null, h('tr', null, h('th', { scope: 'col' }, 'Campo'), h('th', { scope: 'col' }, 'En base de datos'), h('th', { scope: 'col' }, 'En Bluetooth'), h('th', { scope: 'col' }, 'Estado'))), h('tbody', null, ...filas))) : null;
-            const v = c.validada;
-            const estadoVal = v ? h('div', { class: 'row' }, T.badge('Validada · ' + modoTxt(v.modo), 'ok', 'check'), h('span', { class: 'hint' }, (v.operador ? 'por ' + v.operador + ' · ' : '') + (v.creado_en ? util.fecha(v.creado_en) : '')))
-                : (c.ok ? T.badge('Todo coincide: lista para validar', 'ok', 'check') : null);
-            fichaHost.replaceChildren(cab, placas.length ? h('ul', { class: 'val-placas' }, ...placas) : null, ble, tabla, estadoVal, msgHost, h('div', { class: 'row val-acc' }, btnAuto, btnMan));
-        }
-        let tCmp = null;
-        async function comparar() {
-            if (!S.codigo) { S.cmp = null; S.noRec = false; pintarFicha(); return false; }
-            const mi = ++S.seqCmp; S.cargandoCmp = true;
-            const r = await api('/api/validacion/comparar?codigo=' + encodeURIComponent(S.codigo) + '&station_id=' + encodeURIComponent(S.station || ''));
-            if (!S.vivo || mi !== S.seqCmp) return false;
-            S.cargandoCmp = false;
-            if (r.status === 404) { S.cmp = null; S.noRec = true; } else if (r.ok && r.data) { S.cmp = r.data; S.noRec = false; }
-            pintarFicha();
-            return !!(r.ok && r.data && r.data.tarjeta);
-        }
-        function compararSuave() { clearTimeout(tCmp); tCmp = setTimeout(() => { timers.delete(tCmp); if (S.vivo && S.codigo) comparar(); }, 400); timers.add(tCmp); }
-        async function fijarCodigo(c) {
-            c = String(c || '').trim(); S.codigo = c; S.cmp = null; S.noRec = false; msgHost.replaceChildren();
-            const ok = await comparar();
-            if (!S.vivo) return { ok: false, texto: '' };
-            const t = S.cmp && S.cmp.tarjeta;
-            return { ok, texto: t ? 'Tarjeta ' + t.id_tarjeta_num : 'Código no reconocido' };
-        }
-        async function validar(modo, motivo) {
-            if (S.validando || !S.codigo) return false;
-            S.validando = modo; msgHost.replaceChildren(); pintarFicha();
-            const body = { codigo: S.codigo, station_id: S.station || undefined, modo };
-            if (motivo) body.motivo = motivo;
-            const r = await api('/api/validacion/validar', { method: 'POST', body, timeout: 15000 });
-            if (!S.vivo) return false;
-            S.validando = '';
-            if (r.ok) {
-                toast('Tarjeta validada · ' + modoTxt(modo), { kind: 'ok' }); agregarLog('✓ Tarjeta validada (' + modoTxt(modo) + ').', 'ok');
-                await comparar(); cargarResumen(); return true;
-            }
-            const d = r.data || {}; const dd = d.detail && typeof d.detail === 'object' ? d.detail : {};
-            const fallos = checksFallo(d.checks || dd.checks);
-            if (r.status === 409) {
-                msgHost.replaceChildren(T.banner('bad', 'alert', h('b', null, 'No se pudo validar automáticamente. '), typeof d.detail === 'string' ? d.detail : (dd.mensaje || 'Hay diferencias entre la base de datos y el Bluetooth.'),
-                    fallos.length ? h('ul', { class: 'val-fallos' }, ...fallos.map(lineaCheck)) : null));
-                comparar();
-            } else msgHost.replaceChildren(T.banner('bad', 'alert', h('b', null, 'No se pudo validar. '), r.error || 'Intenta de nuevo.'));
-            pintarFicha();
-            return false;
-        }
-        function validarAuto() { validar('auto'); }
-        function validarManual() {
-            const c = S.cmp; if (!c || !c.tarjeta) return;
-            const dif = checksFallo(c.checks), sin = (c.checks || []).filter((k) => k.ok == null);
-            const motivo = h('textarea', { class: 'input', id: 'valMotivo', rows: 3, maxlength: 300, placeholder: 'Ej.: la placa ya estaba probada en otra laptop' });
-            const body = [
-                dif.length ? h('div', null, h('p', { style: 'margin:0 0 6px' }, h('b', null, 'Discrepancias (' + dif.length + ')')), h('ul', { class: 'val-fallos' }, ...dif.map(lineaCheck)))
-                    : h('p', { class: 'hint', style: 'margin:0' }, 'No hay discrepancias confirmadas.'),
-                sin.length ? h('p', { class: 'hint', style: 'margin:0' }, 'Sin dato: ' + sin.map((k) => k.etiqueta || k.campo).join(', ') + '.') : null,
-                h('div', { class: 'field' }, h('label', { for: 'valMotivo' }, 'Motivo (opcional)'), motivo),
-            ];
-            T.sheet({ title: 'Validar manualmente' + (c.tarjeta.id_tarjeta_num ? ' · tarjeta ' + c.tarjeta.id_tarjeta_num : ''), body, focus: false, actions: [
-                { label: 'Cancelar', kind: 'ghost', onClick: () => true },
-                { label: 'Confirmar validación manual', kind: 'primary', onClick: async () => ((await validar('manual', motivo.value.trim())) ? true : false) },
-            ] });
-        }
-
-        // --- estaciones (laptops con el agente) ---
-        async function cargarEstaciones() {
-            const r = await api('/api/validacion/estaciones'); if (!S.vivo) return;
-            const antes = S.station;
-            if (r.ok && r.data && Array.isArray(r.data.estaciones)) {
-                S.estaciones = r.data.estaciones; S.coincide = r.data.coincide !== false; S.ip = r.data.ip || '';
-                const mia = leerMia();
-                if (!S.coincide && mia && S.estaciones.some((x) => x.id === mia)) {   // la recordada en este navegador
-                    S.estaciones = S.estaciones.filter((x) => x.id === mia); S.coincide = true;
-                }
-                if (!S.estaciones.some((s) => s.id === S.station)) S.station = '';
-                if (!S.station && S.estaciones.length === 1) { S.station = S.estaciones[0].id; sondearEstado(); }
-            } else { S.estaciones = []; S.coincide = true; S.station = ''; }
-            pintarEstaciones(); pintarAvisos(); pintarEstado(); pintarLista();
-            if (S.station !== antes) compararSuave();
-        }
-        // --- trabajos del agente: POST + sondeo cada 500 ms, máx. 20 s ---
-        async function trabajo(accion, extra) {
-            const cuerpo = Object.assign({ station_id: S.station, accion }, extra || {});
-            if (S.codigo) cuerpo.codigo = S.codigo;
-            const r = await api('/api/validacion/ble/trabajos', { method: 'POST', body: cuerpo });
-            if (!r.ok || !r.data) return { ok: false, error: r.error || 'No se pudo enviar el trabajo a la laptop.' };
-            const id = r.data.id; const fin = Date.now() + 20000;
-            while (S.vivo && Date.now() < fin) {
-                await esperar(500); if (!S.vivo) break;
-                const q = await api('/api/validacion/ble/trabajos/' + encodeURIComponent(id));
-                if (!q.ok || !q.data) continue;
-                const d = q.data;
-                if (d.estado === 'ok') return { ok: true, resultado: d.resultado || {} };
-                if (d.estado === 'error') return { ok: false, error: d.error || 'La laptop reportó un error.' };
-            }
-            return { ok: false, error: S.vivo ? 'La laptop no respondió a tiempo (20 s).' : '' };
-        }
-        async function correr(accion, extra, antes, despues) {
-            if (!S.station || S.busy || S.buscando) return;
-            if (accion === 'escanear') S.buscando = true; else S.busy = accion;
-            if (antes) agregarLog(antes);
-            pintarEstado(); pintarLista();
-            const r = await trabajo(accion, extra);
-            if (!S.vivo) return;
-            S.busy = ''; S.buscando = false;
-            if (r.ok) despues(r.resultado); else agregarLog(r.error, 'bad');
-            pintarTodo(); recargarSuave(); if (r.ok) compararSuave();
-        }
-        function buscar() {
-            correr('escanear', null, 'Buscando placas TQT cerca de la laptop…', (res) => {
-                S.devs = (res.dispositivos || []).filter((d) => /TQT/i.test(d.nombre || '') || !d.nombre).sort((a, b) => (b.rssi || -999) - (a.rssi || -999));
-                agregarLog(S.devs.length ? 'Encontradas ' + S.devs.length + ' placa(s).' : 'No se encontraron placas TQT.', S.devs.length ? 'ok' : 'warn');
-            });
-        }
-        function conectar(d) {
-            correr('conectar', { address: d.address }, 'Conectando a ' + (d.nombre || d.address) + '…', (res) => {
-                S.conectado = !!res.conectado; S.nombre = res.nombre || d.nombre || ''; S.address = res.address || d.address || '';
-                agregarLog(S.conectado ? 'Conectado a ' + (S.nombre || 'dispositivo') + '.' : 'No se pudo conectar.', S.conectado ? 'ok' : 'bad');
-            });
-        }
-        function desconectar() {
-            correr('desconectar', null, 'Desconectando…', () => { S.conectado = false; S.nombre = S.address = ''; agregarLog('Desconectado.', 'warn'); });
-        }
-        function enviar(cmd) {
-            if (!S.conectado) return;
-            correr('enviar', { comando: cmd, address: S.address || undefined }, '→ ' + nom(cmd), (res) => { agregarLog('✓ ' + nom(cmd) + (res.respuesta ? ' · ← ' + res.respuesta : ''), 'ok'); });
-        }
-        // --- estado del agente: sondeo cada 2 s + WS BLE_ESTADO ---
-        function aplicarConexion(d) {
-            const antes = S.conectado + '|' + S.address;
-            S.conectado = !!d.conectado; S.nombre = d.conectado ? (d.nombre || '') : ''; S.address = d.conectado ? (d.address || '') : '';
-            if ('en_uso_por' in d) S.usoPor = d.en_uso_por || '';
-            return antes !== S.conectado + '|' + S.address;
-        }
-        let sondeando = false;
-        async function sondearEstado() {
-            if (!S.station || sondeando) return; sondeando = true;
-            const r = await api('/api/validacion/ble/estado?station_id=' + encodeURIComponent(S.station)); sondeando = false;
-            if (!S.vivo || !r.ok || !r.data) return;
-            const d = r.data; S.ble = d.ble_disponible !== false;
-            const cambio = aplicarConexion(d);
-            const evs = Array.isArray(d.eventos) ? d.eventos : [];
-            const clave = (e) => String(e.t) + '|' + (e.texto || '');
-            if (S.vistos === null) S.vistos = new Set(evs.map(clave));
-            else evs.filter((e) => !S.vistos.has(clave(e))).sort((a, b) => (a.t > b.t ? 1 : -1)).forEach((e) => { S.vistos.add(clave(e)); agregarLog('← ' + (e.texto || e.tipo), e.tipo === 'error' ? 'bad' : 'rx'); });
-            pintarAvisos(); pintarEstaciones(); pintarEstado(); if (cambio) { compararSuave(); if (!S.busy && !S.buscando) pintarLista(); }
-        }
-
-        function pintarKpis() {
-            const r = S.resumen;
-            const k = (n, t, kind) => h('div', { class: 'val-kpi', dataset: { k: kind || '' } }, h('b', null, r ? String(n == null ? 0 : n) : '—'), h('span', null, t));
-            const u = r && r.ultima ? (typeof r.ultima === 'string' ? r.ultima : (r.ultima.creado_en || r.ultima.creado)) : null;
-            kpis.replaceChildren(k(r && r.hoy, 'Pruebas hoy'), k(r && r.ok_hoy, 'OK', 'ok'), k(r && r.error_hoy, 'Errores', 'bad'), k(r && r.dispositivos_hoy, 'Dispositivos'),
-                h('div', { class: 'val-kpi' }, h('b', { class: 'val-ult' }, u ? util.fecha(u) : '—'), h('span', null, 'Última prueba')));
-        }
-        async function cargarResumen() { const r = await api('/api/validacion/resumen'); if (S.vivo && r.ok) { S.resumen = r.data; pintarKpis(); } }
-        let tRec = null;
-        function recargarSuave() { clearTimeout(tRec); tRec = setTimeout(() => { timers.delete(tRec); if (S.vivo) { cargarResumen(); cargarValidadas(); if (S.codigo) comparar(); } }, 600); timers.add(tRec); }
-
-        // --- v1.3.65: placas validadas (auto/manual) → confirmar sus tarjetas como «Validada» ---
-        const PV = { items: [], sel: new Set(), enviando: false };
-        const quien = (email, id) => (email || '—') + (id != null ? ' · ID ' + id : '');
-        const pvHost = h('div', { class: 'val-pv' });
-        const pvBtn = h('button', { class: 'btn btn-primary', type: 'button', 'data-escribe': true, onclick: () => confirmarTarjetas() });
-        async function cargarValidadas() {
-            const r = await api('/api/validacion/placas-validadas'); if (!S.vivo) return;
-            if (r.ok && r.data) {
-                PV.items = r.data.items || [];
-                if (r.data.yo && !S.yo) { S.yo = r.data.yo; S.log.forEach((l) => { if (!l.u) l.u = S.yo; }); agregarLog(null); }
-            }
-            const pend = new Set(PV.items.filter((x) => x.tarjeta_id && !x.tarjeta_validada).map((x) => x.tarjeta_id));
-            PV.sel.forEach((id) => { if (!pend.has(id)) PV.sel.delete(id); });
-            pintarValidadas();
-        }
-        function pintarValidadas() {
-            const its = PV.items;
-            const pend = [...new Set(its.filter((x) => x.tarjeta_id && !x.tarjeta_validada).map((x) => x.tarjeta_id))];
-            pvBtn.disabled = PV.enviando || !PV.sel.size;
-            pvBtn.replaceChildren(icon('check'), PV.sel.size ? 'Marcar ' + PV.sel.size + (PV.sel.size === 1 ? ' tarjeta' : ' tarjetas') + ' como validadas' : 'Marcar tarjetas como validadas');
-            if (!its.length) { pvHost.replaceChildren(h('p', { class: 'val-vacio' }, 'Aún no hay placas validadas. Valida una placa en «Tarjeta escaneada» y aparecerá aquí.')); return; }
-            const todas = h('input', { type: 'checkbox', 'aria-label': 'Seleccionar todas las tarjetas pendientes', checked: pend.length > 0 && pend.every((id) => PV.sel.has(id)), disabled: !pend.length,
-                onchange: (e) => { pend.forEach((id) => (e.target.checked ? PV.sel.add(id) : PV.sel.delete(id))); pintarValidadas(); } });
-            const filas = its.map((x) => {
-                const pendiente = x.tarjeta_id && !x.tarjeta_validada;
-                const cb = pendiente ? h('input', { type: 'checkbox', 'aria-label': 'Seleccionar tarjeta ' + (x.id_tarjeta_num || ''), checked: PV.sel.has(x.tarjeta_id),
-                    onchange: (e) => { e.target.checked ? PV.sel.add(x.tarjeta_id) : PV.sel.delete(x.tarjeta_id); pintarValidadas(); } }) : null;
-                return h('tr', { dataset: { k: x.tarjeta_validada ? 'ok' : '' } },
-                    h('td', null, cb),
-                    h('td', null, x.id_tarjeta_num ? h('b', { class: 'mono' }, '#' + x.id_tarjeta_num) : h('span', { class: 'hint' }, 'Sin tarjeta')),
-                    h('td', null, h('span', { class: 'val-pl' }, T.tipoChip(x.pcb_tipo), h('span', { class: 'mono' }, x.pcb_nombre || ''))),
-                    h('td', null, x.modo === 'manual' ? T.badge('Manual', 'warn') : T.badge('Automática', 'ok')),
-                    h('td', null, h('span', { class: 'mono' }, quien(x.probo, x.probo_id)), x.operador && x.operador !== x.probo ? h('div', { class: 'hint' }, 'Validó: ' + quien(x.operador, x.operador_id)) : null),
-                    h('td', null, x.creado_en ? util.fecha(x.creado_en) : '—'),
-                    h('td', null, x.tarjeta_validada ? T.badge('Validada', 'ok') : (x.tarjeta_id ? T.badge('Por confirmar', 'warn') : '—')));
-            });
-            pvHost.replaceChildren(h('div', { class: 'val-tabla' }, h('table', { class: 'val-cmp val-pvt' },
-                h('thead', null, h('tr', null, h('th', { scope: 'col' }, todas), ...['Tarjeta', 'Placa', 'Validación', 'Probó (usuario · ID)', 'Hora', 'Estado tarjeta'].map((t) => h('th', { scope: 'col' }, t)))),
-                h('tbody', null, ...filas))));
-        }
-        async function confirmarTarjetas() {
-            if (!PV.sel.size || PV.enviando) return;
-            PV.enviando = true; pintarValidadas();
-            const r = await api('/api/validacion/tarjetas/validar', { method: 'POST', body: { tarjeta_ids: [...PV.sel] } });
-            PV.enviando = false; if (!S.vivo) return;
-            if (r.ok) {
-                const n = (r.data && r.data.validadas || []).length;
-                toast(n + (n === 1 ? ' tarjeta validada' : ' tarjetas validadas'), { kind: 'ok' });
-                agregarLog('✓ ' + n + (n === 1 ? ' tarjeta cambiada' : ' tarjetas cambiadas') + ' a «Validada».', 'ok');
-                PV.sel.clear(); cargarValidadas();
-            } else { toast(r.error || 'No se pudieron validar las tarjetas.', { kind: 'bad' }); pintarValidadas(); }
-        }
-        const panelPv = h('section', { class: 'prog-panel', 'aria-labelledby': 'valT4' },
-            h('div', { class: 'row' }, h('h2', { id: 'valT4' }, 'Placas validadas'), h('div', { class: 'grow' }), pvBtn),
-            h('p', { class: 'hint' }, 'Placas escaneadas, probadas y validadas. Selecciona sus tarjetas y márcalas como «Validada» (se ve en Tarjetas).'), pvHost);
-
-        const dl = h('a', { class: 'btn', href: '/api/validacion/tester.zip', download: '' }, icon('download'), 'Descargar tester Windows');
-
-        const panelFicha = h('section', { class: 'prog-panel', 'aria-labelledby': 'valT0' }, h('h2', { id: 'valT0' }, 'Tarjeta escaneada'), fichaHost);
-        const panelPrueba = h('section', { class: 'prog-panel', 'aria-labelledby': 'valT1' },
-            h('h2', { id: 'valT1' }, 'Prueba BLE'),
-            h('div', { class: 'field' }, h('label', { id: 'valEstL' }, 'Laptop con Bluetooth'), estHost, estHostAy),
-            lista,
-            h('div', { class: 'row', style: 'margin-top:10px' }, estado, h('div', { class: 'grow' }), btnDes, dl),
-            h('div', { class: 'val-cmds' }, btnOn, btnOff));
-        const panelLog = h('section', { class: 'prog-panel', 'aria-labelledby': 'valT2' }, h('h2', { id: 'valT2' }, 'Registro de la sesión'), logUl);
-        host.append(h('div', { class: 'val' }, avisos, kpis, panelFicha, h('div', { class: 'prog-wrap val-wrap' }, panelPrueba, panelLog), panelPv));
-        agregarLog('Listo. Escanea la tarjeta y pulsa «Buscar placas».');
-        pintarTodo(); pintarFicha(); pintarKpis(); cargarResumen(); cargarEstaciones(); cargarValidadas();
-        const tEst = setInterval(() => { if (S.vivo) cargarEstaciones(); }, 5000);
-        const tBle = setInterval(() => { if (S.vivo) sondearEstado(); }, 2000);
-        const wsc = ctx.ws || (T.ws && T.ws());
-        if (wsc && wsc.on) {
-            unsubs.push(wsc.on('VALIDACION_BLE', recargarSuave));
-            unsubs.push(wsc.on('BLE_ESTADO', (m) => {
-                const d = (m && m.data) || m || {};
-                if (!S.vivo || (d.station_id && d.station_id !== S.station)) return;
-                if (aplicarConexion(d)) { agregarLog(S.conectado ? 'Conectado a ' + (S.nombre || 'dispositivo') + '.' : 'El dispositivo se desconectó.', S.conectado ? 'ok' : 'warn'); pintarEstado(); pintarLista(); }
-            }));
-        }
-        const ini = ctx.params && ctx.params().get('codigo'); if (ini) fijarCodigo(ini);
-
-        return {
-            actualizar() { cargarResumen(); cargarValidadas(); if (S.codigo) comparar(); },
-            escaneo(codigo) { return fijarCodigo(codigo); },
-            parametros(p) { const c = p.get('codigo'); if (c && c !== S.codigo) fijarCodigo(c); },
-            desmontar() {
-                S.vivo = false; clearInterval(tEst); clearInterval(tBle);
-                timers.forEach((t) => clearTimeout(t)); timers.clear();
-                unsubs.forEach((u) => { try { u(); } catch (e) { /* nada */ } });
-                host.replaceChildren();
-            },
-        };
+  "use strict";
+  function montar(host, ctx) {
+    const { h, api, T } = ctx;
+    let alive = true,
+      card = null,
+      active = null,
+      lastSeq = 0,
+      events = [],
+      pollTimer = null,
+      stationId = "",
+      manualBusy = false,
+      contract = { fields: [], help: {}, errors: {} };
+    const checkLabels = {
+      card: "Nombre de R1",
+      card_id: "Número de R1",
+      reported_mac: "MAC R1 del firmware",
+      r1_ble_address: "MAC R1 detectada por BLE",
+      reported_mac_r2: "MAC R2 del firmware",
+      r2_ble_address: "MAC R2 detectada por BLE",
+      reported_id_r2: "Identificador de R2",
+      state: "Cotejo completo con inventario",
+    };
+    const status = h("div", { role: "status", "aria-live": "polite" }),
+      sel = h("select", {
+        class: "input",
+        "aria-label": "Estación de pruebas",
+      }),
+      port = h("select", { class: "input", "aria-label": "Puerto COM" });
+    const search = h("input", {
+      class: "input",
+      placeholder: "Tarjeta, nombre de R1 o QR",
+      "aria-label": "Buscar tarjeta para pruebas",
+    });
+    const cardHost = h("div"),
+      sensors = h("div", { class: "tqt-sensors" }),
+      steps = h("ol", { class: "tqt-steps" }),
+      historyHost = h("div"),
+      reportHost = h("div");
+    const bleSelect = h("select", {
+        class: "input",
+        "aria-label": "Dispositivo Bluetooth",
+      }),
+      manual = h("div", { class: "row wrap" });
+    const progress = h("progress", {
+      max: 14,
+      value: 0,
+      "aria-label": "Etapas de la prueba automática",
+    });
+    const start = h(
+      "button",
+      { class: "btn btn-primary", type: "button", onclick: begin },
+      "Iniciar las 14 etapas",
+    );
+    const stop = h(
+      "button",
+      {
+        class: "btn",
+        type: "button",
+        disabled: true,
+        onclick: async () => {
+          await call("/runs/" + active.id + "/cancel", {});
+          message(
+            "Cancelación solicitada. El movimiento actual puede terminar.",
+          );
+        },
+      },
+      "Detener prueba",
+    );
+    const confirm = h("input", {
+      type: "checkbox",
+      "aria-label": "Confirmar tarjeta conectada y banco libre",
+    });
+    const commandSelect = h(
+      "select",
+      { class: "input", "aria-label": "Comando serial adicional" },
+      ...[
+        "STATUS",
+        "MOTOR_STATUS",
+        "RESET_BLE",
+        "MAP_QUERY",
+        "MAP_M1_0",
+        "MAP_M1_1",
+        "MAP_M2_0",
+        "MAP_M2_1",
+      ].map((x) => h("option", { value: x }, x)),
+    );
+    host.append(
+      h("h2", null, "Pruebas TQT"),
+      h(
+        "p",
+        { class: "hint" },
+        "Motor TQT Test Station 0.6.3 · Windows maneja COM y Bluetooth; el inventario conserva cada ejecución.",
+      ),
+      status,
+      h(
+        "div",
+        { class: "prog-wrap" },
+        h(
+          "section",
+          { class: "prog-panel" },
+          h("h3", null, "Tarjeta e inventario"),
+          search,
+          h(
+            "button",
+            { class: "btn", onclick: () => scan(search.value) },
+            "Buscar / cargar QR",
+          ),
+          cardHost,
+          h("h3", null, "Estación Windows"),
+          sel,
+          h(
+            "button",
+            { class: "btn", onclick: install },
+            "Descargar agente de pruebas",
+          ),
+          h(
+            "p",
+            { class: "hint" },
+            "Extrae el paquete privado y ejecuta iniciar.cmd una vez. Cierra el programa de escritorio si usa el mismo puerto.",
+          ),
+          h("h3", null, "Conexión serial · 57600 baudios · ACK 180 ms"),
+          port,
+          h(
+            "div",
+            { class: "row wrap" },
+            button("Detectar COM", () => cmd("ports")),
+            button("Conectar COM", () =>
+              cmd("connect_serial", { port: port.value }),
+            ),
+            button("Desconectar COM", () => cmd("disconnect_serial")),
+          ),
+          h("h3", null, "Bluetooth R1 / R2"),
+          bleSelect,
+          h(
+            "div",
+            { class: "row wrap" },
+            button("Buscar TQT", () => cmd("scan_ble")),
+            button("Conectar BLE", () =>
+              cmd("connect_ble", { address: bleSelect.value }),
+            ),
+            button("Desconectar BLE", () => cmd("disconnect_ble")),
+          ),
+          manual,
+        ),
+        h(
+          "section",
+          { class: "prog-panel" },
+          h("h3", null, "Prueba automática"),
+          h(
+            "label",
+            null,
+            confirm,
+            " Confirmo la tarjeta conectada y el banco libre. La secuencia restablece ajustes y mueve el perno.",
+          ),
+          h("div", { class: "row wrap" }, start, stop),
+          progress,
+          steps,
+          h("h3", null, "Sensores y estados S29"),
+          sensors,
+        ),
+      ),
+      h(
+        "section",
+        { class: "prog-panel" },
+        h("h3", null, "Historial de esta tarjeta"),
+        historyHost,
+      ),
+      reportHost,
+    );
+    manual.append(
+      button("ON serial", () => cmd("serial", { command: "PPON" })),
+      button("OFF serial", () => cmd("serial", { command: "POFF" })),
+      button("Reset normal", () => cmd("serial", { command: "RESET" })),
+      commandSelect,
+      button("Enviar comando", () =>
+        cmd("serial", { command: commandSelect.value }),
+      ),
+      button("ON BLE", () => cmd("ble", { command: "PPON" })),
+      button("OFF BLE", () => cmd("ble", { command: "POFF" })),
+    );
+    function button(text, fn) {
+      return h("button", { class: "btn", type: "button", onclick: fn }, text);
     }
-    const def = { id: 'validacion', titulo: 'Pruebas y validación', icono: 'wifi', grupo: 'operacion', orden: 60, montar };
-    if (E && E.registrar) E.registrar(def); else { (window.__TQTSecciones = window.__TQTSecciones || []).push(def); }
+    function message(text, bad = false) {
+      status.replaceChildren(
+        T.banner(bad ? "bad" : "info", bad ? "alert" : "info", text),
+      );
+    }
+    async function call(path, body) {
+      const r = await api(
+        "/api/validacion/tqt" + path,
+        body !== undefined ? { method: "POST", body } : undefined,
+      );
+      if (!r.ok) {
+        message(r.error, true);
+        throw Error(r.error);
+      }
+      return r.data;
+    }
+    async function scan(code) {
+      if (active || manualBusy) return { ok: false, texto: "Prueba en curso." };
+      const r = await api("/api/consulta?codigo=" + encodeURIComponent(code));
+      if (!r.ok) {
+        message(r.error, true);
+        return { ok: false, texto: r.error };
+      }
+      const t = r.data.tarjeta || r.data.serie?.tarjeta;
+      if (!t) {
+        message(
+          "No hay una tarjeta emparejada para este código. Regístrala o empareja sus PCB desde Inventario; no se inventan identificadores.",
+          true,
+        );
+        return { ok: false };
+      }
+      try {
+        card = await call("/inventory/" + t.id);
+        cardHost.replaceChildren(
+          h("h4", null, "Tarjeta " + card.id_tarjeta_num),
+          h("p", { class: "mono" }, card.nombre),
+          h("p", { class: "mono" }, "R1 " + card.mac_r1),
+          h("p", { class: "mono" }, card.r2_nombre + " · " + card.mac_r2),
+        );
+        confirm.checked = false;
+        await history();
+      } catch (e) {
+        card = null;
+      }
+      return { ok: !!card };
+    }
+    async function stations() {
+      const list = await call("/stations");
+      sel.replaceChildren(
+        h("option", { value: "" }, "Selecciona la laptop"),
+        ...list.map((s) =>
+          h(
+            "option",
+            { value: s.id },
+            s.name + (s.online ? " · conectada" : " · desconectada"),
+          ),
+        ),
+      );
+      if (list.some((s) => s.id === stationId)) sel.value = stationId;
+      else if (list.filter((s) => s.online).length === 1)
+        sel.value = list.find((s) => s.online).id;
+      stationId = sel.value;
+      const s = list.find((s) => s.id === stationId);
+      if (s?.fields) paintSensors(s.fields);
+      start.disabled = !!active || !s?.online || !s.serial_connected || !card;
+    }
+    sel.addEventListener("change", () => {
+      stationId = sel.value;
+    });
+    function paintSensors(fields) {
+      sensors.replaceChildren(
+        ...(contract.fields.length ? contract.fields : Object.keys(fields)).map(
+          (key) =>
+            h(
+              "div",
+              { class: "tqt-sensor", title: contract.help[key] || key },
+              h("dt", null, key),
+              h("dd", { class: "mono" }, fields[key] ?? "—"),
+              key === "err"
+                ? h(
+                    "small",
+                    null,
+                    contract.errors[fields[key]] || "Sin lectura",
+                  )
+                : null,
+            ),
+        ),
+      );
+    }
+    async function cmd(action, body = {}) {
+      if (active || manualBusy) return;
+      manualBusy = true;
+      host.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      try {
+        const j = await call("/commands", {
+          station_id: sel.value,
+          tarjeta_id: card?.id,
+          action,
+          ...body,
+        });
+        let result;
+        for (let i = 0; i < 90 && alive; i++) {
+          const r = await call("/commands/" + j.id);
+          if (["done", "error"].includes(r.state)) {
+            result = r.result;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        if (!result?.ok)
+          throw Error(
+            result?.error ||
+              "Comando sin resultado; no se repite automáticamente.",
+          );
+        if (action === "ports")
+          port.replaceChildren(
+            ...result.data.map((x) => h("option", { value: x }, x)),
+          );
+        if (action === "scan_ble")
+          bleSelect.replaceChildren(
+            ...result.data.map((x) =>
+              h("option", { value: x.address }, x.name + " · " + x.address),
+            ),
+          );
+        message("Acción completada: " + action);
+      } catch (e) {
+        message(e.message, true);
+      } finally {
+        manualBusy = false;
+        host.querySelectorAll("button").forEach((b) => (b.disabled = false));
+        stop.disabled = !active;
+        await stations();
+      }
+    }
+    async function begin() {
+      if (!card || !confirm.checked) {
+        message(
+          "Selecciona la tarjeta y confirma la conexión física y el banco libre.",
+          true,
+        );
+        return;
+      }
+      try {
+        active = await call("/runs", {
+          station_id: sel.value,
+          tarjeta_id: card.id,
+          physical_confirmed: true,
+        });
+        confirm.checked = false;
+        confirm.disabled = true;
+        sel
+          .closest("section")
+          .querySelectorAll("button,input,select")
+          .forEach((b) => (b.disabled = true));
+        lastSeq = 0;
+        events = [];
+        progress.value = 0;
+        steps.replaceChildren();
+        manual
+          .querySelectorAll("button,select")
+          .forEach((b) => (b.disabled = true));
+        sel.disabled = search.disabled = true;
+        start.disabled = true;
+        stop.disabled = false;
+        message(
+          "Prueba iniciada. No cambies la tarjeta ni envíes comandos desde otro programa.",
+        );
+        poll();
+      } catch (e) {}
+    }
+    async function poll() {
+      if (!alive || !active) return;
+      try {
+        const batch = await call(
+          "/runs/" + active.id + "/events?after=" + lastSeq,
+        );
+        for (const e of batch) {
+          lastSeq = e.seq;
+          events.push(e);
+          if (e.data.kind === "status") paintSensors(e.data.args[0].fields);
+          if (e.data.kind === "step") {
+            const [idx, state, detail] = e.data.args;
+            let row = steps.children[idx];
+            if (!row) {
+              while (steps.children.length <= idx)
+                steps.append(h("li", null, "Pendiente"));
+              row = steps.children[idx];
+            }
+            row.textContent =
+              (contract.step_names?.[idx] || "Etapa " + (idx + 1)) +
+              " · " +
+              state +
+              " · " +
+              detail;
+            progress.value = [...steps.children].filter((x) =>
+              x.textContent.includes("aprobado"),
+            ).length;
+          }
+        }
+        const r = await call("/runs/" + active.id);
+        if (!["queued", "running"].includes(r.state)) {
+          const id = active.id;
+          active = null;
+          confirm.disabled = false;
+          sel
+            .closest("section")
+            .querySelectorAll("button,input,select")
+            .forEach((b) => (b.disabled = false));
+          sel.disabled = search.disabled = false;
+          manual
+            .querySelectorAll("button,select")
+            .forEach((b) => (b.disabled = false));
+          stop.disabled = true;
+          await stations();
+          await history();
+          await openReport(id);
+          return;
+        }
+      } catch (e) {
+        message(
+          "Conexión pendiente. No repitas la prueba; se conserva la evidencia recibida.",
+          true,
+        );
+      }
+      pollTimer = setTimeout(poll, 1000);
+    }
+    async function history() {
+      if (!card) return;
+      const rows = await call("/runs?tarjeta_id=" + card.id);
+      historyHost.replaceChildren(
+        rows.length
+          ? h(
+              "table",
+              { class: "val-cmp" },
+              h(
+                "thead",
+                null,
+                h(
+                  "tr",
+                  null,
+                  ...["Fecha", "Resultado", "Operador", "Reporte"].map((x) =>
+                    h("th", null, x),
+                  ),
+                ),
+              ),
+              h(
+                "tbody",
+                null,
+                ...rows.map((r) =>
+                  h(
+                    "tr",
+                    null,
+                    h("td", null, new Date(r.created * 1000).toLocaleString()),
+                    h("td", null, r.result || r.state),
+                    h("td", null, r.operator),
+                    h(
+                      "td",
+                      null,
+                      button("Abrir reporte", () => openReport(r.id)),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : h("p", null, "Esta tarjeta todavía no tiene pruebas guardadas."),
+      );
+      const running = rows.find((r) => ["queued", "running"].includes(r.state));
+      if (running && !active) {
+        active = running;
+        lastSeq = 0;
+        events = [];
+        poll();
+      }
+    }
+    async function openReport(id) {
+      const r = await call("/runs/" + id);
+      const report = r.report?.source_report || {
+          issue:
+            "Ejecución interrumpida o sin informe final. El LOG y los eventos disponibles se conservaron.",
+          steps: [],
+        },
+        checks = r.report?.inventory_check || {},
+        root = "/api/validacion/tqt/runs/" + id;
+      const response = await fetch(root + "/log");
+      if (!response.ok) throw Error("No se pudo recuperar el LOG completo.");
+      const text = await response.text();
+      const log = h("pre", { class: "tqt-log", tabindex: 0 }, text),
+        columns = ["Etapa", "Resultado", "Duración", "Detalle"];
+      reportHost.replaceChildren(
+        h(
+          "article",
+          { class: "prog-panel tqt-report" },
+          h(
+            "div",
+            { class: "row wrap" },
+            h("h2", null, "Reporte · " + (report.card || r.inventory.nombre)),
+            button("Imprimir / guardar PDF", () => window.print()),
+            button("Cerrar reporte", () => reportHost.replaceChildren()),
+          ),
+          h(
+            "p",
+            null,
+            new Date(r.created * 1000).toLocaleString() +
+              " · " +
+              (r.result || r.state) +
+              " · " +
+              r.operator,
+          ),
+          h("h3", null, "Identidad e inventario"),
+          h(
+            "p",
+            null,
+            "FW " +
+              (report.firmware || "—") +
+              " · HW " +
+              (report.hardware || "—") +
+              " · Posición final " +
+              (report.ending_position || "—"),
+          ),
+          h(
+            "p",
+            { class: "mono" },
+            "R1: " +
+              (report.reported_mac || "—") +
+              " · BLE " +
+              (report.r1_ble_address || "—"),
+          ),
+          h(
+            "p",
+            { class: "mono" },
+            "R2: " +
+              (report.reported_mac_r2 || "—") +
+              " · BLE " +
+              (report.r2_ble_address || "—"),
+          ),
+          h(
+            "dl",
+            { class: "tqt-checks" },
+            ...Object.entries(checks).flatMap(([k, v]) => [
+              h("dt", null, checkLabels[k] || k),
+              h("dd", null, v),
+            ]),
+          ),
+          T.banner(
+            "info",
+            "info",
+            "Resultado funcional y liberación son independientes. Esta prueba no autoriza entregar la tarjeta.",
+          ),
+          h("h3", null, "Comunicación"),
+          h(
+            "dl",
+            { class: "tqt-checks" },
+            ...Object.entries({
+              frames: "Tramas recibidas",
+              retries: "Reintentos ACK",
+              partial_warnings: "Advertencias parciales",
+              corrupt_frames: "Tramas corruptas",
+              ack_errors: "Errores ACK",
+            }).flatMap(([key, label]) => [
+              h("dt", null, label),
+              h(
+                "dd",
+                { class: "mono" },
+                String(report.serial_health?.[key] ?? "—"),
+              ),
+            ]),
+          ),
+          h(
+            "p",
+            null,
+            "Calidad: " +
+              (report.communication_quality?.state || "no verificada"),
+          ),
+          h(
+            "table",
+            { class: "val-cmp" },
+            h(
+              "thead",
+              null,
+              h("tr", null, ...columns.map((x) => h("th", null, x))),
+            ),
+            h(
+              "tbody",
+              null,
+              ...(report.steps || []).map((s) =>
+                h(
+                  "tr",
+                  null,
+                  h("td", null, s.name),
+                  h("td", null, s.state),
+                  h("td", null, (s.duration_s ?? "—") + " s"),
+                  h("td", null, s.detail),
+                ),
+              ),
+            ),
+          ),
+          h("h3", null, "Advertencias y errores"),
+          h("p", null, report.issue || "Sin falla informada"),
+          h(
+            "ul",
+            null,
+            ...(report.warnings || []).map((x) => h("li", null, x)),
+          ),
+          h("h3", null, "Parámetros seriales"),
+          h(
+            "dl",
+            { class: "tqt-checks" },
+            h("dt", null, "Baudios"),
+            h("dd", null, "57600 · 8N1"),
+            ...Object.entries({
+              ack_delay_ms: "ACK",
+              command_quiet_ms: "Guarda de comandos",
+              status_quiet_ms: "Espera adicional Status",
+            }).flatMap(([key, label]) => [
+              h("dt", null, label),
+              h("dd", null, String(report.serial_timing?.[key] ?? "—") + " ms"),
+            ]),
+          ),
+          h("a", { class: "btn", href: root + "/json" }, "Descargar JSON"),
+          h("h3", null, "LOG original completo"),
+          h(
+            "div",
+            { class: "row wrap" },
+            button("Copiar LOG", async () => {
+              await navigator.clipboard.writeText(text);
+              message("LOG completo copiado.");
+            }),
+            h("a", { class: "btn", href: root + "/log" }, "Descargar LOG"),
+          ),
+          log,
+        ),
+      );
+      reportHost.tabIndex = -1;
+      reportHost.focus({ preventScroll: true });
+      reportHost.firstElementChild.scrollIntoView({ block: "start" });
+    }
+    async function install() {
+      try {
+        const response = await fetch("/api/validacion/tqt/installer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "Banco TQT Windows" }),
+        });
+        if (!response.ok) throw Error("No se pudo descargar el agente.");
+        const url = URL.createObjectURL(await response.blob());
+        const a = h("a", { href: url, download: "TQT_Pruebas_Windows.zip" });
+        document.body.append(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      } catch (e) {
+        message(e.message, true);
+      }
+    }
+    fetch("/static/js/test_station_contract.json?v=tqt063-final")
+      .then((r) => r.json())
+      .then((d) => {
+        contract = d;
+        paintSensors({});
+      })
+      .catch(() => {});
+    stations().catch(() => {});
+    const refresh = setInterval(() => {
+      if (alive && !active && !manualBusy) stations().catch(() => {});
+    }, 3000);
+    const tid = new URLSearchParams(location.hash.split("?")[1] || "").get(
+      "tarjeta",
+    );
+    if (tid)
+      call("/inventory/" + tid)
+        .then(async (d) => {
+          card = d;
+          cardHost.replaceChildren(
+            h("h4", null, "Tarjeta " + d.id_tarjeta_num),
+            h("p", null, d.nombre),
+          );
+          await history();
+        })
+        .catch(() => {});
+    return {
+      escaneo: scan,
+      ocupada: () => !!active,
+      actualizar: () => stations(),
+      desmontar() {
+        alive = false;
+        clearInterval(refresh);
+        clearTimeout(pollTimer);
+      },
+    };
+  }
+  const def = {
+    id: "validacion",
+    titulo: "Pruebas TQT",
+    icono: "wifi",
+    grupo: "operacion",
+    orden: 60,
+    montar,
+  };
+  if (window.TQTEscritorio?.registrar) window.TQTEscritorio.registrar(def);
+  else (window.__TQTSecciones = window.__TQTSecciones || []).push(def);
 })();

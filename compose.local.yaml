@@ -1,34 +1,27 @@
-# Prueba local: sin túneles, credenciales ni base de producción.
 services:
-  tqt:
+  web:
     build:
       context: .
-      dockerfile: deploy/devsky/Dockerfile
-    image: escaner-tqt:local
+      dockerfile: deploy/local-tests/Dockerfile
     ports:
       - "127.0.0.1:18080:8000"
+    restart: unless-stopped
     environment:
-      TQT_HOST_IP: "127.0.0.1"
-      TQT_DB_PATH: /data/db/tqt_local.db
-      TQT_ADMIN_PASSWORD: ""
-      TQT_USER_SEED_PASSWORD: ""
-      TQT_SMTP_HOST: ""
-      TQT_SMTP_USER: ""
-      TQT_SMTP_PASSWORD: ""
+      TQT_HOST_IP: 127.0.0.1
+      TQT_DB_PATH: /data/db/tqt_produccion.db
+      TQT_EXCEL_DIR: /data/excel
+      TQT_EXPORTS_DIR: /data/exports
+      TQT_BACKUP_DIR: /data/backups
       TZ: America/Mexico_City
     volumes:
-      - local_db:/data/db
-      - local_excel:/data/excel_mensual
-      - local_exports:/data/exports
-      - local_backups:/backups
+      - test_data:/data
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4)"]
-      interval: 10s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=4)"]
+      interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 20s
+      retries: 4
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
 volumes:
-  local_db:
-  local_excel:
-  local_exports:
-  local_backups:
+  test_data:

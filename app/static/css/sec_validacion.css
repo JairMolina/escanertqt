@@ -76,3 +76,28 @@
 @media (max-width: 640px) { .val-quien { margin-left: 0; flex-basis: 100%; } .val-log li { flex-wrap: wrap; } }
 .val-lapay { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .val-tips { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+
+/* Integrated TQT production test station; reuse existing colors and components. */
+.tqt-sensors{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.tqt-sensor{padding:10px;border:1px solid var(--border,#334155);border-radius:8px}
+.tqt-sensor dt{font-size:.8rem;opacity:.75}.tqt-sensor dd{margin:4px 0 0;font-size:1rem}
+.tqt-log{white-space:pre;overflow:auto;max-height:65vh;padding:16px;background:var(--bg,#111827);font:12px/1.6 monospace}
+.tqt-steps{padding-left:24px}.tqt-steps li{padding:6px 0}progress{width:100%;height:14px}
+.tqt-report{margin-top:18px}.tqt-report table{width:100%}.tqt-report td{overflow-wrap:anywhere}
+@media(max-width:640px){.tqt-report table{font-size:12px}.tqt-log{font-size:11px}.tqt-report .row{flex-wrap:wrap}}
+@media print{body:has(.tqt-report) .esc-sidebar,body:has(.tqt-report) header{display:none!important}body:has(.tqt-report) #sec-validacion>*:not(.tqt-report):not(:last-child){display:none!important}.tqt-report button,.tqt-report a{display:none}.tqt-log{max-height:none;overflow:visible;white-space:pre-wrap;color:#000;background:#fff}.tqt-report{color:#000;background:#fff}}
+.tqt-checks{display:grid;grid-template-columns:minmax(150px,1fr) minmax(120px,1fr);gap:6px 20px;margin:12px 0}
+.tqt-checks dt{opacity:.8}.tqt-checks dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.tqt-report h3{margin-top:20px;margin-bottom:10px}.tqt-report h2{margin:0}.tqt-report p{margin:8px 0}
+.tqt-report .row{gap:8px}.tqt-report td{padding:9px 8px;vertical-align:top}
+@media(max-width:640px){.tqt-checks{grid-template-columns:1fr 1fr;gap:7px}.tqt-report{overflow-x:auto}}
+@media print{
+ body:has(.tqt-report){background:#fff!important;color:#000!important}
+ body:has(.tqt-report) .esc-lat,body:has(.tqt-report) .esc-skip,body:has(.tqt-report) header{display:none!important}
+ body:has(.tqt-report) .esc,body:has(.tqt-report) .esc-col,body:has(.tqt-report) .esc-main{display:block!important;background:#fff!important;color:#000!important;margin:0!important;padding:0!important;width:100%!important;min-height:0!important}
+ .tqt-report{border:0!important;padding:0!important;margin:0!important;color:#000!important;background:#fff!important}
+ .tqt-report .banner{color:#000!important;background:#fff!important;border:1px solid #aaa!important}
+ .tqt-report th{color:#333!important}.tqt-report tr{break-inside:avoid}.tqt-report h3{break-after:avoid}
+ .tqt-log{border-top:1px solid #ccc;white-space:pre-wrap!important;overflow-wrap:anywhere!important;max-height:none!important;color:#000!important;background:#fff!important}
+}
+.tqt-report{scroll-margin-top:76px}.tqt-report:focus{outline:2px solid var(--accent,#d5a436)}

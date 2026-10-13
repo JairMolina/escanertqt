@@ -1,0 +1,6 @@
+TQT Test Station 0.6.3 integrado. Extrae el paquete en una carpeta privada de Windows y ejecuta iniciar.cmd.
+Python 3.10+; COM/Bluetooth trabajan en Windows, no en Docker. No abras el programa Tkinter en paralelo sobre el mismo COM.
+config.json contiene una credencial privada: no compartir ni publicar.
+El agente usa conexiones salientes, sin puertos entrantes. HTTP permitido solo para localhost/127.0.0.1; HTTPS en otros destinos.
+Mantiene evidencia y reportes pendientes en evidence/. Una falla de red no repite pruebas ni comandos; reiniciar deja la prueba interrumpida y exige revisar físicamente antes de repetir.
+La secuencia automática restablece ajustes del firmware y mueve el perno. Debe confirmarse en la web con el banco libre.

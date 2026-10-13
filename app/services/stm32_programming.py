@@ -160,6 +160,9 @@ def create_job(pcb, station, expected, operator, physical_confirmed=False):
             raise ValueError('Cambió el inventario o firmware. Vuelve a cargar los datos antes de programar.')
         if c.execute("SELECT 1 FROM stm32_jobs WHERE (pcb=? OR station=?) AND state IN ('queued','running')", (pcb, station)).fetchone():
             raise ValueError('La tarjeta o estación ya tiene un trabajo en curso.')
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='tqt_test_runs'").fetchone():
+            if c.execute("SELECT 1 FROM tqt_test_runs WHERE (station=? OR requested_card=?) AND state IN ('queued','running')",(station,data.get('tarjeta_id'))).fetchone():
+                raise ValueError('La tarjeta o estación está ejecutando una prueba física; espera a que termine.')
         jid, now = secrets.token_hex(16), time.time()
         data['confirmation'] = dict(source='web', operator=operator, pcb_id=pcb,
                                     nombre=data['identity']['nombre'], at=now)
