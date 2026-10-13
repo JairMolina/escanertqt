@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-13 21:32 UTC
-Commit de referencia: `41ed4f27aeed` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-13 23:39 UTC
+Commit de referencia: `4c9b4c14c8d3` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-v1.3.70 publicada en GitHub main y desplegada en inventariotqt.site por autorizacion expresa. Commit de aplicacion 41ed4f2; Orange Pi 192.168.4.70 via MiniPc, /home/orangepi/escanertqt. Agente developer4 online, oculto y con inicio automatico. Respaldo pre-tqt-1370-20261013T212830Z verificado.
+v1.3.71 desplegada: boton Detener y cancelar programacion STM32, recuperacion del trabajo al recargar y correccion del agente R3. Trabajo pendiente de R3 0039 cancelado sin grabacion; estacion Lap Leo 13-10-2026 online con agente actualizado. Commit aplicacion 4c9b4c1.
 
 ## Siguiente paso
-Uso operativo desde la web publicada; conectar COM/BLE y ejecutar solo cuando el banco este libre. Deuda de regresion previa documentada; no se realizaron movimientos adicionales durante el despliegue.
+Recargar web con Ctrl+F5 y usar estacion Lap Leo 13-10-2026. Otras laptops requieren agente actualizado para detener J-Link activo; no se ejecutaron nuevas grabaciones fisicas.
 
 ## Evidencia
-Contenedor healthy, API publica ok, runtime 1.3.70, cuatro tablas nuevas. 100 tarjetas y 300 PCB intactas; 22 tablas anteriores comparadas, solo heartbeat de estaciones cambia. 11 casos de integracion correctos; dos pruebas fisicas previas 14/14.
+29 pruebas STM32 y 11 TQT correctas; Playwright comprobo boton y cancelacion en Docker local. Produccion healthy, API ok, SQLite ok, cero trabajos activos. Respaldo pre-tqt-1371-20261013T233704Z. ECC backend para estados y persistencia.
