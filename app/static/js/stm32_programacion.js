@@ -4,6 +4,7 @@ window.TQTSTM32 = function (host, ctx) {
     const { h, api, T } = ctx;
     const K = ctx.tipo === 'R3' ? 'R3' : 'R1', ID = 'stm-' + K.toLowerCase();
     let alive = true, current = null, selectedPcb = null, busy = false, timer = null, requestN = 0, listN = 0;
+    let activeJob = null, cancelling = false;
     const unsubs = [];
     const search = h('input', { class: 'input', type: 'search', id: ID + '-q', autocomplete: 'off', placeholder: 'Número, nombre o QR de la tarjeta' });
     const list = h('div', { class: 'prog-lista' });
@@ -13,6 +14,7 @@ window.TQTSTM32 = function (host, ctx) {
     const station = h('select', { class: 'input', id: ID + '-est' });
     const stationName = h('input', { class: 'input', value: 'PC de programación', id: ID + '-est-nombre', maxlength: 60 });
     const btnProgram = h('button', { class: 'btn btn-primary', type: 'button', disabled: true, onclick: program }, 'Programar STM32 con J-Link');
+    const btnCancel = h('button', { class: 'btn', type: 'button', disabled: true, onclick: cancelStation }, 'Detener y cancelar programación');
     // v1.3.54: orden de programación de la pareja: ESP32 de R2 (MAC) → STM32 de R1 → ESP32 de R1 (MAC de R1)
     const btnEsp = K !== 'R1' ? null : h('button', { class: 'btn', type: 'button', disabled: true, onclick: async () => {
         if (busy || !selectedPcb) return;
@@ -56,7 +58,7 @@ window.TQTSTM32 = function (host, ctx) {
             h('div', { class: 'field' }, h('label', { for: ID + '-est-nombre' }, 'Nombre de estación Windows'), stationName),
             h('div', { class: 'row wrap' }, bundleBtn),
             h('p', { class: 'hint' }, 'Abre el archivo Instalar_TQT descargado una sola vez: instala el agente y lo deja iniciando con Windows en segundo plano. Después, todas las grabaciones se controlan desde esta pantalla. Usa Python 3.10+ y J-Link de SEGGER o STM32CubeIDE ya instalados.')),
-          h('div', { class: 'row wrap' }, btnProgram, btnEsp, btnSubir, hexIn),
+          h('div', { class: 'row wrap' }, btnProgram, ...(btnEsp ? [btnEsp] : []), btnSubir, btnCancel, hexIn),
           h('p', { class: 'hint' }, K === 'R1' ? 'Orden de la pareja: 1) ESP32 de la R2 (da su MAC) · 2) STM32 de la R1 con la MAC y número de la R2 · 3) ESP32 de la R1 (da la MAC de la R1).' : 'La R3 lleva un firmware fijo (sin MAC ni identidad por unidad). Al verificarse queda registrada como programada.'), status)));
     function message(text, bad = false) { status.replaceChildren(T.banner(bad ? 'bad' : 'info', bad ? 'alert' : 'info', text)); }
     function progress(job) {
@@ -72,8 +74,8 @@ window.TQTSTM32 = function (host, ctx) {
         const index = stages.findIndex(s => s[0] === stage);
         const pct = Math.round((index + 1) / stages.length * 100);
         status.replaceChildren(h('div', { class: 'prog-avance', 'aria-busy': 'true' },
-            h('strong', null, 'Programando ' + K + ' ' + current.identity.nombre.slice(-4)),
-            h('p', { class: 'hint' }, stages[index][1] + '…'),
+            h('strong', null, job.payload?.cancel_requested ? 'Deteniendo la programación…' : 'Programando ' + (job.payload?.identity?.nombre || current?.identity.nombre || K)),
+            h('p', { class: 'hint' }, job.payload?.cancel_requested ? 'Esperando que el agente cierre J-Link y confirme la cancelación.' : stages[index][1] + '…'),
             h('ol', { class: 'prog-pasos' }, ...stages.map(([key, label], n) => h('li', {
                 class: 'prog-paso', 'aria-current': key === stage ? 'step' : null,
                 dataset: { e: n < index ? 'ok' : n === index ? 'activo' : 'pendiente' }
@@ -83,6 +85,7 @@ window.TQTSTM32 = function (host, ctx) {
             h('p', { class: 'hint' }, 'No desconectes la ' + K + ' hasta que termine la verificación.')));
     }
     function enable() {
+        btnCancel.disabled = !station.value || cancelling;
         btnProgram.textContent = busy ? 'Programando…' : current ? 'Programar ' + K + ' ' + current.identity.nombre.slice(-4) + ' con J-Link' : 'Programar STM32 con J-Link';
         btnProgram.disabled = busy || !current || !station.value || station.selectedOptions[0]?.dataset.online !== 'true';
         if (btnEsp) btnEsp.disabled = busy || !current;
@@ -102,8 +105,51 @@ window.TQTSTM32 = function (host, ctx) {
         if (selected && [...station.options].some(o => o.value === selected)) station.value = selected;
         else if (r.data.filter(s => s.online).length === 1) station.value = r.data.find(s => s.online).id;
         enable();
+        if (!busy) await recover();
     }
-    station.addEventListener('change', enable);
+    station.addEventListener('change', () => { enable(); recover(); });
+
+    async function recover() {
+        const sid = station.value;
+        if (!sid || busy) return;
+        const r = await api('/api/stm32/stations/' + sid + '/jobs');
+        if (!alive || station.value !== sid || busy) return;
+        if (r.ok && r.data.length) watchJob(r.data[0]);
+    }
+
+    async function cancelStation() {
+        if (!station.value || cancelling) return;
+        cancelling = true; enable();
+        try {
+            const r = await api('/api/stm32/stations/' + station.value + '/cancel', { method: 'POST', body: {} });
+            if (!r.ok) { message(r.error, true); return; }
+            if (r.data.jobs.some(j => j.waiting)) {
+                message('Cancelación solicitada. Espera que el agente cierre J-Link; aún no desconectes la placa.');
+                if (!busy) await recover();
+            } else {
+                clearTimeout(timer); activeJob = null; busy = false;
+                message('Trabajos pendientes cancelados. Puedes preparar otra programación.');
+            }
+        } finally { cancelling = false; enable(); }
+    }
+
+    function watchJob(j) {
+        activeJob = j.id; busy = true; enable(); progress(j);
+        clearTimeout(timer);
+        async function poll() {
+            const id = activeJob;
+            const r = await api('/api/stm32/jobs/' + id);
+            if (!alive || activeJob !== id) return;
+            if (!r.ok) { message('Recuperando conexión. Puedes solicitar detener la programación; no desconectes la placa.', true); timer = setTimeout(poll, 3000); return; }
+            const job = r.data;
+            if (['queued', 'running'].includes(job.state)) { progress(job); timer = setTimeout(poll, 1000); return; }
+            activeJob = null; busy = false; await stations();
+            if (selectedPcb) await choose(selectedPcb, true);
+            enable();
+            message(job.state === 'verified' ? '✓ STM32 programado y verificado por lectura · FW ' + job.payload.identity.fw + ' · UID ' + job.result.uid + '. Ya puedes desconectar la placa.' : (job.result?.error || 'No se confirmó la programación. Revisa la estación y la tarjeta.'), job.state !== 'verified');
+        }
+        timer = setTimeout(poll, 1000);
+    }
     async function choose(pcb, quiet = false) {
         if (busy) return { ok: false, texto: 'Hay una programación en curso.' };
         selectedPcb = pcb;
@@ -120,7 +166,7 @@ window.TQTSTM32 = function (host, ctx) {
             h('span', { class: 'dim' }, K === 'R1' ? 'R2 ' + current.r2 : (pcb.id_tarjeta_num ? 'Tarjeta #' + String(pcb.id_tarjeta_num).padStart(4, '0') : 'Suelta'))),
             h('dl', { class: 'prog-dl' }, ...filas.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
             h('p', { class: 'hint' }, 'Al pulsar Programar confirmas que esta ' + K + ' es la conectada al J-Link. La grabación empieza directamente y el resultado aparece aquí.'),
-            K === 'R1' ? h('p', { class: 'hint' }, 'Se conserva la configuración existente en EEPROM, incluido su nombre.') : null);
+            ...(K === 'R1' ? [h('p', { class: 'hint' }, 'Se conserva la configuración existente en EEPROM, incluido su nombre.')] : []));
         if (!quiet) message(K === 'R1' ? 'Datos cargados. Revisa la R1 física y la R2 asociada antes de programar.' : 'Datos cargados. Revisa la R3 física antes de programar.'); enable();
         return { ok: true, texto: K === 'R1' ? 'R1 y datos de R2 cargados para STM32.' : 'R3 cargada para STM32.' };
     }
@@ -161,19 +207,7 @@ window.TQTSTM32 = function (host, ctx) {
         progress({ state: 'queued' });
         const r = await api('/api/stm32/jobs', { method: 'POST', body: { pcb_id: current.pcb_id, station_id: station.value, hex_sha256: current.hex_sha256, physical_confirmed: true } });
         if (!r.ok) { busy = false; enable(); message(r.error, true); return; }
-        progress(r.data);
-        async function poll() {
-            const r = await api('/api/stm32/jobs/' + rJob);
-            if (!alive) return;
-            if (!r.ok) { message('Recuperando conexión para consultar el avance. No desconectes la ' + K + '; la grabación no se repite.', true); timer = setTimeout(poll, 3000); return; }
-            const j = r.data;
-            if (['queued', 'running'].includes(j.state)) { progress(j); timer = setTimeout(poll, 1000); return; }
-            busy = false; await stations();
-            if (selectedPcb) await choose(selectedPcb, true);
-            enable();
-            message(j.state === 'verified' ? '✓ STM32 programado y verificado por lectura · FW ' + j.payload.identity.fw + ' · UID ' + j.result.uid + '. Ya puedes desconectar la ' + K + '.' : (j.result?.error || 'No se confirmó la programación. Revisa la estación y la tarjeta.'), j.state !== 'verified');
-        }
-        const rJob = r.data.id; timer = setTimeout(poll, 1000);
+        watchJob(r.data);
     }
     function refresh() {
         if (!alive || busy) return;

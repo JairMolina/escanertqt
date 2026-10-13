@@ -151,6 +151,7 @@ def create_job(pcb, station, expected, operator, physical_confirmed=False):
     if physical_confirmed is not True:
         raise ValueError('Confirma desde la web que la placa seleccionada está conectada al J-Link.')
     init()
+    active_jobs(station)
     with db.transaction() as c:
         st = c.execute('SELECT * FROM stm32_stations WHERE id=?', (station,)).fetchone()
         if not st or time.time()-st['last_seen'] > 20:
@@ -211,6 +212,42 @@ def claim(sid):
         return dict(id=r['id'], payload=d, hex=r['image'])
 
 
+def active_jobs(sid):
+    init()
+    with db.get_db() as c:
+        ids = [r['id'] for r in c.execute("SELECT id FROM stm32_jobs WHERE station=? AND state IN ('queued','running')", (sid,))]
+    return [j for jid in ids if (j := job(jid))['state'] in ('queued', 'running')]
+
+
+def cancel_station(sid, operator):
+    init()
+    with db.transaction() as c:
+        if not c.execute('SELECT 1 FROM stm32_stations WHERE id=?', (sid,)).fetchone():
+            raise ValueError('Estación no encontrada.')
+        now = time.time()
+        rows = c.execute("SELECT * FROM stm32_jobs WHERE station=? AND state IN ('queued','running')", (sid,)).fetchall()
+        for r in rows:
+            p = json.loads(r['payload'])
+            p['cancel_requested'] = dict(operator=operator, at=now)
+            state = 'cancelled' if r['state'] == 'queued' else 'running'
+            result = json.dumps(dict(cancelled=True, verified=False, error='Cancelado desde la web antes de grabar.')) if state == 'cancelled' else r['result']
+            c.execute('UPDATE stm32_jobs SET state=?,payload=?,result=?,updated=? WHERE id=?', (state,json.dumps(p),result,now,r['id']))
+            db.log_evento('STM32_CANCELACION', None, None, 'Cancelación solicitada; job='+r['id'], operator, conn=c)
+    return dict(ok=True, jobs=[dict(id=r['id'], waiting=r['state']=='running') for r in rows])
+
+
+def control(sid, jid):
+    with db.transaction() as c:
+        r = c.execute('SELECT * FROM stm32_jobs WHERE id=? AND station=?', (jid,sid)).fetchone()
+        if not r:
+            raise ValueError('Trabajo ajeno o inexistente.')
+        if r['state'] == 'running':
+            now = time.time()
+            c.execute('UPDATE stm32_jobs SET updated=? WHERE id=?',(now,jid))
+            c.execute('UPDATE stm32_stations SET last_seen=? WHERE id=?',(now,sid))
+    return dict(cancel=bool(json.loads(r['payload']).get('cancel_requested')) or r['state'] not in ('queued','running'), state=r['state'])
+
+
 def progress(sid, jid, stage):
     stages = ('preparing', 'writing', 'reading', 'restarting', 'reporting')
     if stage not in stages:
@@ -233,11 +270,17 @@ def progress(sid, jid, stage):
 def finish(sid, jid, result):
     with db.transaction() as c:
         r = c.execute('SELECT * FROM stm32_jobs WHERE id=? AND station=?', (jid, sid)).fetchone()
+        if r and r['state'] == 'cancelled':
+            return dict(id=jid, state='cancelled')
         if r and r['state'] in ('verified', 'failed') and json.loads(r['result']) == result:
             return dict(id=jid, state=r['state'])  # Lost HTTP acknowledgement: harmless retry.
         if not r or r['state'] not in ('running', 'unknown'):
             raise ValueError('El trabajo no pertenece a la estación o ya terminó.')
         p = json.loads(r['payload'])
+        if p.get('cancel_requested') or result.get('cancelled'):
+            result = dict(result, verified=False, cancelled=True, error='Programación detenida y cancelada. Comprueba la tarjeta antes de repetir.')
+            c.execute("UPDATE stm32_jobs SET state='cancelled',updated=?,result=? WHERE id=?", (time.time(),json.dumps(result),jid))
+            return dict(id=jid, state='cancelled')
         uid = result.get('uid', '')
         verified = (result.get('verified') is True and result.get('hex_sha256')==p['hex_sha256']
                     and result.get('identity_sha256')==p['identity_sha256']

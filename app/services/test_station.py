@@ -203,7 +203,6 @@ def claim(sid, state):
             "INSERT INTO tqt_test_presence VALUES(?,?,?) ON CONFLICT(station) DO UPDATE SET seen=excluded.seen,state=excluded.state",
             (sid, now, json.dumps(state)),
         )
-        c.execute("UPDATE stm32_stations SET last_seen=? WHERE id=?", (now, sid))
         c.execute(
             "UPDATE tqt_test_commands SET state='error',result=? WHERE station=? AND state IN ('queued','running') AND created<?",
             (json.dumps({"error": "Comando expirado; no se repite."}), sid, now - 90),

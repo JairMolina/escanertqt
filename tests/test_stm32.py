@@ -35,6 +35,74 @@ class STM32Tests(unittest.TestCase):
     def prepared(self):
         return s.preview(self.t['r1']['id'])
 
+    def test_cancel_queued_releases_station_without_firmware(self):
+        j = self.queued()
+        s.cancel_station(self.st['id'], 'operador@test.mx')
+        self.assertEqual(s.job(j['id'])['state'], 'cancelled')
+        self.assertIsNone(s.claim(self.st['id']))
+        self.assertNotEqual(self.queued()['id'], j['id'])
+
+    def test_running_cancel_waits_for_agent_and_rejects_late_verification(self):
+        j = self.queued()
+        work = s.claim(self.st['id'])
+        s.cancel_station(self.st['id'], 'operador@test.mx')
+        self.assertEqual(s.job(j['id'])['state'], 'running')
+        self.assertTrue(s.control(self.st['id'], j['id'])['cancel'])
+        with self.assertRaises(ValueError): self.queued()
+        result = dict(verified=True, uid='1234567890ABCDEF12345678', hex_sha256=work['payload']['hex_sha256'], identity_sha256=work['payload']['identity_sha256'])
+        with patch.object(inv, 'set_firmware') as save:
+            self.assertEqual(s.finish(self.st['id'],j['id'],result)['state'],'cancelled')
+            save.assert_not_called()
+        self.assertEqual(s.finish(self.st['id'],j['id'],result)['state'],'cancelled')
+        self.assertTrue(self.queued())
+
+    def test_control_requires_station_owner_and_refreshes_heartbeat(self):
+        j=self.queued(); s.claim(self.st['id'])
+        with self.assertRaises(ValueError): s.control('another',j['id'])
+        with db.get_db() as c:
+            c.execute('UPDATE stm32_jobs SET updated=0 WHERE id=?',(j['id'],))
+        self.assertFalse(s.control(self.st['id'],j['id'])['cancel'])
+        self.assertEqual(s.job(j['id'])['state'],'running')
+
+    def test_expired_queue_does_not_permanently_block_create(self):
+        j=self.queued()
+        with db.get_db() as c:
+            c.execute('UPDATE stm32_jobs SET created=0 WHERE id=?',(j['id'],))
+        self.assertNotEqual(self.queued()['id'],j['id'])
+        self.assertEqual(s.job(j['id'])['state'],'failed')
+
+    def test_cancel_before_command_never_starts_jlink(self):
+        with patch.object(agent.subprocess,'Popen') as start:
+            with self.assertRaises(agent.ProgrammingCancelled):
+                with agent.ProgramControl(lambda path,body: dict(cancel=True),'job'):
+                    agent.commander('JLink.exe',Path('.'),['q'])
+            start.assert_not_called()
+
+    def test_cancel_and_control_api_authentication(self):
+        j=self.queued(); s.claim(self.st['id'])
+        anon=iso.cliente_sin_sesion(app)
+        cancel='/api/stm32/stations/'+self.st['id']+'/cancel'
+        control='/api/stm32/agent/jobs/'+j['id']+'/control'
+        self.assertEqual(anon.post(cancel,json={}).status_code,401)
+        self.assertEqual(anon.post(control,json={}).status_code,401)
+        self.assertEqual(TestClient(app,base_url='https://testserver').post(cancel,json={}).status_code,200)
+        r=anon.post(control,json={},headers={'Authorization':'Bearer '+self.st['token']})
+        self.assertEqual(r.status_code,200)
+        self.assertTrue(r.json()['cancel'])
+
+    def test_cancel_active_command_terminates_only_owned_process(self):
+        from unittest.mock import MagicMock
+        flags=iter([False,True])
+        agent._control.cancelled=lambda: next(flags)
+        proc=MagicMock(); proc.poll.return_value=None; proc.communicate.return_value=('','')
+        try:
+            with tempfile.TemporaryDirectory() as temp, patch.object(agent.subprocess,'Popen',return_value=proc):
+                with self.assertRaises(agent.ProgrammingCancelled): agent.commander('mock',Path(temp),['q'])
+            proc.terminate.assert_called_once()
+            proc.communicate.assert_called_once_with(timeout=5)
+        finally:
+            del agent._control.cancelled
+
     def queued(self):
         d, _ = self.prepared()
         return s.create_job(self.t['r1']['id'], self.st['id'], d['hex_sha256'], 'operador@test.mx', True)

@@ -14,6 +14,42 @@ import urllib.request
 import tqt_hex as hx
 
 USER_AGENT = 'TQT-Station/1.3.63'
+_control = threading.local()
+
+
+class ProgrammingCancelled(ValueError):
+    pass
+
+
+class ProgramControl:
+    def __init__(self, api, jid):
+        self.api, self.jid = api, jid
+        self.cancelled, self.done = threading.Event(), threading.Event()
+
+    def check(self):
+        if self.api('jobs/'+self.jid+'/control', {}).get('cancel'):
+            self.cancelled.set()
+
+    def watch(self):
+        while not self.done.wait(1):
+            try:
+                self.check()
+            except Exception as e:
+                print('Control pendiente:', str(e)[:200])
+
+    def __enter__(self):
+        self.check()
+        if self.cancelled.is_set():
+            raise ProgrammingCancelled('Cancelado antes de abrir J-Link.')
+        _control.cancelled = self.cancelled.is_set
+        self.thread = threading.Thread(target=self.watch, daemon=True)
+        self.thread.start()
+        return self
+
+    def __exit__(self, *args):
+        self.done.set()
+        self.thread.join(timeout=1)
+        del _control.cancelled
 
 
 # ---------------------------------------------------------------------------
@@ -273,8 +309,35 @@ def commander(exe, directory, commands, serial=''):
         args += ['-USB', serial]
     # -NoGui suppresses SEGGER dialogs; CREATE_NO_WINDOW suppresses the Windows console.
     options = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
-    proc = subprocess.run(args, cwd=directory, capture_output=True, text=True, errors='replace', timeout=180, **options)
-    trace = proc.stdout+'\n'+proc.stderr
+    cancelled = getattr(_control, 'cancelled', None)
+    if cancelled is None:
+        proc = subprocess.run(args, cwd=directory, capture_output=True, text=True, errors='replace', timeout=180, **options)
+        trace = proc.stdout+'\n'+proc.stderr
+    else:
+        if cancelled():
+            raise ProgrammingCancelled('Programación cancelada.')
+        proc = subprocess.Popen(args, cwd=directory, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', **options)
+        deadline = time.monotonic()+180
+        try:
+            while True:
+                if cancelled():
+                    raise ProgrammingCancelled('Programación detenida desde la web; revisar la tarjeta.')
+                if time.monotonic() >= deadline:
+                    raise ValueError('J-Link excedió el tiempo máximo; revisar conexión y tarjeta.')
+                try:
+                    stdout, stderr = proc.communicate(timeout=.5)
+                    trace = stdout+'\n'+stderr
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
+        finally:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.communicate()
     if proc.returncode:
         raise ValueError('J-Link falló: '+trace[-4000:])
     return trace
@@ -378,25 +441,33 @@ def main():
     while True:
         try:
             if pending_result:
-                api('jobs/'+pending_result[0]+'/result', pending_result[1])
+                try:
+                    api('jobs/'+pending_result[0]+'/result', pending_result[1])
+                except urllib.error.HTTPError as e:
+                    if e.code not in (400, 404, 409):
+                        raise
+                    print('Resultado conservado localmente; servidor rechazó el reporte:', e.code)
                 pending_result = None
             work = api('claim', {})
             if work:
                 d = work['payload']['identity']
-                print('\nR1:', d['nombre'], '| R2:', d['id_r'], d['mac_r'], '| FW:', d['fw'])
+                print('\nPlaca:', d['nombre'], '| FW:', d['fw'])
                 try:
                     with tempfile.TemporaryDirectory() as tmp:
                         validate(work, Path(tmp))
                     def progress(stage):
+                        if _control.cancelled():
+                            raise ProgrammingCancelled('Programación cancelada desde la web.')
                         try:
                             api('jobs/'+work['id']+'/progress', {'stage': stage})
                         except Exception as e:
                             # Reporting progress must never repeat or interrupt a hardware write.
                             print('Avance no reportado:', str(e)[:200])
-                    result = execute(work, exe, serial, progress)
+                    with ProgramControl(api, work['id']):
+                        result = execute(work, exe, serial, progress)
                     print('Grabación y lectura verificadas. UID:', result['uid'])
                 except Exception as e:
-                    result = dict(verified=False, error=str(e)[:1000])
+                    result = dict(verified=False, cancelled=isinstance(e, ProgrammingCancelled), error=str(e)[:1000])
                     print('ERROR:', e)
                 pending_result = (work['id'], result)
                 # Retrying the report never repeats a hardware write.

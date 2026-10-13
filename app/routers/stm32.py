@@ -40,6 +40,7 @@ class Job(BaseModel):
 
 class Result(BaseModel):
     verified: bool = False
+    cancelled: bool = False
     hex_sha256: str = Field(default='', max_length=64)
     identity_sha256: str = Field(default='', max_length=64)
     uid: str = Field(default='', max_length=24)
@@ -133,6 +134,16 @@ def status(jid: str):
     return run(svc.job, jid)
 
 
+@router.get('/stations/{sid}/jobs')
+def active(sid: str):
+    return run(svc.active_jobs, sid)
+
+
+@router.post('/stations/{sid}/cancel')
+def cancel(sid: str, req: Request):
+    return run(svc.cancel_station, sid, operator(req))
+
+
 def station_token(authorization: str = Header(default='')):
     if not authorization.startswith('Bearer '):
         raise HTTPException(401, 'Falta credencial de estación.')
@@ -145,6 +156,11 @@ def station_token(authorization: str = Header(default='')):
 @router.post('/agent/claim')
 def claim(st=Depends(station_token)):
     return svc.claim(st['id'])
+
+
+@router.post('/agent/jobs/{jid}/control')
+def control(jid: str, st=Depends(station_token)):
+    return run(svc.control, st['id'], jid)
 
 
 @router.post('/agent/jobs/{jid}/result')

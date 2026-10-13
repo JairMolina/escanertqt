@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.71 — 2026-10-13
+- **Programación STM32 R1/R3:** botón «Detener y cancelar programación» cancela los trabajos pendientes de la estación y solicita detener J-Link en los activos. Se mantiene el bloqueo hasta la confirmación del agente; una cancelación no registra firmware verificado.
+- Recuperación del progreso al volver a la sección, vencimiento de trabajos en espera antes de crear otro y corrección del agente al recibir una R3 sin datos de R2.
+- El agente de pruebas COM/BLE ya no anuncia por sí solo que la estación J-Link está conectada. Requiere actualizar el agente STM32 para detener procesos activos desde la web.
+
 ## v1.3.70 — 2026-10-13
 - **Pruebas TQT:** integración de las 14 etapas originales de Test Station 0.6.3 mediante agente Windows para COM y Bluetooth, con progreso y sensores S29 en la web.
 - Cotejo de R1/R2 con el inventario, historial independiente por ejecución y reportes con JSON, LOG original completo e impresión PDF. La aprobación funcional no cambia automáticamente el estado de fabricación de la tarjeta.
