@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.70 — 2026-10-13
+- **Pruebas TQT:** integración de las 14 etapas originales de Test Station 0.6.3 mediante agente Windows para COM y Bluetooth, con progreso y sensores S29 en la web.
+- Cotejo de R1/R2 con el inventario, historial independiente por ejecución y reportes con JSON, LOG original completo e impresión PDF. La aprobación funcional no cambia automáticamente el estado de fabricación de la tarjeta.
+- Validación local con dos ejecuciones físicas de R1 0036 / COM10, ambas 14/14 aprobadas; Docker local aislado y documentación reproducible.
+
 ## v1.3.69 — 2026-10-12
 - **Administración › Resumen:** botón «Descargar copia de la base (.db)» (solo con clave de administración): copia completa y verificada hecha en caliente (`GET /api/admin/respaldo/descargar`, `sqlite3.backup` + `integrity_check`), queda registrada en Movimientos (BD_DESCARGADA). Sirve para restaurar la base en otro equipo, p. ej. el Docker local.
 
