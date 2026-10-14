@@ -1,4 +1,4 @@
-# Programación R2 mediante firmware completo BIN/HEX (web 1.3.73)
+# Programación R2 mediante firmware completo BIN/HEX (web 1.3.76)
 
 R2 V4.0 incorpora un perfil de 92 bytes: marcador `TQT_R2_CFG_V1`, esquema 1,
 HW, FW, nombre BLE y módulo. Las lecturas volátiles durante inicialización

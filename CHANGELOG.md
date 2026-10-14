@@ -1,5 +1,21 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.76 — 2026-10-14
+- **Programación R2 ESP32:** catálogo persistente BIN/HEX, perfil HW/FW interno, nombre tomado del inventario y selector de la versión numérica más reciente compatible. Verificación INFO tras el arranque; se conserva el flujo anterior de R1.
+- Integra los cambios existentes de v1.3.73–1.3.75: orden R2/R1/R3, semáforo STM32, rediseño de Pruebas y estación local J-Link. R2 FW4.0 conserva relés, BLE y eFuse del original.
+
+## v1.3.75 — 2026-10-14
+- **Programación STM32 R1/R3:** «Estación Windows conectada al J-Link» muestra solo la estación local (la que reporta desde la misma red que el navegador), no todas. El servidor recuerda en memoria la IP de cada agente; «Cambiar dispositivo» solo aparece si hay más de una estación local.
+
+## v1.3.74 — 2026-10-14
+- **Pruebas TQT:** rediseño de la sección en tarjetas (Tarjeta e inventario · Conexión y dispositivo · Controles manuales · Prueba automática · Sensores S29 · Historial), dos columnas que se apilan en <900px, botones espaciados de 40px y sin desbordes de 375px a escritorio.
+- **Dispositivo de esta PC:** Programación STM32 (R1/R3) y Pruebas TQT recuerdan en cada navegador su propia estación (al descargar el instalador, al elegirla o si es la única conectada) y muestran solo «Dispositivo de esta PC» con opción «Cambiar dispositivo».
+
+## v1.3.73 — 2026-10-14
+- **Programación:** botones en orden R2 · ESP32 → R1 → R3.
+- **Programación STM32 R1/R3:** el detalle de la tarjeta se divide en datos + semáforo de estado (rojo «Sin programar»/«Error al programar», amarillo «Programando…», verde «Programada») que se actualiza en vivo y relee el estado real de la placa.
+- **Pruebas TQT:** los recuadros de sensores S29 ya no desbordan su contenido (MACs y etiquetas largas se ajustan).
+
 ## v1.3.72 — 2026-10-13
 - **Programación STM32 R1/R3:** subir, validar y guardar HEX en un catálogo persistente. Selector de firmware compatible con la placa; por defecto elige la versión numérica más alta, con la subida más reciente en caso de empate.
 - R1 obtiene HW/FW de su perfil y conserva la personalización por inventario; R3 solicita confirmar HW/FW al registrar una imagen sin perfil. Se conservan las versiones anteriores.

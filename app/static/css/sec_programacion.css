@@ -61,3 +61,17 @@
   .prog-dl dd { margin-bottom: 6px; }
   .prog-panel-detalle > .row .btn { flex: 1 1 100%; }
 }
+
+/* v1.3.73: detalle STM32 dividido en datos + semáforo de estado */
+.prog-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(130px,auto);gap:16px;align-items:start}
+.prog-estado{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border:1px solid var(--border,#334155);border-radius:8px;text-align:center}
+.prog-luz{width:28px;height:28px;border-radius:50%;background:var(--bad,#d64b4b);box-shadow:0 0 10px currentColor;color:var(--bad,#d64b4b)}
+.prog-estado[data-s="ok"] .prog-luz{background:var(--ok,#22a35a);color:var(--ok,#22a35a)}
+.prog-estado[data-s="warn"] .prog-luz{background:var(--warn,#e0a526);color:var(--warn,#e0a526)}
+.prog-luz-txt{font-weight:600;font-size:.9rem}
+@media (prefers-reduced-motion:no-preference){.prog-estado[data-s="warn"] .prog-luz{animation:prog-pulso 1s ease-in-out infinite alternate}}
+@keyframes prog-pulso{to{opacity:.45}}
+@media (max-width:599px){.prog-split{grid-template-columns:1fr}}
+
+.prog-sesion { align-items: center; gap: 8px; }
+.prog-sesion[hidden], .prog-sesion + div[hidden] { display: none; }

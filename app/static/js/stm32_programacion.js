@@ -14,7 +14,26 @@ window.TQTSTM32 = function (host, ctx) {
     const empty = T.empty('flash', 'Elige una ' + K, 'Búscala por número, nombre o QR a la izquierda, o elige una de la lista.');
     const panel = h('div', { class: 'prog-detalle' }, empty);
     const status = h('div', { class: 'prog-resultado', role: 'status', 'aria-live': 'polite' });
+    // v1.3.73: semáforo de estado de programación junto al detalle de la tarjeta
+    const luzTxt = h('span', { class: 'prog-luz-txt', 'aria-live': 'polite' });
+    const estadoBox = h('div', { class: 'prog-estado' }, h('span', { class: 'prog-luz', 'aria-hidden': 'true' }), luzTxt);
+    function setLuz(k) { estadoBox.dataset.s = k; luzTxt.textContent = { ok: 'Programada', warn: 'Programando…', bad: 'Sin programar', err: 'Error al programar' }[k]; }
     const station = h('select', { class: 'input', id: ID + '-est' });
+    const SKEY = 'tqt.station.stm32';
+    const getSaved = () => { try { return localStorage.getItem(SKEY) || ''; } catch (e) { return ''; } };
+    const setSaved = id => { try { if (id) localStorage.setItem(SKEY, id); else localStorage.removeItem(SKEY); } catch (e) { /* sin storage */ } };
+    let changing = false;
+    const sessionTxt = h('span', { class: 'prog-sesion-txt' });
+    const sessionBox = h('div', { class: 'row wrap prog-sesion', hidden: true },
+        sessionTxt, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => { changing = true; renderStation(); } }, 'Cambiar dispositivo'));
+    const btnChange = sessionBox.lastElementChild;
+    function renderStation() {
+        const opt = station.selectedOptions[0];
+        const has = !!station.value && !changing;
+        sessionBox.hidden = !has;
+        stationPick.hidden = has;
+        if (has) sessionTxt.textContent = 'Dispositivo de esta PC: ' + (opt?.dataset.name || opt?.textContent || '') + ' · ' + (opt?.dataset.online === 'true' ? 'conectado' : 'desconectado');
+    }
     const stationName = h('input', { class: 'input', value: 'PC de programación', id: ID + '-est-nombre', maxlength: 60 });
     const btnProgram = h('button', { class: 'btn btn-primary', type: 'button', disabled: true, onclick: program }, 'Programar STM32 con J-Link');
     const btnCancel = h('button', { class: 'btn', type: 'button', disabled: true, onclick: cancelStation }, 'Detener y cancelar programación');
@@ -65,9 +84,16 @@ window.TQTSTM32 = function (host, ctx) {
         } catch (e) { message(e.message, true); }
         finally { if (!opened) { uploadOpen = false; enable(); } }
     });
+    const stationPick = h('div', null, station,
+        h('div', { class: 'row wrap' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: stations }, 'Actualizar estaciones')));
     const lookup = h('button', { class: 'btn', type: 'button', onclick: () => scan(search.value) }, 'Buscar / cargar QR');
     const bundleBtn = h('button', { class: 'btn', type: 'button', onclick: async () => {
-        try { await download('/api/stm32/stations/installer', { name: stationName.value.trim() }); await stations(); }
+        try {
+            const fn = await download('/api/stm32/stations/installer', { name: stationName.value.trim() });
+            const m = /^(?:Instalar|Agente)_TQT_(.+)\.(?:cmd|zip)$/i.exec(fn || '');
+            if (m) { setSaved(m[1]); changing = false; }
+            await stations();
+        }
         catch (e) { message(e.message, true); }
     } }, 'Instalar agente en esta laptop');
     host.append(h('div', { class: 'prog-wrap' },
@@ -76,8 +102,7 @@ window.TQTSTM32 = function (host, ctx) {
           h('div', { class: 'row wrap' }, lookup), list),
         h('div', { class: 'prog-panel prog-panel-detalle' }, panel,
           h('div', { class: 'field' }, h('label', { for: ID + '-fw' }, 'Firmware a programar'), firmwareSelect, firmwareHint),
-          h('div', { class: 'field' }, h('label', { for: ID + '-est' }, 'Estación Windows conectada al J-Link'), station,
-            h('div', { class: 'row wrap' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: stations }, 'Actualizar estaciones'))),
+          h('div', { class: 'field' }, h('label', { for: ID + '-est' }, 'Estación Windows conectada al J-Link'), sessionBox, stationPick),
           h('details', { class: 'prog-config' }, h('summary', null, 'Configurar esta computadora por primera vez'),
             h('div', { class: 'field' }, h('label', { for: ID + '-est-nombre' }, 'Nombre de estación Windows'), stationName),
             h('div', { class: 'row wrap' }, bundleBtn),
@@ -94,6 +119,7 @@ window.TQTSTM32 = function (host, ctx) {
             ['restarting', 'Reiniciando la tarjeta'],
             ['reporting', 'Guardando el resultado en la web']
         ];
+        setLuz('warn');
         const stage = job.state === 'queued' ? 'queued' : (job.payload?.progress?.stage || 'preparing');
         const index = stages.findIndex(s => s[0] === stage);
         const pct = Math.round((index + 1) / stages.length * 100);
@@ -141,17 +167,25 @@ window.TQTSTM32 = function (host, ctx) {
         const r = await api('/api/stm32/stations'); if (!alive) return;
         if (!r.ok) {
             [...station.options].forEach(o => o.dataset.online = 'false');
-            enable(); return;
+            renderStation(); enable(); return;
         }
         const selected = station.value;
-        station.replaceChildren(h('option', { value: '' }, 'Elige una estación'));
-        r.data.forEach(s => station.append(h('option', { value: s.id, dataset: { online: String(s.online) } }, s.name + (s.online ? ' · conectada' : ' · desconectada'))));
-        if (selected && [...station.options].some(o => o.value === selected)) station.value = selected;
-        else if (r.data.filter(s => s.online).length === 1) station.value = r.data.find(s => s.online).id;
+        // v1.3.75: solo las estaciones que reportan desde la misma red que este navegador (la PC local)
+        const locales = r.data.filter(s => s.local);
+        btnChange.hidden = locales.length < 2;
+        station.replaceChildren(h('option', { value: '' }, locales.length ? 'Elige una estación' : 'Ninguna estación J-Link en esta PC'));
+        locales.forEach(s => station.append(h('option', { value: s.id, dataset: { online: String(s.online), name: s.name } }, s.name + (s.online ? ' · conectada' : ' · desconectada'))));
+        const has = id => !!id && [...station.options].some(o => o.value === id);
+        const saved = getSaved();
+        if (saved && !r.data.some(s => s.id === saved)) { setSaved(''); changing = false; }
+        if (has(saved)) station.value = saved;
+        else if (has(selected)) station.value = selected;
+        else if (locales.some(s => s.online)) { station.value = locales.find(s => s.online).id; setSaved(station.value); }
+        renderStation();
         enable();
         if (!busy) await recover();
     }
-    station.addEventListener('change', () => { enable(); recover(); });
+    station.addEventListener('change', () => { if (station.value) { setSaved(station.value); changing = false; } renderStation(); enable(); recover(); });
 
     async function recover() {
         const sid = station.value;
@@ -191,7 +225,7 @@ window.TQTSTM32 = function (host, ctx) {
             if (['queued', 'running'].includes(job.state)) { progress(job); timer = setTimeout(poll, 1000); return; }
             activeJob = null; activeFirmware = null; busy = false; await stations();
             if (selectedPcb) await choose(selectedPcb, true);
-            enable();
+            enable(); setLuz(job.state === 'verified' ? 'ok' : 'err');
             message(job.state === 'verified' ? '✓ STM32 programado y verificado por lectura · FW ' + job.payload.identity.fw + ' · UID ' + job.result.uid + '. Ya puedes desconectar la placa.' : (job.result?.error || 'No se confirmó la programación. Revisa la estación y la tarjeta.'), job.state !== 'verified');
         }
         timer = setTimeout(poll, 1000);
@@ -202,7 +236,7 @@ window.TQTSTM32 = function (host, ctx) {
         const n = ++requestN; current = null; enable(); panel.replaceChildren(h('p', { class: 'hint' }, K === 'R1' ? 'Cargando R1 y su R2…' : 'Cargando R3…')); markSel();
         await loadFirmwares();
         if (!alive || n !== requestN) return { ok: false, texto: 'Selección cambiada.' };
-        const r = await api('/api/stm32/preview/' + pcb.id + (selectedFirmware ? '?firmware_id=' + encodeURIComponent(selectedFirmware) : ''));
+        const [r, fresca] = await Promise.all([api('/api/stm32/preview/' + pcb.id + (selectedFirmware ? '?firmware_id=' + encodeURIComponent(selectedFirmware) : '')), api('/api/pcb/' + pcb.id)]);
         if (!alive || n !== requestN) return { ok: false, texto: 'Selección cambiada.' };
         if (!r.ok) { panel.replaceChildren(T.banner('bad', 'alert', r.error)); return { ok: false, texto: r.error }; }
         current = r.data;
@@ -210,11 +244,12 @@ window.TQTSTM32 = function (host, ctx) {
         const filas = K === 'R1'
             ? [['Nombre R1', d.nombre], ['R2 vinculada', current.r2], ['ID R2', d.id_r], ['MAC R2', d.mac_r], ['HW', d.hw], ['Firmware', d.fw], ['CRC32', current.crc32]]
             : [['Nombre R3', d.nombre], ['HW', d.hw], ['Firmware', d.fw], ['Imagen', (current.bytes / 1024).toFixed(1) + ' KB']];
-        panel.replaceChildren(h('div', { class: 'prog-cab' }, T.tipoChip(K), h('span', { class: 'prog-nm' }, current.nombre || current.r1),
+        setLuz((fresca.ok && fresca.data ? fresca.data : pcb).firmware ? 'ok' : 'bad');
+        panel.replaceChildren(h('div', { class: 'prog-split' }, h('div', { class: 'prog-datos' }, h('div', { class: 'prog-cab' }, T.tipoChip(K), h('span', { class: 'prog-nm' }, current.nombre || current.r1),
             h('span', { class: 'dim' }, K === 'R1' ? 'R2 ' + current.r2 : (pcb.id_tarjeta_num ? 'Tarjeta #' + String(pcb.id_tarjeta_num).padStart(4, '0') : 'Suelta'))),
             h('dl', { class: 'prog-dl' }, ...filas.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
             h('p', { class: 'hint' }, 'Al pulsar Programar confirmas que esta ' + K + ' es la conectada al J-Link. La grabación empieza directamente y el resultado aparece aquí.'),
-            ...(K === 'R1' ? [h('p', { class: 'hint' }, 'Se conserva la configuración existente en EEPROM, incluido su nombre.')] : []));
+            ...(K === 'R1' ? [h('p', { class: 'hint' }, 'Se conserva la configuración existente en EEPROM, incluido su nombre.')] : [])), estadoBox));
         if (!quiet) message(K === 'R1' ? 'Datos cargados. Revisa la R1 física y la R2 asociada antes de programar.' : 'Datos cargados. Revisa la R3 física antes de programar.'); enable();
         return { ok: true, texto: K === 'R1' ? 'R1 y datos de R2 cargados para STM32.' : 'R3 cargada para STM32.' };
     }
@@ -248,13 +283,14 @@ window.TQTSTM32 = function (host, ctx) {
         const filename = /filename="([^"]+)"/.exec(resp.headers.get('Content-Disposition') || '')?.[1] || 'TQT.hex';
         const u = URL.createObjectURL(await resp.blob()), a = h('a', { href: u, download: filename });
         document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000);
+        return filename;
     }
     async function program() {
         if (!current || busy) return;
         busy = true; enable();
         progress({ state: 'queued' });
         const r = await api('/api/stm32/jobs', { method: 'POST', body: { pcb_id: current.pcb_id, station_id: station.value, hex_sha256: current.hex_sha256, firmware_id: current.firmware_id, physical_confirmed: true } });
-        if (!r.ok) { busy = false; enable(); message(r.error, true); return; }
+        if (!r.ok) { busy = false; enable(); setLuz('err'); message(r.error, true); return; }
         watchJob(r.data);
     }
     function refresh() {

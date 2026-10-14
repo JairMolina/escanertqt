@@ -433,7 +433,7 @@
                 m.host.hidden = k !== id; m.btn.classList.toggle('btn-primary', k === id); m.btn.setAttribute('aria-pressed', String(k === id));
             });
         }
-        host.prepend(h('div', { class: 'row wrap' }, MODOS.stm.btn, MODOS.esp.btn, MODOS.r3.btn));
+        host.prepend(h('div', { class: 'row wrap' }, MODOS.esp.btn, MODOS.stm.btn, MODOS.r3.btn));
         host.append(stmHost, r3Host); modo('stm');
 
         cargarPendientes(); loadFirmwares();

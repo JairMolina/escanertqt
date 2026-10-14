@@ -153,10 +153,15 @@ def station_auth(token):
     return dict(row)
 
 
-def stations():
+# v1.3.75: IP pública desde la que reporta cada agente (en memoria); sirve para mostrar solo la estación local
+STATION_IP = {}
+
+
+def stations(client_ip=None):
     init()
     with db.get_db() as c:
-        return [dict(id=r['id'], name=r['name'], online=time.time()-r['last_seen']<20)
+        return [dict(id=r['id'], name=r['name'], online=time.time()-r['last_seen']<20,
+                     local=bool(client_ip) and STATION_IP.get(r['id']) == client_ip)
                 for r in c.execute('SELECT * FROM stm32_stations ORDER BY name')]
 
 
