@@ -27,7 +27,16 @@
         class: "input",
         "aria-label": "Estación de pruebas",
       }),
-      port = h("select", { class: "input", "aria-label": "Puerto COM" });
+      port = h("select", { class: "input", "aria-label": "Puerto COM" }),
+      stationInfo = h("div", { class: "tqt-device" });
+    let changingStation = false;
+    const STKEY = "tqt.station.pruebas";
+    function savedStation() {
+      try { return localStorage.getItem(STKEY) || ""; } catch (e) { return ""; }
+    }
+    function saveStation(id) {
+      try { if (id) localStorage.setItem(STKEY, id); } catch (e) {}
+    }
     const search = h("input", {
       class: "input",
       placeholder: "Tarjeta, nombre de R1 o QR",
@@ -96,74 +105,104 @@
       status,
       h(
         "div",
-        { class: "prog-wrap" },
+        { class: "prog-wrap tqt-grid" },
         h(
-          "section",
-          { class: "prog-panel" },
-          h("h3", null, "Tarjeta e inventario"),
-          search,
+          "div",
+          { class: "tqt-col" },
           h(
-            "button",
-            { class: "btn", onclick: () => scan(search.value) },
-            "Buscar / cargar QR",
-          ),
-          cardHost,
-          h("h3", null, "Estación Windows"),
-          sel,
-          h(
-            "button",
-            { class: "btn", onclick: install },
-            "Descargar agente de pruebas",
-          ),
-          h(
-            "p",
-            { class: "hint" },
-            "Extrae el paquete privado y ejecuta iniciar.cmd una vez. Cierra el programa de escritorio si usa el mismo puerto.",
-          ),
-          h("h3", null, "Conexión serial · 57600 baudios · ACK 180 ms"),
-          port,
-          h(
-            "div",
-            { class: "row wrap" },
-            button("Detectar COM", () => cmd("ports")),
-            button("Conectar COM", () =>
-              cmd("connect_serial", { port: port.value }),
+            "section",
+            { class: "prog-panel tqt-card" },
+            h("h3", null, "Tarjeta e inventario"),
+            search,
+            h(
+              "div",
+              { class: "row wrap" },
+              h(
+                "button",
+                { class: "btn", type: "button", onclick: () => scan(search.value) },
+                "Buscar / cargar QR",
+              ),
             ),
-            button("Desconectar COM", () => cmd("disconnect_serial")),
+            cardHost,
           ),
-          h("h3", null, "Bluetooth R1 / R2"),
-          bleSelect,
           h(
-            "div",
-            { class: "row wrap" },
-            button("Buscar TQT", () => cmd("scan_ble")),
-            button("Conectar BLE", () =>
-              cmd("connect_ble", { address: bleSelect.value }),
+            "section",
+            { class: "prog-panel tqt-card" },
+            h("h3", null, "Conexión y dispositivo"),
+            stationInfo,
+            sel,
+            h(
+              "div",
+              { class: "row wrap" },
+              h(
+                "button",
+                { class: "btn", type: "button", onclick: install },
+                "Descargar agente de pruebas",
+              ),
             ),
-            button("Desconectar BLE", () => cmd("disconnect_ble")),
+            h(
+              "p",
+              { class: "hint" },
+              "Extrae el paquete privado y ejecuta iniciar.cmd una vez. Cierra el programa de escritorio si usa el mismo puerto.",
+            ),
+            h("h4", null, "Serial · 57600 baudios · ACK 180 ms"),
+            port,
+            h(
+              "div",
+              { class: "row wrap" },
+              button("Detectar COM", () => cmd("ports")),
+              button("Conectar COM", () =>
+                cmd("connect_serial", { port: port.value }),
+              ),
+              button("Desconectar COM", () => cmd("disconnect_serial")),
+            ),
+            h("h4", null, "Bluetooth R1 / R2"),
+            bleSelect,
+            h(
+              "div",
+              { class: "row wrap" },
+              button("Buscar TQT", () => cmd("scan_ble")),
+              button("Conectar BLE", () =>
+                cmd("connect_ble", { address: bleSelect.value }),
+              ),
+              button("Desconectar BLE", () => cmd("disconnect_ble")),
+            ),
           ),
-          manual,
+          h(
+            "section",
+            { class: "prog-panel tqt-card" },
+            h("h3", null, "Controles manuales"),
+            manual,
+          ),
         ),
         h(
-          "section",
-          { class: "prog-panel" },
-          h("h3", null, "Prueba automática"),
+          "div",
+          { class: "tqt-col" },
           h(
-            "label",
-            null,
-            confirm,
-            " Confirmo la tarjeta conectada y el banco libre. La secuencia restablece ajustes y mueve el perno.",
+            "section",
+            { class: "prog-panel tqt-card" },
+            h("h3", null, "Prueba automática"),
+            h(
+              "label",
+              { class: "tqt-confirm" },
+              confirm,
+              " Confirmo la tarjeta conectada y el banco libre. La secuencia restablece ajustes y mueve el perno.",
+            ),
+            h("div", { class: "row wrap" }, start, stop),
+            progress,
+            steps,
           ),
-          h("div", { class: "row wrap" }, start, stop),
-          progress,
-          steps,
-          h("h3", null, "Sensores y estados S29"),
-          sensors,
+          h(
+            "section",
+            { class: "prog-panel tqt-card" },
+            h("h3", null, "Sensores y estados S29"),
+            sensors,
+          ),
         ),
       ),
       h(
         "section",
-        { class: "prog-panel" },
+        { class: "prog-panel tqt-card" },
         h("h3", null, "Historial de esta tarjeta"),
         historyHost,
       ),
@@ -241,16 +280,54 @@
           ),
         ),
       );
+      const saved = savedStation();
+      let known = true;
       if (list.some((s) => s.id === stationId)) sel.value = stationId;
-      else if (list.filter((s) => s.online).length === 1)
+      else if (list.some((s) => s.id === saved)) sel.value = saved;
+      else if (list.filter((s) => s.online).length === 1) {
         sel.value = list.find((s) => s.online).id;
+        saveStation(sel.value);
+      } else known = false;
       stationId = sel.value;
+      const cur = list.find((s) => s.id === stationId);
+      const compact = known && !!cur && !changingStation;
+      sel.hidden = compact;
+      stationInfo.replaceChildren(
+        ...(cur
+          ? [
+              h(
+                "p",
+                { class: "tqt-device-name" },
+                "Dispositivo de esta PC: " + cur.name + (cur.online ? " · conectado" : " · desconectado"),
+              ),
+              ...(compact
+                ? [
+                    h(
+                      "button",
+                      {
+                        class: "btn btn-sm tqt-change",
+                        type: "button",
+                        onclick: () => {
+                          changingStation = true;
+                          sel.hidden = false;
+                          stationInfo.querySelector(".tqt-change")?.remove();
+                          sel.focus();
+                        },
+                      },
+                      "Cambiar dispositivo",
+                    ),
+                  ]
+                : []),
+            ]
+          : []),
+      );
       const s = list.find((s) => s.id === stationId);
       if (s?.fields) paintSensors(s.fields);
       start.disabled = !!active || !s?.online || !s.serial_connected || !card;
     }
     sel.addEventListener("change", () => {
       stationId = sel.value;
+      saveStation(stationId);
     });
     function paintSensors(fields) {
       const labels = {
@@ -633,6 +710,10 @@
           body: JSON.stringify({ name: "Banco TQT Windows" }),
         });
         if (!response.ok) throw Error("No se pudo descargar el agente.");
+        try {
+          const m = /filename="?TQT_Pruebas_([^".]+)\.zip/.exec(response.headers.get("Content-Disposition") || "");
+          if (m) { saveStation(m[1]); stationId = m[1]; }
+        } catch (e) {}
         const url = URL.createObjectURL(await response.blob());
         const a = h("a", { href: url, download: "TQT_Pruebas_Windows.zip" });
         document.body.append(a);

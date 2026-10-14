@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.74 — 2026-10-14
+- **Pruebas TQT:** rediseño de la sección en tarjetas (Tarjeta e inventario · Conexión y dispositivo · Controles manuales · Prueba automática · Sensores S29 · Historial), dos columnas que se apilan en <900px, botones espaciados de 40px y sin desbordes de 375px a escritorio.
+- **Dispositivo de esta PC:** Programación STM32 (R1/R3) y Pruebas TQT recuerdan en cada navegador su propia estación (al descargar el instalador, al elegirla o si es la única conectada) y muestran solo «Dispositivo de esta PC» con opción «Cambiar dispositivo».
+
 ## v1.3.73 — 2026-10-14
 - **Programación:** botones en orden R2 · ESP32 → R1 → R3.
 - **Programación STM32 R1/R3:** el detalle de la tarjeta se divide en datos + semáforo de estado (rojo «Sin programar»/«Error al programar», amarillo «Programando…», verde «Programada») que se actualiza en vivo y relee el estado real de la placa.

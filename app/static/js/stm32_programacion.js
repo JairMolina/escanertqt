@@ -19,6 +19,20 @@ window.TQTSTM32 = function (host, ctx) {
     const estadoBox = h('div', { class: 'prog-estado' }, h('span', { class: 'prog-luz', 'aria-hidden': 'true' }), luzTxt);
     function setLuz(k) { estadoBox.dataset.s = k; luzTxt.textContent = { ok: 'Programada', warn: 'Programando…', bad: 'Sin programar', err: 'Error al programar' }[k]; }
     const station = h('select', { class: 'input', id: ID + '-est' });
+    const SKEY = 'tqt.station.stm32';
+    const getSaved = () => { try { return localStorage.getItem(SKEY) || ''; } catch (e) { return ''; } };
+    const setSaved = id => { try { if (id) localStorage.setItem(SKEY, id); else localStorage.removeItem(SKEY); } catch (e) { /* sin storage */ } };
+    let changing = false;
+    const sessionTxt = h('span', { class: 'prog-sesion-txt' });
+    const sessionBox = h('div', { class: 'row wrap prog-sesion', hidden: true },
+        sessionTxt, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => { changing = true; renderStation(); } }, 'Cambiar dispositivo'));
+    function renderStation() {
+        const opt = station.selectedOptions[0];
+        const has = !!station.value && !changing;
+        sessionBox.hidden = !has;
+        stationPick.hidden = has;
+        if (has) sessionTxt.textContent = 'Dispositivo de esta PC: ' + (opt?.dataset.name || opt?.textContent || '') + ' · ' + (opt?.dataset.online === 'true' ? 'conectado' : 'desconectado');
+    }
     const stationName = h('input', { class: 'input', value: 'PC de programación', id: ID + '-est-nombre', maxlength: 60 });
     const btnProgram = h('button', { class: 'btn btn-primary', type: 'button', disabled: true, onclick: program }, 'Programar STM32 con J-Link');
     const btnCancel = h('button', { class: 'btn', type: 'button', disabled: true, onclick: cancelStation }, 'Detener y cancelar programación');
@@ -69,9 +83,16 @@ window.TQTSTM32 = function (host, ctx) {
         } catch (e) { message(e.message, true); }
         finally { if (!opened) { uploadOpen = false; enable(); } }
     });
+    const stationPick = h('div', null, station,
+        h('div', { class: 'row wrap' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: stations }, 'Actualizar estaciones')));
     const lookup = h('button', { class: 'btn', type: 'button', onclick: () => scan(search.value) }, 'Buscar / cargar QR');
     const bundleBtn = h('button', { class: 'btn', type: 'button', onclick: async () => {
-        try { await download('/api/stm32/stations/installer', { name: stationName.value.trim() }); await stations(); }
+        try {
+            const fn = await download('/api/stm32/stations/installer', { name: stationName.value.trim() });
+            const m = /^(?:Instalar|Agente)_TQT_(.+)\.(?:cmd|zip)$/i.exec(fn || '');
+            if (m) { setSaved(m[1]); changing = false; }
+            await stations();
+        }
         catch (e) { message(e.message, true); }
     } }, 'Instalar agente en esta laptop');
     host.append(h('div', { class: 'prog-wrap' },
@@ -80,8 +101,7 @@ window.TQTSTM32 = function (host, ctx) {
           h('div', { class: 'row wrap' }, lookup), list),
         h('div', { class: 'prog-panel prog-panel-detalle' }, panel,
           h('div', { class: 'field' }, h('label', { for: ID + '-fw' }, 'Firmware a programar'), firmwareSelect, firmwareHint),
-          h('div', { class: 'field' }, h('label', { for: ID + '-est' }, 'Estación Windows conectada al J-Link'), station,
-            h('div', { class: 'row wrap' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: stations }, 'Actualizar estaciones'))),
+          h('div', { class: 'field' }, h('label', { for: ID + '-est' }, 'Estación Windows conectada al J-Link'), sessionBox, stationPick),
           h('details', { class: 'prog-config' }, h('summary', null, 'Configurar esta computadora por primera vez'),
             h('div', { class: 'field' }, h('label', { for: ID + '-est-nombre' }, 'Nombre de estación Windows'), stationName),
             h('div', { class: 'row wrap' }, bundleBtn),
@@ -146,17 +166,22 @@ window.TQTSTM32 = function (host, ctx) {
         const r = await api('/api/stm32/stations'); if (!alive) return;
         if (!r.ok) {
             [...station.options].forEach(o => o.dataset.online = 'false');
-            enable(); return;
+            renderStation(); enable(); return;
         }
         const selected = station.value;
         station.replaceChildren(h('option', { value: '' }, 'Elige una estación'));
-        r.data.forEach(s => station.append(h('option', { value: s.id, dataset: { online: String(s.online) } }, s.name + (s.online ? ' · conectada' : ' · desconectada'))));
-        if (selected && [...station.options].some(o => o.value === selected)) station.value = selected;
-        else if (r.data.filter(s => s.online).length === 1) station.value = r.data.find(s => s.online).id;
+        r.data.forEach(s => station.append(h('option', { value: s.id, dataset: { online: String(s.online), name: s.name } }, s.name + (s.online ? ' · conectada' : ' · desconectada'))));
+        const has = id => !!id && [...station.options].some(o => o.value === id);
+        const saved = getSaved();
+        if (saved && !has(saved)) { setSaved(''); changing = false; }
+        if (has(saved)) station.value = saved;
+        else if (has(selected)) station.value = selected;
+        else if (r.data.filter(s => s.online).length === 1) { station.value = r.data.find(s => s.online).id; setSaved(station.value); }
+        renderStation();
         enable();
         if (!busy) await recover();
     }
-    station.addEventListener('change', () => { enable(); recover(); });
+    station.addEventListener('change', () => { if (station.value) { setSaved(station.value); changing = false; } renderStation(); enable(); recover(); });
 
     async function recover() {
         const sid = station.value;
@@ -254,6 +279,7 @@ window.TQTSTM32 = function (host, ctx) {
         const filename = /filename="([^"]+)"/.exec(resp.headers.get('Content-Disposition') || '')?.[1] || 'TQT.hex';
         const u = URL.createObjectURL(await resp.blob()), a = h('a', { href: u, download: filename });
         document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000);
+        return filename;
     }
     async function program() {
         if (!current || busy) return;

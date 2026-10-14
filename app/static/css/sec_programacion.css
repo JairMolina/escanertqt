@@ -72,3 +72,6 @@
 @media (prefers-reduced-motion:no-preference){.prog-estado[data-s="warn"] .prog-luz{animation:prog-pulso 1s ease-in-out infinite alternate}}
 @keyframes prog-pulso{to{opacity:.45}}
 @media (max-width:599px){.prog-split{grid-template-columns:1fr}}
+
+.prog-sesion { align-items: center; gap: 8px; }
+.prog-sesion[hidden], .prog-sesion + div[hidden] { display: none; }
