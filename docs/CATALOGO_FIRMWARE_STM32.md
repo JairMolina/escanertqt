@@ -24,3 +24,7 @@ Validación: ASCII y límite 4 MB; registros Intel HEX y checksum; ausencia de s
 - Revisiones ECC backend y seguridad aplicadas a estados, persistencia y entradas externas, con comprobaciones ejecutables de los límites de confianza. No se introdujeron procesos ni memoria ECC.
 
 La prueba confirma el formato y el flujo de almacenamiento/selección; el funcionamiento físico de cada firmware sigue dependiendo de su prueba en la tarjeta correspondiente.
+
+## Despliegue verificado
+
+Aplicación 1.3.72 en inventariotqt.site, commit cdad30fa90f61b5a471cff394ff42f7c1bacb047. Respaldo previo de código y SQLite: /home/orangepi/escanertqt/servidor/data/respaldos/pre-tqt-1372-20261014T002844Z. Integridad verificada, contenedor saludable y API pública ok; inventario conserva 100 tarjetas y 300 PCB. Se reinició únicamente la web, sin cambiar Compose ni Cloudflare. Catálogo de producción al cierre: R1 4.3 y R3 1.0. No se cargó el HEX V1.1 de prueba.

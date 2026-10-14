@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-13 23:39 UTC
-Commit de referencia: `4c9b4c14c8d3` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-14 00:31 UTC
+Commit de referencia: `cdad30fa90f6` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-v1.3.71 desplegada: boton Detener y cancelar programacion STM32, recuperacion del trabajo al recargar y correccion del agente R3. Trabajo pendiente de R3 0039 cancelado sin grabacion; estacion Lap Leo 13-10-2026 online con agente actualizado. Commit aplicacion 4c9b4c1.
+v1.3.72 desplegada: catalogo persistente HEX R1/R3, selector del firmware compatible mas reciente y trabajos fijados a la version elegida. Commit aplicacion cdad30f; produccion saludable y catalogo solo R1 4.3 / R3 1.0. V1.1 aportado usado solo para validar y cancelado antes de guardarlo.
 
 ## Siguiente paso
-Recargar web con Ctrl+F5 y usar estacion Lap Leo 13-10-2026. Otras laptops requieren agente actualizado para detener J-Link activo; no se ejecutaron nuevas grabaciones fisicas.
+Recargar la web y usar Subir HEX > confirmar HW/FW > Guardar firmware. El usuario elegira que archivos registrar; no cargar automaticamente el V1.1 aportado para prueba.
 
 ## Evidencia
-29 pruebas STM32 y 11 TQT correctas; Playwright comprobo boton y cancelacion en Docker local. Produccion healthy, API ok, SQLite ok, cero trabajos activos. Respaldo pre-tqt-1371-20261013T233704Z. ECC backend para estados y persistencia.
+37 casos STM32/catalogo y 11 TQT correctos. Playwright valido selector, formulario, cancelacion de prueba V1.1, duplicado, persistencia tras recrear Docker y movil 390 px sin desborde. Respaldo pre-tqt-1372-20261014T002844Z, SQLite ok, 100 tarjetas y 300 PCB. ECC backend y seguridad.
