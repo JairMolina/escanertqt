@@ -122,9 +122,23 @@ cola nunca mayor de ocho; 69/9 lecturas para el fixture de 8.197 bytes.
 escritorio1366/móvil390 sin desborde después de estabilizar el diseño.
 node --check y git diff --check correctos. Datos y Bluetooth simulados aislados.
 
-La 1.3.78 todavía no está desplegada. Antes de aplicarla, el usuario debe
-detener el envío actual desde su navegador o esperar su conclusión, y autorizar
-el despliegue según AGENTS.md. Producción continúa con web1.3.77.
+Web1.3.78 desplegada con autorización expresa después de que el usuario detuvo
+el envío. El servidor confirmó el job anterior en cancelled y cero trabajos
+STM32/Pruebas/OTA activos. Commit de aplicación
+`738379fd7063f1e17dc735919ca223805c1c3447`, rama codex/esp32-r2-ble-ota,
+fast-forward desde927b965. Solo tqt recreado; Compose/cloudflared intactos.
+Contenedor healthy; API local/pública HTTPS2001.3.78 y JS/CSS cache1378.
+Código de transporte y etiquetas de progreso/ETA verificados públicamente.
+
+Respaldo consistente previo `pre-r2-ota-1378-20261014T215048Z.db`, SHA256
+`ff01551b31b8c8ac66ad48bc66d99e4dec3648d1a5d099bfd264659220d90418`.
+Integridad SQLite ok y huellas idénticas antes/después de 100 tarjetas,300PCB,
+7 usuarios,2 firmwares,1 credencial y1job. R2 0069 sigueFW4.1 y eligible=true.
+
+Pendiente: el usuario recibió instrucciones de Ctrl+F5 y nueva OTA0069/FW4.1,
+con R1 desconectada y alimentación normal. Recoger porcentaje,KB/s,ETA a los
+10–15segundos y contrastar chunk_bytes/estado en servidor. El trabajo nuevo
+no se inicia desde el servidor; aún no hay resultado OTA físico verificado.
 
 Capacidades utilizadas: CM continuidad/checkpoint/Git/memoria; ECC HW/FW y
 C++ para protocolo y restricciones del SDK, seguridad para identidad/credencial
