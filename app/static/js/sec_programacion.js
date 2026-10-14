@@ -33,7 +33,7 @@
     function montar(host, ctx) {
         const { T, api, h, icon, toast, util } = ctx;
 
-        const S = { vivo: true, pendientes: [], filtro: '', tarjeta: null, busy: false, puertos: [], puertoSel: null, completed: null };
+        const S = { vivo: true, pendientes: [], filtro: '', tarjeta: null, busy: false, puertos: [], puertoSel: null, completed: null, capability: null, otaCommitting: false };
         const timers = new Set();
         const unsubs = [];
 
@@ -52,7 +52,7 @@
         buscar.addEventListener('input', (e) => { S.filtro = e.target.value; pintarLista(); });
 
         async function cargarPendientes() {
-            const r = await api('/api/pcb?sin_mac=1&limit=500');
+            const r = await api('/api/pcb?tipo=R2&limit=500');
             if (!S.vivo) return;
             if (!r.ok) { lista.replaceChildren(T.banner('bad', 'alert', r.network ? 'Sin conexión con el servidor.' : `No se pudo cargar: ${r.error}`)); return; }
             S.pendientes = ((r.data && r.data.items) || []).filter((p) => p.tipo === 'R2');   // v1.3.55: este modo es el de R2; la R1 llega con «Programar ESP32 R1»
@@ -68,7 +68,7 @@
             const items = filtradas();
             lista.replaceChildren();
             lista.classList.toggle('is-busy', S.busy);
-            if (!items.length) { lista.appendChild(T.empty('search', S.pendientes.length ? 'Ninguna coincide con la búsqueda' : 'No hay R1 ni R2 pendientes de MAC', '')); return; }
+            if (!items.length) { lista.appendChild(T.empty('search', S.pendientes.length ? 'Ninguna coincide con la búsqueda' : 'No hay R2 registradas', '')); return; }
             items.forEach((p) => {
                 const b = h('button', {
                     class: 'prog-item', type: 'button', disabled: S.busy, 'aria-pressed': String(S.tarjeta && S.tarjeta.id === p.id),
@@ -140,28 +140,54 @@
         const barra = h('div', { class: 'prog-bar' }, relleno);
         const resultado = h('div', { class: 'prog-resultado', hidden: true, role: 'status' });
         const btnFlash = h('button', { class: 'btn btn-primary', type: 'button' }, icon('flash'), 'Compilar y flashear');
+        let otaController = null;
+        const btnOta = h('button', { class: 'btn btn-primary', type: 'button', onclick: () => ejecutarOta(false) }, 'Actualizar por Bluetooth');
+        const btnOtaVerify = h('button', { class: 'btn', type: 'button', onclick: () => ejecutarOta(true) }, 'Verificar OTA pendiente');
+        const btnOtaDiscard = h('button', { class: 'btn btn-ghost', type: 'button', onclick: async () => {
+            try { await window.TQTR2OTA.discard(api); enableFirmware(); } catch (e) { escribir('✗ ' + e.message); }
+        } }, 'Descartar pendiente');
+        const btnOtaCancel = h('button', { class: 'btn', type: 'button', onclick: () => otaController?.abort() }, 'Detener actualización Bluetooth');
+        const otaHint = h('p', { class: 'hint', 'aria-live': 'polite' });
+        const otaPanel = h('div', { class: 'field' }, h('h3', null, 'Actualización por Bluetooth'), otaHint,
+            h('div', { class: 'row wrap' }, btnOta, btnOtaVerify, btnOtaDiscard, btnOtaCancel));
 
         function enableFirmware() {
             const blocked = S.busy || uploadBusy || firmwareLoading;
             firmwareSelect.disabled = blocked || !firmwareSelect.options.length;
             uploadBtn.disabled = blocked;
             btnFlash.disabled = blocked || !S.tarjeta || S.completed === S.tarjeta.id || (S.tarjeta?.tipo === 'R2' && !firmwareSelect.value);
-            btnFlash.textContent = S.tarjeta?.tipo === 'R1' ? 'Compilar y flashear' : 'Programar R2';
+            btnFlash.textContent = S.tarjeta?.tipo === 'R1' ? 'Compilar y flashear' : 'Instalar por serial';
+            const saved = window.TQTR2OTA?.pending();
+            const ownPending = saved?.pcb_id === S.tarjeta?.id;
+            const selectedOta = firmwareSelect.selectedOptions[0]?.dataset.ota === '1';
+            btnOta.disabled = blocked || !S.capability?.eligible || !selectedOta || Boolean(saved) || !navigator.bluetooth;
+            btnOtaVerify.hidden = !ownPending; btnOtaDiscard.hidden = !saved;
+            btnOtaVerify.disabled = btnOtaDiscard.disabled = blocked;
+            btnOtaCancel.hidden = !otaController; btnOtaCancel.disabled = S.otaCommitting;
+            otaPanel.hidden = S.tarjeta?.tipo === 'R1';
+            otaHint.textContent = ownPending ? 'Hay una actualización pendiente de comprobar. Conecta la R2 encendida para verificarla.' :
+                saved ? 'Verifica o descarta la OTA pendiente de ' + (saved.nombre || 'otra R2') + ' antes de iniciar otra.' :
+                S.capability?.eligible ? 'FW ' + S.capability.current_fw + ': admite OTA. Mantén alimentación estable y libera la conexión Bluetooth de la R1 durante la actualización.' :
+                'Primera instalación: instala FW 4.1 o superior por serial desde esta web. Después podrás actualizar por Bluetooth.';
         }
         async function loadFirmwares(reset = false) {
             const n = ++firmwareRequest;
             firmwareLoading = true; enableFirmware();
             const selected = firmwareSelect.value;
             const hw = S.tarjeta?.tipo === 'R2' ? S.tarjeta.version : '';
-            const r = await api('/api/esp32/firmwares?hw=' + encodeURIComponent(hw));
+            const [r, capability] = await Promise.all([
+                api('/api/esp32/firmwares?hw=' + encodeURIComponent(hw)),
+                S.tarjeta?.tipo === 'R2' ? api('/api/esp32/ota/capability/' + S.tarjeta.id) : Promise.resolve(null)
+            ]);
             if (!S.vivo || n !== firmwareRequest) return;
             firmwareLoading = false;
+            S.capability = capability?.ok ? capability.data : null;
             if (!r.ok) {
                 firmwareSelect.replaceChildren(); firmwareHint.textContent = r.error;
                 enableFirmware(); return;
             }
-            firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id },
-                `FW ${f.fw} · HW ${f.hw}` + (f.id === r.data.default_id ? ' · más reciente' : ''))));
+            firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id, dataset: { ota: String(f.ota_protocol || 0) } },
+                `FW ${f.fw} · HW ${f.hw}` + (f.ota_protocol ? ' · OTA' : '') + (f.id === r.data.default_id ? ' · más reciente' : ''))));
             firmwareSelect.value = !reset && r.data.items.some(f => f.id === selected) ? selected : (r.data.default_id || '');
             firmwareHint.textContent = r.data.items.length ? 'El nombre se toma de la R2 elegida; HW y FW se leen del archivo. Puedes elegir una versión anterior.' : 'No hay firmware compatible con el hardware de esta R2.';
             enableFirmware();
@@ -186,7 +212,7 @@
                 await new Promise(resolve => {
                     const modal = T.sheet({ title: 'Guardar firmware R2',
                     body: h('div', null, h('p', null, `${file.name} · FW ${d.fw} · HW ${d.hw}`),
-                        h('p', { class: 'hint' }, 'El archivo se guardará sin identidad de unidad. Al programar se colocará el nombre de la R2 del inventario.'),
+                        h('p', { class: 'hint' }, 'El archivo se guardará sin identidad ni credenciales de unidad. Al instalar se colocarán los datos de la R2 del inventario.'),
                         h('p', { class: 'hint' }, 'Módulo: ' + d.module), error),
                     onClose: resolve,
                     actions: [{ label: 'Guardar firmware', kind: 'primary', onClick: async () => {
@@ -215,6 +241,7 @@
             } catch (e) { toast(e.message, { kind: 'bad' }); }
             finally { uploadBusy = false; if (S.vivo) enableFirmware(); }
         });
+        firmwareSelect.addEventListener('change', enableFirmware);
         async function compilarFirmware(pcb) {
             const r2 = pcb.tipo === 'R2';
             const resp = await fetch(r2 ? `/api/esp32/bin/${pcb.id}?firmware_id=${encodeURIComponent(firmwareSelect.value)}` : '/api/firmware/compilar',
@@ -225,12 +252,12 @@
                 throw new Error('No se pudo preparar el firmware: ' + msg);
             }
             const hd = k => resp.headers.get('X-TQT-' + k) || '';
-            return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), hardware: hd('Hardware'), firmwareId: hd('Firmware-Id'), sha: hd('Sha256') || hd('Fuente-Sha256') };
+            return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), hardware: hd('Hardware'), firmwareId: hd('Firmware-Id'), sha: hd('Sha256') || hd('Fuente-Sha256'), otaProtocol: Number(hd('OTA-Protocol') || 0), keyId: hd('Key-Id') };
         }
         async function leerMacPorSerial(port, requireProfile = false) {
             try { if (port.readable || port.writable) await port.close(); } catch (e) { /* ya estaba cerrado */ }
             await port.open({ baudRate: 115200 });
-            let mac = null, nombre = null, hardware = null, firmware = null, retry = null;
+            let mac = null, nombre = null, hardware = null, firmware = null, retry = null, otaProtocol = 0, keyId = '';
             try {
                 await new Promise((res) => setTimeout(res, 300));
                 const ask = async () => {
@@ -258,7 +285,7 @@
                             if (requireProfile) {
                                 if (!linea.startsWith('TQT_INFO ')) continue;
                                 try { const info = JSON.parse(linea.slice(9));
-                                    mac = extraerMac(info.mac || ''); nombre = info.nombre; hardware = info.hw; firmware = info.fw;
+                                    mac = extraerMac(info.mac || ''); nombre = info.nombre; hardware = info.hw; firmware = info.fw; otaProtocol = info.ota_protocol || 0; keyId = info.key_id || '';
                                 } catch (e) { continue; }
                                 if (mac) break;
                                 continue;
@@ -274,7 +301,7 @@
                 clearInterval(retry);
                 try { await port.close(); } catch (e) { /* nada */ }
             }
-            return { mac, nombre, hardware, firmware };
+            return { mac, nombre, hardware, firmware, otaProtocol, keyId };
         }
         /** Hoja de confirmación dentro del flujo (sin confirm()): resuelve true al continuar, false al cancelar. */
         function confirmar(titulo, texto, ok) {
@@ -355,17 +382,19 @@
                 if (!mac) throw new Error('No se detectó la MAC por USB (sin comunicación). Revisa que soltaste BOOT y reiniciaste; puedes teclearla en «MAC y firmware».');
                 if (esR2 && fw.nombreBle && leido.nombre !== fw.nombreBle) throw new Error(`Identidad incorrecta: la placa respondió «${leido.nombre || 'sin nombre'}» y se esperaba «${fw.nombreBle}». No se guardó la MAC.`);
                 if (esR2 && (leido.hardware !== fw.hardware || leido.firmware !== fw.firmware)) throw new Error('La versión HW/FW que responde la R2 no coincide con el archivo. No se guardó el resultado.');
+                if (esR2 && fw.otaProtocol && (leido.otaProtocol !== fw.otaProtocol || leido.keyId !== fw.keyId)) throw new Error('La R2 no confirmó su credencial OTA. No se guardó el resultado.');
                 if (pcb.mac && pcb.mac.toUpperCase() !== mac && !await confirmar('MAC diferente', `${pcb.nombre} ya tiene la MAC ${pcb.mac} y la placa respondió ${mac}. ¿Reemplazarla? Hazlo solo si confirmaste que es la misma placa física.`, 'Reemplazar MAC')) throw new Error('MAC en conflicto: no se cambió el registro.');
                 marcarPaso('mac', 'ok');
                 escribir('MAC leída: ' + mac + (leido.nombre ? ' · nombre ' + leido.nombre : ''));
 
-                const cuerpo = { mac }; if (esR2 && fw.firmware) Object.assign(cuerpo, { firmware: fw.firmware, firmware_id: fw.firmwareId, nombre_verificado: leido.nombre, hardware_verificado: leido.hardware });   // R1: aquí no se elige versión
+                const cuerpo = { mac }; if (esR2 && fw.firmware) Object.assign(cuerpo, { firmware: fw.firmware, firmware_id: fw.firmwareId, nombre_verificado: leido.nombre, hardware_verificado: leido.hardware, ota_protocol_verificado: leido.otaProtocol, key_id_verificado: leido.keyId });   // R1: aquí no se elige versión
                 const res = await api(`/api/pcb/${pcb.id}/programacion`, { method: 'PUT', body: cuerpo });
                 if (!res.ok) throw new Error(res.network ? 'Sin conexión con el servidor: no se guardó.' : res.error);
                 escribir('Guardado ✓');
                 toast(`${pcb.nombre}: MAC ${mac} guardada`, { kind: 'ok' });
-                mostrarResultado(pcb, mac, fw);
-                S.pendientes = S.pendientes.filter((p) => p.id !== pcb.id);
+                S.tarjeta = Object.assign({}, pcb, res.data);
+                mostrarResultado(S.tarjeta, mac, fw);
+                await loadFirmwares();
             } catch (e) {
                 marcarActivoComoError();
                 escribir('✗ ' + (e && e.message ? e.message : String(e)));
@@ -377,6 +406,24 @@
             }
         }
         btnFlash.addEventListener('click', ejecutar);
+        async function ejecutarOta(recovery) {
+            if (!S.tarjeta || S.busy || uploadBusy || firmwareLoading || !window.TQTR2OTA) return;
+            const pcb = S.tarjeta, firmwareId = firmwareSelect.value;
+            otaController = new AbortController(); S.busy = true; S.completed = null;
+            resultado.hidden = true; log.textContent = ''; relleno.style.width = '0';
+            enableFirmware(); pintarLista(); pintarPuertos(); resetPasos();
+            try {
+                const result = await window.TQTR2OTA.execute({ pcb, firmwareId, api,
+                    signal: otaController.signal, stage: text => escribir(text + '…'),
+                    progress: (done, total) => { relleno.style.width = Math.round(done / total * 100) + '%'; },
+                    committing: value => { S.otaCommitting = value; enableFirmware(); } }, recovery);
+                S.tarjeta = result.pcb;
+                escribir('OTA verificada ✓ · FW ' + result.fw);
+                mostrarResultado(S.tarjeta, S.tarjeta.mac, { firmware: result.fw, hardware: S.tarjeta.version, nombreBle: S.tarjeta.nombre.replace(/-/g, '_') });
+                toast('R2 actualizada y verificada por Bluetooth', { kind: 'ok' });
+            } catch (e) { escribir('✗ ' + e.message); }
+            finally { S.busy = false; otaController = null; S.otaCommitting = false; await loadFirmwares(); enableFirmware(); pintarLista(); pintarPuertos(); }
+        }
 
         // ------------------------------------------------------------ panel de detalle
         const cabecera = h('div', { class: 'prog-cab' });
@@ -385,12 +432,12 @@
             h('div', { class: 'field' }, h('label', null, 'Puerto de la tarjeta'), puertosWrap,
                 h('div', { class: 'hint' }, 'Solo se listan aquí los puertos que ya autorizaste antes. «Elegir puerto» abre la lista real de puertos COM de Windows (el navegador la pide una vez por puerto; luego queda recordado).')),
             h('div', { class: 'hint' }, 'Antes de sincronizar, pon la tarjeta en modo programador; el registro avisa si no avanza.'),
-            log, barra, h('div', { class: 'row' }, btnFlash), resultado);
+            log, barra, h('div', { class: 'row' }, btnFlash), otaPanel, resultado);
         const vacio = T.empty('flash', 'Elige una tarjeta', 'Búscala por número o nombre a la izquierda, o elige una de la lista.');
 
         function seleccionar(p) {
             if (S.busy || uploadBusy) return;
-            S.tarjeta = p;
+            S.tarjeta = p; S.capability = null;
             S.completed = null;
             loadFirmwares(true);
             pintarDetalle();
@@ -450,6 +497,7 @@
             escaneo(codigo) { if (actual === 'r3') return stm3.escaneo(codigo); modo('stm'); return stm.escaneo(codigo); },
             desmontar() {
                 S.vivo = false;
+                if (!S.otaCommitting) otaController?.abort();
                 stm.desmontar(); stm3.desmontar();
                 timers.forEach((t) => clearTimeout(t)); timers.clear();
                 unsubs.forEach((u) => { try { u(); } catch (e) { /* nada */ } });

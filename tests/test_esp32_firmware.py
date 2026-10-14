@@ -149,7 +149,7 @@ class Esp32FirmwareTests(unittest.TestCase):
         with self.assertRaises(ValueError): f.prepare(self.card['r2']['id'],saved['id'])
 
     def test_result_requires_actual_matching_name_hw_fw(self):
-        meta,_=f.prepare(self.card['r2']['id'])
+        meta,_=f.prepare(self.card['r2']['id'],'base-R2-v4')
         for name,hw,fw in [(meta['nombre'],'3.0','9.0'),('TQT_R2_V30_0000','3.0','4.0'),(meta['nombre'],'3.1','4.0')]:
             with self.assertRaises(ValueError): f.result(self.card['r2']['id'],iso.mac_unica(),meta['firmware_id'],name,hw,fw,self.operator)
         self.assertIsNone(inv.get_pcb(self.card['r2']['id'])['mac'])

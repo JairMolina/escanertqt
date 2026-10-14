@@ -18,7 +18,9 @@ FLASH_SIZE = 4 * 1024 * 1024
 MAX_UPLOAD = 12 * 1024 * 1024
 MAGIC = b'TQT_R2_CFG_V1' + bytes(3)
 PROFILE = struct.Struct('<16sI8s16s24s24s')
+PROFILE_V2 = struct.Struct('<16sI8s16s24s24sI32s')
 NAME_OFFSET = 44
+KEY_OFFSET = 96
 
 
 def hex_image(raw):
@@ -176,7 +178,7 @@ def inspect(raw):
     pos = positions[0]
     _, schema, hw, fw, name, module = PROFILE.unpack_from(raw, pos)
     hw, fw, name, module = map(field, (hw, fw, name, module))
-    if schema != 1 or module != 'ESP32-WROOM-32E-N4':
+    if schema not in (1,2) or module != 'ESP32-WROOM-32E-N4':
         raise ValueError('Esquema o módulo ESP32 no soportado.')
     if not re.fullmatch(r'\d+(?:\.\d+)+', hw) or len(hw) > 7 or not re.fullmatch(r'\d+(?:\.\d+)+', fw) or len(fw) > 15:
         raise ValueError('Versiones HW/FW inválidas en el perfil.')
@@ -184,15 +186,29 @@ def inspect(raw):
         raise ValueError('Nombre BLE incompatible con el HW del firmware.')
     meta = dict(kind='R2', hw=hw, fw=fw, nombre=name, module=module, schema=schema,
                 bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+    meta.update(ota_protocol=0,key_id='')
+    if schema==2:
+        if not any(a<=pos and pos+PROFILE_V2.size<=b for a,b in layout['segments']):
+            raise ValueError('Perfil OTA incompleto.')
+        flags,key=struct.unpack_from('<I32s',raw,pos+92)
+        if flags!=1 or tuple(int(v) for v in fw.split('.'))<(4,1):
+            raise ValueError('Capacidad/version OTA no soportada.')
+        if [(p['offset'],p['size'],p['subtype']) for p in apps]!=[(0x10000,0x140000,0x10),(0x150000,0x140000,0x11)]:
+            raise ValueError('OTA requiere las dos particiones Arduino de 1280 KiB.')
+        meta.update(ota_protocol=1,key_id=hashlib.sha256(key).hexdigest()[:16] if any(key) else '')
     return meta, pos, layout
 
 
-def personalize(raw, name):
+def personalize(raw, name, ota_key=None):
     meta, pos, layout = inspect(raw)
     if not re.fullmatch(re.escape('TQT_R2_V'+meta['hw'].replace('.', '')+'_')+r'\d{4}', name) or len(name)>23:
         raise ValueError('La identidad del inventario no coincide con el HW del firmware.')
     image = bytearray(raw)
     image[pos+NAME_OFFSET:pos+NAME_OFFSET+24] = name.encode('ascii').ljust(24,b'\0')
+    if meta['schema']==2 and ota_key is not None:
+        if not isinstance(ota_key,bytes) or len(ota_key)!=32:
+            raise ValueError('Credencial de unidad OTA inválida.')
+        image[pos+KEY_OFFSET:pos+KEY_OFFSET+32]=ota_key
     checksum = 0xEF
     for first,last in layout['segments']:
         for value in image[first:last]:
@@ -216,7 +232,7 @@ def normalize(raw, filename):
         raise ValueError('Sube un merged.bin o un Intel HEX de ESP32 completo.')
     meta, _, layout=inspect(raw)
     raw=raw[:layout['end']]  # canonical image: ignore erased padding, never flash unused NVS/OTA slots
-    stored, _=personalize(raw,'TQT_R2_V'+meta['hw'].replace('.','')+'_0000')
+    stored, _=personalize(raw,'TQT_R2_V'+meta['hw'].replace('.','')+'_0000',bytes(32))
     meta, _, _=inspect(stored)
     return meta,stored,filename
 
@@ -226,11 +242,19 @@ def ensure(c):
       id TEXT PRIMARY KEY, hw TEXT NOT NULL, fw TEXT NOT NULL, filename TEXT NOT NULL,
       sha256 TEXT NOT NULL UNIQUE, metadata TEXT NOT NULL, image BLOB NOT NULL,
       created REAL NOT NULL, operator TEXT NOT NULL)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS esp32_unit_keys (
+        pcb INTEGER PRIMARY KEY REFERENCES pcb_inventario(id) ON DELETE CASCADE, secret BLOB NOT NULL CHECK(length(secret)=32),
+        created REAL NOT NULL)''')
     if not c.execute('SELECT 1 FROM esp32_firmwares LIMIT 1').fetchone():
         path=ROOT/'firmware/esp32_r2/TQT_R2_V4_0.merged.bin'
         meta,image,filename=normalize(path.read_bytes(),path.name)
         c.execute('INSERT OR IGNORE INTO esp32_firmwares VALUES(?,?,?,?,?,?,?,?,?)',
                   ('base-R2-v4',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,0,'sistema'))
+    path=ROOT/'firmware/esp32_r2/TQT_R2_V4_1.merged.bin'
+    if path.is_file() and not c.execute("SELECT 1 FROM esp32_firmwares WHERE id='base-R2-v41'").fetchone():
+        meta,image,filename=normalize(path.read_bytes(),path.name)
+        c.execute('INSERT INTO esp32_firmwares VALUES(?,?,?,?,?,?,?,?,?)',
+                  ('base-R2-v41',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,1,'sistema'))
 
 
 def public(row):
@@ -270,7 +294,7 @@ def save(raw,filename,operator):
         return dict(meta,id=identifier,filename=filename,existing=False)
 
 
-def prepare(pcb_id,firmware_id=None):
+def prepare(pcb_id,firmware_id=None,provision=False):
     with db.transaction() as c:
         pcb=inv.get_pcb(pcb_id,conn=c)
         if not pcb or pcb['tipo']!='R2':
@@ -285,11 +309,20 @@ def prepare(pcb_id,firmware_id=None):
         name=pcb['nombre'].replace('-','_')
         if not name.endswith('_'+pcb['serie']) or pcb['serie']=='0000':
             raise ValueError('Nombre y serie de R2 inconsistentes en el inventario.')
-        image,meta=personalize(raw,name)
+        meta,_,_=inspect(raw)
+        secret=None
+        if meta['ota_protocol']:
+            key=c.execute('SELECT secret FROM esp32_unit_keys WHERE pcb=?',(pcb_id,)).fetchone()
+            if not key and provision:
+                secret=secrets.token_bytes(32)
+                c.execute('INSERT INTO esp32_unit_keys VALUES(?,?,?)',(pcb_id,secret,time.time()))
+            elif key:
+                secret=bytes(key['secret'])
+        image,meta=personalize(raw,name,secret)
         return dict(meta,firmware_id=row['id'],pcb_id=pcb_id),image
 
 
-def result(pcb_id,mac,firmware_id,name,hw,fw,operator):
+def result(pcb_id,mac,firmware_id,name,hw,fw,operator,key_id='',ota_protocol=0):
     with db.transaction() as c:
         ensure(c)
         pcb=inv.get_pcb(pcb_id,conn=c)
@@ -300,6 +333,12 @@ def result(pcb_id,mac,firmware_id,name,hw,fw,operator):
             raise ValueError('Nombre o versiones verificadas no coinciden con la R2 y su firmware.')
         if hashlib.sha256(bytes(row['image'])).hexdigest()!=row['sha256']:
             raise ValueError('El archivo guardado no coincide con su hash.')
+        image_meta,_,_=inspect(bytes(row['image']))
+        if image_meta['ota_protocol']:
+            key=c.execute('SELECT secret FROM esp32_unit_keys WHERE pcb=?',(pcb_id,)).fetchone()
+            expected=hashlib.sha256(bytes(key['secret'])).hexdigest()[:16] if key else ''
+            if not expected or ota_protocol!=1 or key_id!=expected:
+                raise ValueError('La R2 no confirmó la credencial y capacidad OTA de esta unidad.')
         updated=inv.guardar_programacion(pcb_id,mac,fw,operator,conn=c)
         db.log_evento('ESP32_PROGRAMADA',None,None,f'{name}; firmware_id={firmware_id}; HW {hw} FW {fw}; base_sha256={row["sha256"]}',operator,conn=c)
         return updated

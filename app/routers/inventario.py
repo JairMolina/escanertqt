@@ -201,7 +201,8 @@ async def put_programacion(pcb_id: int, payload: ProgramacionUpdate, request: Re
     if payload.firmware_id:
         pcb = await _run(esp32_firmware.result, pcb_id, payload.mac, payload.firmware_id,
                          payload.nombre_verificado, payload.hardware_verificado, payload.firmware,
-                         usuarios.validar_sesion(request.cookies.get(usuarios.COOKIE))['email'])
+                         usuarios.validar_sesion(request.cookies.get(usuarios.COOKIE))['email'],
+                         payload.key_id_verificado,payload.ota_protocol_verificado)
     else:
         pcb = await _run(inv.guardar_programacion, pcb_id, payload.mac, payload.firmware, payload.operador)
     await manager.broadcast("PCB_ACTUALIZADA", {"pcb": pcb, "conteos": await run_in_threadpool(_conteos)})

@@ -473,6 +473,8 @@ class ProgramacionUpdate(BaseModel):
     firmware_id: Optional[str] = Field(None, max_length=32)
     nombre_verificado: Optional[str] = Field(None, max_length=23)
     hardware_verificado: Optional[str] = Field(None, max_length=7)
+    ota_protocol_verificado: int = Field(0,ge=0,le=1)
+    key_id_verificado: str = Field('',max_length=16,pattern=r'^(?:[a-f0-9]{16})?$')
 
 
 class FirmwareCompilarRequest(BaseModel):
