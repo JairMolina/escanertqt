@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-14 21:19 UTC
-Commit de referencia: `f7fb240fb3f5` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-14 21:27 UTC
+Commit de referencia: `927b96555a9f` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-R2 FW4.1 y web1.3.77 implementadas: OTA Bluetooth autenticada/cifrada por unidad, instalacion serial inicial, catalogo y verificacion de reinicio/particion, cancelar y recuperar resultado pendiente. Proyecto V4.1 independiente con BIN/HEX, V3.1/V4.0 intactos. Todavia sin desplegar ni programar hardware.
+Web1.3.77 desplegada con autorizacion en Orange Pi desde GitHub codex/esp32-r2-ble-ota/927b965. API publica/local verificadas, catalogo R2 4.1OTA por defecto y4.0serial. R2 0069/PCB66: imagen privada preparada desde API y validada nativamente; credencial persistida y respaldada. No se programo hardware ni se abrio COM3.
 
 ## Siguiente paso
-Autorizacion expresa para desplegar web1.3.77 en Orange Pi segun AGENTS.md; despues prueba R2 0069/COM3. Usuario sostiene contactos: avisar solo al estar listo; no abrir puerto antes de LISTO. Produccion sigue1.3.76/f7fb240; main separado. No se detecta adaptador serial conectado al consultar Windows.
+Usuario debe confirmar LISTO: R2 0069 banco libre en modo programacion COM3. La imagen esta en AppData Local TQT programming R2_0069_FW41 fuera de Git/Drive. Avisar al terminar para soltar BOOT y reiniciar; leer INFO real y registrar MAC/FW/capacidad; despues validar OTA Bluetooth con R1 desconectada y alimentacion normal. Produccion usa rama OTA, main sigue separado.
 
 ## Evidencia
-Arduino ESP32 core3.3.12:1130943 bytes86%,RAM42196 12%; rollback SDK y simbolo verifyRollbackLater nativo. BIN1196624 SHA3b1c3a42e51b99cc91bf770780d287f5c6604787d83eee9dced8224e97c9d08a; checksum/SHA nativos y HEX identico. Docker78 pruebas correctas(28ESP32/OTA+37STM32+13lote),node--check,diff--check. Playwright contexto aislado: envio6285paquetes,2jobsverificados(incluye recuperacion trasHTTP503),1cancelado;V4.0sinOTA;escritorio1366/movil390sin desborde. Solo DB sintetica. CM checkpoint/Git/memoria;ECC HW-FW/CPP/security/verification.
+Servicio tqt recreado exclusivamente, compose/cloudflared intactos; healthy y HTTPS2001.3.77. Inventario/usuarios hash identico100tarjetas/300PCB/7usuarios,SQLiteok. Respaldo pre-r2-ota-1377-20261014T212145Z.db SHA731beb94072b7c1424d279cff4c3eb708de98c3275f3d736d8ead906ae5fcf21; posterior con clave post-r2-ota-1377-20261014T212659Z.db SHA108f9db2a66f9d393a7087713cc776dd4b54e4bc02764006225dc671e55390da. Imagen0069FW4.1HW3.0,nombre correcto,checksum/SHA esptool validos; COM3 registrado sin abrir. Compilacion y78tests previos correctos; Playwright envio/cancelacion/recuperacion en DB sintetica. CM checkpoint/Git/memoria yECC HWFW/CPP/security/verification.

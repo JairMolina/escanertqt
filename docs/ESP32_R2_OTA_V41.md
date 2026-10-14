@@ -57,10 +57,32 @@ verificados y uno cancelado. OTA deshabilitada al seleccionar V4.0. Sin desborde
 horizontal en escritorio de 1.366 px y móvil de 390 px. Ningún mock permanece
 en el contexto que se utilizará para hardware.
 
-Pendiente: publicar la web 1.3.77 con autorización expresa de despliegue y
-validar físicamente R2 0069, adaptador COM3 indicado por el usuario. No se ha
-abierto COM3 ni grabado ninguna placa en este avance. Avisar justo antes de
-la prueba porque el usuario sostiene los contactos de programación.
+Desplegada con autorización expresa en Orange Pi el 14 de octubre de 2026:
+web 1.3.77, commit `927b96555a9f1ba1dfb98228f127074df0dc6ccf`, rama
+`codex/esp32-r2-ble-ota`, avance por fast-forward desde `f7fb240`. Solo se
+recreó el servicio tqt; no se modificó Compose ni se reinició cloudflared.
+Contenedor saludable, APIs local/pública HTTPS 200 y HTML/JS OTA publicados.
+Catálogo compatible: 4.1 OTA por defecto y 4.0 serial conservada. Los registros
+antiguos de catálogo pueden omitir ota_protocol; el cliente los trata como cero.
+
+Respaldo previo consistente `pre-r2-ota-1377-20261014T212145Z.db` en
+`servidor/data/respaldos`, SHA256
+`731beb94072b7c1424d279cff4c3eb708de98c3275f3d736d8ead906ae5fcf21`.
+SQLite íntegra y hashes idénticos de 100 tarjetas, 300 PCB y 7 usuarios.
+No había trabajos STM32 ni Pruebas activos al recrear el servicio.
+
+R2 0069 / HW30 corresponde a PCB id 66 en producción. Imagen personalizada
+preparada desde API autenticada, sin asignar todavía MAC/FW de instalación.
+Credencial guardada en SQLite y copia del BIN en carpeta privada de AppData
+de la laptop, fuera de Git/Drive. Esptool valida checksum y hash de aplicación
+personalizada. Windows registra COM3; no se ha abierto ni programado.
+Respaldo posterior con la credencial: `post-r2-ota-1377-20261014T212659Z.db`,
+SHA256 `108f9db2a66f9d393a7087713cc776dd4b54e4bc02764006225dc671e55390da`.
+
+Pendiente: validar físicamente R2 0069 / COM3 cuando el usuario indique LISTO
+con el banco libre y la tarjeta en modo programación. Avisar justo antes de
+la prueba porque sostiene los contactos. Luego comprobar INFO real, registrar
+MAC/FW/capacidad y probar Bluetooth con alimentación normal y R1 desconectada.
 
 Capacidades utilizadas: CM continuidad/checkpoint/Git/memoria; ECC HW/FW y
 C++ para protocolo y restricciones del SDK, seguridad para identidad/credencial
