@@ -79,10 +79,20 @@ personalizada. Windows registra COM3; no se ha abierto ni programado.
 Respaldo posterior con la credencial: `post-r2-ota-1377-20261014T212659Z.db`,
 SHA256 `108f9db2a66f9d393a7087713cc776dd4b54e4bc02764006225dc671e55390da`.
 
-Pendiente: validar físicamente R2 0069 / COM3 cuando el usuario indique LISTO
-con el banco libre y la tarjeta en modo programación. Avisar justo antes de
-la prueba porque sostiene los contactos. Luego comprobar INFO real, registrar
-MAC/FW/capacidad y probar Bluetooth con alimentación normal y R1 desconectada.
+Instalación física serial completada tras LISTO del usuario: ESP32-D0WD-V3
+revisión 3.1 detectado en COM3, 1.196.624 bytes escritos a 460.800 baudios;
+esptool verificó el hash de Flash. Tras liberar BOOT y reiniciar por indicación
+del usuario, INFO real confirmó nombre `TQT_R2_V30_0069`, HW 3.0, FW 4.1 y
+credencial/capacidad OTA correctas. MAC Bluetooth `8C:8C:29:C3:D6:A6`.
+COM3 quedó cerrado y se indicó retirar contactos. Se registró el resultado por
+API autenticada en PCB 66; capability devuelve eligible=true, current_fw=4.1,
+requires_serial=false. No se enviaron comandos de relés.
+
+Pendiente: prueba OTA física desde Chrome/Edge con R2 alimentada normalmente y
+R1 apagada o desconectada de Bluetooth. El usuario debe elegir el dispositivo
+en el selector de su navegador; ya recibió instrucciones para reinstalar FW4.1
+y verificar cambio de partición. No afirmar OTA física verificada hasta leer
+su resultado y contrastarlo con el job/attestation del servidor.
 
 Capacidades utilizadas: CM continuidad/checkpoint/Git/memoria; ECC HW/FW y
 C++ para protocolo y restricciones del SDK, seguridad para identidad/credencial
