@@ -1,9 +1,18 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-14 21:48 UTC
-Commit de referencia: `4efb360d9e34` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-14 22:50 UTC
+Commit de referencia: `738379f` + esta rama (v1.3.79)
 
 ## Avance reportado
+Rama codex/r2-serial-monitor (sobre 1.3.78): v1.3.79 monitor serial R2, grabación serial a 921600 con respaldo 115200, eventos WS tras OTA verificada. Sin desplegar.
+
+## Siguiente paso
+Probar en hardware R2 (monitor, polaridad RTS/DTR de «Reiniciar placa», grabación a 921600 con el adaptador USB–TTL real). Desplegar solo con autorización expresa. Pendiente de decisión: semáforo STM32 (verde sin J-Link verificado) y si una tarjeta sin R3 debe mostrarse como R1/R2 programadas.
+
+## Evidencia
+pytest test_esp32_firmware, test_esp32_ota, test_api, test_db: 59 correctas, 1 falla ajena (test_17 certificado: certs/ ignorado en el worktree). node --check sec_programacion.js correcto. Sin prueba física.
+
+## Anterior
 Prueba OTA fisica0069 iniciada pero NO verificada: usuario aclara sigue Enviando, servidor job45226b5e1a6c36611ddf8b80 prepared con INFO autentica aceptada. Preparada web1.3.78: ventana8paquetes compatibleFW4.1 reduce consultasestado, progresoKB/porcentaje/velocidad/ETA y diagnosticochunk. Aun sin desplegar; prod1.3.77, serial0069 si verificada.
 
 ## Siguiente paso

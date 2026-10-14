@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.79 — 2026-10-14
+- **Programación R2 ESP32 · Monitor serial:** panel estilo Arduino IDE (velocidad, abrir/cerrar, limpiar, enviar texto con fin de línea, «Reiniciar placa» por RTS/DTR) para leer el arranque (`waiting for download`, `rst:`…). Se cierra solo antes de grabar o leer la MAC, muestra la salida de esptool y de la verificación, y se reabre al terminar (opcional).
+- **Grabación por serial más rápida:** sincroniza a 115200 y envía los datos a la «Velocidad de grabación» elegida (921600 por defecto, como Arduino IDE; se recuerda en el navegador). Si falla a alta velocidad, pide volver a BOOT y reintenta una vez a 115200.
+- **OTA Bluetooth:** al verificar la actualización se notifica `PCB_ACTUALIZADA`/`TARJETA_ACTUALIZADA`, así Tarjetas e Inventario muestran la MAC y el FW nuevos sin recargar. Prueba de regresión: R2 programada en tarjeta sin R3 y con `firmware_r2` desactualizado devuelve MAC/FW en tarjetas, detalle, búsqueda por MAC y placa.
+
 ## v1.3.76 — 2026-10-14
 - **Programación R2 ESP32:** catálogo persistente BIN/HEX, perfil HW/FW interno, nombre tomado del inventario y selector de la versión numérica más reciente compatible. Verificación INFO tras el arranque; se conserva el flujo anterior de R1.
 - Integra los cambios existentes de v1.3.73–1.3.75: orden R2/R1/R3, semáforo STM32, rediseño de Pruebas y estación local J-Link. R2 FW4.0 conserva relés, BLE y eFuse del original.

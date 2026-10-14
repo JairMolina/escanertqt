@@ -4,6 +4,10 @@ import binascii
 from fastapi import APIRouter, HTTPException, Request, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from fastapi.concurrency import run_in_threadpool
+from app.database import db
+from app.routers.inventario import _conteos, _notificar_tarjeta
+from app.routers.ws import manager
 from app.services import esp32_firmware as svc, esp32_ota as ota, usuarios
 
 router=APIRouter(prefix='/api/esp32',tags=['Programación R2 ESP32'])
@@ -49,8 +53,17 @@ def ota_prepare(pcb_id: int,body: OtaPrepare,req: Request):
 
 
 @router.post('/ota/result/{identifier}')
-def ota_result(identifier: str,body: DeviceInfo,req: Request):
-    return run(ota.finish,identifier,body.model_dump(),operator(req))
+async def ota_result(identifier: str,body: DeviceInfo,req: Request):
+    try:
+        res=await run_in_threadpool(ota.finish,identifier,body.model_dump(),operator(req))
+    except ValueError as e:
+        raise HTTPException(400,str(e)) from e
+    pcb=res.get('pcb') if isinstance(res,dict) else None
+    if pcb:   # igual que PUT /api/pcb/{id}/programacion: las vistas se refrescan con MAC y firmware nuevos
+        await manager.broadcast('PCB_ACTUALIZADA',{'pcb':pcb,'conteos':await run_in_threadpool(_conteos)})
+        if pcb.get('tarjeta_id'):
+            await _notificar_tarjeta(await run_in_threadpool(db.get_tarjeta_by_id,pcb['tarjeta_id']))
+    return res
 
 
 @router.post('/ota/cancel/{identifier}')

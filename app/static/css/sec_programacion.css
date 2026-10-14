@@ -75,3 +75,11 @@
 
 .prog-sesion { align-items: center; gap: 8px; }
 .prog-sesion[hidden], .prog-sesion + div[hidden] { display: none; }
+
+/* monitor serial (estilo Arduino IDE) */
+.prog-mon .row { margin-top: 10px; align-items: flex-end; gap: 8px; }
+.prog-mon-log { background: #0d1117; color: #d6e2f0; border: 1px solid var(--line); border-radius: var(--r-1); padding: 10px; margin: 10px 0 0; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.45; height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+.prog-mon-log:focus-visible { outline: 2px solid var(--accent, #4c9ffe); outline-offset: 1px; }
+.prog-mon-campo { flex: 1 1 200px; }
+.prog-mon-campo .input { width: 100%; }
+.prog-mon-chk { display: block; margin-top: 10px; font-size: 13px; }

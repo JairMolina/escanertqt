@@ -190,5 +190,37 @@ class Esp32FirmwareTests(unittest.TestCase):
         with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'consultor'}):
             self.assertEqual(client.post(f'/api/esp32/bin/{self.card["r2"]["id"]}').status_code,403)
 
+    def test_programmed_r2_without_r3_shows_mac_and_firmware_everywhere(self):
+        """R2 programada en una tarjeta sin R3: tarjetas, detalle, por MAC e inventario devuelven MAC y firmware de la PCB."""
+        r2=self.card['r2']['id']; tid=self.card['id']; mac=iso.mac_unica()
+        with db.get_db() as c:   # dato heredado y obsoleto en la tarjeta: la PCB manda
+            c.execute("UPDATE tarjetas_produccion SET firmware_r2='3.9' WHERE id=?",(tid,))
+        client=TestClient(app,base_url='https://testserver')
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+            self.assertEqual(client.put(f'/api/pcb/{r2}/programacion',json={'mac':mac,'firmware':'4.1'}).status_code,200)
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+            detalle,lista_r,bymac,pcb_r=[client.get(u).json() for u in (f'/api/tarjetas/{tid}',f'/api/tarjetas?lote_id={self.card["lote_id"]}&limit=500',f'/api/tarjetas/by-mac/{mac}',f'/api/pcb/{r2}')]
+        lista=[t for t in lista_r['items'] if t['id']==tid][0]
+        for t in (detalle,lista,bymac):
+            self.assertIsNone(t['r3'])
+            self.assertEqual((t['r2']['mac'],t['r2']['firmware'],t['mac_r2'],t['firmware_r2']),(mac,'4.1',mac,'4.1'))
+            self.assertEqual(t['sin_mac'],['R1'])
+        pcb=pcb_r
+        self.assertEqual((pcb['mac'],pcb['firmware']),(mac,'4.1'))
+
+    def test_ota_result_broadcasts_pcb_and_card_updates(self):
+        events=[]
+        async def capture(evento,datos): events.append((evento,datos))
+        r2=self.card['r2']['id']
+        with patch('app.services.esp32_ota.finish',return_value={'verified':True,'pcb':inv.guardar_programacion(r2,iso.mac_unica(),'4.1',self.operator)}), \
+             patch('app.routers.esp32.manager.broadcast',side_effect=capture), \
+             patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+            body=dict(nombre='TQT_R2_V30_0001',hw='3.0',fw='4.1',mac=iso.mac_unica(),ota_protocol=1,key_id='a'*16,nonce='b'*32,
+                      app_sha256='c'*64,proof='d'*64,boot_valid=True,partition=0)
+            res=TestClient(app,base_url='https://testserver').post('/api/esp32/ota/result/x',json=body)
+        self.assertEqual(res.status_code,200)
+        self.assertEqual([e for e,_ in events],['PCB_ACTUALIZADA','TARJETA_ACTUALIZADA'])
+        self.assertEqual(events[1][1]['tarjeta']['r2']['firmware'],'4.1')
+
 
 if __name__=='__main__': unittest.main()

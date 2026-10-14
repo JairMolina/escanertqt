@@ -152,12 +152,126 @@
         const otaPanel = h('div', { class: 'field' }, h('h3', null, 'Actualización por Bluetooth'), otaHint,
             h('div', { class: 'row wrap' }, btnOta, btnOtaVerify, btnOtaDiscard, btnOtaCancel));
 
+        // ---- monitor serial (estilo Arduino IDE): comparte el puerto con el flasheo, nunca a la vez
+        const MON_MAX = 2000, BAUDS_MON = [115200, 9600, 57600, 74880, 230400, 460800, 921600], BAUDS_FLASH = [921600, 460800, 230400, 115200];
+        const mon = { port: null, reader: null, tarea: null, txt: '', n: 0, raf: 0, abierto: false, ocupado: false };
+        const monLog = h('pre', { class: 'prog-mon-log', 'aria-live': 'off', tabindex: '0', role: 'log', 'aria-label': 'Salida del monitor serial' });
+        const monBaud = h('select', { id: 'prog-mon-baud', class: 'input' }, ...BAUDS_MON.map((b) => h('option', { value: String(b) }, String(b))));
+        const monFin = h('select', { id: 'prog-mon-fin', class: 'input' }, h('option', { value: '\n' }, 'LF (\\n)'), h('option', { value: '\r\n' }, 'CRLF (\\r\\n)'), h('option', { value: '' }, 'Sin fin de línea'));
+        const monIn = h('input', { id: 'prog-mon-in', class: 'input', type: 'text', autocomplete: 'off', spellcheck: 'false' });
+        const monToggle = h('button', { class: 'btn btn-sm', type: 'button', onclick: () => (mon.abierto ? monDetener() : monAbrir()) }, 'Abrir monitor');
+        const monEnviar = h('button', { class: 'btn btn-sm', type: 'button', onclick: () => monEnvia() }, 'Enviar');
+        const monReiniciar = h('button', { class: 'btn btn-sm', type: 'button', title: 'Pulsa EN (RTS) con IO0 alto para ver el arranque', onclick: () => monReset() }, 'Reiniciar placa');
+        const monLimpiar = h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => { mon.txt = ''; mon.n = 0; monPintar(); } }, 'Limpiar');
+        const monEstado = h('span', { class: 'hint', role: 'status' }, 'Cerrado');
+        const chkAbrir = h('input', { type: 'checkbox', id: 'prog-mon-auto', checked: true });
+        let selFlashBaud = null;
+        const monPanel = h('details', { class: 'prog-config prog-mon' }, h('summary', null, 'Monitor serial'),
+            h('div', { class: 'row wrap' },
+                h('div', { class: 'field' }, h('label', { for: 'prog-mon-baud' }, 'Velocidad'), monBaud), monToggle, monReiniciar, monLimpiar, monEstado),
+            monLog,
+            h('form', { class: 'row wrap prog-mon-envio', onsubmit: (ev) => { ev.preventDefault(); monEnvia(); } },
+                h('div', { class: 'field prog-mon-campo' }, h('label', { for: 'prog-mon-in' }, 'Texto a enviar'), monIn),
+                h('div', { class: 'field' }, h('label', { for: 'prog-mon-fin' }, 'Fin de línea'), monFin),
+                monEnviar),
+            h('label', { class: 'prog-mon-chk', for: 'prog-mon-auto' }, chkAbrir, ' Abrir monitor al terminar de grabar'));
+        function monPintar() {
+            if (mon.raf) return;
+            mon.raf = requestAnimationFrame(() => {
+                mon.raf = 0; if (!S.vivo) return;
+                const abajo = monLog.scrollHeight - monLog.scrollTop - monLog.clientHeight < 24;
+                monLog.textContent = mon.txt;
+                if (abajo) monLog.scrollTop = monLog.scrollHeight;
+            });
+        }
+        function monAppend(t) {
+            if (!t) return;
+            mon.txt += t;
+            for (let i = t.indexOf('\n'); i >= 0; i = t.indexOf('\n', i + 1)) mon.n++;
+            if (mon.n > MON_MAX) {
+                let corte = 0, sobran = mon.n - MON_MAX;
+                while (sobran-- > 0) corte = mon.txt.indexOf('\n', corte) + 1;
+                mon.txt = mon.txt.slice(corte); mon.n = MON_MAX;
+            }
+            monPintar();
+        }
+        function monUI() {
+            const bloq = S.busy || mon.ocupado;
+            monToggle.textContent = mon.abierto ? 'Cerrar monitor' : 'Abrir monitor';
+            monToggle.disabled = bloq || (!mon.abierto && !S.puertoSel);
+            monBaud.disabled = bloq || mon.abierto;
+            monReiniciar.disabled = bloq || !mon.abierto; monEnviar.disabled = bloq || !mon.abierto; monIn.disabled = bloq || !mon.abierto;
+            monFin.disabled = bloq; monLimpiar.disabled = false;
+            monEstado.textContent = mon.abierto ? `Abierto a ${monBaud.value} baud` : 'Cerrado';
+        }
+        async function monAbrir() {
+            if (mon.abierto || mon.ocupado || S.busy || !S.puertoSel) return;
+            mon.ocupado = true; monUI();
+            const port = S.puertoSel;
+            try {
+                try { if (port.readable || port.writable) await port.close(); } catch (e) { /* ya cerrado */ }
+                await port.open({ baudRate: +monBaud.value || 115200 });
+                mon.port = port; mon.abierto = true;
+                const dec = new TextDecoder('utf-8'); const reader = port.readable.getReader(); mon.reader = reader;
+                mon.tarea = (async () => {
+                    try { for (;;) { const { value, done } = await reader.read(); if (done) break; if (value) monAppend(dec.decode(value, { stream: true })); } }
+                    catch (e) { /* cable quitado o cancelado */ }
+                    finally { try { reader.releaseLock(); } catch (e) { /* nada */ } }
+                    if (mon.reader === reader) await monCerrarPuerto();   // fin inesperado (desconexión)
+                })();
+            } catch (e) {
+                monAppend('✗ No se pudo abrir el puerto: ' + (e && e.message ? e.message : e) + '\n');
+                try { await port.close(); } catch (e2) { /* nada */ }
+                mon.abierto = false; mon.port = null;
+            } finally { mon.ocupado = false; if (S.vivo) monUI(); }
+        }
+        async function monCerrarPuerto() {
+            const port = mon.port; mon.reader = null; mon.port = null; mon.abierto = false;
+            try { if (port && (port.readable || port.writable)) await port.close(); } catch (e) { /* nada */ }
+            if (S.vivo) monUI();
+        }
+        /** Libera por completo el puerto (cancela lector, suelta locks, cierra). Seguro de llamar siempre. */
+        async function monDetener() {
+            const reader = mon.reader, tarea = mon.tarea;
+            if (!mon.abierto && !reader) return;
+            mon.ocupado = true; mon.reader = null; monUI();
+            try { if (reader) await reader.cancel(); } catch (e) { /* nada */ }
+            try { if (tarea) await tarea; } catch (e) { /* nada */ }
+            mon.tarea = null;
+            await monCerrarPuerto();
+            mon.ocupado = false; if (S.vivo) monUI();
+        }
+        async function monEnvia() {
+            if (!mon.abierto || !mon.port || !mon.port.writable) return;
+            const txt = monIn.value + monFin.value;
+            if (!txt) return;
+            try {
+                const w = mon.port.writable.getWriter();
+                try { await w.write(new TextEncoder().encode(txt)); } finally { w.releaseLock(); }
+                monIn.value = '';
+            } catch (e) { monAppend('✗ No se pudo enviar: ' + (e && e.message ? e.message : e) + '\n'); }
+        }
+        async function monReset() {
+            if (!mon.abierto || !mon.port || !mon.port.setSignals) return;
+            const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
+            try {   // DTR bajo = IO0 alto (arranque normal); RTS alto = EN bajo (reset)
+                await mon.port.setSignals({ dataTerminalReady: false, requestToSend: true }); await pausa(120);
+                await mon.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+            } catch (e) { monAppend('✗ No se pudo reiniciar por RTS/DTR: ' + (e && e.message ? e.message : e) + '\n'); }
+        }
+        try { const g = +localStorage.getItem('prog_flash_baud'); selFlashBaud = BAUDS_FLASH.includes(g) ? g : null; } catch (e) { /* sin storage */ }
+        const selBaudFlash = h('select', { id: 'prog-flash-baud', class: 'input', onchange: () => { try { localStorage.setItem('prog_flash_baud', selBaudFlash.value); } catch (e) { /* nada */ } } },
+            ...BAUDS_FLASH.map((b) => h('option', { value: String(b) }, String(b))));
+        selBaudFlash.value = String(selFlashBaud || 921600);
+        unsubs.push(() => { cancelAnimationFrame(mon.raf); monDetener(); });
+
         function enableFirmware() {
             const blocked = S.busy || uploadBusy || firmwareLoading;
             firmwareSelect.disabled = blocked || !firmwareSelect.options.length;
             uploadBtn.disabled = blocked;
             btnFlash.disabled = blocked || !S.tarjeta || S.completed === S.tarjeta.id || (S.tarjeta?.tipo === 'R2' && !firmwareSelect.value);
             btnFlash.textContent = S.tarjeta?.tipo === 'R1' ? 'Compilar y flashear' : 'Instalar por serial';
+            selBaudFlash.disabled = blocked; monUI();
             const saved = window.TQTR2OTA?.pending();
             const ownPending = saved?.pcb_id === S.tarjeta?.id;
             const selectedOta = firmwareSelect.selectedOptions[0]?.dataset.ota === '1';
@@ -256,6 +370,7 @@
             return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), hardware: hd('Hardware'), firmwareId: hd('Firmware-Id'), sha: hd('Sha256') || hd('Fuente-Sha256'), otaProtocol: Number(hd('OTA-Protocol') || 0), keyId: hd('Key-Id') };
         }
         async function leerMacPorSerial(port, requireProfile = false) {
+            await monDetener();
             try { if (port.readable || port.writable) await port.close(); } catch (e) { /* ya estaba cerrado */ }
             await port.open({ baudRate: 115200 });
             let mac = null, nombre = null, hardware = null, firmware = null, retry = null, otaProtocol = 0, keyId = '';
@@ -282,6 +397,7 @@
                         const lineas = buffer.split('\n');
                         buffer = lineas.pop();
                         for (const linea of lineas) {
+                            monAppend(linea + '\n');
                             // v1.3.62: la R2 responde «<nombre> MAC: AA:BB:…»; se guarda la línea completa para validar el nombre
                             if (requireProfile) {
                                 if (!linea.startsWith('TQT_INFO ')) continue;
@@ -336,6 +452,7 @@
             const pcb = S.tarjeta;
             let transport = null;
             try {
+                await monDetener();   // el monitor libera el puerto antes de flashear
                 marcarPaso('compilar', 'activo');
                 escribir(pcb.tipo === 'R2' ? 'Preparando firmware y nombre desde inventario…' : 'Compilando firmware de R1…');
                 const fw = await compilarFirmware(pcb); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
@@ -349,25 +466,41 @@
                 }
                 marcarPaso('boot', 'ok');
                 const esptool = await cargarEsptool();
-                transport = new esptool.Transport(port, true);
-                const loader = new esptool.ESPLoader({
-                    transport, baudrate: 115200,
-                    terminal: { clean() { /* nada */ }, writeLine: escribir, write: (s) => escribir(String(s).replace(/\n$/, '')) },
-                });
-                marcarPaso('sync', 'activo');
-                escribir('Sincronizando… si no avanza, pon la tarjeta en modo programador.');
-                const chip = await loader.main();
-                marcarPaso('sync', 'ok');
-                escribir('Tarjeta detectada: ' + chip);
+                // sincroniza siempre a 115200 (romBaudrate) y sube a la velocidad elegida para los datos
+                let usar = +selBaudFlash.value || 115200, intento = 0, loader = null, escritoAlgo = false;
+                const terminal = { clean() { /* nada */ }, writeLine: (s) => { escribir(s); monAppend(s + '\n'); }, write: (s) => { const t = String(s).replace(/\n$/, ''); escribir(t); monAppend(t + '\n'); } };
+                for (;;) {
+                    transport = new esptool.Transport(port, true);
+                    loader = new esptool.ESPLoader({ transport, baudrate: usar, romBaudrate: 115200, terminal });
+                    try {
+                        marcarPaso('sync', 'activo');
+                        escribir('Sincronizando… si no avanza, pon la tarjeta en modo programador.');
+                        const chip = await loader.main();
+                        marcarPaso('sync', 'ok');
+                        escribir('Tarjeta detectada: ' + chip + (usar > 115200 ? ` · datos a ${usar} baud` : ''));
 
-                marcarPaso('flash', 'activo');
-                escribir('Flasheando (no desconectes el USB)…');
-                await loader.writeFlash({
-                    fileArray: [{ data: binario, address: 0x0 }],
-                    flashMode: 'keep', flashFreq: 'keep', flashSize: 'keep',
-                    eraseAll: false, compress: true,
-                    reportProgress: (_i, escrito, total) => { relleno.style.width = Math.round((escrito / total) * 100) + '%'; },
-                });
+                        marcarPaso('flash', 'activo');
+                        escribir('Flasheando (no desconectes el USB)…');
+                        let pct = -1;
+                        await loader.writeFlash({
+                            fileArray: [{ data: binario, address: 0x0 }],
+                            flashMode: 'keep', flashFreq: 'keep', flashSize: 'keep',
+                            eraseAll: false, compress: true,
+                            reportProgress: (_i, escrito, total) => {
+                                if (escrito > 0) escritoAlgo = true;
+                                const p = Math.round((escrito / total) * 100); if (p !== pct) { pct = p; relleno.style.width = p + '%'; }
+                            },
+                        });
+                        break;
+                    } catch (err) {
+                        try { await transport.disconnect(); } catch (e) { /* ya cerrado */ }
+                        transport = null;
+                        if (usar <= 115200 || intento > 0) throw err;
+                        escribir(`⚠ Falló a ${usar} baud (${err && err.message ? err.message : err}). Reintentando a 115200…`);
+                        if (!await confirmar('Reintentar a 115200', (escritoAlgo ? 'La grabación se interrumpió a alta velocidad. ' : 'No se pudo sincronizar a alta velocidad. ') + 'Vuelve a poner la R2 en modo descarga (GPIO0/BOOT en bajo + RESET) y confirma para reintentar a 115200.', 'Ya está en BOOT')) throw err;
+                        usar = 115200; intento++; escritoAlgo = false; relleno.style.width = '0';
+                    }
+                }
                 escribir('Flasheo terminado. Reiniciando la tarjeta…');
                 await loader.after('hard_reset');
                 try { await transport.disconnect(); } catch (e) { /* ya se cerró al reiniciar */ }
@@ -405,6 +538,7 @@
                 try { if (port.readable || port.writable) await port.close(); } catch (e) { /* sin puerto abierto */ }
                 S.busy = false; enableFirmware();
                 pintarLista(); pintarPuertos();
+                if (S.vivo && chkAbrir.checked && S.puertoSel === port) monAbrir();   // ver el arranque tras grabar
             }
         }
         btnFlash.addEventListener('click', ejecutar);
@@ -449,7 +583,9 @@
             h('div', { class: 'field' }, h('label', null, 'Puerto de la tarjeta'), puertosWrap,
                 h('div', { class: 'hint' }, 'Solo se listan aquí los puertos que ya autorizaste antes. «Elegir puerto» abre la lista real de puertos COM de Windows (el navegador la pide una vez por puerto; luego queda recordado).')),
             h('div', { class: 'hint' }, 'Antes de sincronizar, pon la tarjeta en modo programador; el registro avisa si no avanza.'),
-            log, barra, otaProgress, h('div', { class: 'row' }, btnFlash), otaPanel, resultado);
+            h('div', { class: 'field' }, h('label', { for: 'prog-flash-baud' }, 'Velocidad de grabación'), selBaudFlash,
+                h('div', { class: 'hint' }, 'Se sincroniza a 115200 y los datos van a esta velocidad; si falla, reintenta a 115200.')),
+            log, barra, otaProgress, h('div', { class: 'row' }, btnFlash), monPanel, otaPanel, resultado);
         const vacio = T.empty('flash', 'Elige una tarjeta', 'Búscala por número o nombre a la izquierda, o elige una de la lista.');
 
         function seleccionar(p) {
