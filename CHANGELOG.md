@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.72 — 2026-10-13
+- **Programación STM32 R1/R3:** subir, validar y guardar HEX en un catálogo persistente. Selector de firmware compatible con la placa; por defecto elige la versión numérica más alta, con la subida más reciente en caso de empate.
+- R1 obtiene HW/FW de su perfil y conserva la personalización por inventario; R3 solicita confirmar HW/FW al registrar una imagen sin perfil. Se conservan las versiones anteriores.
+- Cada trabajo guarda el firmware elegido y su hash; una subida posterior no cambia una programación pendiente. Los HEX se incluyen en los respaldos de la base de datos.
+
 ## v1.3.71 — 2026-10-13
 - **Programación STM32 R1/R3:** botón «Detener y cancelar programación» cancela los trabajos pendientes de la estación y solicita detener J-Link en los activos. Se mantiene el bloqueo hasta la confirmación del agente; una cancelación no registra firmware verificado.
 - Recuperación del progreso al volver a la sección, vencimiento de trabajos en espera antes de crear otro y corrección del agente al recibir una R3 sin datos de R2.

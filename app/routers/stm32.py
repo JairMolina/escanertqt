@@ -10,6 +10,7 @@ from fastapi.responses import Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from app.services import stm32_programming as svc, usuarios
+from app.services import stm32_firmware as catalogue
 from app.routers.ws import manager
 from app.database import inventario as inv
 
@@ -36,6 +37,7 @@ class Job(BaseModel):
     station_id: str = Field(min_length=24, max_length=24)
     hex_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     physical_confirmed: bool = False
+    firmware_id: str | None = Field(default=None, max_length=32)
 
 
 class Result(BaseModel):
@@ -53,6 +55,24 @@ class HexSubido(BaseModel):
     tipo: str = Field(default='R1', pattern='^R[13]$')
 
 
+class FirmwareUpload(HexSubido):
+    filename: str = Field(min_length=5, max_length=180)
+    hw: str = Field(default='', max_length=7)
+    fw: str = Field(default='', max_length=7)
+
+
+@router.get('/firmwares')
+def firmwares(tipo: str = 'R1', hw: str = ''):
+    if tipo not in ('R1','R3'):
+        raise HTTPException(400,'Tipo de firmware no soportado.')
+    return run(catalogue.catalogue, tipo, hw)
+
+
+@router.post('/firmwares')
+def upload_firmware(body: FirmwareUpload, req: Request):
+    return run(catalogue.save, body.contenido, body.tipo, body.filename, body.hw, body.fw, operator(req))
+
+
 class Progress(BaseModel):
     stage: str = Field(pattern='^(preparing|writing|reading|restarting|reporting)$')
 
@@ -66,13 +86,13 @@ def analizar_hex(body: HexSubido):
 
 
 @router.get('/preview/{pcb_id}')
-def preview(pcb_id: int):
-    return run(svc.preview, pcb_id)[0]
+def preview(pcb_id: int, firmware_id: str | None = None):
+    return run(svc.preview, pcb_id, None, firmware_id)[0]
 
 
 @router.get('/hex/{pcb_id}')
-def image(pcb_id: int):
-    d, image = run(svc.preview, pcb_id)
+def image(pcb_id: int, firmware_id: str | None = None):
+    d, image = run(svc.preview, pcb_id, None, firmware_id)
     return Response(image, media_type='application/octet-stream', headers={
         'Content-Disposition': f'attachment; filename="{d["identity"]["nombre"]}_FW{d["identity"]["fw"]}.hex"',
         'Cache-Control': 'no-store'})
@@ -126,7 +146,7 @@ def installer(body: Station, req: Request):
 
 @router.post('/jobs')
 def create(body: Job, req: Request):
-    return run(svc.create_job, body.pcb_id, body.station_id, body.hex_sha256, operator(req), body.physical_confirmed)
+    return run(svc.create_job, body.pcb_id, body.station_id, body.hex_sha256, operator(req), body.physical_confirmed, body.firmware_id)
 
 
 @router.get('/jobs/{jid}')

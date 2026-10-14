@@ -1,7 +1,8 @@
 /* Sección "Programación": elegir tarjeta + flasheo por USB con monitor serial y pasos visuales */
-.prog-wrap { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
-@media (max-width: 900px) { .prog-wrap { grid-template-columns: 1fr; } }
-.prog-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); padding: 14px; }
+.prog-wrap { display: grid; grid-template-columns: 300px minmax(0,1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .prog-wrap { grid-template-columns: minmax(0,1fr); } }
+.prog-panel { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); padding: 14px; }
+.prog-panel .input { min-width: 0; max-width: 100%; }
 .prog-panel h2 { font-size: 15px; margin: 0 0 10px; }
 .prog-lista { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; max-height: 60vh; overflow: auto; }
 .prog-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-1); background: var(--bg-2); cursor: pointer; text-align: left; }

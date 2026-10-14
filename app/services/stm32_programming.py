@@ -8,6 +8,7 @@ from pathlib import Path
 
 from app.database import db, inventario as inv
 from app.services import tqt_hex as hx
+from app.services import stm32_firmware as catalogue
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = ROOT / 'firmware/stm32_r1/fw43_base.hex'
@@ -37,6 +38,7 @@ def init():
         c.execute('CREATE TABLE IF NOT EXISTS stm32_jobs (id TEXT PRIMARY KEY, station TEXT NOT NULL, pcb INTEGER NOT NULL, state TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL, operator TEXT NOT NULL, payload TEXT NOT NULL, image TEXT NOT NULL, result TEXT)')
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS stm32_pcb_busy ON stm32_jobs(pcb) WHERE state IN ('queued','running')")
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS stm32_station_busy ON stm32_jobs(station) WHERE state IN ('queued','running')")
+        catalogue.ensure(c)
 
 
 def firmware():
@@ -56,10 +58,16 @@ def analizar_hex(texto, tipo='R1'):
     if tipo == 'R3':
         _, r3mem, meta = firmware_r3()
         igual = mem == r3mem
+        with db.get_db() as c:
+            catalogue.ensure(c)
+            known = c.execute('SELECT * FROM stm32_firmwares WHERE kind=? AND sha256=?', ('R3',hashlib.sha256(texto.encode('ascii')).hexdigest())).fetchone()
+            if known:
+                meta = catalogue.public(known)
+                igual = True
         return dict(mcu=meta['mcu'], hw=meta['hw'] if igual else '?', fw=meta['fw'] if igual else 'desconocida', bytes=len(mem),
                     sha256=hashlib.sha256(texto.encode('ascii')).hexdigest(), identidad=None,
                     base_fw=meta['fw'], base_hw=meta['hw'],
-                    aviso=None if igual else 'El firmware R3 no trae perfil de versión: solo se reconoce si es idéntico al de la app.')
+                    aviso=None if igual else 'El HEX R3 no contiene versión interna. Indica HW y FW para registrarlo en el catálogo.')
     identidad = hx.leer_identidad(mem)
     app = {a: b for a, b in mem.items() if a < hx.IDENTITY_BEGIN}
     profile = hx.leer_perfil(app)
@@ -70,16 +78,18 @@ def analizar_hex(texto, tipo='R1'):
                 base_fw=base['fw'], base_hw=base['hw'])
 
 
-def preview(pcb_id, conn=None):
+def preview(pcb_id, conn=None, firmware_id=None):
     def read_r3(c, p):
-        texto, mem, meta = firmware_r3()
         hw = p['version']
+        meta, texto = catalogue.selected(c, 'R3', hw, firmware_id)
+        mem, _ = catalogue.parse(texto)
         if hw == meta['hw'].replace('.', ''):
             hw = meta['hw']
         identity = dict(nombre='TQT_R3_V'+hw.replace('.', '')+'_'+p['serie'], hw=hw, fw=meta['fw'])
         result = dict(kind='R3', pcb_id=p['id'], tarjeta_id=p['tarjeta_id'], nombre=p['nombre'], r1=p['nombre'],
+                      firmware_id=meta['id'], firmware=meta,
                       identity=identity, profile=dict(mcu=meta['mcu'], hw=meta['hw'], fw=meta['fw']),
-                      base_sha256=meta['hex_sha256'], hex_sha256=meta['hex_sha256'],
+                      base_sha256=meta['sha256'], hex_sha256=meta['sha256'],
                       identity_sha256=huella(mem), bytes=len(mem))
         return result, texto
 
@@ -97,8 +107,10 @@ def preview(pcb_id, conn=None):
         r2 = t.get('r2') if t else None
         if not r2 or not r2.get('mac') or r2['estado_ciclo'] in ('FALLA', 'BAJA'):
             raise ValueError('La R1 necesita una R2 vinculada, sin falla y con MAC registrada.')
-        mem, starts, profile = firmware()
         hw = p['version']
+        meta, stored = catalogue.selected(c, 'R1', hw, firmware_id)
+        mem, starts = catalogue.parse(stored)
+        profile = hx.leer_perfil(mem)
         # Inventario almacena V30; el contrato STM32 usa HW 3.0.
         if hw == profile['hw'].replace('.', ''):
             hw = profile['hw']
@@ -109,8 +121,9 @@ def preview(pcb_id, conn=None):
         mem.update({hx.IDENTITY_BEGIN+i: b for i, b in enumerate(raw)})
         image = hx.emitir_hex(mem, starts)
         result = dict(kind='R1', pcb_id=p['id'], tarjeta_id=t['id'], r1=p['nombre'], nombre=p['nombre'], r2=r2['nombre'],
+                      firmware_id=meta['id'], firmware=meta,
                       r2_id=r2['id'], identity=identity, profile=profile,
-                      base_sha256=hashlib.sha256(BASE.read_bytes()).hexdigest(),
+                      base_sha256=meta['sha256'],
                       hex_sha256=hashlib.sha256(image.encode('ascii')).hexdigest(),
                       identity_sha256=hashlib.sha256(raw).hexdigest(),
                       crc32=f'{int.from_bytes(raw[-4:], "little"):08X}')
@@ -147,7 +160,7 @@ def stations():
                 for r in c.execute('SELECT * FROM stm32_stations ORDER BY name')]
 
 
-def create_job(pcb, station, expected, operator, physical_confirmed=False):
+def create_job(pcb, station, expected, operator, physical_confirmed=False, firmware_id=None):
     if physical_confirmed is not True:
         raise ValueError('Confirma desde la web que la placa seleccionada está conectada al J-Link.')
     init()
@@ -156,7 +169,7 @@ def create_job(pcb, station, expected, operator, physical_confirmed=False):
         st = c.execute('SELECT * FROM stm32_stations WHERE id=?', (station,)).fetchone()
         if not st or time.time()-st['last_seen'] > 20:
             raise ValueError('La estación Windows está desconectada. Inicia el agente.')
-        data, image = preview(pcb, c)
+        data, image = preview(pcb, c, firmware_id)
         if data['hex_sha256'] != expected:
             raise ValueError('Cambió el inventario o firmware. Vuelve a cargar los datos antes de programar.')
         if c.execute("SELECT 1 FROM stm32_jobs WHERE (pcb=? OR station=?) AND state IN ('queued','running')", (pcb, station)).fetchone():
@@ -202,7 +215,7 @@ def claim(sid):
             return None
         d = json.loads(r['payload'])
         try:
-            current, _ = preview(r['pcb'], c)
+            current, _ = preview(r['pcb'], c, d.get('firmware_id'))
             if current['hex_sha256'] != d['hex_sha256'] or now-r['created']>120:
                 raise ValueError('Trabajo caducado o datos del inventario modificados; vuelve a preparar la tarjeta.')
         except ValueError as e:

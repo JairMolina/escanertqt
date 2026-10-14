@@ -4,7 +4,10 @@ window.TQTSTM32 = function (host, ctx) {
     const { h, api, T } = ctx;
     const K = ctx.tipo === 'R3' ? 'R3' : 'R1', ID = 'stm-' + K.toLowerCase();
     let alive = true, current = null, selectedPcb = null, busy = false, timer = null, requestN = 0, listN = 0;
-    let activeJob = null, cancelling = false;
+    let activeJob = null, activeFirmware = null, cancelling = false;
+    let selectedFirmware = null, firmwareRequest = 0, uploadOpen = false;
+    const firmwareSelect = h('select', { class: 'input', id: ID + '-fw', disabled: true });
+    const firmwareHint = h('p', { class: 'hint', 'aria-live': 'polite' }, 'Cargando firmware…');
     const unsubs = [];
     const search = h('input', { class: 'input', type: 'search', id: ID + '-q', autocomplete: 'off', placeholder: 'Número, nombre o QR de la tarjeta' });
     const list = h('div', { class: 'prog-lista' });
@@ -30,17 +33,37 @@ window.TQTSTM32 = function (host, ctx) {
     hexIn.addEventListener('change', async () => {
         const f = hexIn.files && hexIn.files[0]; if (!f) return;
         if (f.size > 4_000_000) { message('El archivo es demasiado grande para un HEX de STM32.', true); return; }
-        btnSubir.disabled = true; message('Leyendo ' + f.name + '…');
+        uploadOpen = true; enable(); message('Validando ' + f.name + '…');
+        let opened = false;
         try {
-            const r = await api('/api/stm32/hex/analizar', { method: 'POST', body: { contenido: await f.text(), tipo: K } });
+            const contenido = await f.text();
+            const r = await api('/api/stm32/hex/analizar', { method: 'POST', body: { contenido, tipo: K } });
             if (!r.ok) { message(f.name + ': ' + r.error, true); return; }
-            const d = r.data; const igual = d.fw === d.base_fw && d.hw === d.base_hw;
-            status.replaceChildren(T.banner(igual ? 'ok' : 'info', igual ? 'check' : 'info', h('div', null,
-                h('b', null, f.name + ' · FW ' + d.fw), h('br'),
-                'MCU ' + d.mcu + ' · HW ' + d.hw + ' · ' + (d.bytes / 1024).toFixed(0) + ' KB de aplicación' + (d.identidad ? ' · trae identidad ' + d.identidad : ''), h('br'),
-                igual ? 'Es la misma versión que el firmware base de la app (FW ' + d.base_fw + ').' : 'El firmware base de la app es FW ' + d.base_fw + ' / HW ' + d.base_hw + '.', d.aviso ? h('br') : null, d.aviso || null)));
+            if (!alive) return;
+            const d = r.data;
+            const suggested = /FW[-_]?V?([0-9]+(?:\.[0-9]+)*)/i.exec(f.name)?.[1] || '';
+            const hw = h('input', { class: 'input', id: ID + '-upload-hw', value: K === 'R1' ? d.hw : d.hw !== '?' ? d.hw : '3.0', maxlength: 7, required: true, readonly: K === 'R1' });
+            const fw = h('input', { class: 'input', id: ID + '-upload-fw', value: K === 'R1' ? d.fw : d.fw !== 'desconocida' ? d.fw : suggested, maxlength: 7, required: true, readonly: K === 'R1' });
+            const error = h('div', { role: 'alert' });
+            T.sheet({ title: 'Guardar firmware ' + K,
+                body: h('div', { class: 'stack' }, h('p', null, f.name),
+                    h('p', { class: 'hint' }, d.mcu + ' · ' + (d.bytes / 1024).toFixed(1) + ' KB'),
+                    h('div', { class: 'field' }, h('label', { for: hw.id }, 'Versión de hardware (HW)'), hw),
+                    h('div', { class: 'field' }, h('label', { for: fw.id }, 'Versión de firmware (FW)'), fw),
+                    h('p', { class: 'hint' }, K === 'R3' ? 'Este HEX no contiene su versión. Comprueba HW y FW antes de guardarlo; el nombre del archivo solo propone una versión.' : 'La versión se obtiene del perfil interno. La identidad individual se retira para preparar cada tarjeta con sus datos del inventario.'), error),
+                onClose: () => { uploadOpen = false; enable(); },
+                actions: [{ label: 'Guardar firmware', kind: 'primary', onClick: async () => {
+                    if (!hw.reportValidity() || !fw.reportValidity()) return false;
+                    const saved = await api('/api/stm32/firmwares', { method: 'POST', body: { tipo: K, contenido, filename: f.name, hw: hw.value.trim(), fw: fw.value.trim() } });
+                    if (!saved.ok) { error.replaceChildren(T.banner('bad', 'alert', saved.error)); return false; }
+                    await loadFirmwares(true);
+                    if (selectedPcb) await choose(selectedPcb, true);
+                    message(saved.data.existing ? 'Este firmware ya estaba guardado. Puedes seleccionarlo para programar.' : 'Firmware guardado. Se seleccionó la versión más reciente compatible.');
+                    return true;
+                } }, { label: 'Cancelar', kind: 'ghost', onClick: () => true }] });
+            opened = true;
         } catch (e) { message(e.message, true); }
-        finally { btnSubir.disabled = busy; }
+        finally { if (!opened) { uploadOpen = false; enable(); } }
     });
     const lookup = h('button', { class: 'btn', type: 'button', onclick: () => scan(search.value) }, 'Buscar / cargar QR');
     const bundleBtn = h('button', { class: 'btn', type: 'button', onclick: async () => {
@@ -52,6 +75,7 @@ window.TQTSTM32 = function (host, ctx) {
           h('div', { class: 'field' }, h('label', { for: ID + '-q' }, 'Buscar'), search),
           h('div', { class: 'row wrap' }, lookup), list),
         h('div', { class: 'prog-panel prog-panel-detalle' }, panel,
+          h('div', { class: 'field' }, h('label', { for: ID + '-fw' }, 'Firmware a programar'), firmwareSelect, firmwareHint),
           h('div', { class: 'field' }, h('label', { for: ID + '-est' }, 'Estación Windows conectada al J-Link'), station,
             h('div', { class: 'row wrap' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: stations }, 'Actualizar estaciones'))),
           h('details', { class: 'prog-config' }, h('summary', null, 'Configurar esta computadora por primera vez'),
@@ -87,12 +111,32 @@ window.TQTSTM32 = function (host, ctx) {
     function enable() {
         btnCancel.disabled = !station.value || cancelling;
         btnProgram.textContent = busy ? 'Programando…' : current ? 'Programar ' + K + ' ' + current.identity.nombre.slice(-4) + ' con J-Link' : 'Programar STM32 con J-Link';
-        btnProgram.disabled = busy || !current || !station.value || station.selectedOptions[0]?.dataset.online !== 'true';
+        btnProgram.disabled = busy || uploadOpen || !current || !firmwareSelect.value || !station.value || station.selectedOptions[0]?.dataset.online !== 'true';
         if (btnEsp) btnEsp.disabled = busy || !current;
-        btnSubir.disabled = busy;
+        btnSubir.disabled = busy || uploadOpen;
+        firmwareSelect.disabled = busy || uploadOpen || !firmwareSelect.options.length;
         search.disabled = busy; lookup.disabled = busy; station.disabled = busy; bundleBtn.disabled = busy;
         list.querySelectorAll('button').forEach(b => b.disabled = busy);
     }
+
+    async function loadFirmwares(reset = false) {
+        const n = ++firmwareRequest;
+        const hw = selectedPcb?.version || '';
+        const r = await api('/api/stm32/firmwares?tipo=' + K + '&hw=' + encodeURIComponent(hw));
+        if (!alive || n !== firmwareRequest) return;
+        if (!r.ok) { firmwareHint.textContent = r.error; firmwareSelect.replaceChildren(); enable(); return; }
+        const d = r.data;
+        if (busy && activeFirmware) selectedFirmware = activeFirmware;
+        else if (reset || !d.items.some(f => f.id === selectedFirmware)) selectedFirmware = d.default_id;
+        firmwareSelect.replaceChildren(...d.items.map(f => h('option', { value: f.id }, 'FW ' + f.fw + ' · HW ' + f.hw + ' · ' + f.sha256.slice(0, 8) + (f.id === d.default_id ? ' · más reciente' : ''))));
+        firmwareSelect.value = selectedFirmware || '';
+        firmwareHint.textContent = d.items.length ? 'Por defecto se usa la versión más alta compatible; puedes elegir una anterior.' : 'No hay firmware compatible con esta placa. Sube un HEX para su hardware.';
+        enable();
+    }
+    firmwareSelect.addEventListener('change', () => {
+        selectedFirmware = firmwareSelect.value;
+        if (selectedPcb) choose(selectedPcb, true);
+    });
     async function stations() {
         const r = await api('/api/stm32/stations'); if (!alive) return;
         if (!r.ok) {
@@ -127,13 +171,15 @@ window.TQTSTM32 = function (host, ctx) {
                 message('Cancelación solicitada. Espera que el agente cierre J-Link; aún no desconectes la placa.');
                 if (!busy) await recover();
             } else {
-                clearTimeout(timer); activeJob = null; busy = false;
+                clearTimeout(timer); activeJob = null; activeFirmware = null; busy = false;
                 message('Trabajos pendientes cancelados. Puedes preparar otra programación.');
             }
         } finally { cancelling = false; enable(); }
     }
 
     function watchJob(j) {
+        activeFirmware = j.payload?.firmware_id || null;
+        if (activeFirmware) { selectedFirmware = activeFirmware; firmwareSelect.value = activeFirmware; }
         activeJob = j.id; busy = true; enable(); progress(j);
         clearTimeout(timer);
         async function poll() {
@@ -143,7 +189,7 @@ window.TQTSTM32 = function (host, ctx) {
             if (!r.ok) { message('Recuperando conexión. Puedes solicitar detener la programación; no desconectes la placa.', true); timer = setTimeout(poll, 3000); return; }
             const job = r.data;
             if (['queued', 'running'].includes(job.state)) { progress(job); timer = setTimeout(poll, 1000); return; }
-            activeJob = null; busy = false; await stations();
+            activeJob = null; activeFirmware = null; busy = false; await stations();
             if (selectedPcb) await choose(selectedPcb, true);
             enable();
             message(job.state === 'verified' ? '✓ STM32 programado y verificado por lectura · FW ' + job.payload.identity.fw + ' · UID ' + job.result.uid + '. Ya puedes desconectar la placa.' : (job.result?.error || 'No se confirmó la programación. Revisa la estación y la tarjeta.'), job.state !== 'verified');
@@ -154,7 +200,9 @@ window.TQTSTM32 = function (host, ctx) {
         if (busy) return { ok: false, texto: 'Hay una programación en curso.' };
         selectedPcb = pcb;
         const n = ++requestN; current = null; enable(); panel.replaceChildren(h('p', { class: 'hint' }, K === 'R1' ? 'Cargando R1 y su R2…' : 'Cargando R3…')); markSel();
-        const r = await api('/api/stm32/preview/' + pcb.id);
+        await loadFirmwares();
+        if (!alive || n !== requestN) return { ok: false, texto: 'Selección cambiada.' };
+        const r = await api('/api/stm32/preview/' + pcb.id + (selectedFirmware ? '?firmware_id=' + encodeURIComponent(selectedFirmware) : ''));
         if (!alive || n !== requestN) return { ok: false, texto: 'Selección cambiada.' };
         if (!r.ok) { panel.replaceChildren(T.banner('bad', 'alert', r.error)); return { ok: false, texto: r.error }; }
         current = r.data;
@@ -205,7 +253,7 @@ window.TQTSTM32 = function (host, ctx) {
         if (!current || busy) return;
         busy = true; enable();
         progress({ state: 'queued' });
-        const r = await api('/api/stm32/jobs', { method: 'POST', body: { pcb_id: current.pcb_id, station_id: station.value, hex_sha256: current.hex_sha256, physical_confirmed: true } });
+        const r = await api('/api/stm32/jobs', { method: 'POST', body: { pcb_id: current.pcb_id, station_id: station.value, hex_sha256: current.hex_sha256, firmware_id: current.firmware_id, physical_confirmed: true } });
         if (!r.ok) { busy = false; enable(); message(r.error, true); return; }
         watchJob(r.data);
     }
@@ -216,7 +264,7 @@ window.TQTSTM32 = function (host, ctx) {
     }
     const ws = ctx.ws || (T.ws && T.ws());
     if (ws?.on) ['PCB_ACTUALIZADA', 'PCB_ELIMINADA', 'TARJETA_ACTUALIZADA', 'TARJETA_EMPAREJADA'].forEach(ev => unsubs.push(ws.on(ev, refresh)));
-    loadList(); stations();
+    loadFirmwares(true); loadList(); stations();
     const stationTimer = setInterval(() => { if (alive && !busy) stations(); }, 5000);
     return { escaneo: scan, ocupada() { return busy; }, actualizar: refresh, desmontar() { alive = false; clearTimeout(timer); clearTimeout(debounce); clearInterval(stationTimer); unsubs.forEach(fn => fn()); } };
 };
