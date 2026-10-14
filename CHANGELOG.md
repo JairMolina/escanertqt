@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.73 — 2026-10-14
+- **Programación:** botones en orden R2 · ESP32 → R1 → R3.
+- **Programación STM32 R1/R3:** el detalle de la tarjeta se divide en datos + semáforo de estado (rojo «Sin programar»/«Error al programar», amarillo «Programando…», verde «Programada») que se actualiza en vivo y relee el estado real de la placa.
+- **Pruebas TQT:** los recuadros de sensores S29 ya no desbordan su contenido (MACs y etiquetas largas se ajustan).
+
 ## v1.3.72 — 2026-10-13
 - **Programación STM32 R1/R3:** subir, validar y guardar HEX en un catálogo persistente. Selector de firmware compatible con la placa; por defecto elige la versión numérica más alta, con la subida más reciente en caso de empate.
 - R1 obtiene HW/FW de su perfil y conserva la personalización por inventario; R3 solicita confirmar HW/FW al registrar una imagen sin perfil. Se conservan las versiones anteriores.
