@@ -1,0 +1,87 @@
+/* GATT receiver model: finite queue, byte offsets, reconnect and cancellation. No hardware. */
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const { performance } = require('node:perf_hooks');
+const source = fs.readFileSync(path.join(__dirname, '../app/static/js/esp32_ota.js'), 'utf8');
+async function trial(chunk, cancel = false, loseResult = false) {
+    const image = Uint8Array.from({length: 8197}, (_, i) => (i * 17 + 3) & 255);
+    const manifest = new Uint8Array(138);
+    new DataView(manifest.buffer).setUint32(48, image.length, true);
+    const state = {state:'idle', offset:0, total:0, error:''};
+    const records = {writes:0, reads:0, queued:0, commits:0, cancels:0, apiCancel:0, received:[], manifest:[]};
+    let rebooted = false, resultLost = false;
+    const storage = new Map(); const signal = new AbortController();
+    const json = value => new DataView(new TextEncoder().encode(JSON.stringify(value)).buffer);
+    const info = () => ({nombre:'TQT_R2_V30_0069', ota_protocol:1, boot_valid:true, chunk,
+                         partition:rebooted ? 0x150000 : 0x10000});
+    const chars = {
+        '0002': {readValue:async()=>json(info())},
+        '0005': {readValue:async()=>{records.reads++; records.queued=0; return json(state);}},
+        '0003': {writeValueWithResponse:async bytes=>{
+            if (bytes[0]===1) Object.assign(state,{state:'manifest',offset:0,total:138});
+            if (bytes[0]===3) records.cancels++;
+            if (bytes[0]===2) {records.commits++;rebooted=true;device.gatt.disconnect();}
+        }},
+        '0004': {writeValueWithResponse:async bytes=>{
+            assert.ok(++records.queued<=8, 'Firmware queue capacity exceeded');
+            assert.ok(bytes.length<=chunk+4, 'Peer MTU payload exceeded');
+            const offset=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(0,true);
+            assert.equal(offset,state.offset, 'Receiver cannot accept skipped/duplicate offset');
+            records.writes++;state.offset+=bytes.length-4;
+            if(state.state==='manifest') {
+                records.manifest.push(...bytes.slice(4));
+                if(state.offset===138) Object.assign(state,{state:'receiving',offset:0,total:image.length});
+            } else {
+                records.received.push(...bytes.slice(4));
+                if(state.offset===image.length) state.state='ready';
+            }
+        }}
+    };
+    const device={gatt:{connected:false,
+        connect:async function(){this.connected=true;return {getPrimaryService:async()=>({getCharacteristic:async uuid=>chars[uuid.slice(4,8)]})};},
+        disconnect(){this.connected=false;records.queued=0;}
+    }};
+    const context=vm.createContext({window:{isSecureContext:true},navigator:{bluetooth:{requestDevice:async()=>device}},
+        sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
+        TextDecoder,Uint8Array,DataView,atob:s=>Buffer.from(s,'base64').toString('binary'),
+        setTimeout,clearTimeout,performance,console});
+    vm.runInContext(source,context);
+    const api=async (url)=>{
+        if(url.includes('/prepare/')) return {ok:true,data:{job_id:'simulation',manifest:Buffer.from(manifest).toString('base64'),encrypted_image:Buffer.from(image).toString('base64')}};
+        if(url.includes('/cancel/')) {records.apiCancel++;return {ok:true};}
+        if(loseResult&&!resultLost) {resultLost=true;return {ok:false,error:'Simulated network failure after restart'};}
+        return {ok:true,data:{verified:true,fw:'4.1',pcb:{id:66}}};
+    };
+    const options={pcb:{id:66,nombre:'TQT-R2-V30-0069'},firmwareId:'base-R2-v41',api,signal:signal.signal,
+        stage:()=>{},committing:()=>{},progress:(done,total,timing)=>{
+            assert.ok(done<=total && timing.elapsed>=0);
+            if(cancel&&done>0) signal.abort();
+        }};
+    if(cancel) {
+        await assert.rejects(context.window.TQTR2OTA.execute(options),/cancelada/);
+        assert.equal(records.commits,0);assert.equal(records.apiCancel,1);
+        assert.equal(context.window.TQTR2OTA.pending(),null);
+    } else {
+        if(loseResult) {
+            await assert.rejects(context.window.TQTR2OTA.execute(options),/pendiente/);
+            assert.ok(context.window.TQTR2OTA.pending());
+            assert.equal(records.apiCancel,0);
+            const writes=records.writes;
+            await context.window.TQTR2OTA.execute(options,true);
+            assert.equal(records.writes,writes,'Recovery must never send firmware again');
+        } else assert.equal((await context.window.TQTR2OTA.execute(options)).verified,true);
+        assert.equal(records.commits,1);
+        assert.equal(context.window.TQTR2OTA.pending(),null);
+        assert.deepEqual(Uint8Array.from(records.manifest),manifest);
+        assert.deepEqual(Uint8Array.from(records.received),image);
+        const batches=Math.ceil(Math.ceil(138/chunk)/8)+Math.ceil(Math.ceil(image.length/chunk)/8);
+        assert.equal(records.reads,batches+2,'Status read budget must match eight-packet windows');
+    }
+    return {chunk,cancel,loseResult,writes:records.writes,statusReads:records.reads};
+}
+(async()=>{
+    for(const args of [[16,false,false],[180,false,false],[16,true,false],[180,false,true]]) console.log(await trial(...args));
+    console.log('4 transport scenarios passed; no hardware accessed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

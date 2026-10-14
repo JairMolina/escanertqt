@@ -138,6 +138,7 @@
         const escribir = (linea) => { log.textContent += linea + '\n'; log.scrollTop = log.scrollHeight; };
         const relleno = h('div', { class: 'prog-bar-fill' });
         const barra = h('div', { class: 'prog-bar' }, relleno);
+        const otaProgress = h('p', { class: 'hint', hidden: true, role: 'status', 'aria-live': 'polite' });
         const resultado = h('div', { class: 'prog-resultado', hidden: true, role: 'status' });
         const btnFlash = h('button', { class: 'btn btn-primary', type: 'button' }, icon('flash'), 'Compilar y flashear');
         let otaController = null;
@@ -330,6 +331,7 @@
             const port = S.puertoSel;
             if (!port) { escribir('✗ Elige primero el puerto de la tarjeta.'); return; }
             S.busy = true; btnFlash.disabled = true; resultado.hidden = true; relleno.style.width = '0';
+            otaProgress.hidden = true;
             pintarLista(); pintarPuertos(); resetPasos(); enableFirmware();
             const pcb = S.tarjeta;
             let transport = null;
@@ -411,17 +413,32 @@
             const pcb = S.tarjeta, firmwareId = firmwareSelect.value;
             otaController = new AbortController(); S.busy = true; S.completed = null;
             resultado.hidden = true; log.textContent = ''; relleno.style.width = '0';
+            otaProgress.hidden = false; otaProgress.textContent = 'Preparando actualización Bluetooth…';
+            let lastProgressUpdate = 0;
             enableFirmware(); pintarLista(); pintarPuertos(); resetPasos();
             try {
                 const result = await window.TQTR2OTA.execute({ pcb, firmwareId, api,
-                    signal: otaController.signal, stage: text => escribir(text + '…'),
-                    progress: (done, total) => { relleno.style.width = Math.round(done / total * 100) + '%'; },
+                    signal: otaController.signal, stage: text => { escribir(text + '…'); otaProgress.textContent = text + '…'; },
+                    progress: (done, total, timing = { elapsed: 0 }) => {
+                        const percent = Math.floor(done / total * 100);
+                        relleno.style.width = percent + '%';
+                        const now = performance.now();
+                        if (lastProgressUpdate && done > 0 && done < total && now - lastProgressUpdate < 1000) return;
+                        lastProgressUpdate = now;
+                        const rate = timing.elapsed > 0 ? done / timing.elapsed : 0;
+                        const remaining = rate > 0 ? Math.ceil((total - done) / rate) : 0;
+                        const eta = remaining >= 60 ? Math.ceil(remaining / 60) + ' min' : remaining + ' s';
+                        otaProgress.textContent = `Enviado ${percent}% · ${Math.round(done / 1024)} / ${Math.round(total / 1024)} KB` +
+                            (rate > 0 ? ` · ${(rate / 1024).toFixed(1)} KB/s` : '') +
+                            (timing.elapsed >= 3 && done < total ? ` · Restan aproximadamente ${eta}` : '');
+                    },
                     committing: value => { S.otaCommitting = value; enableFirmware(); } }, recovery);
                 S.tarjeta = result.pcb;
                 escribir('OTA verificada ✓ · FW ' + result.fw);
+                otaProgress.textContent = 'Actualización y nuevo arranque verificados · FW ' + result.fw;
                 mostrarResultado(S.tarjeta, S.tarjeta.mac, { firmware: result.fw, hardware: S.tarjeta.version, nombreBle: S.tarjeta.nombre.replace(/-/g, '_') });
                 toast('R2 actualizada y verificada por Bluetooth', { kind: 'ok' });
-            } catch (e) { escribir('✗ ' + e.message); }
+            } catch (e) { escribir('✗ ' + e.message); otaProgress.textContent = e.message; }
             finally { S.busy = false; otaController = null; S.otaCommitting = false; await loadFirmwares(); enableFirmware(); pintarLista(); pintarPuertos(); }
         }
 
@@ -432,12 +449,13 @@
             h('div', { class: 'field' }, h('label', null, 'Puerto de la tarjeta'), puertosWrap,
                 h('div', { class: 'hint' }, 'Solo se listan aquí los puertos que ya autorizaste antes. «Elegir puerto» abre la lista real de puertos COM de Windows (el navegador la pide una vez por puerto; luego queda recordado).')),
             h('div', { class: 'hint' }, 'Antes de sincronizar, pon la tarjeta en modo programador; el registro avisa si no avanza.'),
-            log, barra, h('div', { class: 'row' }, btnFlash), otaPanel, resultado);
+            log, barra, otaProgress, h('div', { class: 'row' }, btnFlash), otaPanel, resultado);
         const vacio = T.empty('flash', 'Elige una tarjeta', 'Búscala por número o nombre a la izquierda, o elige una de la lista.');
 
         function seleccionar(p) {
             if (S.busy || uploadBusy) return;
             S.tarjeta = p; S.capability = null;
+            otaProgress.hidden = true;
             S.completed = null;
             loadFirmwares(true);
             pintarDetalle();

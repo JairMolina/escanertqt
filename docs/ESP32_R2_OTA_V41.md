@@ -94,6 +94,38 @@ en el selector de su navegador; ya recibió instrucciones para reinstalar FW4.1
 y verificar cambio de partición. No afirmar OTA física verificada hasta leer
 su resultado y contrastarlo con el job/attestation del servidor.
 
+## Mejora de envío preparada: web 1.3.78
+
+La prueba física generó el job `45226b5e1a6c36611ddf8b80` para PCB66 desde
+partición 0x10000, con prueba INFO auténtica aceptada. El usuario aclaró que
+seguía en «Enviando firmware por Bluetooth…», aunque inicialmente seleccionó
+la respuesta de éxito. El servidor todavía muestra prepared, sin resultado
+verificado. No se registra una OTA física exitosa ni se interrumpe desde el servidor.
+
+Se cambia la ventana de envío de cuatro a ocho paquetes, respetando la cola
+de ocho del firmware ya instalado. Se conserva write-with-response, offset,
+MTU, comprobación del receptor, cifrado, cancelación y activación tras validar.
+Esto reduce aproximadamente a la mitad las consultas de estado; no promete
+reducir el tiempo total a la mitad. No exige volver a instalar firmware por serial.
+
+El indicador muestra porcentaje, KB enviados/total, velocidad y tiempo restante
+estimado a partir de lo transferido. Las actualizaciones de texto se limitan a
+una por segundo y separan envío de la confirmación del nuevo arranque. El job
+nuevo también conserva chunk_bytes para diagnosticar el límite Bluetooth.
+
+Verificación: `node tests/esp32_ota_transport.cjs`, cuatro escenarios con
+receptor de cola finita, bloques de 16/180 bytes, cancelación previa a activar
+y recuperación del resultado sin reenviar firmware. Bytes y offsets exactos,
+cola nunca mayor de ocho; 69/9 lecturas para el fixture de 8.197 bytes.
+14 tests OTA de backend correctos. Playwright aislado: progreso 25%/250 de
+1.000KB/25KBs/30s estimados, cancelación visible y controles restaurados;
+escritorio1366/móvil390 sin desborde después de estabilizar el diseño.
+node --check y git diff --check correctos. Datos y Bluetooth simulados aislados.
+
+La 1.3.78 todavía no está desplegada. Antes de aplicarla, el usuario debe
+detener el envío actual desde su navegador o esperar su conclusión, y autorizar
+el despliegue según AGENTS.md. Producción continúa con web1.3.77.
+
 Capacidades utilizadas: CM continuidad/checkpoint/Git/memoria; ECC HW/FW y
 C++ para protocolo y restricciones del SDK, seguridad para identidad/credencial
 y autorización, verificación para compilación, pruebas y revisión del diff.

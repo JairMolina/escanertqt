@@ -57,6 +57,7 @@
         throw new Error('La R2 no confirmó el bloque OTA; no se activó el firmware.');
     }
     async function stream(chars, bytes, chunk, signal, manifest, progress) {
+        const started = performance.now();
         for (let offset = 0, batch = 0; offset < bytes.length;) {
             check(signal);
             const length = Math.min(chunk, bytes.length - offset);
@@ -65,11 +66,12 @@
             packet.set(bytes.subarray(offset, offset + length), 4);
             await bounded(chars.data.writeValueWithResponse(packet), signal);
             offset += length;
-            if (++batch === 4 || offset === bytes.length) {
+            // Firmware v1 queues eight packets. Drain at that boundary before sending more.
+            if (++batch === 8 || offset === bytes.length) {
                 await waitState(chars, status => manifest ?
                     (status.state === 'manifest' && status.offset >= offset) || (offset === bytes.length && status.state === 'receiving') :
                     (status.state === 'receiving' && status.offset >= offset) || (offset === bytes.length && status.state === 'ready'), signal);
-                batch = 0; if (!manifest) progress(offset, bytes.length);
+                batch = 0; if (!manifest) progress(offset, bytes.length, { elapsed: (performance.now() - started) / 1000 });
             }
         }
     }
@@ -117,7 +119,9 @@
             await waitState(chars, s => s.state === 'manifest', signal);
             await stream(chars, decode(prepared.data.manifest), chunk, signal, true, progress);
             stage('Enviando firmware por Bluetooth');
-            await stream(chars, decode(prepared.data.encrypted_image), chunk, signal, false, progress);
+            const encrypted = decode(prepared.data.encrypted_image);
+            progress(0, encrypted.length, { elapsed: 0 });
+            await stream(chars, encrypted, chunk, signal, false, progress);
             await waitState(chars, s => s.state === 'ready', signal);
             // Cancellation is safe up to this point. Afterwards the device may already boot the new slot.
             save({ pcb_id: pcb.id, nombre: pcb.nombre, job_id: job }); committing(true); committed = true;

@@ -117,6 +117,7 @@ def prepare(pcb_id,firmware_id,info,operator):
         identifier=secrets.token_hex(12)
         payload=dict(pcb_id=pcb_id,firmware_id=firmware_id,nombre=meta['nombre'],hw=meta['hw'],fw=meta['fw'],
                      mac=pcb['mac'],nonce=info['nonce'],source_partition=info['partition'],
+                     chunk_bytes=info.get('chunk',16),
                      app_sha256=application[-32:].hex(),transfer_sha256=hashlib.sha256(application).hexdigest(),bytes=len(application))
         c.execute('INSERT INTO esp32_ota_jobs VALUES(?,?,?,?,?,?,?,NULL)',
                   (identifier,pcb_id,firmware_id,'prepared',now,operator,json.dumps(payload)))
