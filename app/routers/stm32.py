@@ -99,8 +99,8 @@ def image(pcb_id: int, firmware_id: str | None = None):
 
 
 @router.get('/stations')
-def stations():
-    return svc.stations()
+def stations(req: Request):
+    return svc.stations(req.client.host if req.client else None)
 
 
 def station_archive(st, server):
@@ -164,11 +164,14 @@ def cancel(sid: str, req: Request):
     return run(svc.cancel_station, sid, operator(req))
 
 
-def station_token(authorization: str = Header(default='')):
+def station_token(req: Request, authorization: str = Header(default='')):
     if not authorization.startswith('Bearer '):
         raise HTTPException(401, 'Falta credencial de estación.')
     try:
-        return svc.station_auth(authorization[7:])
+        st = svc.station_auth(authorization[7:])
+        if req.client:
+            svc.STATION_IP[st['id']] = req.client.host
+        return st
     except ValueError:
         raise HTTPException(401, 'Credencial de estación inválida.')
 

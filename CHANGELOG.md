@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.75 — 2026-10-14
+- **Programación STM32 R1/R3:** «Estación Windows conectada al J-Link» muestra solo la estación local (la que reporta desde la misma red que el navegador), no todas. El servidor recuerda en memoria la IP de cada agente; «Cambiar dispositivo» solo aparece si hay más de una estación local.
+
 ## v1.3.74 — 2026-10-14
 - **Pruebas TQT:** rediseño de la sección en tarjetas (Tarjeta e inventario · Conexión y dispositivo · Controles manuales · Prueba automática · Sensores S29 · Historial), dos columnas que se apilan en <900px, botones espaciados de 40px y sin desbordes de 375px a escritorio.
 - **Dispositivo de esta PC:** Programación STM32 (R1/R3) y Pruebas TQT recuerdan en cada navegador su propia estación (al descargar el instalador, al elegirla o si es la única conectada) y muestran solo «Dispositivo de esta PC» con opción «Cambiar dispositivo».

@@ -26,6 +26,7 @@ window.TQTSTM32 = function (host, ctx) {
     const sessionTxt = h('span', { class: 'prog-sesion-txt' });
     const sessionBox = h('div', { class: 'row wrap prog-sesion', hidden: true },
         sessionTxt, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => { changing = true; renderStation(); } }, 'Cambiar dispositivo'));
+    const btnChange = sessionBox.lastElementChild;
     function renderStation() {
         const opt = station.selectedOptions[0];
         const has = !!station.value && !changing;
@@ -169,14 +170,17 @@ window.TQTSTM32 = function (host, ctx) {
             renderStation(); enable(); return;
         }
         const selected = station.value;
-        station.replaceChildren(h('option', { value: '' }, 'Elige una estación'));
-        r.data.forEach(s => station.append(h('option', { value: s.id, dataset: { online: String(s.online), name: s.name } }, s.name + (s.online ? ' · conectada' : ' · desconectada'))));
+        // v1.3.75: solo las estaciones que reportan desde la misma red que este navegador (la PC local)
+        const locales = r.data.filter(s => s.local);
+        btnChange.hidden = locales.length < 2;
+        station.replaceChildren(h('option', { value: '' }, locales.length ? 'Elige una estación' : 'Ninguna estación J-Link en esta PC'));
+        locales.forEach(s => station.append(h('option', { value: s.id, dataset: { online: String(s.online), name: s.name } }, s.name + (s.online ? ' · conectada' : ' · desconectada'))));
         const has = id => !!id && [...station.options].some(o => o.value === id);
         const saved = getSaved();
-        if (saved && !has(saved)) { setSaved(''); changing = false; }
+        if (saved && !r.data.some(s => s.id === saved)) { setSaved(''); changing = false; }
         if (has(saved)) station.value = saved;
         else if (has(selected)) station.value = selected;
-        else if (r.data.filter(s => s.online).length === 1) { station.value = r.data.find(s => s.online).id; setSaved(station.value); }
+        else if (locales.some(s => s.online)) { station.value = locales.find(s => s.online).id; setSaved(station.value); }
         renderStation();
         enable();
         if (!busy) await recover();
