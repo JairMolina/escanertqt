@@ -78,6 +78,23 @@ class TestPersonalizadorR2(unittest.TestCase):
         self.assertEqual(firmware_build.metadatos("R2")["version"], "3.1.2")
 
 
+class TestR1Precompilada(unittest.TestCase):
+    """v1.3.79: la R1 usa el .merged.bin del repo (como el catálogo R2) y no necesita arduino-cli."""
+
+    def test_r1_sin_arduino_cli_sirve_el_bin(self):
+        previo = firmware_build.binario_precompilado_r1()
+        self.assertIsNotNone(previo, "falta o no coincide firmware/esp32_r1/ESP32_BLE_SERIAL.merged.bin con su JSON")
+        with mock.patch.dict(os.environ, {"TQT_ARDUINO_CLI": "/no/existe/arduino-cli"}):
+            datos, info = firmware_build.compilar_firmware_meta("R1")
+        self.assertEqual(datos, previo[0])
+        self.assertEqual(datos[0x1000], 0xE9)   # cabecera del bootloader ESP32 en 0x1000 del merged
+        self.assertEqual(info["sha256_fuente"], previo[1]["source_sha256"])
+
+    def test_r1_fuente_cambiada_no_usa_el_bin(self):
+        with mock.patch.object(firmware_build, "metadatos", return_value={"sha256": "x" * 64, "source_sha256": "y" * 64}):
+            self.assertIsNone(firmware_build.binario_precompilado_r1())
+
+
 @unittest.skipUnless(_ENV is not None, "arduino-cli no disponible en este entorno (ver _env_compilable)")
 class TestFirmwareBuildCompilaDeVerdad(unittest.TestCase):
     def _compilar(self, tipo, numero=None):

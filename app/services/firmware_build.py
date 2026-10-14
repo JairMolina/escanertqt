@@ -97,6 +97,21 @@ def compilar_firmware(tipo: str, numero: Optional[str] = None) -> bytes:
     return compilar_firmware_meta(tipo, numero)[0]
 
 
+def binario_precompilado_r1() -> Optional[Tuple[bytes, Dict[str, str]]]:
+    """v1.3.79: la R1 no se personaliza por unidad (el nombre BLE lo pone el STM32 por UART2), así que se sirve el
+    `.merged.bin` precompilado igual que el catálogo de R2, sin arduino-cli en el servidor. Solo si el JSON coincide
+    con la fuente y con el binario; si no, se compila como antes."""
+    src = SKETCHES["R1"]
+    binario, ino = src.parent / f"{src.name}.merged.bin", src / f"{src.name}.ino"
+    meta = metadatos("R1")
+    if not (binario.is_file() and ino.is_file() and meta.get("sha256") and meta.get("source_sha256")):
+        return None
+    datos = binario.read_bytes()
+    if hashlib.sha256(datos).hexdigest() != meta["sha256"] or hashlib.sha256(ino.read_bytes()).hexdigest() != meta["source_sha256"]:
+        return None
+    return datos, meta
+
+
 def compilar_firmware_meta(tipo: str, numero: Optional[str] = None) -> Tuple[bytes, Dict[str, str]]:
     """Como `compilar_firmware`, más los datos de trazabilidad (nombre BLE esperado, hashes y versión)."""
     tipo = (tipo or "").strip().upper()
@@ -107,6 +122,12 @@ def compilar_firmware_meta(tipo: str, numero: Optional[str] = None) -> Tuple[byt
         raise FirmwareBuildError(f"No se encontró el firmware fuente de {tipo} en el servidor ({src_dir}).")
 
     info: Dict[str, str] = {"firmware": metadatos(tipo).get("version", "")}
+    if tipo == "R1":
+        previo = binario_precompilado_r1()
+        if previo:
+            datos, meta = previo
+            info.update(sha256_fuente=meta["source_sha256"])
+            return datos, info
 
     with tempfile.TemporaryDirectory(prefix="tqt_fw_") as tmp:
         tmp_path = Path(tmp)

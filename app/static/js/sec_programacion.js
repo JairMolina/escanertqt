@@ -37,12 +37,14 @@
         const timers = new Set();
         const unsubs = [];
 
+        let r1Gate = { ok: true, motivo: '' };
         let firmwareRequest = 0, uploadBusy = false, firmwareLoading = false;
         const firmwareSelect = h('select', { class: 'input', id: 'esp-r2-fw' });
         const firmwareHint = h('p', { class: 'hint', 'aria-live': 'polite' }, 'Cargando firmware…');
         const uploadInput = h('input', { type: 'file', accept: '.bin,.hex', hidden: true });
         const uploadBtn = h('button', { class: 'btn', type: 'button', onclick: () => uploadInput.click() }, 'Subir BIN / HEX');
-        const firmwarePanel = h('div', { class: 'field' }, h('label', { for: 'esp-r2-fw' }, 'Firmware R2 a programar'), firmwareSelect, firmwareHint, h('div', { class: 'row wrap' }, uploadBtn, uploadInput));
+        const firmwareLabel = h('label', { for: 'esp-r2-fw' }, 'Firmware R2 a programar');
+        const firmwarePanel = h('div', { class: 'field' }, firmwareLabel, firmwareSelect, firmwareHint, h('div', { class: 'row wrap' }, uploadBtn, uploadInput));
         let esptoolProm = null;
         function cargarEsptool() { return esptoolProm || (esptoolProm = import(ESPTOOL_URL)); }
 
@@ -269,8 +271,9 @@
             const blocked = S.busy || uploadBusy || firmwareLoading;
             firmwareSelect.disabled = blocked || !firmwareSelect.options.length;
             uploadBtn.disabled = blocked;
-            btnFlash.disabled = blocked || !S.tarjeta || S.completed === S.tarjeta.id || (S.tarjeta?.tipo === 'R2' && !firmwareSelect.value);
-            btnFlash.textContent = S.tarjeta?.tipo === 'R1' ? 'Compilar y flashear' : 'Instalar por serial';
+            btnFlash.disabled = blocked || !S.tarjeta || S.completed === S.tarjeta.id || !firmwareSelect.value || (S.tarjeta?.tipo === 'R1' && !r1Gate.ok);
+            btnFlash.textContent = 'Instalar por serial';
+            firmwareLabel.textContent = 'Firmware ' + (S.tarjeta?.tipo || 'R2') + ' a programar';
             selBaudFlash.disabled = blocked; monUI();
             const saved = window.TQTR2OTA?.pending();
             const ownPending = saved?.pcb_id === S.tarjeta?.id;
@@ -279,7 +282,7 @@
             btnOtaVerify.hidden = !ownPending; btnOtaDiscard.hidden = !saved;
             btnOtaVerify.disabled = btnOtaDiscard.disabled = blocked;
             btnOtaCancel.hidden = !otaController; btnOtaCancel.disabled = S.otaCommitting;
-            otaPanel.hidden = S.tarjeta?.tipo === 'R1';
+            otaPanel.hidden = S.tarjeta?.tipo !== 'R2';
             otaHint.textContent = ownPending ? 'Hay una actualización pendiente de comprobar. Conecta la R2 encendida para verificarla.' :
                 saved ? 'Verifica o descarta la OTA pendiente de ' + (saved.nombre || 'otra R2') + ' antes de iniciar otra.' :
                 S.capability?.eligible ? 'FW ' + S.capability.current_fw + ': admite OTA. Mantén alimentación estable y libera la conexión Bluetooth de la R1 durante la actualización.' :
@@ -289,22 +292,27 @@
             const n = ++firmwareRequest;
             firmwareLoading = true; enableFirmware();
             const selected = firmwareSelect.value;
-            const hw = S.tarjeta?.tipo === 'R2' ? S.tarjeta.version : '';
+            const tipo = S.tarjeta?.tipo === 'R1' ? 'R1' : 'R2';
+            const hw = tipo === 'R2' ? S.tarjeta?.version || '' : '';
             const [r, capability] = await Promise.all([
-                api('/api/esp32/firmwares?hw=' + encodeURIComponent(hw)),
+                api('/api/esp32/firmwares?tipo=' + tipo + '&hw=' + encodeURIComponent(hw)),
                 S.tarjeta?.tipo === 'R2' ? api('/api/esp32/ota/capability/' + S.tarjeta.id) : Promise.resolve(null)
             ]);
             if (!S.vivo || n !== firmwareRequest) return;
             firmwareLoading = false;
             S.capability = capability?.ok ? capability.data : null;
+            r1Gate = { ok: true, motivo: '' };
+            if (tipo === 'R1') { const g = await api('/api/esp32/r1-gate/' + S.tarjeta.id); if (n !== firmwareRequest) return; r1Gate = g.ok ? g.data : { ok: false, motivo: g.error }; }
             if (!r.ok) {
                 firmwareSelect.replaceChildren(); firmwareHint.textContent = r.error;
                 enableFirmware(); return;
             }
             firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id, dataset: { ota: String(f.ota_protocol || 0) } },
-                `FW ${f.fw} · HW ${f.hw}` + (f.ota_protocol ? ' · OTA' : '') + (f.id === r.data.default_id ? ' · más reciente' : ''))));
+                `FW ${f.fw}` + (f.hw ? ` · HW ${f.hw}` : '') + (f.ota_protocol ? ' · OTA' : '') + (f.id === r.data.default_id ? ' · más reciente' : ''))));
             firmwareSelect.value = !reset && r.data.items.some(f => f.id === selected) ? selected : (r.data.default_id || '');
-            firmwareHint.textContent = r.data.items.length ? 'El nombre se toma de la R2 elegida; HW y FW se leen del archivo. Puedes elegir una versión anterior.' : 'No hay firmware compatible con el hardware de esta R2.';
+            firmwareHint.textContent = tipo === 'R1' ? (r.data.items.length ? 'Sketch BLE-serie de la R1: no lleva identidad por unidad (el nombre BLE lo graba el STM32). Se verifica solo la MAC.' : 'No hay firmware ESP32 de R1 guardado. Sube un merged.bin.')
+                : r.data.items.length ? 'El nombre se toma de la R2 elegida; HW y FW se leen del archivo. Puedes elegir una versión anterior.' : 'No hay firmware compatible con el hardware de esta R2.';
+            if (!r1Gate.ok) firmwareHint.textContent = r1Gate.motivo;
             enableFirmware();
         }
         uploadInput.addEventListener('change', async () => {
@@ -316,7 +324,13 @@
                 const bytes = new Uint8Array(await file.arrayBuffer());
                 let binary = '';
                 for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i+8192));
-                const body = { filename: file.name, contenido: btoa(binary) };
+                const tipo = S.tarjeta?.tipo === 'R1' ? 'R1' : 'R2';
+                const body = { filename: file.name, contenido: btoa(binary), tipo };
+                if (tipo === 'R1') {
+                    const v = window.prompt('Versión del firmware R1 (p. ej. 1.0):', '');
+                    if (!v) return;
+                    body.version = String(v).trim();
+                }
                 const r = await api('/api/esp32/firmwares/analizar', { method: 'POST', body });
                 if (!r.ok) throw new Error(r.error);
                 if (!S.vivo) return;
@@ -325,9 +339,9 @@
                 let saving = false;
                 const error = h('div', { role: 'alert' });
                 await new Promise(resolve => {
-                    const modal = T.sheet({ title: 'Guardar firmware R2',
-                    body: h('div', null, h('p', null, `${file.name} · FW ${d.fw} · HW ${d.hw}`),
-                        h('p', { class: 'hint' }, 'El archivo se guardará sin identidad ni credenciales de unidad. Al instalar se colocarán los datos de la R2 del inventario.'),
+                    const modal = T.sheet({ title: 'Guardar firmware ' + tipo,
+                    body: h('div', null, h('p', null, `${file.name} · FW ${d.fw}` + (d.hw ? ` · HW ${d.hw}` : '')),
+                        h('p', { class: 'hint' }, tipo === 'R1' ? 'El archivo se guardará tal cual, sin modificarlo. La R1 se verifica solo por su MAC.' : 'El archivo se guardará sin identidad ni credenciales de unidad. Al instalar se colocarán los datos de la R2 del inventario.'),
                         h('p', { class: 'hint' }, 'Módulo: ' + d.module), error),
                     onClose: resolve,
                     actions: [{ label: 'Guardar firmware', kind: 'primary', onClick: async () => {
@@ -358,9 +372,7 @@
         });
         firmwareSelect.addEventListener('change', enableFirmware);
         async function compilarFirmware(pcb) {
-            const r2 = pcb.tipo === 'R2';
-            const resp = await fetch(r2 ? `/api/esp32/bin/${pcb.id}?firmware_id=${encodeURIComponent(firmwareSelect.value)}` : '/api/firmware/compilar',
-                r2 ? { method: 'POST' } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo: pcb.tipo, numero: pcb.serie }) });
+            const resp = await fetch(`/api/esp32/bin/${pcb.id}?firmware_id=${encodeURIComponent(firmwareSelect.value)}`, { method: 'POST' });
             if (!resp.ok) {
                 let msg = `Error ${resp.status}`;
                 try { const j = await resp.json(); msg = j.detail || msg; } catch (e) { /* sin JSON */ }
@@ -454,15 +466,15 @@
             try {
                 await monDetener();   // el monitor libera el puerto antes de flashear
                 marcarPaso('compilar', 'activo');
-                escribir(pcb.tipo === 'R2' ? 'Preparando firmware y nombre desde inventario…' : 'Compilando firmware de R1…');
+                escribir(pcb.tipo === 'R2' ? 'Preparando firmware y nombre desde inventario…' : 'Preparando firmware de R1 del catálogo…');
                 const fw = await compilarFirmware(pcb); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
                 marcarPaso('compilar', 'ok');
                 escribir(`Firmware listo (${(binario.length / 1024).toFixed(0)} KB)${fw.firmware ? ' · FW ' + fw.firmware + (fw.hardware ? ' · HW ' + fw.hardware : '') : ''}${fw.nombreBle ? ' · nombre BLE ' + fw.nombreBle : ''}.`);
 
                 marcarPaso('puerto', 'ok');
-                if (esR2) {
+                {
                     marcarPaso('boot', 'activo');
-                    if (!await confirmar('Modo descarga de la R2', 'Conecta el USB–TTL, mantén GPIO0 (BOOT) en bajo y haz RESET. Confirma cuando esté listo.', 'Ya está en BOOT')) throw new Error('Cancelado antes de programar: no se grabó nada.');
+                    if (!await confirmar('Modo descarga de la ' + pcb.tipo, 'Conecta el USB–TTL, mantén GPIO0 (BOOT) en bajo y haz RESET. Confirma cuando esté listo.', 'Ya está en BOOT')) throw new Error('Cancelado antes de programar: no se grabó nada.');
                 }
                 marcarPaso('boot', 'ok');
                 const esptool = await cargarEsptool();
@@ -483,7 +495,7 @@
                         escribir('Flasheando (no desconectes el USB)…');
                         let pct = -1;
                         await loader.writeFlash({
-                            fileArray: [{ data: binario, address: 0x0 }],
+                            fileArray: esR2 ? [{ data: binario, address: 0x0 }] : [{ data: binario.slice(0, 0x9000), address: 0x0 }, { data: binario.slice(0xE000), address: 0xE000 }],   // R1: como Arduino IDE, no borra NVS (0x9000–0xE000) donde vive el nombre BLE que pone el STM32
                             flashMode: 'keep', flashFreq: 'keep', flashSize: 'keep',
                             eraseAll: false, compress: true,
                             reportProgress: (_i, escrito, total) => {
@@ -506,9 +518,9 @@
                 try { await transport.disconnect(); } catch (e) { /* ya se cerró al reiniciar */ }
                 marcarPaso('flash', 'ok');
 
-                if (esR2) {
+                {
                     marcarPaso('arranque', 'activo');
-                    if (!await confirmar('Arranque normal', 'Suelta BOOT (GPIO0) y haz RESET para que arranque el firmware. Confirma cuando esté listo.', 'Ya reinicié')) throw new Error('Grabado, pero sin verificar: falta arrancar en modo normal y leer nombre/MAC.');
+                    if (!await confirmar('Arranque normal', 'Suelta BOOT (GPIO0) y haz RESET para que arranque el firmware. Confirma cuando esté listo.', 'Ya reinicié')) throw new Error('Grabado, pero sin verificar: falta arrancar en modo normal y leer la MAC.');
                 }
                 marcarPaso('arranque', 'ok');
                 marcarPaso('mac', 'activo');
@@ -522,7 +534,8 @@
                 marcarPaso('mac', 'ok');
                 escribir('MAC leída: ' + mac + (leido.nombre ? ' · nombre ' + leido.nombre : ''));
 
-                const cuerpo = { mac }; if (esR2 && fw.firmware) Object.assign(cuerpo, { firmware: fw.firmware, firmware_id: fw.firmwareId, nombre_verificado: leido.nombre, hardware_verificado: leido.hardware, ota_protocol_verificado: leido.otaProtocol, key_id_verificado: leido.keyId });   // R1: aquí no se elige versión
+                const cuerpo = { mac }; if (!esR2 && fw.firmwareId) cuerpo.firmware_id = fw.firmwareId;   // R1: solo MAC; pcb.firmware es el del STM32
+                if (esR2 && fw.firmware) Object.assign(cuerpo, { firmware: fw.firmware, firmware_id: fw.firmwareId, nombre_verificado: leido.nombre, hardware_verificado: leido.hardware, ota_protocol_verificado: leido.otaProtocol, key_id_verificado: leido.keyId });   
                 const res = await api(`/api/pcb/${pcb.id}/programacion`, { method: 'PUT', body: cuerpo });
                 if (!res.ok) throw new Error(res.network ? 'Sin conexión con el servidor: no se guardó.' : res.error);
                 escribir('Guardado ✓');
@@ -598,8 +611,7 @@
             pintarLista();
         }
         function pintarDetalle() {
-            firmwarePanel.hidden = S.tarjeta?.tipo === 'R1';
-            enableFirmware();
+                        enableFirmware();
             if (!S.tarjeta) { detalle.hidden = true; vacio.hidden = false; return; }
             vacio.hidden = true; detalle.hidden = false;
             const p = S.tarjeta;

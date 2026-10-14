@@ -3,6 +3,8 @@
 ## v1.3.79 — 2026-10-14
 - **Programación R2 ESP32 · Monitor serial:** panel estilo Arduino IDE (velocidad, abrir/cerrar, limpiar, enviar texto con fin de línea, «Reiniciar placa» por RTS/DTR) para leer el arranque (`waiting for download`, `rst:`…). Se cierra solo antes de grabar o leer la MAC, muestra la salida de esptool y de la verificación, y se reabre al terminar (opcional).
 - **Grabación por serial más rápida:** sincroniza a 115200 y envía los datos a la «Velocidad de grabación» elegida (921600 por defecto, como Arduino IDE; se recuerda en el navegador). Si falla a alta velocidad, pide volver a BOOT y reintenta una vez a 115200.
+- **Programación R1 ESP32 como R2:** catálogo persistente por tipo (`esp32_firmwares.tipo`), subir BIN y elegir versión; descarga por `/api/esp32/bin` sin arduino-cli (antes fallaba en el servidor). Base `ESP32_BLE_SERIAL` 1.0 precompilada (core 3.3.12). Se graba como Arduino IDE sin borrar NVS (0x9000–0xE000), donde vive el nombre BLE que pone el STM32. Verificación por MAC al arrancar; no cambia el FW (STM32) de la R1; registra ESP32_PROGRAMADA.
+- **Orden de producción:** el ESP32 de la R1 solo se graba si su R2 tiene MAC y el último trabajo J-Link del STM32 de esa R1 está verificado (`GET /api/esp32/r1-gate/{id}`; el botón muestra qué falta).
 - **OTA Bluetooth:** al verificar la actualización se notifica `PCB_ACTUALIZADA`/`TARJETA_ACTUALIZADA`, así Tarjetas e Inventario muestran la MAC y el FW nuevos sin recargar. Prueba de regresión: R2 programada en tarjeta sin R3 y con `firmware_r2` desactualizado devuelve MAC/FW en tarjetas, detalle, búsqueda por MAC y placa.
 
 ## v1.3.76 — 2026-10-14

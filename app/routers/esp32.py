@@ -16,6 +16,8 @@ router=APIRouter(prefix='/api/esp32',tags=['Programación R2 ESP32'])
 class Upload(BaseModel):
     filename: str = Field(min_length=5,max_length=180)
     contenido: str = Field(min_length=20,max_length=16_777_216)
+    tipo: str = Field(default='R2',pattern=r'^R[12]$')
+    version: str | None = Field(default=None,max_length=15)
 
 
 class DeviceInfo(BaseModel):
@@ -86,19 +88,24 @@ def decode(body):
 
 
 @router.get('/firmwares')
-def catalogue(hw: str = Query(default='',max_length=7)):
-    return run(svc.catalogue,hw)
+def catalogue(hw: str = Query(default='',max_length=7),tipo: str = Query(default='R2',pattern=r'^R[12]$')):
+    return run(svc.catalogue,hw,tipo)
 
 
 @router.post('/firmwares/analizar')
 def analyze(body: Upload):
-    return run(svc.normalize,decode(body),body.filename)[0]
+    return run(svc.normalize,decode(body),body.filename,body.tipo,body.version)[0]
 
 
 @router.post('/firmwares')
 def upload(body: Upload,req: Request):
     operator=usuarios.validar_sesion(req.cookies.get(usuarios.COOKIE))['email']
-    return run(svc.save,decode(body),body.filename,operator)
+    return run(svc.save,decode(body),body.filename,operator,body.tipo,body.version)
+
+
+@router.get('/r1-gate/{pcb_id}')
+def r1_gate(pcb_id: int):
+    return run(svc.gate,pcb_id)
 
 
 @router.get('/preview/{pcb_id}')
@@ -110,7 +117,7 @@ def preview(pcb_id: int,firmware_id: str | None = Query(default=None,max_length=
 def image(pcb_id: int,firmware_id: str | None = Query(default=None,max_length=32)):
     meta,data=run(svc.prepare,pcb_id,firmware_id,True)
     return Response(data,media_type='application/octet-stream',headers={
-        'Content-Disposition':f'attachment; filename="{meta["nombre"]}_FW{meta["fw"]}.bin"',
+        'Content-Disposition':f'attachment; filename="{meta["nombre"] or meta["kind"]}_FW{meta["fw"]}.bin"',
         'X-TQT-Nombre-Ble':meta['nombre'],'X-TQT-Firmware':meta['fw'],
         'X-TQT-Hardware':meta['hw'],'X-TQT-Sha256':meta['sha256'],
         'X-TQT-Firmware-Id':meta['firmware_id'],'X-TQT-OTA-Protocol':str(meta['ota_protocol']),

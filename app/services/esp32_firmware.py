@@ -1,4 +1,4 @@
-"""R2 images with a fixed profile; modify identity data and ESP image checksums only.
+"""R2 (and R1, unmodified) images with a fixed profile; modify identity data and ESP image checksums only.
 
 Format: Espressif ESP32 image v1 (24-byte header, segment XOR, appended SHA256).
 Source: docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/firmware-image-format.html
@@ -111,7 +111,7 @@ def field(raw):
         raise ValueError('Perfil TQT debe ser ASCII.') from e
 
 
-def inspect(raw):
+def inspect(raw, kind='R2'):
     if not isinstance(raw, bytes) or not 65536 < len(raw) <= FLASH_SIZE:
         raise ValueError('Se requiere firmware ESP32 completo, de hasta 4 MB.')
     boot = image_layout(raw, 0x1000, 0x8000)
@@ -166,6 +166,9 @@ def inspect(raw):
         cursor = min(last, len(raw))
     if any(b != 255 for b in raw[cursor:]):
         raise ValueError('Hay datos adicionales o firma Secure Boot; no se personalizan.')
+    if kind=='R1':   # sketch sin perfil ni identidad por unidad: solo se valida la estructura de la imagen
+        return dict(kind='R1',hw='',fw='',nombre='',module='ESP32',schema=0,bytes=len(raw),
+                    sha256=hashlib.sha256(raw).hexdigest(),ota_protocol=0,key_id=''), None, layout
     positions = []
     for first, last in layout['segments']:
         pos = raw.find(MAGIC, first, last)
@@ -220,7 +223,9 @@ def personalize(raw, name, ota_key=None):
     return final, dict(verified, source_sha256=meta['sha256'])
 
 
-def normalize(raw, filename):
+def normalize(raw, filename, tipo='R2', version=None):
+    if tipo not in ('R1','R2'):
+        raise ValueError('Tipo de placa inválido.')
     if not isinstance(raw,bytes) or len(raw)>MAX_UPLOAD:
         raise ValueError('Firmware vacío o mayor de 12 MB.')
     filename=filename.replace('\\','/').split('/')[-1].strip()
@@ -230,6 +235,14 @@ def normalize(raw, filename):
         raw = hex_image(raw)
     elif not filename.lower().endswith('.bin'):
         raise ValueError('Sube un merged.bin o un Intel HEX de ESP32 completo.')
+    if tipo=='R1':
+        version=(version or '').strip()
+        if not re.fullmatch(r'\d+(?:\.\d+)*',version) or len(version)>15:
+            raise ValueError('Indica la versión del firmware R1 (por ejemplo 1.0).')
+        meta, _, layout=inspect(raw,'R1')
+        raw=raw[:layout['end']]
+        meta, _, _=inspect(raw,'R1')
+        return dict(meta,fw=version),raw,filename
     meta, _, layout=inspect(raw)
     raw=raw[:layout['end']]  # canonical image: ignore erased padding, never flash unused NVS/OTA slots
     stored, _=personalize(raw,'TQT_R2_V'+meta['hw'].replace('.','')+'_0000',bytes(32))
@@ -241,30 +254,49 @@ def ensure(c):
     c.execute('''CREATE TABLE IF NOT EXISTS esp32_firmwares (
       id TEXT PRIMARY KEY, hw TEXT NOT NULL, fw TEXT NOT NULL, filename TEXT NOT NULL,
       sha256 TEXT NOT NULL UNIQUE, metadata TEXT NOT NULL, image BLOB NOT NULL,
-      created REAL NOT NULL, operator TEXT NOT NULL)''')
+      created REAL NOT NULL, operator TEXT NOT NULL, tipo TEXT NOT NULL DEFAULT 'R2')''')
+    if not any(r[1]=='tipo' for r in c.execute('PRAGMA table_info(esp32_firmwares)')):   # migración: catálogo previo = R2
+        c.execute("ALTER TABLE esp32_firmwares ADD COLUMN tipo TEXT NOT NULL DEFAULT 'R2'")
     c.execute('''CREATE TABLE IF NOT EXISTS esp32_unit_keys (
         pcb INTEGER PRIMARY KEY REFERENCES pcb_inventario(id) ON DELETE CASCADE, secret BLOB NOT NULL CHECK(length(secret)=32),
         created REAL NOT NULL)''')
     if not c.execute('SELECT 1 FROM esp32_firmwares LIMIT 1').fetchone():
         path=ROOT/'firmware/esp32_r2/TQT_R2_V4_0.merged.bin'
         meta,image,filename=normalize(path.read_bytes(),path.name)
-        c.execute('INSERT OR IGNORE INTO esp32_firmwares VALUES(?,?,?,?,?,?,?,?,?)',
+        c.execute('INSERT OR IGNORE INTO esp32_firmwares(id,hw,fw,filename,sha256,metadata,image,created,operator) VALUES(?,?,?,?,?,?,?,?,?)',
                   ('base-R2-v4',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,0,'sistema'))
     path=ROOT/'firmware/esp32_r2/TQT_R2_V4_1.merged.bin'
     if path.is_file() and not c.execute("SELECT 1 FROM esp32_firmwares WHERE id='base-R2-v41'").fetchone():
         meta,image,filename=normalize(path.read_bytes(),path.name)
-        c.execute('INSERT INTO esp32_firmwares VALUES(?,?,?,?,?,?,?,?,?)',
+        c.execute('INSERT INTO esp32_firmwares(id,hw,fw,filename,sha256,metadata,image,created,operator) VALUES(?,?,?,?,?,?,?,?,?)',
                   ('base-R2-v41',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,1,'sistema'))
+    seed_r1(c)
+
+
+def seed_r1(c):
+    """R1: ESP32_BLE_SERIAL.json + .merged.bin -> entrada 'base-R1-ble' (idempotente; se omite si falta algo o el hash no coincide)."""
+    if c.execute("SELECT 1 FROM esp32_firmwares WHERE id='base-R1-ble'").fetchone(): return
+    path=ROOT/'firmware/esp32_r1/ESP32_BLE_SERIAL.merged.bin'
+    try:
+        info=json.loads((ROOT/'firmware/esp32_r1/ESP32_BLE_SERIAL.json').read_text(encoding='utf-8'))
+        raw=path.read_bytes()
+        if info.get('sha256') and info['sha256']!=hashlib.sha256(raw).hexdigest(): return
+        meta,image,filename=normalize(raw,path.name,'R1',str(info.get('version','')))
+        meta.update(hw=str(info.get('hw') or ''),hardware=info.get('hardware',''),fqbn=info.get('fqbn',''),fecha=info.get('fecha',''))
+        if c.execute('SELECT 1 FROM esp32_firmwares WHERE sha256=?',(meta['sha256'],)).fetchone(): return
+        c.execute("INSERT INTO esp32_firmwares(id,hw,fw,filename,sha256,metadata,image,created,operator,tipo) VALUES(?,?,?,?,?,?,?,?,?,'R1')",
+                  ('base-R1-ble',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,0,'sistema'))
+    except (OSError,ValueError,TypeError,AttributeError): return
 
 
 def public(row):
     return dict(json.loads(row['metadata']),id=row['id'],filename=row['filename'],created=row['created'])
 
 
-def rows(c,hw=''):
+def rows(c,hw='',tipo='R2'):
     ensure(c)
-    found=list(c.execute('SELECT * FROM esp32_firmwares'))
-    if hw:
+    found=list(c.execute('SELECT * FROM esp32_firmwares WHERE tipo=?',(tipo,)))
+    if hw and tipo=='R2':
         found=[r for r in found if r['hw'].replace('.','')==hw.replace('.','')]
     def order(row):
         parts=[int(x) for x in row['fw'].split('.')]
@@ -274,38 +306,66 @@ def rows(c,hw=''):
     return sorted(found,key=order,reverse=True)
 
 
-def catalogue(hw=''):
+def catalogue(hw='',tipo='R2'):
     with db.transaction() as c:
-        found=rows(c,hw)
+        found=rows(c,hw,tipo)
     return dict(items=[public(r) for r in found],default_id=found[0]['id'] if found else None)
 
 
-def save(raw,filename,operator):
-    meta,image,filename=normalize(raw,filename)
+def save(raw,filename,operator,tipo='R2',version=None):
+    meta,image,filename=normalize(raw,filename,tipo,version)
     with db.transaction() as c:
         ensure(c)
         previous=c.execute('SELECT * FROM esp32_firmwares WHERE sha256=?',(meta['sha256'],)).fetchone()
         if previous:
             return dict(public(previous),existing=True)
         identifier=secrets.token_hex(12)
-        c.execute('INSERT INTO esp32_firmwares VALUES(?,?,?,?,?,?,?,?,?)',
-                  (identifier,meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,time.time(),operator))
-        db.log_evento('ESP32_FIRMWARE_GUARDADO',None,None,f'R2 HW {meta["hw"]} FW {meta["fw"]}; sha256={meta["sha256"]}',operator,conn=c)
+        c.execute('INSERT INTO esp32_firmwares(id,hw,fw,filename,sha256,metadata,image,created,operator,tipo) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                  (identifier,meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,time.time(),operator,tipo))
+        db.log_evento('ESP32_FIRMWARE_GUARDADO',None,None,f'{tipo} HW {meta["hw"]} FW {meta["fw"]}; sha256={meta["sha256"]}',operator,conn=c)
         return dict(meta,id=identifier,filename=filename,existing=False)
+
+
+def r1_gate(c,pcb):
+    """Orden de producción: R2 con MAC -> STM32 de la R1 verificado con J-Link -> recién entonces el ESP32 de la R1."""
+    falta=[]
+    tarjeta=db.get_tarjeta_by_id(pcb['tarjeta_id'],c) if pcb.get('tarjeta_id') else None
+    if not tarjeta: falta.append('la R1 no está vinculada a una tarjeta')
+    elif not (tarjeta.get('r2') or {}).get('mac'): falta.append('la R2 de la tarjeta no tiene MAC guardada')
+    job=None
+    if c.execute("SELECT 1 FROM sqlite_master WHERE name='stm32_jobs'").fetchone():
+        job=c.execute('SELECT state FROM stm32_jobs WHERE pcb=? ORDER BY created DESC,updated DESC LIMIT 1',(pcb['id'],)).fetchone()
+    if not job: falta.append('el STM32 de esta R1 no se ha programado con J-Link')
+    elif job['state']!='verified': falta.append(f'el último trabajo J-Link del STM32 está en estado «{job["state"]}», no verificado')
+    if falta: raise ValueError('Primero programa la R2 (MAC) y el STM32 de esta R1 con J-Link; falta: '+'; '.join(falta)+'.')
+
+
+def gate(pcb_id):
+    with db.transaction() as c:
+        pcb=inv.get_pcb(pcb_id,conn=c)
+        if not pcb or pcb['tipo']!='R1': return dict(ok=True,motivo='')
+        try: r1_gate(c,pcb)
+        except ValueError as e: return dict(ok=False,motivo=str(e))
+        return dict(ok=True,motivo='')
 
 
 def prepare(pcb_id,firmware_id=None,provision=False):
     with db.transaction() as c:
         pcb=inv.get_pcb(pcb_id,conn=c)
-        if not pcb or pcb['tipo']!='R2':
-            raise ValueError('Elige una R2 del inventario.')
-        found=rows(c,pcb['version'])
+        if not pcb or pcb['tipo'] not in ('R1','R2'):
+            raise ValueError('Elige una R1 o R2 del inventario.')
+        r1=pcb['tipo']=='R1'
+        if r1: r1_gate(c,pcb)
+        found=rows(c,pcb['version'],pcb['tipo'])
         row=next((r for r in found if r['id']==firmware_id),None) if firmware_id else (found[0] if found else None)
         if row is None:
-            raise ValueError('No hay firmware compatible con el HW de la R2 seleccionada.')
+            raise ValueError('No hay firmware ESP32 compatible con la placa seleccionada.' if r1 else 'No hay firmware compatible con el HW de la R2 seleccionada.')
         raw=bytes(row['image'])
         if hashlib.sha256(raw).hexdigest()!=row['sha256']:
             raise ValueError('El firmware guardado no coincide con su hash.')
+        if r1:   # sin identidad por unidad: la imagen se entrega tal cual está en el catálogo
+            inspect(raw,'R1')
+            return dict(json.loads(row['metadata']),firmware_id=row['id'],pcb_id=pcb_id),raw
         name=pcb['nombre'].replace('-','_')
         if not name.endswith('_'+pcb['serie']) or pcb['serie']=='0000':
             raise ValueError('Nombre y serie de R2 inconsistentes en el inventario.')
@@ -327,8 +387,16 @@ def result(pcb_id,mac,firmware_id,name,hw,fw,operator,key_id='',ota_protocol=0):
         ensure(c)
         pcb=inv.get_pcb(pcb_id,conn=c)
         row=c.execute('SELECT * FROM esp32_firmwares WHERE id=?',(firmware_id,)).fetchone()
-        if not pcb or pcb['tipo']!='R2' or not row:
+        if not pcb or pcb['tipo'] not in ('R1','R2') or not row or row['tipo']!=pcb['tipo']:
             raise ValueError('Placa R2 o firmware no encontrado.')
+        if pcb['tipo']=='R1':
+            r1_gate(c,pcb)
+            # solo MAC: pcb.firmware de una R1 es el del STM32 y no se toca
+            if hashlib.sha256(bytes(row['image'])).hexdigest()!=row['sha256']:
+                raise ValueError('El archivo guardado no coincide con su hash.')
+            updated=inv.guardar_programacion(pcb_id,mac,None,operator,conn=c)
+            db.log_evento('ESP32_PROGRAMADA',None,None,f'{pcb["nombre"]}; firmware_id={firmware_id}; ESP32 R1 FW {row["fw"]}; base_sha256={row["sha256"]}',operator,conn=c)
+            return updated
         if (name,hw,fw)!=(pcb['nombre'].replace('-','_'),row['hw'],row['fw']) or pcb['version']!=hw.replace('.',''):
             raise ValueError('Nombre o versiones verificadas no coinciden con la R2 y su firmware.')
         if hashlib.sha256(bytes(row['image'])).hexdigest()!=row['sha256']:

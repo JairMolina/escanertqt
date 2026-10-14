@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "hw": "3.0",
+  "hardware": "ESP32-WROOM-32",
+  "fqbn": "esp32:esp32:esp32doit-devkit-v1",
+  "core": "3.3.12",
+  "fecha": "2026-10-14",
+  "estado": "compilado desde ESP32_BLE_SERIAL.ino (Drive); prueba fisica pendiente",
+  "source_sha256": "86775065c1dfa9f81ba9b130cdc233bfe0a27b0b08d8bf39aa215108781fd13b",
+  "sha256": "58a1dbc0ec7ffc2797f7b0cff8e73e8a1a4669f0c9cc17234a71a07854da8287"
+}

@@ -222,5 +222,96 @@ class Esp32FirmwareTests(unittest.TestCase):
         self.assertEqual([e for e,_ in events],['PCB_ACTUALIZADA','TARJETA_ACTUALIZADA'])
         self.assertEqual(events[1][1]['tarjeta']['r2']['firmware'],'4.1')
 
+    def ready_r1(self,state='verified'):
+        r1=self.card['r1']['id']
+        if not inv.get_pcb(self.card['r2']['id'])['mac']: inv.set_mac(self.card['r2']['id'],iso.mac_unica())
+        with db.get_db() as c:
+            c.execute('CREATE TABLE IF NOT EXISTS stm32_jobs (id TEXT PRIMARY KEY, station TEXT NOT NULL, pcb INTEGER NOT NULL, state TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL, operator TEXT NOT NULL, payload TEXT NOT NULL, image TEXT NOT NULL, result TEXT)')
+            n=c.execute('SELECT COUNT(*) FROM stm32_jobs WHERE pcb=?',(r1,)).fetchone()[0]
+            c.execute("INSERT INTO stm32_jobs VALUES(?,?,?,?,?,?,?,?,?,NULL)",(f't{r1}-{n}','st',r1,state,9e9+n,9e9+n,self.operator,'{}','x'))
+        return r1
+
+    def test_r1_gate_requires_r2_mac_and_verified_stm32(self):
+        saved=f.save(self.r1_image(),'g.bin',self.operator,'R1','1.9')
+        r1=self.card['r1']['id']
+        with self.assertRaisesRegex(ValueError,'Primero programa la R2'): f.prepare(r1,saved['id'])
+        with self.assertRaises(ValueError): f.result(r1,iso.mac_unica(),saved['id'],None,None,None,self.operator)
+        self.assertFalse(f.gate(r1)['ok'])
+        self.ready_r1('failed')
+        with self.assertRaisesRegex(ValueError,'failed'): f.prepare(r1,saved['id'])
+        self.ready_r1('verified')
+        self.assertTrue(f.gate(r1)['ok'])
+        f.prepare(r1,saved['id'])
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+            client=TestClient(app,base_url='https://testserver')
+            self.assertEqual(client.post(f'/api/esp32/bin/{r1}?firmware_id={saved["id"]}').status_code,200)
+            self.assertEqual(client.get(f'/api/esp32/r1-gate/{r1}').json()['ok'],True)
+
+    def r1_image(self):
+        """Imagen ESP32 válida sin perfil TQT R2 (como el sketch ESP32_BLE_SERIAL)."""
+        _,pos,_=f.inspect(self.raw)
+        return rewrite(self.raw,pos,b'NO_PROFILE_HERE!!')
+
+    def test_r1_catalogue_separate_from_r2_and_unmodified_download(self):
+        image=self.r1_image()
+        with self.assertRaises(ValueError): f.inspect(image)
+        with self.assertRaises(ValueError): f.save(image,'r1.bin',self.operator)          # R2 exige perfil
+        with self.assertRaises(ValueError): f.save(image,'r1.bin',self.operator,'R1')     # R1 exige versión
+        saved=f.save(image,'ESP32_BLE_SERIAL.merged.bin',self.operator,'R1','1.2')
+        self.assertEqual((saved['fw'],saved['kind']),('1.2','R1'))
+        self.assertIn(saved['id'],[i['id'] for i in f.catalogue('','R1')['items']])
+        self.assertNotIn(saved['id'],[i['id'] for i in f.catalogue('30')['items']])
+        self.assertNotIn('base-R2-v4',[i['id'] for i in f.catalogue('','R1')['items']])
+        self.ready_r1()
+        meta,data=f.prepare(self.card['r1']['id'],saved['id'])
+        self.assertEqual((data,meta['fw'],meta['firmware_id']),(image[:len(data)],'1.2',saved['id']))
+        self.assertEqual(data,f.normalize(image,'x.bin','R1','1.2')[1])
+        with self.assertRaises(ValueError): f.prepare(self.card['r2']['id'],saved['id'])   # firmware R1 no sirve para R2
+        with self.assertRaises(ValueError): f.prepare(self.card['r1']['id'],'base-R2-v4')
+        with db.get_db() as c:
+            with self.assertRaises(Exception): c.execute("SELECT tipo FROM esp32_firmwares WHERE id='nope'").fetchone()['tipo']
+            self.assertEqual(c.execute("SELECT tipo FROM esp32_firmwares WHERE id='base-R2-v4'").fetchone()['tipo'],'R2')
+
+    def test_r1_result_saves_mac_only_keeps_stm32_firmware_and_logs(self):
+        saved=f.save(self.r1_image(),'r1.bin',self.operator,'R1','1.3')
+        r1=self.ready_r1(); mac=iso.mac_unica()
+        inv.guardar_programacion(r1,iso.mac_unica(),'4.2',self.operator)   # firmware STM32 previo
+        with self.assertRaises(ValueError): f.result(self.card['r2']['id'],iso.mac_unica(),saved['id'],None,None,None,self.operator)
+        updated=f.result(r1,mac,saved['id'],None,None,None,self.operator)
+        self.assertEqual((updated['mac'],updated['firmware']),(mac,'4.2'))
+        with db.get_db() as c:
+            ev=c.execute("SELECT * FROM escaneos WHERE evento='ESP32_PROGRAMADA' ORDER BY id DESC LIMIT 1").fetchone()
+        self.assertIn(saved['id'],str(dict(ev))); self.assertIn('FW 1.3',str(dict(ev))); self.assertIn(saved['sha256'],str(dict(ev)))
+
+    def test_r1_api_upload_bin_and_programacion(self):
+        image=self.r1_image()
+        body=dict(filename='R1.bin',contenido=base64.b64encode(image).decode(),tipo='R1',version='2.0')
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+            client=TestClient(app,base_url='https://testserver')
+            bad=dict(body,version=None)
+            self.assertEqual(client.post('/api/esp32/firmwares',json=bad).status_code,400)
+            identifier=client.post('/api/esp32/firmwares',json=body).json()['id']
+            r1=self.ready_r1()
+            self.assertIn(identifier,[i['id'] for i in client.get('/api/esp32/firmwares?tipo=R1').json()['items']])
+            self.assertNotIn(identifier,[i['id'] for i in client.get('/api/esp32/firmwares?hw=30').json()['items']])
+            download=client.post(f'/api/esp32/bin/{r1}?firmware_id={identifier}')
+            self.assertEqual((download.status_code,download.content),(200,f.normalize(image,'x.bin','R1','2.0')[1]))
+            self.assertEqual(download.headers['X-TQT-Firmware'],'2.0')
+            mac=iso.mac_unica()
+            res=client.put(f'/api/pcb/{r1}/programacion',json=dict(mac=mac,firmware_id=identifier))
+            self.assertEqual(res.status_code,200); self.assertEqual(res.json()['mac'],mac); self.assertIsNone(res.json()['firmware'])
+            self.assertEqual(client.post(f'/api/esp32/bin/{self.card["r2"]["id"]}?firmware_id={identifier}').status_code,400)
+
+    def test_legacy_schema_gets_tipo_column(self):
+        with db.get_db() as c:
+            c.execute('ALTER TABLE esp32_firmwares RENAME TO esp32_old')
+            c.execute('CREATE TABLE esp32_firmwares (id TEXT PRIMARY KEY, hw TEXT NOT NULL, fw TEXT NOT NULL, filename TEXT NOT NULL, sha256 TEXT NOT NULL UNIQUE, metadata TEXT NOT NULL, image BLOB NOT NULL, created REAL NOT NULL, operator TEXT NOT NULL)')
+            c.execute('INSERT INTO esp32_firmwares SELECT id,hw,fw,filename,sha256,metadata,image,created,operator FROM esp32_old')
+            try:
+                f.ensure(c)
+                self.assertEqual(c.execute("SELECT tipo FROM esp32_firmwares WHERE id='base-R2-v4'").fetchone()['tipo'],'R2')
+            finally:
+                c.execute('DROP TABLE esp32_firmwares'); c.execute('ALTER TABLE esp32_old RENAME TO esp32_firmwares')
+
 
 if __name__=='__main__': unittest.main()
