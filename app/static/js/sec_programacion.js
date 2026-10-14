@@ -18,7 +18,7 @@
         { id: 'sync', t: 'Modo programador' },
         { id: 'flash', t: 'Flashear' },
         { id: 'arranque', t: 'Soltar BOOT + RESET' },
-        { id: 'mac', t: 'Leer nombre y MAC' },
+        { id: 'mac', t: 'Leer MAC (y nombre en R2)' },
     ];
 
     function hexDe(s) { return String(s || '').replace(/[^0-9A-Fa-f]/g, ''); }
@@ -33,7 +33,7 @@
     function montar(host, ctx) {
         const { T, api, h, icon, toast, util } = ctx;
 
-        const S = { vivo: true, pendientes: [], filtro: '', tarjeta: null, busy: false, puertos: [], puertoSel: null, completed: null, capability: null, otaCommitting: false };
+        const S = { vivo: true, tipoEsp: 'R2', pendientes: [], filtro: '', tarjeta: null, busy: false, puertos: [], puertoSel: null, completed: null, capability: null, otaCommitting: false };
         const timers = new Set();
         const unsubs = [];
 
@@ -54,10 +54,10 @@
         buscar.addEventListener('input', (e) => { S.filtro = e.target.value; pintarLista(); });
 
         async function cargarPendientes() {
-            const r = await api('/api/pcb?tipo=R2&limit=500');
-            if (!S.vivo) return;
+            const tipo = S.tipoEsp; const r = await api('/api/pcb?tipo=' + tipo + '&limit=500');
+            if (!S.vivo || tipo !== S.tipoEsp) return;
             if (!r.ok) { lista.replaceChildren(T.banner('bad', 'alert', r.network ? 'Sin conexión con el servidor.' : `No se pudo cargar: ${r.error}`)); return; }
-            S.pendientes = ((r.data && r.data.items) || []).filter((p) => p.tipo === 'R2');   // v1.3.55: este modo es el de R2; la R1 llega con «Programar ESP32 R1»
+            S.pendientes = ((r.data && r.data.items) || []).filter((p) => p.tipo === tipo);   // v1.3.79: pestaña R2 o R1 (ESP32 BLE serial); la R1 elegida ya no se pierde al refrescar
             if (S.tarjeta && S.completed !== S.tarjeta.id && !S.pendientes.some((p) => p.id === S.tarjeta.id)) { S.tarjeta = null; pintarDetalle(); }
             pintarLista();
         }
@@ -70,7 +70,7 @@
             const items = filtradas();
             lista.replaceChildren();
             lista.classList.toggle('is-busy', S.busy);
-            if (!items.length) { lista.appendChild(T.empty('search', S.pendientes.length ? 'Ninguna coincide con la búsqueda' : 'No hay R2 registradas', '')); return; }
+            if (!items.length) { lista.appendChild(T.empty('search', S.pendientes.length ? 'Ninguna coincide con la búsqueda' : `No hay ${S.tipoEsp} registradas`, '')); return; }
             items.forEach((p) => {
                 const b = h('button', {
                     class: 'prog-item', type: 'button', disabled: S.busy, 'aria-pressed': String(S.tarjeta && S.tarjeta.id === p.id),
@@ -273,7 +273,7 @@
             uploadBtn.disabled = blocked;
             btnFlash.disabled = blocked || !S.tarjeta || S.completed === S.tarjeta.id || !firmwareSelect.value || (S.tarjeta?.tipo === 'R1' && !r1Gate.ok);
             btnFlash.textContent = 'Instalar por serial';
-            const esR1 = S.tarjeta?.tipo === 'R1';   // R1: firmware fijo (ESP32_BLE_SERIAL), sin catálogo ni subida
+            const esR1 = S.tipoEsp === 'R1';   // R1: firmware fijo (ESP32_BLE_SERIAL), sin catálogo ni subida
             firmwareLabel.textContent = esR1 ? 'Firmware ESP32 de la R1 (fijo)' : 'Firmware R2 a programar';
             uploadBtn.hidden = esR1; firmwareSelect.hidden = esR1;
             selBaudFlash.disabled = blocked; monUI();
@@ -284,7 +284,7 @@
             btnOtaVerify.hidden = !ownPending; btnOtaDiscard.hidden = !saved;
             btnOtaVerify.disabled = btnOtaDiscard.disabled = blocked;
             btnOtaCancel.hidden = !otaController; btnOtaCancel.disabled = S.otaCommitting;
-            otaPanel.hidden = S.tarjeta?.tipo !== 'R2';
+            otaPanel.hidden = S.tipoEsp !== 'R2' || !S.tarjeta;
             otaHint.textContent = ownPending ? 'Hay una actualización pendiente de comprobar. Conecta la R2 encendida para verificarla.' :
                 saved ? 'Verifica o descarta la OTA pendiente de ' + (saved.nombre || 'otra R2') + ' antes de iniciar otra.' :
                 S.capability?.eligible ? 'FW ' + S.capability.current_fw + ': admite OTA. Mantén alimentación estable y libera la conexión Bluetooth de la R1 durante la actualización.' :
@@ -294,7 +294,7 @@
             const n = ++firmwareRequest;
             firmwareLoading = true; enableFirmware();
             const selected = firmwareSelect.value;
-            const tipo = S.tarjeta?.tipo === 'R1' ? 'R1' : 'R2';
+            const tipo = S.tipoEsp;
             const hw = tipo === 'R2' ? S.tarjeta?.version || '' : '';
             const [r, capability] = await Promise.all([
                 api('/api/esp32/firmwares?tipo=' + tipo + '&hw=' + encodeURIComponent(hw)),
@@ -304,7 +304,7 @@
             firmwareLoading = false;
             S.capability = capability?.ok ? capability.data : null;
             r1Gate = { ok: true, motivo: '' };
-            if (tipo === 'R1') { const g = await api('/api/esp32/r1-gate/' + S.tarjeta.id); if (n !== firmwareRequest) return; r1Gate = g.ok ? g.data : { ok: false, motivo: g.error }; }
+            if (tipo === 'R1' && S.tarjeta) { const g = await api('/api/esp32/r1-gate/' + S.tarjeta.id); if (n !== firmwareRequest) return; r1Gate = g.ok ? g.data : { ok: false, motivo: g.error }; }
             if (!r.ok) {
                 firmwareSelect.replaceChildren(); firmwareHint.textContent = r.error;
                 enableFirmware(); return;
@@ -626,24 +626,31 @@
         const espHost = host.lastElementChild;
         const stmHost = h('div');
         // v1.3.54: «Programar ESP32 R1» del panel STM32 abre el flujo ESP32 con la misma R1 elegida
-        const stm = window.TQTSTM32(stmHost, Object.assign({}, ctx, { tipo: 'R1', programarEsp32(p) { if (S.busy) return; modo('esp'); seleccionar(p); } }));
+        const stm = window.TQTSTM32(stmHost, Object.assign({}, ctx, { tipo: 'R1', programarEsp32(p) { if (S.busy) return; modo('espR1'); seleccionar(p); } }));
         // v1.3.55: R3 (STM32 «TIMER») con el mismo agente J-Link y firmware fijo
         const r3Host = h('div');
         const stm3 = window.TQTSTM32(r3Host, Object.assign({}, ctx, { tipo: 'R3' }));
         const MODOS = {
             stm: { host: stmHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('stm') }, 'R1 · STM32 / J-Link') },
             esp: { host: espHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('esp') }, 'R2 · ESP32 · USB serial') },
+            espR1: { host: espHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('espR1') }, 'R1 · ESP32 · BLE serial') },
             r3: { host: r3Host, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('r3') }, 'R3 · STM32 / J-Link') },
         };
         let actual = 'stm';
         function modo(id) {
             if (S.busy || uploadBusy || stm.ocupada() || stm3.ocupada()) return;
             actual = id;
+            const tipo = id === 'espR1' ? 'R1' : id === 'esp' ? 'R2' : S.tipoEsp;
+            if (tipo !== S.tipoEsp) {   // misma interfaz ESP32 para R2 y R1; cambia la lista y el firmware
+                S.tipoEsp = tipo; S.tarjeta = null; S.completed = null; S.filtro = ''; buscar.value = ''; S.pendientes = [];
+                buscar.placeholder = `Número o nombre (p. ej. 0021 o TQT-${tipo}-V30-0021)…`;
+                pintarDetalle(); pintarLista(); cargarPendientes(); loadFirmwares(true);
+            }
             Object.entries(MODOS).forEach(([k, m]) => {
-                m.host.hidden = k !== id; m.btn.classList.toggle('btn-primary', k === id); m.btn.setAttribute('aria-pressed', String(k === id));
+                m.host.hidden = m.host !== MODOS[id].host; m.btn.classList.toggle('btn-primary', k === id); m.btn.setAttribute('aria-pressed', String(k === id));
             });
         }
-        host.prepend(h('div', { class: 'row wrap' }, MODOS.esp.btn, MODOS.stm.btn, MODOS.r3.btn));
+        host.prepend(h('div', { class: 'row wrap' }, MODOS.esp.btn, MODOS.stm.btn, MODOS.espR1.btn, MODOS.r3.btn));
         host.append(stmHost, r3Host); modo('stm');
 
         cargarPendientes(); loadFirmwares();
