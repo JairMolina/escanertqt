@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-14 19:44 UTC
-Commit de referencia: `cdd39b11115b` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-14 20:12 UTC
+Commit de referencia: `0e8bedcf1157` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-R2 FW4.0 y web1.3.73 preparados en codex/esp32-r2-v4 desde GitHub cdd39b1. Catalogo persistente BIN/HEX ESP32 con perfil interno HW/FW, nombre desde inventario, selector mas reciente compatible y verificacion INFO. Copia TQT_R2_V4_0_14_10_2026 creada junto al original intacto. Orange Pi recuperada por reinicio segun usuario; produccion no modificada.
+Web1.3.76 desplegada en Orange Pi desde GitHub codex/esp32-r2-v4, commit aplicacion 0e8bedc. Integra R2 V4.0 con catalogo BIN/HEX/nombre de inventario y conserva cambios de produccion1.3.73-1.3.75 de semaforo, Pruebas y estacion J-Link local. Montaje R2 readonly; solo servicio tqt recreado. Catalogo real R2 FW4.0/HW3.0.
 
 ## Siguiente paso
-Desplegar rama aprobada en Orange Pi por peticion expresa y validar V4.0 en una R2 fisica autorizada. No programar plantilla 0000 directamente. La instancia LAN de recuperacion y su BD se conservaron; preview separado solo contiene registros e imagenes simulados.
+Validar R2 V4.0 en hardware cuando el usuario indique tarjeta y autorice prueba. No se programo ninguna placa durante despliegue. GitHub/prod usan rama codex/esp32-r2-v4; main GitHub sigue separado. Instancia LAN recuperacion y originales intactos; vista previa aislada se detiene al cerrar.
 
 ## Evidencia
-Arduino core3.3.12: compilacion y script exportador BIN/HEX correctos, 1105967 bytes (84%) y RAM41660 (12%). Esptool5.3.1 valido checksum/SHA del binario personalizado. 14 tests ESP32, 37 STM32/catalogo y 13 programacion lote OK. Playwright: BIN/HEX, cancelar/guardar, 4.10>4.9, version anterior, HW incompatible, rechazo FW discordante y MAC duplicada, flujo serial simulado exitoso, persistencia tras recrear, Tab/Escape y movil390 sin desborde. Compose y node --check OK. Original e3bb4e47a701 respaldado en MiniPC, 0 pendientes. ECC HW/FW, CPP, backend, seguridad y verificacion; ui-ux-pro-max.
+API local/publica HTTPS200 version1.3.76; imagen R2 0013 preparada/validada sin grabar, perfil4.0/3.0/nombre correcto; HTML/JS cache1376. Contenedor healthy, cloudflared sin reinicio. SQLite integrity ok y hashes identicos de100 tarjetas/300PCB/7usuarios. Respaldo pre-r2-v4-1376-20261014T200710Z.db SHA d665ad29f0d8064d45c7164f46bc2f895b0fc50909cf23f241c0c1fa31e9d424; compose previo20261014T200829Z. Integracion51 tests correctos (37STM32+14ESP32), node --check y Playwright preservan orden R2/R1/R3 y selector. Original R2 respaldado en MiniPC, 0 adjuntos pendientes. CM memoria/checkpoint; ECC verificacion.

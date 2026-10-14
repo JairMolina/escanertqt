@@ -48,7 +48,31 @@ Capacidades: CM actualizar/adjuntar/checkpoint y ECC HW/FW, C++, backend,
 seguridad y verificación; ui-ux-pro-max para carga, selector y estado accesibles.
 Pruebas y resultados concretos se registran en CODEX_ESTADO/HISTORIAL.
 
-Despliegue pendiente: publicar/aplicar rama aprobada y copiar también
-`firmware/esp32_r2`, o reconstruir imagen según el Compose real de Orange Pi.
-La imagen base permite programar sin Arduino CLI en el servidor. No se cambió
-infraestructura, túnel, base de producción ni agentes STM32.
+Desplegado el 14 de octubre de 2026 en Orange Pi, web **1.3.76**, commit de
+aplicación `0e8bedcf115756fc137ebc93bf33e221575227de`, rama
+`codex/esp32-r2-v4`. Conserva los tres commits de producción 1.3.73–1.3.75
+(orden de botones/semáforo, rediseño de Pruebas y estación J-Link local), que
+se incorporaron a esta misma rama de GitHub. `main` de GitHub sigue separado.
+
+Servidor: `/home/orangepi/escanertqt/servidor/compose.yml`. Se añadió únicamente
+`../firmware/esp32_r2:/app/firmware/esp32_r2:ro` y se recreó el servicio `tqt`,
+sin reconstruir imagen ni reiniciar `cloudflared`. App/estación/R2 permanecen
+montados en modo de solo lectura. La configuración del host continúa fuera de
+este repositorio; aquí se conserva la trazabilidad del despliegue.
+
+Respaldo SQLite verificado antes del despliegue:
+`/home/orangepi/escanertqt/servidor/data/respaldos/pre-r2-v4-1376-20261014T200710Z.db`,
+SHA256 `d665ad29f0d8064d45c7164f46bc2f895b0fc50909cf23f241c0c1fa31e9d424`.
+Compose previo: `compose-pre-r2-1376-20261014T200829Z.yml` en esa misma carpeta.
+El anterior commit del servidor `394487d7739e78cf94dcc92953754d9105f05c8b`
+permanece en su rama main para recuperar el código si fuera necesario.
+
+Comprobaciones: contenedor saludable; API local/pública 1.3.76; catálogo real
+solo R2 4.0/HW3.0; imagen de R2 0013 preparada y validada por HTTPS sin grabarla;
+HTML/JS con caché 1376. SQLite íntegra y mismos hashes de las 100 tarjetas,
+300 PCB y 7 usuarios. Los firmwares simulados 4.9/4.10 se usaron exclusivamente
+en la vista previa local y no se subieron a producción. Tras integrar se
+repitieron 37 tests STM32/catalogo y 14 ESP32: todos correctos.
+
+Pendiente: validación física de V4.0 en una R2 autorizada. Preparar o descargar
+la imagen por API no certifica que se haya grabado una placa.
