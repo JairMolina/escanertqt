@@ -288,9 +288,8 @@ class Esp32FirmwareTests(unittest.TestCase):
         body=dict(filename='R1.bin',contenido=base64.b64encode(image).decode(),tipo='R1',version='2.0')
         with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
             client=TestClient(app,base_url='https://testserver')
-            bad=dict(body,version=None)
-            self.assertEqual(client.post('/api/esp32/firmwares',json=bad).status_code,400)
-            identifier=client.post('/api/esp32/firmwares',json=body).json()['id']
+            self.assertEqual(client.post('/api/esp32/firmwares',json=body).status_code,422)   # R1: firmware fijo, no se sube por la web
+            identifier=f.save(image,'R1.bin',self.operator,'R1','2.0')['id']
             r1=self.ready_r1()
             self.assertIn(identifier,[i['id'] for i in client.get('/api/esp32/firmwares?tipo=R1').json()['items']])
             self.assertNotIn(identifier,[i['id'] for i in client.get('/api/esp32/firmwares?hw=30').json()['items']])

@@ -16,7 +16,7 @@ router=APIRouter(prefix='/api/esp32',tags=['Programación R2 ESP32'])
 class Upload(BaseModel):
     filename: str = Field(min_length=5,max_length=180)
     contenido: str = Field(min_length=20,max_length=16_777_216)
-    tipo: str = Field(default='R2',pattern=r'^R[12]$')
+    tipo: str = Field(default='R2',pattern=r'^R2$')   # la R1 usa firmware fijo del repo: no se suben archivos
     version: str | None = Field(default=None,max_length=15)
 
 

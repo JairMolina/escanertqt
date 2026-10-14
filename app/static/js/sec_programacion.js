@@ -273,7 +273,9 @@
             uploadBtn.disabled = blocked;
             btnFlash.disabled = blocked || !S.tarjeta || S.completed === S.tarjeta.id || !firmwareSelect.value || (S.tarjeta?.tipo === 'R1' && !r1Gate.ok);
             btnFlash.textContent = 'Instalar por serial';
-            firmwareLabel.textContent = 'Firmware ' + (S.tarjeta?.tipo || 'R2') + ' a programar';
+            const esR1 = S.tarjeta?.tipo === 'R1';   // R1: firmware fijo (ESP32_BLE_SERIAL), sin catálogo ni subida
+            firmwareLabel.textContent = esR1 ? 'Firmware ESP32 de la R1 (fijo)' : 'Firmware R2 a programar';
+            uploadBtn.hidden = esR1; firmwareSelect.hidden = esR1;
             selBaudFlash.disabled = blocked; monUI();
             const saved = window.TQTR2OTA?.pending();
             const ownPending = saved?.pcb_id === S.tarjeta?.id;
@@ -310,7 +312,7 @@
             firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id, dataset: { ota: String(f.ota_protocol || 0) } },
                 `FW ${f.fw}` + (f.hw ? ` · HW ${f.hw}` : '') + (f.ota_protocol ? ' · OTA' : '') + (f.id === r.data.default_id ? ' · más reciente' : ''))));
             firmwareSelect.value = !reset && r.data.items.some(f => f.id === selected) ? selected : (r.data.default_id || '');
-            firmwareHint.textContent = tipo === 'R1' ? (r.data.items.length ? 'Sketch BLE-serie de la R1: no lleva identidad por unidad (el nombre BLE lo graba el STM32). Se verifica solo la MAC.' : 'No hay firmware ESP32 de R1 guardado. Sube un merged.bin.')
+            firmwareHint.textContent = tipo === 'R1' ? (r.data.items.length ? `ESP32_BLE_SERIAL FW ${r.data.items[0].fw}: es el mismo para todas las R1 (el nombre BLE lo graba el STM32). Se verifica solo la MAC.` : 'Falta el firmware fijo de la R1 en el servidor (firmware/esp32_r1).')
                 : r.data.items.length ? 'El nombre se toma de la R2 elegida; HW y FW se leen del archivo. Puedes elegir una versión anterior.' : 'No hay firmware compatible con el hardware de esta R2.';
             if (!r1Gate.ok) firmwareHint.textContent = r1Gate.motivo;
             enableFirmware();
@@ -326,11 +328,6 @@
                 for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i+8192));
                 const tipo = S.tarjeta?.tipo === 'R1' ? 'R1' : 'R2';
                 const body = { filename: file.name, contenido: btoa(binary), tipo };
-                if (tipo === 'R1') {
-                    const v = window.prompt('Versión del firmware R1 (p. ej. 1.0):', '');
-                    if (!v) return;
-                    body.version = String(v).trim();
-                }
                 const r = await api('/api/esp32/firmwares/analizar', { method: 'POST', body });
                 if (!r.ok) throw new Error(r.error);
                 if (!S.vivo) return;
@@ -466,7 +463,7 @@
             try {
                 await monDetener();   // el monitor libera el puerto antes de flashear
                 marcarPaso('compilar', 'activo');
-                escribir(pcb.tipo === 'R2' ? 'Preparando firmware y nombre desde inventario…' : 'Preparando firmware de R1 del catálogo…');
+                escribir(pcb.tipo === 'R2' ? 'Preparando firmware y nombre desde inventario…' : 'Preparando firmware fijo de R1…');
                 const fw = await compilarFirmware(pcb); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
                 marcarPaso('compilar', 'ok');
                 escribir(`Firmware listo (${(binario.length / 1024).toFixed(0)} KB)${fw.firmware ? ' · FW ' + fw.firmware + (fw.hardware ? ' · HW ' + fw.hardware : '') : ''}${fw.nombreBle ? ' · nombre BLE ' + fw.nombreBle : ''}.`);

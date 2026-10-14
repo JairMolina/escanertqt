@@ -4,7 +4,7 @@ Actualizado: 2026-10-14 22:50 UTC
 Commit de referencia: `738379f` + esta rama (v1.3.79)
 
 ## Avance reportado
-Rama codex/r2-serial-monitor (sobre 1.3.78): v1.3.79 monitor serial R2, grabación serial a 921600 con respaldo 115200, eventos WS tras OTA verificada; R1 ESP32 con catálogo como R2 (base ESP32_BLE_SERIAL 1.0, sin borrar NVS) y candado de orden R2 MAC → STM32 R1 verificado → ESP32 R1. Sin desplegar.
+Rama codex/r2-serial-monitor (sobre 1.3.78): v1.3.79 monitor serial R2, grabación serial a 921600 con respaldo 115200, eventos WS tras OTA verificada; R1 ESP32 con firmware fijo ESP32_BLE_SERIAL 1.0 (sin catálogo ni subida, sin borrar NVS) y candado de orden R2 MAC → STM32 R1 verificado → ESP32 R1. Sin desplegar.
 
 ## Siguiente paso
 Probar en hardware R2 (monitor, polaridad RTS/DTR de «Reiniciar placa», grabación a 921600 con el adaptador USB–TTL real). Desplegar solo con autorización expresa. Despliegue requiere montar ../firmware/esp32_r1 en servidor/compose.yml (no versionado) o reconstruir imagen. R1 con STM32 grabado fuera del J-Link web quedan bloqueadas por el candado. Pendiente de decisión: semáforo STM32 (verde sin J-Link verificado) y si una tarjeta sin R3 debe mostrarse como R1/R2 programadas.
