@@ -1,26 +1,37 @@
 # Firmware ESP32 (R1 y R2)
 
-Copia versionada de los `.ino` que se flashean a las placas R1 (`esp32_r1/ESP32_BLE_SERIAL`) y R2
-(`esp32_r2/TQT2_RESPALDO_V2_1_CORREGIDO`). Los originales de referencia (y el proyecto STM32 de R1
-"Principal", que **no** se toca desde la app) siguen en
-`Desktop\Todos los FW de las TQT Corregidos`.
+La programación de ESP32 se realiza por USB con Web Serial en `/monitor`,
+mediante `esptool-js` incluido en la aplicación. Chrome/Edge de escritorio,
+HTTPS o localhost, y adaptador USB–TTL autorizado en el navegador.
 
-La app los compila on-demand dentro del contenedor Docker (`app/services/firmware_build.py`, endpoint
-`POST /api/firmware/compilar`) con `arduino-cli` y la placa `esp32:esp32:esp32doit-devkit-v1` (DOIT ESP32
-DEVKIT V1), y el navegador los flashea por USB con Web Serial (sección "MAC y firmware" de la consola de
-escritorio, `/monitor`). El binario que se flashea es el `*.ino.merged.bin` (bootloader + particiones + app
-en un solo archivo, offset `0x0`).
+## R2: FW 4.0 y catálogo BIN / HEX
 
-**R2**: al compilar se sustituye únicamente el grupo final de 4 dígitos del
-`#define Nombre_Del_Ble "TQT_R2_V2_0_0049"` por el número de la tarjeta (todo lo demás del archivo se
-compila tal cual). **R1** no lleva número en el código (usa un nombre por defecto en EEPROM); se compila
-sin ningún parche.
+Fuente nueva: `esp32_r2/TQT_R2_V4_0`. Base compilada de runtime:
+`esp32_r2/TQT_R2_V4_0.merged.bin`, HW 3.0 / FW 4.0, core ESP32 3.3.12.
+Las fuentes anteriores V3.1.2 y V2.1 permanecen sin cambios.
 
-## Actualizar una versión de firmware
+En Programación > R2, **Subir BIN / HEX** analiza el perfil interno y permite
+ guardar la imagen en la BD. El selector usa por defecto la versión numérica
+más alta compatible y permite escoger una anterior. La web coloca el nombre
+de la R2 elegida del inventario dentro del campo reservado; no recompila ni
+modifica código, HW o FW por unidad. Verifica nombre/HW/FW/MAC al arrancar.
 
-1. Reemplaza el `.ino` correspondiente aquí mismo, conservando el nombre de archivo y de carpeta
-   (deben coincidir: es una regla de Arduino). Para R2, conserva la forma exacta del
-   `#define Nombre_Del_Ble "TQT_R2_V2_0_XXXX"` (prefijo + 4 dígitos finales) o el parcheo automático
-   fallará con un error claro en vez de compilar algo incorrecto.
-2. Reconstruye la imagen Docker (`docker compose up -d --build`) para que quede horneada.
-3. Prueba flashear una tarjeta de prueba antes de usarlo en planta.
+Para preparar otra versión, cambia HW/FW una sola vez en `tqt_profile.h`,
+compila y ejecuta `compilar.ps1`. Sube el archivo completo `*.ino.merged.bin`
+o el HEX ESP32 exportado por el script. `*.ino.bin` es solo la aplicación,
+por lo que se rechaza. Un HEX STM32 no se usa para ESP32.
+
+Detalles del formato, persistencia y API: [ESP32_R2_V4](../docs/ESP32_R2_V4.md).
+El perfil plantilla 0000 se personaliza en la web antes de grabar. La imagen
+base fue compilada/verificada; la prueba de hardware de V4.0 sigue pendiente.
+
+## R1 y compatibilidad anterior
+
+El ESP32 de R1 conserva la compilación por Arduino CLI desde
+`esp32_r1/ESP32_BLE_SERIAL`, placa `esp32:esp32:esp32doit-devkit-v1`.
+El endpoint `POST /api/firmware/compilar` mantiene también la compilación R2
+V3.1.2 anterior y su personalización del nombre para clientes existentes.
+El nuevo panel R2 utiliza el catálogo y no requiere Arduino CLI en el servidor.
+
+El STM32 de R1/R3 usa su catálogo HEX y la estación Windows J-Link; es un
+flujo independiente del ESP32.

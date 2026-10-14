@@ -1,7 +1,7 @@
 /**
  * sec_programacion.js - Sección "Programación" (consola de escritorio): buscar/elegir una R1/R2
- * pendiente y flashearla por USB (Web Serial) con el firmware fuente de `firmware/` (siempre el más
- * reciente; aquí no se elige versión de firmware, eso es cosa de "MAC y firmware"), con monitor serial
+ * pendiente y flashearla por USB (Web Serial). R2 usa un catálogo persistente BIN/HEX
+ * con perfil HW/FW y nombre personalizado desde inventario, con monitor serial
  * en vivo, pasos visuales y manejo de puertos COM (recordar, refrescar y olvidar los autorizados).
  * Sin cámara, sin CDN (esptool-js vendorizado en /static/js/vendor/esptool-js/).
  */
@@ -12,7 +12,7 @@
     const MAC_RE = /(^|[^0-9A-Fa-f])((?:[0-9A-Fa-f]{2}[:\-.]?){5}[0-9A-Fa-f]{2})(?![0-9A-Fa-f])/;
     const VID_NOMBRE = { '10c4': 'Silicon Labs CP210x', '1a86': 'CH340/CH341', '0403': 'FTDI' };
     const PASOS = [
-        { id: 'compilar', t: 'Compilar firmware' },
+        { id: 'compilar', t: 'Preparar firmware' },
         { id: 'puerto', t: 'Puerto elegido' },
         { id: 'boot', t: 'BOOT + RESET (manual)' },
         { id: 'sync', t: 'Modo programador' },
@@ -33,10 +33,16 @@
     function montar(host, ctx) {
         const { T, api, h, icon, toast, util } = ctx;
 
-        const S = { vivo: true, pendientes: [], filtro: '', tarjeta: null, busy: false, puertos: [], puertoSel: null };
+        const S = { vivo: true, pendientes: [], filtro: '', tarjeta: null, busy: false, puertos: [], puertoSel: null, completed: null };
         const timers = new Set();
         const unsubs = [];
 
+        let firmwareRequest = 0, uploadBusy = false, firmwareLoading = false;
+        const firmwareSelect = h('select', { class: 'input', id: 'esp-r2-fw' });
+        const firmwareHint = h('p', { class: 'hint', 'aria-live': 'polite' }, 'Cargando firmware…');
+        const uploadInput = h('input', { type: 'file', accept: '.bin,.hex', hidden: true });
+        const uploadBtn = h('button', { class: 'btn', type: 'button', onclick: () => uploadInput.click() }, 'Subir BIN / HEX');
+        const firmwarePanel = h('div', { class: 'field' }, h('label', { for: 'esp-r2-fw' }, 'Firmware R2 a programar'), firmwareSelect, firmwareHint, h('div', { class: 'row wrap' }, uploadBtn, uploadInput));
         let esptoolProm = null;
         function cargarEsptool() { return esptoolProm || (esptoolProm = import(ESPTOOL_URL)); }
 
@@ -50,7 +56,7 @@
             if (!S.vivo) return;
             if (!r.ok) { lista.replaceChildren(T.banner('bad', 'alert', r.network ? 'Sin conexión con el servidor.' : `No se pudo cargar: ${r.error}`)); return; }
             S.pendientes = ((r.data && r.data.items) || []).filter((p) => p.tipo === 'R2');   // v1.3.55: este modo es el de R2; la R1 llega con «Programar ESP32 R1»
-            if (S.tarjeta && !S.pendientes.some((p) => p.id === S.tarjeta.id)) { S.tarjeta = null; pintarDetalle(); }
+            if (S.tarjeta && S.completed !== S.tarjeta.id && !S.pendientes.some((p) => p.id === S.tarjeta.id)) { S.tarjeta = null; pintarDetalle(); }
             pintarLista();
         }
         function filtradas() {
@@ -135,28 +141,105 @@
         const resultado = h('div', { class: 'prog-resultado', hidden: true, role: 'status' });
         const btnFlash = h('button', { class: 'btn btn-primary', type: 'button' }, icon('flash'), 'Compilar y flashear');
 
+        function enableFirmware() {
+            const blocked = S.busy || uploadBusy || firmwareLoading;
+            firmwareSelect.disabled = blocked || !firmwareSelect.options.length;
+            uploadBtn.disabled = blocked;
+            btnFlash.disabled = blocked || !S.tarjeta || S.completed === S.tarjeta.id || (S.tarjeta?.tipo === 'R2' && !firmwareSelect.value);
+            btnFlash.textContent = S.tarjeta?.tipo === 'R1' ? 'Compilar y flashear' : 'Programar R2';
+        }
+        async function loadFirmwares(reset = false) {
+            const n = ++firmwareRequest;
+            firmwareLoading = true; enableFirmware();
+            const selected = firmwareSelect.value;
+            const hw = S.tarjeta?.tipo === 'R2' ? S.tarjeta.version : '';
+            const r = await api('/api/esp32/firmwares?hw=' + encodeURIComponent(hw));
+            if (!S.vivo || n !== firmwareRequest) return;
+            firmwareLoading = false;
+            if (!r.ok) {
+                firmwareSelect.replaceChildren(); firmwareHint.textContent = r.error;
+                enableFirmware(); return;
+            }
+            firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id },
+                `FW ${f.fw} · HW ${f.hw}` + (f.id === r.data.default_id ? ' · más reciente' : ''))));
+            firmwareSelect.value = !reset && r.data.items.some(f => f.id === selected) ? selected : (r.data.default_id || '');
+            firmwareHint.textContent = r.data.items.length ? 'El nombre se toma de la R2 elegida; HW y FW se leen del archivo. Puedes elegir una versión anterior.' : 'No hay firmware compatible con el hardware de esta R2.';
+            enableFirmware();
+        }
+        uploadInput.addEventListener('change', async () => {
+            const file = uploadInput.files?.[0]; uploadInput.value = '';
+            if (!file || S.busy || uploadBusy) return;
+            uploadBusy = true; enableFirmware();
+            try {
+                if (file.size > 12 * 1024 * 1024) throw new Error('El archivo excede 12 MB.');
+                const bytes = new Uint8Array(await file.arrayBuffer());
+                let binary = '';
+                for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i+8192));
+                const body = { filename: file.name, contenido: btoa(binary) };
+                const r = await api('/api/esp32/firmwares/analizar', { method: 'POST', body });
+                if (!r.ok) throw new Error(r.error);
+                if (!S.vivo) return;
+                const d = r.data;
+                let saved = false;
+                let saving = false;
+                const error = h('div', { role: 'alert' });
+                await new Promise(resolve => {
+                    const modal = T.sheet({ title: 'Guardar firmware R2',
+                    body: h('div', null, h('p', null, `${file.name} · FW ${d.fw} · HW ${d.hw}`),
+                        h('p', { class: 'hint' }, 'El archivo se guardará sin identidad de unidad. Al programar se colocará el nombre de la R2 del inventario.'),
+                        h('p', { class: 'hint' }, 'Módulo: ' + d.module), error),
+                    onClose: resolve,
+                    actions: [{ label: 'Guardar firmware', kind: 'primary', onClick: async () => {
+                        saving = true;
+                        const cancel = modal.el.querySelector('.btn-ghost'); cancel.disabled = true;
+                        try {
+                            const res = await api('/api/esp32/firmwares', { method: 'POST', body });
+                            if (!res.ok) { error.replaceChildren(T.banner('bad', 'alert', res.error)); return false; }
+                            saved = true; resolve(); return true;
+                        } finally { saving = false; cancel.disabled = false; }
+                    } }, { label: 'Cancelar', kind: 'ghost', onClick: () => { if (saving) return false; resolve(); return true; } }] });
+                    modal.el.addEventListener('keydown', e => {
+                        if (e.key === 'Escape' && saving) { e.preventDefault(); e.stopPropagation(); }
+                        if (e.key !== 'Tab') return;
+                        const buttons = [...modal.el.querySelectorAll('button:not(:disabled)')];
+                        const first = buttons[0], last = buttons[buttons.length-1];
+                        if (!first) return;
+                        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+                    });
+                    modal.el.previousElementSibling.addEventListener('click', e => {
+                        if (saving) { e.preventDefault(); e.stopImmediatePropagation(); }
+                    }, true);
+                });
+                if (saved && S.vivo) { await loadFirmwares(true); toast('Firmware guardado; se eligió el más reciente compatible.', { kind: 'ok' }); }
+            } catch (e) { toast(e.message, { kind: 'bad' }); }
+            finally { uploadBusy = false; if (S.vivo) enableFirmware(); }
+        });
         async function compilarFirmware(pcb) {
-            const resp = await fetch('/api/firmware/compilar', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tipo: pcb.tipo, numero: pcb.serie }),
-            });
+            const r2 = pcb.tipo === 'R2';
+            const resp = await fetch(r2 ? `/api/esp32/bin/${pcb.id}?firmware_id=${encodeURIComponent(firmwareSelect.value)}` : '/api/firmware/compilar',
+                r2 ? { method: 'POST' } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo: pcb.tipo, numero: pcb.serie }) });
             if (!resp.ok) {
                 let msg = `Error ${resp.status}`;
-                try { const j = await resp.json(); msg = (j && j.detail) || msg; } catch (e) { /* sin cuerpo JSON */ }
-                throw new Error('No se pudo compilar el firmware: ' + msg);
+                try { const j = await resp.json(); msg = j.detail || msg; } catch (e) { /* sin JSON */ }
+                throw new Error('No se pudo preparar el firmware: ' + msg);
             }
-            // v1.3.62: el servidor devuelve el nombre BLE esperado y la versión para validar tras el arranque
-            const hd = (k) => resp.headers.get('X-TQT-' + k) || '';
-            return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), sha: hd('Fuente-Sha256') };
+            const hd = k => resp.headers.get('X-TQT-' + k) || '';
+            return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), hardware: hd('Hardware'), firmwareId: hd('Firmware-Id'), sha: hd('Sha256') || hd('Fuente-Sha256') };
         }
-        async function leerMacPorSerial(port) {
+        async function leerMacPorSerial(port, requireProfile = false) {
             try { if (port.readable || port.writable) await port.close(); } catch (e) { /* ya estaba cerrado */ }
             await port.open({ baudRate: 115200 });
-            let mac = null, nombre = null;
+            let mac = null, nombre = null, hardware = null, firmware = null, retry = null;
             try {
                 await new Promise((res) => setTimeout(res, 300));
-                const writer = port.writable.getWriter();
-                try { await writer.write(new TextEncoder().encode('MAC\n')); } finally { writer.releaseLock(); }
+                const ask = async () => {
+                    const writer = port.writable.getWriter();
+                    try { await writer.write(new TextEncoder().encode(requireProfile ? 'INFO\n' : 'MAC\n')); }
+                    finally { writer.releaseLock(); }
+                };
+                await ask();
+                if (requireProfile) retry = setInterval(() => ask().catch(() => {}), 1000);
                 const decoder = new TextDecoderStream();
                 const listo = port.readable.pipeTo(decoder.writable).catch(() => {});
                 const reader = decoder.readable.getReader();
@@ -172,6 +255,14 @@
                         buffer = lineas.pop();
                         for (const linea of lineas) {
                             // v1.3.62: la R2 responde «<nombre> MAC: AA:BB:…»; se guarda la línea completa para validar el nombre
+                            if (requireProfile) {
+                                if (!linea.startsWith('TQT_INFO ')) continue;
+                                try { const info = JSON.parse(linea.slice(9));
+                                    mac = extraerMac(info.mac || ''); nombre = info.nombre; hardware = info.hw; firmware = info.fw;
+                                } catch (e) { continue; }
+                                if (mac) break;
+                                continue;
+                            }
                             const m = extraerMac(linea); if (m) { mac = m; nombre = (/^\s*(\S+)\s+MAC:/i.exec(linea) || [])[1] || null; break; }
                         }
                     }
@@ -180,9 +271,10 @@
                     try { await listo; } catch (e) { /* nada */ }
                 }
             } finally {
+                clearInterval(retry);
                 try { await port.close(); } catch (e) { /* nada */ }
             }
-            return { mac, nombre };
+            return { mac, nombre, hardware, firmware };
         }
         /** Hoja de confirmación dentro del flujo (sin confirm()): resuelve true al continuar, false al cancelar. */
         function confirmar(titulo, texto, ok) {
@@ -193,30 +285,33 @@
             });
         }
 
-        function mostrarResultado(pcb, mac) {
+        function mostrarResultado(pcb, mac, fw) {
+            S.completed = pcb.id;
             resultado.hidden = false;
             const macTxt = h('span', { class: 'prog-mac' }, mac);
             resultado.replaceChildren(
                 T.banner('ok', 'check', `${pcb.nombre}: programada correctamente.`),
+                fw.hardware ? h('p', { class: 'hint' }, `FW ${fw.firmware} · HW ${fw.hardware} · ${fw.nombreBle}`) : null,
                 h('div', { class: 'prog-mac-row' }, h('span', { class: 'hint' }, 'MAC:'), macTxt,
                     h('button', { class: 'btn btn-sm', type: 'button', onclick: () => util.copiar(mac, 'MAC copiada') }, icon('paste'), 'Copiar')),
                 h('button', { class: 'btn', type: 'button', onclick: () => { S.tarjeta = null; pintarDetalle(); buscar.focus(); } }, 'Elegir otra tarjeta'));
         }
 
         async function ejecutar() {
-            if (!S.tarjeta || S.busy) return;
+            if (!S.tarjeta || S.completed === S.tarjeta.id || S.busy || uploadBusy || firmwareLoading) return;
             if (!navigator.serial) { escribir('✗ Este navegador no soporta Web Serial. Usa Chrome o Edge de escritorio.'); return; }
             const port = S.puertoSel;
             if (!port) { escribir('✗ Elige primero el puerto de la tarjeta.'); return; }
             S.busy = true; btnFlash.disabled = true; resultado.hidden = true; relleno.style.width = '0';
-            pintarLista(); pintarPuertos(); resetPasos();
+            pintarLista(); pintarPuertos(); resetPasos(); enableFirmware();
             const pcb = S.tarjeta;
+            let transport = null;
             try {
                 marcarPaso('compilar', 'activo');
-                escribir(`Compilando firmware de ${pcb.tipo}…`);
+                escribir(pcb.tipo === 'R2' ? 'Preparando firmware y nombre desde inventario…' : 'Compilando firmware de R1…');
                 const fw = await compilarFirmware(pcb); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
                 marcarPaso('compilar', 'ok');
-                escribir(`Firmware listo (${(binario.length / 1024).toFixed(0)} KB)${fw.firmware ? ' · FW ' + fw.firmware : ''}${fw.nombreBle ? ' · nombre BLE ' + fw.nombreBle : ''}.`);
+                escribir(`Firmware listo (${(binario.length / 1024).toFixed(0)} KB)${fw.firmware ? ' · FW ' + fw.firmware + (fw.hardware ? ' · HW ' + fw.hardware : '') : ''}${fw.nombreBle ? ' · nombre BLE ' + fw.nombreBle : ''}.`);
 
                 marcarPaso('puerto', 'ok');
                 if (esR2) {
@@ -225,7 +320,7 @@
                 }
                 marcarPaso('boot', 'ok');
                 const esptool = await cargarEsptool();
-                const transport = new esptool.Transport(port, true);
+                transport = new esptool.Transport(port, true);
                 const loader = new esptool.ESPLoader({
                     transport, baudrate: 115200,
                     terminal: { clean() { /* nada */ }, writeLine: escribir, write: (s) => escribir(String(s).replace(/\n$/, '')) },
@@ -256,25 +351,28 @@
                 marcarPaso('arranque', 'ok');
                 marcarPaso('mac', 'activo');
                 escribir('Leyendo nombre y MAC por USB…');
-                const leido = await leerMacPorSerial(port); const mac = leido.mac;
+                const leido = await leerMacPorSerial(port, esR2); const mac = leido.mac;
                 if (!mac) throw new Error('No se detectó la MAC por USB (sin comunicación). Revisa que soltaste BOOT y reiniciaste; puedes teclearla en «MAC y firmware».');
                 if (esR2 && fw.nombreBle && leido.nombre !== fw.nombreBle) throw new Error(`Identidad incorrecta: la placa respondió «${leido.nombre || 'sin nombre'}» y se esperaba «${fw.nombreBle}». No se guardó la MAC.`);
+                if (esR2 && (leido.hardware !== fw.hardware || leido.firmware !== fw.firmware)) throw new Error('La versión HW/FW que responde la R2 no coincide con el archivo. No se guardó el resultado.');
                 if (pcb.mac && pcb.mac.toUpperCase() !== mac && !await confirmar('MAC diferente', `${pcb.nombre} ya tiene la MAC ${pcb.mac} y la placa respondió ${mac}. ¿Reemplazarla? Hazlo solo si confirmaste que es la misma placa física.`, 'Reemplazar MAC')) throw new Error('MAC en conflicto: no se cambió el registro.');
                 marcarPaso('mac', 'ok');
                 escribir('MAC leída: ' + mac + (leido.nombre ? ' · nombre ' + leido.nombre : ''));
 
-                const cuerpo = { mac }; if (esR2 && fw.firmware) cuerpo.firmware = fw.firmware;   // R1: aquí no se elige versión
+                const cuerpo = { mac }; if (esR2 && fw.firmware) Object.assign(cuerpo, { firmware: fw.firmware, firmware_id: fw.firmwareId, nombre_verificado: leido.nombre, hardware_verificado: leido.hardware });   // R1: aquí no se elige versión
                 const res = await api(`/api/pcb/${pcb.id}/programacion`, { method: 'PUT', body: cuerpo });
                 if (!res.ok) throw new Error(res.network ? 'Sin conexión con el servidor: no se guardó.' : res.error);
                 escribir('Guardado ✓');
                 toast(`${pcb.nombre}: MAC ${mac} guardada`, { kind: 'ok' });
-                mostrarResultado(pcb, mac);
+                mostrarResultado(pcb, mac, fw);
                 S.pendientes = S.pendientes.filter((p) => p.id !== pcb.id);
             } catch (e) {
                 marcarActivoComoError();
                 escribir('✗ ' + (e && e.message ? e.message : String(e)));
             } finally {
-                S.busy = false; btnFlash.disabled = false;
+                if (transport) { try { await transport.disconnect(); } catch (e) { /* ya cerrado */ } }
+                try { if (port.readable || port.writable) await port.close(); } catch (e) { /* sin puerto abierto */ }
+                S.busy = false; enableFirmware();
                 pintarLista(); pintarPuertos();
             }
         }
@@ -291,12 +389,16 @@
         const vacio = T.empty('flash', 'Elige una tarjeta', 'Búscala por número o nombre a la izquierda, o elige una de la lista.');
 
         function seleccionar(p) {
-            if (S.busy) return;
+            if (S.busy || uploadBusy) return;
             S.tarjeta = p;
+            S.completed = null;
+            loadFirmwares(true);
             pintarDetalle();
             pintarLista();
         }
         function pintarDetalle() {
+            firmwarePanel.hidden = S.tarjeta?.tipo === 'R1';
+            enableFirmware();
             if (!S.tarjeta) { detalle.hidden = true; vacio.hidden = false; return; }
             vacio.hidden = true; detalle.hidden = false;
             const p = S.tarjeta;
@@ -309,7 +411,7 @@
         host.classList.add('prog');
         host.append(h('div', { class: 'prog-wrap' },
             h('div', { class: 'prog-panel' }, h('h2', null, 'Elige una tarjeta'), h('div', { class: 'field' }, h('label', { for: 'prog-q' }, 'Buscar'), buscar), lista),
-            h('div', { class: 'prog-panel prog-panel-detalle' }, vacio, detalle)));
+            h('div', { class: 'prog-panel prog-panel-detalle' }, firmwarePanel, vacio, detalle)));
 
         const espHost = host.lastElementChild;
         const stmHost = h('div');
@@ -325,7 +427,7 @@
         };
         let actual = 'stm';
         function modo(id) {
-            if (S.busy || stm.ocupada() || stm3.ocupada()) return;
+            if (S.busy || uploadBusy || stm.ocupada() || stm3.ocupada()) return;
             actual = id;
             Object.entries(MODOS).forEach(([k, m]) => {
                 m.host.hidden = k !== id; m.btn.classList.toggle('btn-primary', k === id); m.btn.setAttribute('aria-pressed', String(k === id));
@@ -334,7 +436,7 @@
         host.prepend(h('div', { class: 'row wrap' }, MODOS.stm.btn, MODOS.esp.btn, MODOS.r3.btn));
         host.append(stmHost, r3Host); modo('stm');
 
-        cargarPendientes();
+        cargarPendientes(); loadFirmwares();
         refrescarPuertosAutorizados();
 
         let tRec = null;
@@ -344,7 +446,7 @@
         if (navigator.serial) { const onConn = () => refrescarPuertosAutorizados(); navigator.serial.addEventListener('connect', onConn); navigator.serial.addEventListener('disconnect', onConn); unsubs.push(() => { navigator.serial.removeEventListener('connect', onConn); navigator.serial.removeEventListener('disconnect', onConn); }); }
 
         return {
-            actualizar() { stm.actualizar(); stm3.actualizar(); if (!S.busy) cargarPendientes(); },
+            actualizar() { stm.actualizar(); stm3.actualizar(); if (!S.busy && !uploadBusy) { cargarPendientes(); loadFirmwares(); } },
             escaneo(codigo) { if (actual === 'r3') return stm3.escaneo(codigo); modo('stm'); return stm.escaneo(codigo); },
             desmontar() {
                 S.vivo = false;

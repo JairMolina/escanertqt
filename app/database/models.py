@@ -470,6 +470,9 @@ class ProgramacionUpdate(BaseModel):
     mac: str = Field(..., min_length=1, max_length=60, description="Cualquier formato")
     firmware: Optional[str] = Field(None, max_length=40, description="Versión de firmware con la que se programó (ej. 4.1)")
     operador: Optional[str] = Field(None, max_length=60)
+    firmware_id: Optional[str] = Field(None, max_length=32)
+    nombre_verificado: Optional[str] = Field(None, max_length=23)
+    hardware_verificado: Optional[str] = Field(None, max_length=7)
 
 
 class FirmwareCompilarRequest(BaseModel):

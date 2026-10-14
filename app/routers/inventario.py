@@ -33,7 +33,7 @@ from app.database.models import (
     VersionMasiva,
 )
 from app.routers.ws import manager
-from app.services import firmware_build
+from app.services import firmware_build, esp32_firmware, usuarios
 from app.services.admin_dep import admin_si_habilitado
 
 logger = logging.getLogger(__name__)
@@ -197,8 +197,13 @@ async def put_mac(pcb_id: int, payload: MACUpdate):
 
 
 @router.put("/pcb/{pcb_id}/programacion", summary="Guardar la MAC y el firmware de una R1/R2 recién programada (una sola operación)")
-async def put_programacion(pcb_id: int, payload: ProgramacionUpdate):
-    pcb = await _run(inv.guardar_programacion, pcb_id, payload.mac, payload.firmware, payload.operador)
+async def put_programacion(pcb_id: int, payload: ProgramacionUpdate, request: Request):
+    if payload.firmware_id:
+        pcb = await _run(esp32_firmware.result, pcb_id, payload.mac, payload.firmware_id,
+                         payload.nombre_verificado, payload.hardware_verificado, payload.firmware,
+                         usuarios.validar_sesion(request.cookies.get(usuarios.COOKIE))['email'])
+    else:
+        pcb = await _run(inv.guardar_programacion, pcb_id, payload.mac, payload.firmware, payload.operador)
     await manager.broadcast("PCB_ACTUALIZADA", {"pcb": pcb, "conteos": await run_in_threadpool(_conteos)})
     if pcb.get("tarjeta_id"):
         await _notificar_tarjeta(await run_in_threadpool(db.get_tarjeta_by_id, pcb["tarjeta_id"]))

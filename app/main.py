@@ -20,7 +20,7 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station
+from app.routers import test_station, esp32
 from app.ssl_cert import ensure_ssl_certificates
 
 # Configurar logging
@@ -84,6 +84,7 @@ app = FastAPI(
     redoc_url=None,
     openapi_url="/openapi.json" if os.getenv("TQT_DOCS") == "1" else None,
 )
+app.include_router(esp32.router)
 
 # Sin CORS: la interfaz se sirve desde este mismo origen (https://IP:8443). Sin middleware CORS el
 # navegador bloquea que OTROS sitios abiertos en el celular/PC escriban en la API con JSON.

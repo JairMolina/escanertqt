@@ -51,4 +51,5 @@ station/resultados/
 # Builds STM32 generados por CubeIDE
 firmware/stm32_r1/CubeIDE/**/Debug/
 firmware/stm32_r1/CubeIDE/**/Release/
+firmware/esp32_r2/**/build/
 *.launch

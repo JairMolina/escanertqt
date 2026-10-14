@@ -37,7 +37,7 @@
 .prog-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-top: 8px; }
 .prog-bar-fill { height: 100%; width: 0; background: var(--accent); transition: width .15s ease; }
 .prog-resultado { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-.prog-mac-row { display: flex; align-items: center; gap: 10px; }
+.prog-mac-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; max-width: 100%; }
 .prog-mac { font-family: var(--font-mono); font-size: 20px; font-weight: 700; letter-spacing: .02em; user-select: all; }
 
 /* R1 STM32 / J-Link */

@@ -1,0 +1,305 @@
+"""R2 images with a fixed profile; modify identity data and ESP image checksums only.
+
+Format: Espressif ESP32 image v1 (24-byte header, segment XOR, appended SHA256).
+Source: docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/firmware-image-format.html
+"""
+import hashlib
+import json
+import re
+import secrets
+import struct
+import time
+import zlib
+from pathlib import Path
+from app.database import db, inventario as inv
+
+ROOT = Path(__file__).resolve().parents[2]
+FLASH_SIZE = 4 * 1024 * 1024
+MAX_UPLOAD = 12 * 1024 * 1024
+MAGIC = b'TQT_R2_CFG_V1' + bytes(3)
+PROFILE = struct.Struct('<16sI8s16s24s24s')
+NAME_OFFSET = 44
+
+
+def hex_image(raw):
+    """Intel HEX with ESP flash offsets; bounded allocation, checksums and no overlaps."""
+    try:
+        lines = raw.decode('ascii').splitlines()
+    except UnicodeError as e:
+        raise ValueError('El HEX debe ser texto ASCII.') from e
+    image = bytearray(b'\xff') * FLASH_SIZE
+    seen = bytearray(FLASH_SIZE)
+    base = end = 0
+    eof = False
+    for line in lines:
+        if not line.strip():
+            continue
+        if eof or not re.fullmatch(r':[0-9a-fA-F]+', line.strip()):
+            raise ValueError('Registro HEX inválido o posterior a EOF.')
+        try:
+            record = bytes.fromhex(line.strip()[1:])
+        except ValueError as e:
+            raise ValueError('Registro HEX inválido.') from e
+        if len(record) < 5 or record[0] != len(record)-5 or sum(record) % 256:
+            raise ValueError('Longitud o checksum HEX incorrecto.')
+        size, offset, kind = record[0], int.from_bytes(record[1:3], 'big'), record[3]
+        data = record[4:-1]
+        if kind == 0:
+            start = base + offset
+            stop = start + size
+            if offset+size > 65536 or stop > FLASH_SIZE or any(seen[start:stop]):
+                raise ValueError('HEX fuera de Flash ESP32 o con direcciones superpuestas.')
+            image[start:stop] = data
+            seen[start:stop] = b'\x01' * size
+            end = max(end, stop)
+        elif kind in (2, 4) and size == 2 and offset == 0:
+            base = int.from_bytes(data, 'big') << (4 if kind == 2 else 16)
+        elif kind == 1 and size == offset == 0:
+            eof = True
+        else:
+            raise ValueError('Tipo de registro HEX no soportado para ESP32.')
+    if not eof or not end:
+        raise ValueError('HEX vacío o sin EOF.')
+    return bytes(image[:end])
+
+
+def image_layout(raw, start, limit):
+    if start+24 > limit or raw[start] != 0xE9:
+        raise ValueError('Falta imagen de arranque ESP32; usa el archivo merged.bin completo.')
+    count = raw[start+1]
+    if not 1 <= count <= 16 or raw[start+12:start+14] != b'\0\0' or raw[start+23] != 1:
+        raise ValueError('Imagen incompatible: se requiere ESP32 clásico con SHA256, sin firma Secure Boot.')
+    if raw[start+2] not in (0,1,2,3) or raw[start+3]>>4 != 2 or raw[start+3]&15 not in (0,1,2,15):
+        raise ValueError('Configuración Flash incompatible con ESP32-WROOM-32E-N4 de 4 MB.')
+    pos = start+24
+    segments = []
+    loaded = []
+    checksum = 0xEF
+    for _ in range(count):
+        if pos+8 > limit:
+            raise ValueError('Segmento ESP32 incompleto.')
+        address, length = struct.unpack_from('<II', raw, pos)
+        pos += 8
+        if length > FLASH_SIZE or pos+length > limit:
+            raise ValueError('Longitud de segmento ESP32 inválida.')
+        segments.append((pos, pos+length))
+        loaded.append((address,address+length))
+        for value in raw[pos:pos+length]:
+            checksum ^= value
+        pos += length
+    entry = struct.unpack_from('<I',raw,start+4)[0]
+    if not any(first<=entry<last for first,last in loaded):
+        raise ValueError('Punto de entrada ESP32 fuera de los segmentos de aplicación.')
+    checksum_pos = start + ((pos-start)//16)*16 + 15
+    end = checksum_pos+33
+    if end > limit or raw[checksum_pos] != checksum:
+        raise ValueError('Checksum de imagen ESP32 incorrecto.')
+    if hashlib.sha256(raw[start:checksum_pos+1]).digest() != raw[checksum_pos+1:end]:
+        raise ValueError('SHA256 interno de imagen ESP32 incorrecto.')
+    return dict(start=start, segments=segments, checksum=checksum_pos, end=end)
+
+
+def field(raw):
+    value, sep, padding = raw.partition(b'\0')
+    if not sep or not value or any(padding):
+        raise ValueError('Perfil TQT incompleto o no canónico.')
+    try:
+        return value.decode('ascii')
+    except UnicodeError as e:
+        raise ValueError('Perfil TQT debe ser ASCII.') from e
+
+
+def inspect(raw):
+    if not isinstance(raw, bytes) or not 65536 < len(raw) <= FLASH_SIZE:
+        raise ValueError('Se requiere firmware ESP32 completo, de hasta 4 MB.')
+    boot = image_layout(raw, 0x1000, 0x8000)
+    partitions = []
+    digest_seen = False
+    for pos in range(0x8000, 0x9000, 32):
+        record = raw[pos:pos+32]
+        magic = record[:2]
+        if magic == b'\xff\xff':
+            break
+        if magic == b'\xeb\xeb':
+            if digest_seen or record[2:16] != b'\xff'*14 or hashlib.md5(raw[0x8000:pos]).digest() != record[16:32]:
+                raise ValueError('Checksum de tabla de particiones incorrecto.')
+            digest_seen = True
+            continue
+        if magic != b'\xaa\x50' or digest_seen:
+            raise ValueError('Tabla de particiones ESP32 inválida.')
+        _, typ, subtype, offset, size, label, flags = struct.unpack('<HBBII16sI', record)
+        if not size or offset < 0x9000 or offset % 4096 or offset+size > FLASH_SIZE or flags:
+            raise ValueError('Particiones fuera de Flash o cifradas; formato no soportado.')
+        if any(offset < p['offset']+p['size'] and offset+size > p['offset'] for p in partitions):
+            raise ValueError('Particiones superpuestas.')
+        partitions.append(dict(type=typ, subtype=subtype, offset=offset, size=size))
+    apps = [p for p in partitions if p['type'] == 0]
+    if not digest_seen or not apps:
+        raise ValueError('Falta tabla de particiones verificada y aplicación.')
+    # Arduino default layout: otadata must select the first app; other OTA slots remain erased.
+    app = apps[0]
+    if app['offset'] != 0x10000 or app['subtype'] not in (0, 0x10):
+        raise ValueError('Se requiere aplicación inicial en 0x10000 (configuración Arduino por defecto).')
+    layout = image_layout(raw, app['offset'], min(len(raw), app['offset']+app['size']))
+    allowed = [(0x1000, boot['end']), (0x8000, 0x9000), (app['offset'], layout['end'])]
+    for p in partitions:
+        if p['type'] == 1 and p['subtype'] == 0:  # boot_app0/OTA select data
+            if (p['offset'],p['size'])!=(0xE000,0x2000):
+                raise ValueError('Datos OTA fuera de la configuración Arduino por defecto.')
+            ota=raw[0xE000:0x10000]
+            if len(ota)!=0x2000 or ota[:4]!=b'\x01\0\0\0' or ota[4:28]!=b'\xff'*24:
+                raise ValueError('La imagen OTA no selecciona la aplicación inicial de forma segura.')
+            if struct.unpack_from('<I',ota,28)[0]!=zlib.crc32(ota[:4],0xFFFFFFFF):
+                raise ValueError('CRC de selección OTA incorrecto.')
+            if any(b!=255 for b in ota[32:4096]) or ota[4096:4100] not in (b'\0'*4,b'\xff'*4) or any(b!=255 for b in ota[4100:]):
+                raise ValueError('La imagen incluye un estado OTA previo o selecciona otra aplicación.')
+            allowed.append((p['offset'], p['offset']+p['size']))
+    if app['subtype']==0x10 and not any(p['type']==1 and p['subtype']==0 for p in partitions):
+        raise ValueError('Falta la selección OTA de la aplicación inicial.')
+    # Never propagate EEPROM/NVS data, encrypted payloads or a second preloaded application.
+    cursor = 0
+    for first, last in sorted(allowed):
+        if any(b != 255 for b in raw[cursor:first]):
+            raise ValueError('El archivo incluye datos de unidad u otra aplicación fuera de las regiones permitidas.')
+        cursor = min(last, len(raw))
+    if any(b != 255 for b in raw[cursor:]):
+        raise ValueError('Hay datos adicionales o firma Secure Boot; no se personalizan.')
+    positions = []
+    for first, last in layout['segments']:
+        pos = raw.find(MAGIC, first, last)
+        while pos >= 0:
+            if pos+PROFILE.size <= last:
+                positions.append(pos)
+            pos = raw.find(MAGIC, pos+1, last)
+    if len(positions) != 1:
+        raise ValueError('Falta perfil único R2 V4.0; el firmware anterior no admite personalizar un binario.')
+    pos = positions[0]
+    _, schema, hw, fw, name, module = PROFILE.unpack_from(raw, pos)
+    hw, fw, name, module = map(field, (hw, fw, name, module))
+    if schema != 1 or module != 'ESP32-WROOM-32E-N4':
+        raise ValueError('Esquema o módulo ESP32 no soportado.')
+    if not re.fullmatch(r'\d+(?:\.\d+)+', hw) or len(hw) > 7 or not re.fullmatch(r'\d+(?:\.\d+)+', fw) or len(fw) > 15:
+        raise ValueError('Versiones HW/FW inválidas en el perfil.')
+    if not re.fullmatch(re.escape('TQT_R2_V'+hw.replace('.', '')+'_')+r'\d{4}', name) or len(name) > 23:
+        raise ValueError('Nombre BLE incompatible con el HW del firmware.')
+    meta = dict(kind='R2', hw=hw, fw=fw, nombre=name, module=module, schema=schema,
+                bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+    return meta, pos, layout
+
+
+def personalize(raw, name):
+    meta, pos, layout = inspect(raw)
+    if not re.fullmatch(re.escape('TQT_R2_V'+meta['hw'].replace('.', '')+'_')+r'\d{4}', name) or len(name)>23:
+        raise ValueError('La identidad del inventario no coincide con el HW del firmware.')
+    image = bytearray(raw)
+    image[pos+NAME_OFFSET:pos+NAME_OFFSET+24] = name.encode('ascii').ljust(24,b'\0')
+    checksum = 0xEF
+    for first,last in layout['segments']:
+        for value in image[first:last]:
+            checksum ^= value
+    image[layout['checksum']] = checksum
+    image[layout['checksum']+1:layout['end']] = hashlib.sha256(image[layout['start']:layout['checksum']+1]).digest()
+    final = bytes(image)
+    verified, _, _ = inspect(final)
+    return final, dict(verified, source_sha256=meta['sha256'])
+
+
+def normalize(raw, filename):
+    if not isinstance(raw,bytes) or len(raw)>MAX_UPLOAD:
+        raise ValueError('Firmware vacío o mayor de 12 MB.')
+    filename=filename.replace('\\','/').split('/')[-1].strip()
+    if not 1<=len(filename)<=180 or any(ord(ch)<32 for ch in filename):
+        raise ValueError('Nombre de archivo inválido.')
+    if filename.lower().endswith('.hex'):
+        raw = hex_image(raw)
+    elif not filename.lower().endswith('.bin'):
+        raise ValueError('Sube un merged.bin o un Intel HEX de ESP32 completo.')
+    meta, _, layout=inspect(raw)
+    raw=raw[:layout['end']]  # canonical image: ignore erased padding, never flash unused NVS/OTA slots
+    stored, _=personalize(raw,'TQT_R2_V'+meta['hw'].replace('.','')+'_0000')
+    meta, _, _=inspect(stored)
+    return meta,stored,filename
+
+
+def ensure(c):
+    c.execute('''CREATE TABLE IF NOT EXISTS esp32_firmwares (
+      id TEXT PRIMARY KEY, hw TEXT NOT NULL, fw TEXT NOT NULL, filename TEXT NOT NULL,
+      sha256 TEXT NOT NULL UNIQUE, metadata TEXT NOT NULL, image BLOB NOT NULL,
+      created REAL NOT NULL, operator TEXT NOT NULL)''')
+    if not c.execute('SELECT 1 FROM esp32_firmwares LIMIT 1').fetchone():
+        path=ROOT/'firmware/esp32_r2/TQT_R2_V4_0.merged.bin'
+        meta,image,filename=normalize(path.read_bytes(),path.name)
+        c.execute('INSERT OR IGNORE INTO esp32_firmwares VALUES(?,?,?,?,?,?,?,?,?)',
+                  ('base-R2-v4',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,0,'sistema'))
+
+
+def public(row):
+    return dict(json.loads(row['metadata']),id=row['id'],filename=row['filename'],created=row['created'])
+
+
+def rows(c,hw=''):
+    ensure(c)
+    found=list(c.execute('SELECT * FROM esp32_firmwares'))
+    if hw:
+        found=[r for r in found if r['hw'].replace('.','')==hw.replace('.','')]
+    def order(row):
+        parts=[int(x) for x in row['fw'].split('.')]
+        while len(parts)>1 and parts[-1]==0:
+            parts.pop()
+        return tuple(parts),row['created'],row['id']
+    return sorted(found,key=order,reverse=True)
+
+
+def catalogue(hw=''):
+    with db.transaction() as c:
+        found=rows(c,hw)
+    return dict(items=[public(r) for r in found],default_id=found[0]['id'] if found else None)
+
+
+def save(raw,filename,operator):
+    meta,image,filename=normalize(raw,filename)
+    with db.transaction() as c:
+        ensure(c)
+        previous=c.execute('SELECT * FROM esp32_firmwares WHERE sha256=?',(meta['sha256'],)).fetchone()
+        if previous:
+            return dict(public(previous),existing=True)
+        identifier=secrets.token_hex(12)
+        c.execute('INSERT INTO esp32_firmwares VALUES(?,?,?,?,?,?,?,?,?)',
+                  (identifier,meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,time.time(),operator))
+        db.log_evento('ESP32_FIRMWARE_GUARDADO',None,None,f'R2 HW {meta["hw"]} FW {meta["fw"]}; sha256={meta["sha256"]}',operator,conn=c)
+        return dict(meta,id=identifier,filename=filename,existing=False)
+
+
+def prepare(pcb_id,firmware_id=None):
+    with db.transaction() as c:
+        pcb=inv.get_pcb(pcb_id,conn=c)
+        if not pcb or pcb['tipo']!='R2':
+            raise ValueError('Elige una R2 del inventario.')
+        found=rows(c,pcb['version'])
+        row=next((r for r in found if r['id']==firmware_id),None) if firmware_id else (found[0] if found else None)
+        if row is None:
+            raise ValueError('No hay firmware compatible con el HW de la R2 seleccionada.')
+        raw=bytes(row['image'])
+        if hashlib.sha256(raw).hexdigest()!=row['sha256']:
+            raise ValueError('El firmware guardado no coincide con su hash.')
+        name=pcb['nombre'].replace('-','_')
+        if not name.endswith('_'+pcb['serie']) or pcb['serie']=='0000':
+            raise ValueError('Nombre y serie de R2 inconsistentes en el inventario.')
+        image,meta=personalize(raw,name)
+        return dict(meta,firmware_id=row['id'],pcb_id=pcb_id),image
+
+
+def result(pcb_id,mac,firmware_id,name,hw,fw,operator):
+    with db.transaction() as c:
+        ensure(c)
+        pcb=inv.get_pcb(pcb_id,conn=c)
+        row=c.execute('SELECT * FROM esp32_firmwares WHERE id=?',(firmware_id,)).fetchone()
+        if not pcb or pcb['tipo']!='R2' or not row:
+            raise ValueError('Placa R2 o firmware no encontrado.')
+        if (name,hw,fw)!=(pcb['nombre'].replace('-','_'),row['hw'],row['fw']) or pcb['version']!=hw.replace('.',''):
+            raise ValueError('Nombre o versiones verificadas no coinciden con la R2 y su firmware.')
+        if hashlib.sha256(bytes(row['image'])).hexdigest()!=row['sha256']:
+            raise ValueError('El archivo guardado no coincide con su hash.')
+        updated=inv.guardar_programacion(pcb_id,mac,fw,operator,conn=c)
+        db.log_evento('ESP32_PROGRAMADA',None,None,f'{name}; firmware_id={firmware_id}; HW {hw} FW {fw}; base_sha256={row["sha256"]}',operator,conn=c)
+        return updated

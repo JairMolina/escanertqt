@@ -1,0 +1,13 @@
+{
+  "version": "4.0",
+  "hw": "3.0",
+  "hardware": "ESP32-WROOM-32E-N4",
+  "fqbn": "esp32:esp32:esp32doit-devkit-v1",
+  "core": "3.3.12",
+  "fecha": "2026-10-14",
+  "estado": "compilado; prueba fisica pendiente",
+  "source_sha256": "021a27266654242ffe40f059e5ae14677d5cd5c7cf3f6975339f85540142294f",
+  "profile_sha256": "44e85b28eb876c9f32ef79e6da2e9e31c66d7635ae0523286ccdcfcd4cc56bf5",
+  "original_sha256": "e3bb4e47a7013485b1a369c9e6cbe36a0bcce595724d0e4899bfb4c5de9722b0",
+  "sha256": "61974c0c07b080f4fbc73f3477f05bb4a0fa2dc35191d9b3306e4f18c1d13b4b"
+}
