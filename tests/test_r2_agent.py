@@ -28,6 +28,10 @@ class AgentVerificationTests(unittest.IsolatedAsyncioTestCase):
         result=await worker.verificar_r2(dict(mac=device.address,nombre=device.name))
         self.assertTrue(result['ok']);self.assertEqual(calls[0],('scan',device.address))
         self.assertEqual(calls[-1],('disconnect',));self.assertEqual(len(calls),4)
+        calls.clear()
+        cached=await worker.verificar_r2(dict(mac=device.address,nombre=device.name.replace('_','-')))
+        self.assertTrue(cached['ok']);self.assertEqual(calls[-1],('disconnect',))
+        self.assertEqual(len(calls),4,'A cached separator format must not block the authenticated INFO read')
 
     async def test_wrong_advertised_name_never_connects(self):
         class Scanner:

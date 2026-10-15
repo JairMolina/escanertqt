@@ -11,6 +11,7 @@ from app.routers.ws import manager
 from fastapi import Depends
 from app.routers.stm32 import station_token
 from app.services import r2_programming as r2
+from app.services import r2_enrollment as enrollment
 from app.services import esp32_firmware as svc, esp32_ota as ota, usuarios
 
 router=APIRouter(prefix='/api/esp32',tags=['Programación R2 ESP32'])
@@ -87,11 +88,36 @@ class DeviceInfo(BaseModel):
     boot_valid: bool = Field(strict=True)
     partition: int = Field(ge=0,le=4_194_304,strict=True)
     chunk: int = Field(default=16,ge=1,le=500)
+    name_format: int = Field(default=1,ge=1,le=2,strict=True)
 
 
 class OtaPrepare(BaseModel):
     firmware_id: str = Field(min_length=1,max_length=32)
     device: DeviceInfo
+
+class EnrollmentDevice(BaseModel):
+    nombre: str = Field(min_length=1,max_length=23)
+    hw: str = Field(pattern=r'^\d+(?:\.\d+)+$',max_length=7)
+    fw: str = Field(pattern=r'^4\.0$')
+    mac: str = Field(pattern=r'^(?:[a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$')
+    nonce: str = Field(pattern=r'^[a-f0-9]{32}$')
+    app_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    boot_valid: bool = Field(strict=True)
+    enrollment: int = Field(ge=1,le=1,strict=True)
+    enroll_key_id: str = Field(pattern=r'^[a-f0-9]{16}$')
+    device_pub: str = Field(pattern=r'^04[a-f0-9]{128}$')
+
+class EnrollmentPrepare(BaseModel):
+    firmware_id: str = Field(min_length=1,max_length=32)
+    device: EnrollmentDevice
+
+@router.post('/enroll/prepare/{pcb_id}')
+def enrollment_prepare(pcb_id: int,body: EnrollmentPrepare,req: Request):
+    return run(enrollment.prepare,pcb_id,body.firmware_id,body.device.model_dump(),operator(req))
+
+@router.post('/enroll/result/{identifier}')
+def enrollment_result(identifier: str,body: DeviceInfo,req: Request):
+    return run(enrollment.finish,identifier,body.model_dump(),operator(req))
 
 
 def operator(req):
@@ -175,4 +201,5 @@ def image(pcb_id: int,firmware_id: str | None = Query(default=None,max_length=32
         'X-TQT-Nombre-Ble':meta['nombre'],'X-TQT-Firmware':meta['fw'],
         'X-TQT-Hardware':meta['hw'],'X-TQT-Sha256':meta['sha256'],
         'X-TQT-Firmware-Id':meta['firmware_id'],'X-TQT-OTA-Protocol':str(meta['ota_protocol']),
+        'X-TQT-Bootstrap':'1' if meta.get('bootstrap') else '0',
         'X-TQT-Key-Id':meta['key_id'],'Cache-Control':'no-store'})

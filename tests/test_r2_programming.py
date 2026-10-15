@@ -33,7 +33,7 @@ class VerificationTests(unittest.TestCase):
         self.assertTrue(res['verified'])
         self.assertEqual(self.result(identifier),res)
         state=next(x for x in r2.statuses()['items'] if x['pcb_id']==self.p['id'])
-        self.assertEqual((state['state'],state['evidence']['method']),('updated','serial'))
+        self.assertEqual((state['state'],state['evidence']['method']),('outdated','serial'))
         self.assertEqual(state['evidence']['hw'],'3.0')
         self.assertGreater(state['evidence']['programmed_at'],0)
 

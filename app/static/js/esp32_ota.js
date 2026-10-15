@@ -39,7 +39,7 @@
         for (const [key, id] of Object.entries(UUID)) chars[key] = await bounded(service.getCharacteristic(id), signal);
         chars.fast = !!(chars.data.properties?.writeWithoutResponse && chars.status.properties?.notify);
         if (chars.fast) {
-            const states = ['idle', 'manifest', 'receiving', 'ready', 'restarting', 'error'];
+            const states = ['idle', 'manifest', 'receiving', 'ready', 'restarting', 'error','enrollment'];
             chars.onStatus = event => {
                 const value = event.target.value;
                 if (value.byteLength !== 10 || !states[value.getUint8(0)]) return;
@@ -98,6 +98,29 @@
             }
         }
     }
+    async function enroll(chars,pcb,firmwareId,api,info,signal,stage) {
+        if(!chars.fast || info.enrollment!==1) throw new Error('La base genérica no admite el alta rápida esperada.');
+        stage('Asignando identidad y credencial de la R2 seleccionada');
+        const prepared=await api('/api/esp32/enroll/prepare/'+pcb.id,{method:'POST',body:{firmware_id:firmwareId,device:info}});
+        if(!prepared.ok)throw new Error(prepared.error);
+        const bytes=decode(prepared.data.ticket),chunk=Math.min(500,info.chunk || 16);
+        chars.latest=null;
+        await bounded(chars.control.writeValueWithResponse(new Uint8Array([4])),signal);
+        await waitState(chars,s=>s.state==='enrollment',signal);
+        for(let offset=0,batch=0;offset<bytes.length;){
+            const length=Math.min(chunk,bytes.length-offset),packet=new Uint8Array(length+4);
+            new DataView(packet.buffer).setUint32(0,offset,true);packet.set(bytes.subarray(offset,offset+length),4);
+            await bounded(chars.data.writeValueWithoutResponse(packet),signal);offset+=length;
+            if(++batch===8 || offset===bytes.length){
+                await waitState(chars,s=>(s.state==='enrollment' && s.offset>=offset) || (offset===bytes.length && s.state==='idle'),signal);
+                batch=0;
+            }
+        }
+        const assigned=await bootInfo(chars,signal);
+        const checked=await api('/api/esp32/enroll/result/'+prepared.data.id,{method:'POST',body:assigned});
+        if(!checked.ok)throw new Error(checked.error);
+        return assigned;
+    }
     async function reconnect(device, signal) {
         const deadline = Date.now() + 45000;
         let last;
@@ -114,10 +137,22 @@
         check(signal);
         let device, chars, job = null, committed = false;
         const abortDevice = () => device?.gatt?.disconnect();
+        async function completed(result) {
+            save(null);
+            if(result.data.migration_required) {
+                if(options.migrationAttempt) throw new Error('No se confirmó la transición al nombre exacto.');
+                cleanup(chars);device.gatt.disconnect();committing(false);
+                stage('Compatibilidad instalada; aplicando el nombre exacto del inventario');
+                return await execute({...options,migrationAttempt:true},false);
+            }
+            return result.data;
+        }
         try {
             // Keep requestDevice in the click gesture, before network operations.
-            const name=pcb.nombre.replace(/-/g, '_');
-            const selection = devices.get(name) || navigator.bluetooth.requestDevice({ filters: [{ name }], optionalServices: [SERVICE] });
+            const name=pcb.nombre;
+            const legacy=pcb.nombre.replace(/-/g, '_');
+            const generic='TQT_R2_V'+pcb.version+'_XXXX';
+            const selection = devices.get(name) || navigator.bluetooth.requestDevice({ filters: [{ name },{name:legacy},{name:generic}], optionalServices: [SERVICE] });
             stage('Selecciona la R2 conectada por Bluetooth');
             device = await bounded(selection, signal, 120000);
             devices.set(name,device);
@@ -125,14 +160,15 @@
             stage('Conectando y verificando la identidad de la R2');
             chars = await connect(device, signal);
             let info = await bootInfo(chars, signal);
-            if (info.nombre !== pcb.nombre.replace(/-/g, '_') || info.ota_protocol !== 1) throw new Error('La placa no corresponde a la R2 elegida o no tiene OTA V4.1.');
+            if(info.enrollment===1 && !recovery) info=await enroll(chars,pcb,firmwareId,api,info,signal,stage);
+            if (![name,legacy].includes(info.nombre) || info.ota_protocol !== 1) throw new Error('La placa no corresponde a la R2 elegida o no tiene OTA compatible.');
             if (recovery) {
                 const saved = pending();
                 if (!saved || saved.pcb_id !== pcb.id) throw new Error('No hay OTA pendiente para esta R2.');
                 stage('Verificando el firmware instalado');
                 const result = await api('/api/esp32/ota/result/' + saved.job_id, { method: 'POST', body: info });
                 if (!result.ok) throw new Error(result.error);
-                save(null); return result.data;
+                return await completed(result);
             }
             if (pending()) throw new Error('Primero verifica o descarta la OTA pendiente.');
             stage('Autorizando y preparando el firmware cifrado');
@@ -155,14 +191,21 @@
             await bounded(chars.control.writeValueWithResponse(new Uint8Array([2])), signal);
             const disconnectDeadline = Date.now() + 10000;
             while (device.gatt.connected && Date.now() < disconnectDeadline) await sleep(100);
-            if (device.gatt.connected) throw new Error('La R2 no confirmó el reinicio; verifica la OTA pendiente.');
+            // Some Bluetooth stacks retain connected=true across the ESP32 reset.
+            // Reopen GATT and let the server authenticate the new image, nonce and
+            // partition; a missed disconnect event is not a failed installation.
+            if (device.gatt.connected) {
+                cleanup(chars);
+                device.gatt.disconnect();
+                await sleep(300);
+            }
             stage('Reconectando y comprobando la nueva versión');
             cleanup(chars);
             chars = await reconnect(device, signal);
             info = await bootInfo(chars, signal);
             const result = await api('/api/esp32/ota/result/' + job, { method: 'POST', body: info });
             if (!result.ok) throw new Error(result.error);
-            save(null); return result.data;
+            return await completed(result);
         } catch (error) {
             if (job && !committed) {
                 if (device?.gatt?.connected && chars?.control) {
@@ -170,7 +213,7 @@
                 }
                 await api('/api/esp32/ota/cancel/' + job, { method: 'POST',body:{error:String(error?.message || error).slice(0,1000)} });
             }
-            if (committed) throw new Error(String(error?.message || error) + ' Quedó un resultado pendiente de verificación; no repitas la instalación por serial.');
+            if (committed && pending()) throw new Error(String(error?.message || error) + ' Quedó un resultado pendiente de verificación; no repitas la instalación por serial.');
             throw error;
         } finally {
             signal?.removeEventListener('abort', abortDevice);

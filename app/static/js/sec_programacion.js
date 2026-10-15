@@ -306,15 +306,15 @@
             firmwareSelect.disabled = blocked || !firmwareSelect.options.length;
             uploadBtn.disabled = blocked;
             btnFlash.disabled = blocked || !S.tarjeta || S.completed === S.tarjeta.id || !firmwareSelect.value || (S.tarjeta?.tipo === 'R1' && !r1Gate.ok);
-            btnFlash.textContent = S.tipoEsp==='R2' && !S.capability?.eligible ? 'Instalar base 4.0 OTA por USB' : 'Instalar por serial';
+            btnFlash.textContent = S.tipoEsp==='R2' && (S.capability?.needs_enrollment || !S.capability?.eligible) ? 'Instalar base genérica 4.0 por USB' : 'Instalar por serial';
             const esR1 = S.tipoEsp === 'R1';   // R1: firmware fijo (ESP32_BLE_SERIAL), sin catálogo ni subida
-            if(!S.busy) usbPanel.open=esR1 || !S.capability?.eligible;
+            if(!S.busy) usbPanel.open=esR1 || S.capability?.needs_enrollment || !S.capability?.eligible;
             firmwareLabel.textContent = esR1 ? 'Firmware ESP32 de la R1 (fijo)' : 'Firmware R2 a programar';
             uploadBtn.hidden = esR1; firmwareSelect.hidden = esR1;
             selBaudFlash.disabled = blocked; monUI();
             const saved = window.TQTR2OTA?.pending();
             const ownPending = saved?.pcb_id === S.tarjeta?.id;
-            const selectedOta = firmwareSelect.selectedOptions[0]?.dataset.ota === '1';
+            const selectedOta = firmwareSelect.selectedOptions[0]?.dataset.ota === '1' && firmwareSelect.selectedOptions[0]?.dataset.bootstrap!=='1';
             btnOta.disabled = blocked || !S.capability?.eligible || !selectedOta || Boolean(saved) || !navigator.bluetooth;
             btnOtaVerify.hidden = !ownPending; btnOtaDiscard.hidden = !saved;
             btnOtaVerify.disabled = btnOtaDiscard.disabled = blocked;
@@ -322,6 +322,7 @@
             otaPanel.hidden = S.tipoEsp !== 'R2' || !S.tarjeta;
             otaHint.textContent = ownPending ? 'Hay una actualización pendiente de comprobar. Conecta la R2 encendida para verificarla.' :
                 saved ? 'Verifica o descarta la OTA pendiente de ' + (saved.nombre || 'otra R2') + ' antes de iniciar otra.' :
+                S.capability?.needs_enrollment ? 'Con base4.0 genérica: selecciona el dispositivo XXXX por Bluetooth. La web le asignará esta tarjeta e instalará el firmware elegido.' :
                 S.capability?.eligible ? 'Se comprobarán por Bluetooth la identidad y la capacidad OTA reales, aunque figure sin programar. Mantén alimentación estable y libera Bluetooth de la R1.' :
                 S.capability?.reason==='legacy' ? 'El firmware registrado es anterior a 4.0: necesita instalar la base OTA por USB.' :
                 'Falta la credencial de esta unidad: instala la base OTA por USB desde esta web.';
@@ -349,8 +350,8 @@
                 firmwareSelect.replaceChildren(); firmwareHint.textContent = r.error;
                 enableFirmware(); return;
             }
-            firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id, dataset: { ota: String(f.ota_protocol || 0) } },
-                `FW ${f.fw}` + (f.hw ? ` · HW ${f.hw}` : '') + (f.ota_protocol ? ' · OTA' : '') + (f.id === r.data.default_id ? ' · más reciente' : ''))));
+            firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id, dataset: { ota: String(f.ota_protocol || 0),bootstrap:f.bootstrap?'1':'0' } },
+                `FW ${f.fw}` + (f.hw ? ` · HW ${f.hw}` : '') + (f.bootstrap ? ' · Base genérica XXXX · USB' : f.ota_protocol ? ' · OTA' : '') + (f.id === r.data.default_id ? ' · más reciente' : ''))));
             firmwareSelect.value = !reset && r.data.items.some(f => f.id === selected) ? selected : (r.data.default_id || '');
             firmwareHint.textContent = tipo === 'R1' ? (r.data.items.length ? `ESP32_BLE_SERIAL FW ${r.data.items[0].fw}: es el mismo para todas las R1 (el nombre BLE lo graba el STM32). Se verifica solo la MAC.` : 'Falta el firmware fijo de la R1 en el servidor (firmware/esp32_r1).')
                 : r.data.items.length ? 'El nombre se toma de la R2 elegida; HW y FW se leen del archivo. Puedes elegir una versión anterior.' : 'No hay firmware compatible con el hardware de esta R2.';
@@ -421,7 +422,7 @@
                 throw new Error('No se pudo preparar el firmware: ' + msg);
             }
             const hd = k => resp.headers.get('X-TQT-' + k) || '';
-            return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), hardware: hd('Hardware'), firmwareId: hd('Firmware-Id'), sha: hd('Sha256') || hd('Fuente-Sha256'), otaProtocol: Number(hd('OTA-Protocol') || 0), keyId: hd('Key-Id') };
+            return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), hardware: hd('Hardware'), firmwareId: hd('Firmware-Id'), sha: hd('Sha256') || hd('Fuente-Sha256'), otaProtocol: Number(hd('OTA-Protocol') || 0), keyId: hd('Key-Id'),bootstrap:hd('Bootstrap')==='1' };
         }
         async function leerMacPorSerial(port, requireProfile = false) {
             await monDetener();
@@ -516,9 +517,9 @@
                 await monDetener();   // el monitor libera el puerto antes de flashear
                 marcarPaso('compilar', 'activo');
                 escribir(pcb.tipo === 'R2' ? 'Preparando firmware y nombre desde inventario…' : 'Preparando firmware fijo de R1…');
-                const initialBase=pcb.tipo==='R2' && !S.capability?.eligible;
-                const fw = await compilarFirmware(pcb,initialBase ? 'base-R2-v40-ota' : firmwareSelect.value); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
-                if(esR2 && fw.otaProtocol) {
+                const initialBase=pcb.tipo==='R2' && (S.capability?.needs_enrollment || !S.capability?.eligible);
+                const fw = await compilarFirmware(pcb,initialBase ? 'base-R2-v40-generic' : firmwareSelect.value); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
+                if(esR2 && fw.otaProtocol && !fw.bootstrap) {
                     const prepared=await api('/api/esp32/r2/'+pcb.id+'/attempts',{method:'POST',body:{firmware_id:fw.firmwareId,station_id:await localStation(),method:'serial'}});
                     if(!prepared.ok) throw new Error(prepared.error);
                     attempt=prepared.data.id;
@@ -588,6 +589,12 @@
                 if (pcb.mac && pcb.mac.toUpperCase() !== mac && !await confirmar('MAC diferente', `${pcb.nombre} ya tiene la MAC ${pcb.mac} y la placa respondió ${mac}. ¿Reemplazarla? Hazlo solo si confirmaste que es la misma placa física.`, 'Reemplazar MAC')) throw new Error('MAC en conflicto: no se cambió el registro.');
                 marcarPaso('mac', 'ok');
                 escribir('MAC leída: ' + mac + (leido.nombre ? ' · nombre ' + leido.nombre : ''));
+                if(fw.bootstrap){
+                    resultado.hidden=false;
+                    resultado.replaceChildren(T.banner('info','info','Base genérica4.0 instalada y leída: '+leido.nombre+'. Aún no está asignada ni marcada como programada.'),
+                        h('p',{class:'hint'},'Libera los contactos, deja la R2 alimentada y pulsa Actualizar por Bluetooth para asignar '+pcb.nombre+' e instalar el firmware elegido.'));
+                    await loadFirmwares();return;
+                }
 
                 const cuerpo = { mac }; if (!esR2 && fw.firmwareId) cuerpo.firmware_id = fw.firmwareId;   // R1: solo MAC; pcb.firmware es el del STM32
                 if (esR2 && fw.firmware) Object.assign(cuerpo, { firmware: fw.firmware, firmware_id: fw.firmwareId, nombre_verificado: leido.nombre, hardware_verificado: leido.hardware, ota_protocol_verificado: leido.otaProtocol, key_id_verificado: leido.keyId });   
@@ -651,7 +658,7 @@
                 await refreshR2States();
                 escribir('OTA verificada ✓ · FW ' + result.fw);
                 otaProgress.textContent = 'Actualización y nuevo arranque verificados · FW ' + result.fw;
-                mostrarResultado(S.tarjeta, S.tarjeta.mac, { firmware: result.fw, hardware: S.tarjeta.version, nombreBle: S.tarjeta.nombre.replace(/-/g, '_') });
+                mostrarResultado(S.tarjeta, S.tarjeta.mac, { firmware: result.fw, hardware: S.tarjeta.version, nombreBle: result.nombre_ble || S.tarjeta.nombre.replace(/-/g, '_') });
                 toast('R2 actualizada y verificada por Bluetooth', { kind: 'ok' });
             } catch (e) { escribir('✗ ' + e.message); otaProgress.textContent = e.message; }
             finally { S.busy = false; otaController = null; S.otaCommitting = false; await loadFirmwares(); enableFirmware(); pintarLista(); pintarPuertos(); }

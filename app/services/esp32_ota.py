@@ -57,7 +57,7 @@ def mac(value):
 def verify_info(info,key,pcb,allow_missing_mac=False):
     if info.get('ota_protocol')!=1 or info.get('boot_valid') is not True or version(info.get('fw'))<(4,0):
         raise ValueError('La R2 debe confirmar su arranque y capacidad OTA; instala una base OTA por serial primero.')
-    if info.get('nombre')!=pcb['nombre'].replace('-','_') or not isinstance(info.get('hw'),str) or info['hw'].replace('.','')!=pcb['version']:
+    if info.get('nombre') not in (pcb['nombre'],pcb['nombre'].replace('-','_')) or not isinstance(info.get('hw'),str) or info['hw'].replace('.','')!=pcb['version']:
         raise ValueError('El nombre/HW de la R2 Bluetooth no coincide con el inventario.')
     actual_mac=mac(info.get('mac'))
     if (pcb.get('mac') and actual_mac!=mac(pcb['mac'])) or (not pcb.get('mac') and not allow_missing_mac):
@@ -85,9 +85,9 @@ def capability(pcb_id):
     # Inventory is not a live device probe: clearing FW/MAC must not disable an already provisioned R2.
     # Original 4.0 without OTA is distinguished by its real GATT/INFO response before any write.
     known_old=bool(current and re.fullmatch(r'\d+(?:\.\d+)+',current) and version(current)<(4,0))
-    eligible=bool(key and not known_old)
+    eligible=not known_old
     return dict(eligible=eligible,current_fw=current,requires_serial=not eligible,requires_probe=eligible,
-                reason='legacy' if known_old else 'missing_key' if not key else 'probe')
+                reason='legacy' if known_old else 'enrollment' if not key else 'probe',needs_enrollment=not bool(key))
 
 
 def prepare(pcb_id,firmware_id,info,operator):
@@ -109,7 +109,10 @@ def prepare(pcb_id,firmware_id,info,operator):
         if hashlib.sha256(raw).hexdigest()!=row['sha256']: raise ValueError('El firmware guardado no coincide con su hash.')
         meta,_,layout=fw.inspect(raw)
         if meta['ota_protocol']!=1: raise ValueError('Ese firmware no admite OTA; usa serial para instalarlo.')
-        image,meta=fw.personalize(raw,pcb['nombre'].replace('-','_'),key)
+        exact=bool(meta.get('exact_name'))
+        migration=exact and info['nombre']!=pcb['nombre'] and info.get('name_format')!=2
+        target_name=(info['nombre'] if migration else pcb['nombre']) if exact else pcb['nombre'].replace('-','_')
+        image,meta=fw.personalize(raw,target_name,key)
         application=image[layout['start']:layout['end']]
         nonce=hex_bytes(info['nonce'],16)
         manifest=(nonce+hashlib.sha256(application).digest()+struct.pack('<I',len(application))+
@@ -127,7 +130,7 @@ def prepare(pcb_id,firmware_id,info,operator):
         identifier=secrets.token_hex(12)
         payload=dict(pcb_id=pcb_id,firmware_id=firmware_id,nombre=meta['nombre'],hw=meta['hw'],fw=meta['fw'],
                      mac=info['mac'].upper(),nonce=info['nonce'],source_partition=info['partition'],
-                     chunk_bytes=info.get('chunk',16),
+                     chunk_bytes=info.get('chunk',16),migration_required=migration,
                      app_sha256=application[-32:].hex(),transfer_sha256=hashlib.sha256(application).hexdigest(),bytes=len(application))
         c.execute('INSERT INTO esp32_ota_jobs VALUES(?,?,?,?,?,?,?,NULL)',
                   (identifier,pcb_id,firmware_id,'prepared',now,operator,json.dumps(payload)))
@@ -153,10 +156,16 @@ def finish(identifier,info,operator):
             raise ValueError('La placa no arrancó con la imagen y versión elegidas; no se guarda el resultado.')
         if info['partition']==payload['source_partition'] or info['nonce']==payload['nonce']:
             raise ValueError('La R2 no confirmó el arranque en la partición nueva.')
+        if payload.get('migration_required'):
+            result=dict(verified=False,migration_required=True,fw=payload['fw'])
+            c.execute("UPDATE esp32_ota_jobs SET state='verified',result=? WHERE id=?",(json.dumps(result),identifier))
+            return result
         updated=inv.guardar_programacion(pcb['id'],payload['mac'],payload['fw'],operator,conn=c)
         from app.services import r2_programming as r2
         r2.record(c,updated,'ble_ota',info)
-        result=dict(verified=True,pcb=updated,fw=payload['fw'],app_sha256=payload['app_sha256'])
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='r2_enrollments'").fetchone():
+            c.execute("UPDATE r2_enrollments SET state='verified' WHERE pcb=? AND state IN ('prepared','assigned')",(pcb['id'],))
+        result=dict(verified=True,pcb=updated,fw=payload['fw'],nombre_ble=info['nombre'],app_sha256=payload['app_sha256'])
         c.execute("UPDATE esp32_ota_jobs SET state='verified',result=? WHERE id=?",(json.dumps(result),identifier))
         db.log_evento('ESP32_OTA_VERIFICADA',None,None,f'{payload["nombre"]}; FW {payload["fw"]}; job={identifier}; sha={payload["app_sha256"]}',operator,conn=c)
         return result

@@ -248,7 +248,9 @@ class BleWorker:
         if not address: raise ValueError('Falta la MAC leída por serial o registrada.')
         device=await self.lib.BleakScanner.find_device_by_address(address,timeout=12)
         if device is None: raise ValueError('No se encontró la R2 esperada por su MAC. Comprueba alimentación y libera Bluetooth.')
-        if device.name and device.name!=work['nombre']: raise ValueError('La MAC encontrada anuncia otro nombre de R2.')
+        # Windows can retain the old separator format in its advertisement cache.
+        # The server still authenticates the exact current name in INFO.
+        if device.name and device.name.replace('_','-')!=work['nombre'].replace('_','-'): raise ValueError('La MAC encontrada anuncia otro nombre de R2.')
         client=self.lib.BleakClient(device,timeout=15)
         try:
             await client.connect()
