@@ -205,6 +205,17 @@ def calcular_diseno_r3(formato: FormatoEtiqueta, nombres: List[str]) -> List[Mit
     return mitades
 
 
+# --- Etiqueta de cable (v1.3.83) -----------------------------------------------------------------------------------
+# La etiqueta rectangular se divide a la mitad en vertical: solo la mitad izquierda lleva el número (grande y centrado);
+# la derecha va en blanco porque se enrolla sobre el cable y queda visible solo el número.
+CABLE_FUENTE_PT = 36.0
+
+
+def caja_cable(formato: "FormatoEtiqueta") -> "Caja":
+    m = MARGEN_SEGURO_MM
+    return Caja(m, m, formato.ancho_mm / 2 - 2 * m, formato.alto_mm - 2 * m)
+
+
 def _v8_imagen(nombre: str, png: str, c: "Caja") -> str:
     return f"""    <ObjectInfo>
         <ImageObject>
@@ -229,7 +240,7 @@ def _v8_imagen(nombre: str, png: str, c: "Caja") -> str:
 """
 
 
-def _v8_texto(nombre: str, texto: str, pt: float, c: "Caja") -> str:
+def _v8_texto(nombre: str, texto: str, pt: float, c: "Caja", alineacion: str = "Left") -> str:
     return f"""    <ObjectInfo>
         <TextObject>
             <Name>{nombre}</Name>
@@ -241,7 +252,7 @@ def _v8_texto(nombre: str, texto: str, pt: float, c: "Caja") -> str:
             <IsVariable>False</IsVariable>
             <GroupID>-1</GroupID>
             <IsOutlined>False</IsOutlined>
-            <HorizontalAlignment>Left</HorizontalAlignment>
+            <HorizontalAlignment>{alineacion}</HorizontalAlignment>
             <VerticalAlignment>Middle</VerticalAlignment>
             <TextFitMode>ShrinkToFit</TextFitMode>
             <UseFullFontHeight>True</UseFullFontHeight>
@@ -651,6 +662,86 @@ class DymoService:
         if tipo == "label":
             return cls.generate_r3_label_xml(nombres, label_format).encode("utf-8"), f"TQT_R3_{base}.label"
         return b"\xef\xbb\xbf" + cls.generate_r3_dcd_xml(nombres, label_format).encode("utf-8"), f"TQT_R3_{base}.dymo"
+
+    # ------------------------------------------------------------------ cable (v1.3.83): número en la mitad izquierda
+    @classmethod
+    def generate_cable_label_xml(cls, numero: str, label_format: Optional[str] = None) -> str:
+        """`.label` (DYMO Label v8) con el número solo en la mitad izquierda."""
+        f = obtener_formato(label_format)
+        objeto = _v8_texto("NUMERO", numero, CABLE_FUENTE_PT, caja_cable(f), "Center")
+        return f"""<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+    <PaperOrientation>{f.v8_orientacion}</PaperOrientation>
+    <Id>{f.paper_id}</Id>
+    <PaperName>{f.paper_name}</PaperName>
+    <DrawCommands>
+        <RoundRectangle X="0" Y="0" Width="{f.v8_ancho or f.twips_alto}" Height="{f.v8_alto or f.twips_ancho}" Rx="270" Ry="270" />
+    </DrawCommands>
+{objeto}</DieCutLabel>"""
+
+    @classmethod
+    def generate_cable_dcd_xml(cls, numero: str, label_format: Optional[str] = None) -> str:
+        """`.dymo` (DYMO Connect) con el número solo en la mitad izquierda."""
+        f = obtener_formato(label_format)
+        m = MARGEN_SEGURO_MM
+        c = caja_cable(f)
+        negro = cls._color(1, 0, 0, 0)
+        fuente = (f"<FontInfo><FontName>{FUENTE}</FontName><FontSize>{CABLE_FUENTE_PT:g}</FontSize><IsBold>True</IsBold>"
+                  f"<IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>")
+        return f"""<?xml version="1.0" encoding="utf-8"?>
+<DesktopLabel Version="1">
+  <DYMOLabel Version="3">
+    <Description>TQT cable {f.codigo} {f.ancho_mm:g}x{f.alto_mm:g} mm</Description>
+    <Orientation>Landscape</Orientation>
+    <LabelName>{f.nombre_dcd}</LabelName>
+    <InitialLength>0</InitialLength>
+    <BorderStyle>SolidLine</BorderStyle>
+    <DYMORect>
+      <DYMOPoint><X>{_pulg(m)}</X><Y>{_pulg(m)}</Y></DYMOPoint>
+      <Size><Width>{_pulg(f.ancho_mm - 2 * m)}</Width><Height>{_pulg(f.alto_mm - 2 * m)}</Height></Size>
+    </DYMORect>
+    <BorderColor>{negro}</BorderColor>
+    <BorderThickness>1</BorderThickness>
+    <Show_Border>False</Show_Border>
+    <DynamicLayoutManager>
+      <RotationBehavior>ClearObjects</RotationBehavior>
+      <LabelObjects>
+        <TextObject>
+          <Name>NUMERO</Name>
+          {cls._brushes()}
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          <Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0" /></Margin>
+          <HorizontalAlignment>Center</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <FitMode>AlwaysFit</FitMode>
+          <IsVertical>False</IsVertical>
+          <FormattedText>
+            <FitMode>AlwaysFit</FitMode>
+            <HorizontalAlignment>Center</HorizontalAlignment>
+            <VerticalAlignment>Middle</VerticalAlignment>
+            <IsVertical>False</IsVertical>
+            <LineTextSpan><TextSpan><Text>{xml_escape(numero)}</Text>{fuente}</TextSpan></LineTextSpan>
+          </FormattedText>
+          <ObjectLayout><DYMOPoint><X>{_pulg(c.x)}</X><Y>{_pulg(c.y)}</Y></DYMOPoint><Size><Width>{_pulg(c.w)}</Width><Height>{_pulg(c.h)}</Height></Size></ObjectLayout>
+        </TextObject>
+      </LabelObjects>
+    </DynamicLayoutManager>
+  </DYMOLabel>
+  <LabelApplication>Blank</LabelApplication>
+  <DataTable>
+    <Columns></Columns>
+    <Rows></Rows>
+  </DataTable>
+</DesktopLabel>"""
+
+    @classmethod
+    def archivo_cable(cls, numero: str, label_format: Optional[str] = None, tipo: str = "dymo") -> Tuple[bytes, str]:
+        if tipo == "label":
+            return cls.generate_cable_label_xml(numero, label_format).encode("utf-8"), f"TQT_cable_{numero}.label"
+        return b"\xef\xbb\xbf" + cls.generate_cable_dcd_xml(numero, label_format).encode("utf-8"), f"TQT_cable_{numero}.dymo"
 
     # ------------------------------------------------------------------ paquete de datos
     @classmethod

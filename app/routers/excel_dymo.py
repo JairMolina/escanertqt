@@ -348,6 +348,35 @@ def get_dymo_r3_archivo(
     return _adjunto(datos, archivo)
 
 
+# ---------------------------------------------------------------- etiqueta de cable (v1.3.83): solo el número, mitad izquierda
+NUMERO_CABLE = r"^[0-9]{1,6}$"
+
+
+@router.get("/dymo/cable/xml", summary="XML de la etiqueta de cable (número en la mitad izquierda) para DYMO")
+def get_dymo_cable_xml(
+    numero: str = Query(..., description="Número a imprimir, ej. 0021"),
+    label_format: str = Query("30334", description=FORMATO_DOC),
+    tipo: str = Query("dymo", pattern="^(dymo|label)$"),
+):
+    if not re.fullmatch(NUMERO_CABLE, numero):
+        raise HTTPException(422, f"Número inválido: {numero}")
+    fmt = _formato_o_400(label_format)
+    xml = DymoService.generate_cable_dcd_xml(numero, fmt) if tipo == "dymo" else DymoService.generate_cable_label_xml(numero, fmt)
+    return Response(content=xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/dymo/cable/archivo", summary="Descarga la etiqueta de cable como archivo .dymo o .label")
+def get_dymo_cable_archivo(
+    numero: str = Query(...),
+    label_format: str = Query("30334", description=FORMATO_DOC),
+    tipo: str = Query("dymo", pattern="^(dymo|label)$"),
+):
+    if not re.fullmatch(NUMERO_CABLE, numero):
+        raise HTTPException(422, f"Número inválido: {numero}")
+    datos, archivo = DymoService.archivo_cable(numero, _formato_o_400(label_format), tipo)
+    return _adjunto(datos, archivo)
+
+
 class ImpresasRequest(BaseModel):
     marcas: List[Dict[str, Any]] = Field(..., max_length=500, description="[{id, firma}] de las etiquetas enviadas con éxito a la DYMO")
 

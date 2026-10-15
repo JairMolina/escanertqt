@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.83 — 2026-10-15
+- **Etiquetas DYMO › Etiquetas cable:** nueva sección desplegable al final (debajo de Etiquetas R3). La etiqueta rectangular se divide a la mitad en vertical y solo la mitad izquierda lleva el número (grande y centrado); la derecha se enrolla en el cable. Rango «desde/hasta» (máx. 500), copias, vista previa, impresión en DYMO y descarga `.label`. API `GET /api/dymo/cable/xml` y `/api/dymo/cable/archivo`. Caché `dymo.js` a `?v=1383`.
+
 ## v1.3.82 — 2026-10-15
 - **Programación ESP32 (R2 y R1):** se quita la terminal clara duplicada; el registro de grabación, esptool y la verificación salen en la terminal negra del monitor serial, que queda abierta y como principal. Caché `sec_programacion.js/.css` a `?v=1382`.
 

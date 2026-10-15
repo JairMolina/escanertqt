@@ -34,6 +34,15 @@
         .r3m { position: relative; min-height: 0; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 1.5mm; padding: 1.5mm; box-sizing: border-box; }
         .r3m + .r3m::before { content: ""; position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed #1d63c2; }
         .r3m .dymo-l { font-size: 10pt; }
+        /* Cable (v1.3.83): la etiqueta se divide a la mitad en vertical; el número va solo en la mitad izquierda */
+        .dymo-label.cable { padding: 0; gap: 0; display: grid; grid-template-columns: 1fr 1fr; }
+        .cable-num { display: flex; align-items: center; justify-content: center; font-size: 30pt; font-weight: 700; line-height: 1; }
+        .cable-vacia { border-left: 1px dashed #1d63c2; }
+        #cableBox > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+        #cableBox > summary::-webkit-details-marker { display: none; }
+        #cableBox > summary::before { content: "▸"; color: var(--ink-3, #8a93a6); transition: transform .15s ease; }
+        #cableBox[open] > summary::before { transform: rotate(90deg); }
+        @media (prefers-reduced-motion: reduce) { #cableBox > summary::before { transition: none; } }
         .r3m-vacia { color: #8a93a6; font: 600 7pt/1.2 system-ui, sans-serif; text-align: center; }
         #btnEscVinc[data-on="1"] { border-color: var(--ok); color: var(--ok); }
         .zoomhost { transform-origin: top left; }
@@ -137,6 +146,23 @@
                 <button class="btn" type="button" id="btnR3Open"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
             </div>
         </section>
+        <details class="panel pad stack" id="cableBox">
+            <summary><h2 class="silk" id="hCable" style="margin:0">Etiquetas cable</h2>
+                <span class="hint">La etiqueta se divide a la mitad: el número va solo en la izquierda y la derecha se enrolla en el cable.</span></summary>
+            <div class="row wrap" style="gap:10px;align-items:flex-end;margin-top:12px">
+                <div class="field" style="width:130px"><label for="cableDesde">Número desde</label><input class="input mono" id="cableDesde" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
+                <div class="field" style="width:130px"><label for="cableHasta">Número hasta</label><input class="input mono" id="cableHasta" inputmode="numeric" maxlength="4" placeholder="(igual)" autocomplete="off"></div>
+                <div class="field" style="width:110px"><label for="cableCopias">Copias</label><input class="input mono" id="cableCopias" inputmode="numeric" maxlength="2" value="1"></div>
+            </div>
+            <div class="stage-preview" role="region" aria-label="Vista previa de la etiqueta de cable">
+                <div class="silk" style="width:100%" id="cableInfo">Vista previa · 57 × 32 mm</div>
+                <div id="cableZoomHost" class="zoomhost"><div id="cableLabel"></div></div>
+            </div>
+            <div class="row wrap" style="gap:10px">
+                <button class="btn btn-primary" type="button" id="btnCablePrint"><span class="svg-slot" data-i="printer"></span> Imprimir cable en DYMO</button>
+                <button class="btn" type="button" id="btnCableOpen"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
+            </div>
+        </details>
         <div id="prog" class="stack" hidden><div class="progress" aria-hidden="true"><i id="progBar"></i></div><div class="hint" id="progTxt" role="status" aria-live="polite"></div></div>
     </main>
 </div>
@@ -146,6 +172,6 @@
 <script src="/static/js/qrcode-generator.js?v=1316"></script>
 <script src="/static/js/vendor/dymo.connect.framework.js?v=1316"></script>
 <script src="/static/js/dymo_connect.js?v=1316"></script>
-<script src="/static/js/dymo.js?v=1362"></script>
+<script src="/static/js/dymo.js?v=1383"></script>
 </body>
 </html>
