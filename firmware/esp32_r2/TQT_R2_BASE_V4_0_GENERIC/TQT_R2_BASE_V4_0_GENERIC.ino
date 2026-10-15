@@ -1,6 +1,6 @@
 /*******************************************************************************
  * PROYECTO: TQT2 - MÓDULO DE RESPALDO R2
- * FIRMWARE: V4.1 - PROGRAMACION WEB Y OTA BLE
+ * FIRMWARE: V4.0 GENERICO - ALTA WEB Y OTA BLE RAPIDA
  *
  * Base funcional: PCB_TQT_R2_V3_0_RESPALDO.ino
  * Mejoras tomadas de: TQT2_RESPALDO_V2_1_CORREGIDO.ino
@@ -8,8 +8,8 @@
  *
  * CAMBIOS PRINCIPALES
  *  - Conserva nombre BLE, UUID y lógica PPON / POFF del firmware original.
- *  - Solución definitiva para GPIO12/MTDI mediante eFuse VDD_SDIO=3.3 V.
- *  - Verifica LOS TRES eFuses y comprueba errores de escritura.
+ *  - Conserva el diagnostico GPIO12/MTDI y VDD_SDIO.
+ *  - Escritura automatica de eFuses DESACTIVADA por decision del usuario.
  *  - NO deshabilita el Brownout Detector.
  *  - Inicializa todas las salidas de relé en LOW lo antes posible.
  *  - Elimina delay(3000) del callback BLE; usa máquina de estados con millis().

@@ -8,6 +8,18 @@ from app.services import r2_enrollment as enroll,esp32_firmware as fw,esp32_ota 
 from test_esp32_ota import attestation
 
 class EnrollmentTests(unittest.TestCase):
+    def test_multiple_registered_base_builds_remain_usable(self):
+        from test_esp32_firmware import rewrite
+        pos=self.raw.index(b'Auto-fix deshabilitado')
+        variant=rewrite(self.raw,pos,b'Auto-fix deshabilitadO')
+        fw.save(variant,'BASE_RECOMPILADA_SIMULADA.bin',self.operator)
+        first=self.prepare()
+        self.assertTrue(first['ticket'])
+        self.info['nonce']=secrets.token_hex(16)
+        _,_,layout=fw.inspect(variant)
+        self.info['app_sha256']=variant[layout['end']-32:layout['end']].hex()
+        self.assertTrue(self.prepare()['ticket'])
+
     def test_generic_info_fits_one_gatt_value_without_unit_hmac(self):
         from app.routers.esp32 import EnrollmentDevice
         info=dict(nombre='TQT_R2_V30_XXXX',hw='3.0',fw='4.0',mac='FF:FF:FF:FF:FF:FF',ota_protocol=1,

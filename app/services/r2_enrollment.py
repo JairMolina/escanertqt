@@ -71,11 +71,15 @@ def prepare(pcb_id,firmware_id,info,operator):
             raise ValueError('La MAC ya corresponde a otra PCB.')
         target=next((r for r in fw.rows(c,pcb['version']) if r['id']==firmware_id),None)
         if not target or ota.version(target['fw'])<(4,2):raise ValueError('El alta genérica requiere FW4.2 o superior.')
-        base=next((r for r in fw.rows(c,pcb['version']) if json.loads(r['metadata']).get('bootstrap')),None)
-        if not base:raise ValueError('No está registrada la base genérica.')
-        base_image=bytes(base['image']);_,_,layout=fw.inspect(base_image)
-        if info.get('app_sha256')!=base_image[layout['end']-32:layout['end']].hex():
-            raise ValueError('La base instalada no coincide con el firmware genérico registrado.')
+        bases=[r for r in fw.rows(c,pcb['version']) if json.loads(r['metadata']).get('bootstrap')]
+        if not bases:raise ValueError('No está registrada la base genérica.')
+        recognized=False
+        for base in bases:
+            base_image=bytes(base['image']);_,_,layout=fw.inspect(base_image)
+            if info.get('app_sha256')==base_image[layout['end']-32:layout['end']].hex():
+                recognized=True;break
+        if not recognized:
+            raise ValueError('Base genérica no registrada: sube una vez el BIN completo generado al compilarla, o instala el BIN fijo 4.0.')
         for active in c.execute("SELECT id,payload FROM r2_enrollments WHERE pcb=? AND state='prepared' AND created>?",(pcb_id,time.time()-TTL)):
             previous=json.loads(active['payload'])
             if previous['mac']!=info['mac'].upper() or previous['nonce']==info['nonce']:

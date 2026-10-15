@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.88 — 2026-10-15
+- Base R2 4.0: reconoce varias compilaciones registradas para permitir cargas desde Arduino IDE sin invalidar la base fija anterior.
+- Incluye grabador local repetitivo del BIN fijo, comprobación previa sin abrir puerto e instrucciones Arduino. Corrige cabeceras de versión y eFuses en las fuentes, sin cambiar la lógica ni los BIN ya probados.
+
 ## v1.3.87 — 2026-10-15
 - Integra la versión desplegada 1.3.84: conserva etiquetas de cable DYMO, terminal única y optimizaciones J-Link.
 - R2: base genérica 4.0 XXXX, alta firmada y cifrada, FW 4.2 con nombre exacto del inventario y OTA rápida con recuperación GATT.
