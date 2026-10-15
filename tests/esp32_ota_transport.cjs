@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { performance } = require('node:perf_hooks');
 const source = fs.readFileSync(path.join(__dirname, '../app/static/js/esp32_ota.js'), 'utf8');
-async function trial(chunk, cancel = false, loseResult = false) {
+async function trial(chunk, cancel = false, loseResult = false, fast = false) {
     const image = Uint8Array.from({length: 8197}, (_, i) => (i * 17 + 3) & 255);
     const manifest = new Uint8Array(138);
     new DataView(manifest.buffer).setUint32(48, image.length, true);
@@ -39,6 +39,28 @@ async function trial(chunk, cancel = false, loseResult = false) {
             }
         }}
     };
+    if (fast) {
+        let listener;
+        chars['0004'].properties = {writeWithoutResponse:true};
+        chars['0005'].properties = {notify:true};
+        chars['0005'].addEventListener = (_, fn) => {listener=fn;};
+        chars['0005'].removeEventListener = (_, fn) => {if(listener===fn) listener=null;};
+        const notify = () => {
+            const v = new DataView(new ArrayBuffer(10));
+            v.setUint8(0,['idle','manifest','receiving','ready','restarting','error'].indexOf(state.state));
+            v.setUint32(1,state.offset,true);v.setUint32(5,state.total,true);
+            records.queued=0;listener?.({target:{value:v}});
+        };
+        chars['0005'].startNotifications=async()=>{};
+        const control=chars['0003'].writeValueWithResponse;
+        chars['0003'].writeValueWithResponse=async bytes=>{await control(bytes);notify();};
+        const write=chars['0004'].writeValueWithResponse;
+        chars['0004'].writeValueWithoutResponse=async bytes=>{
+            const before=state.state; await write(bytes);
+            if(records.queued===8 || state.state!==before) notify();
+        };
+        chars['0004'].writeValueWithResponse=async()=>{throw Error('Fast path must use write without response');};
+    }
     const device={gatt:{connected:false,
         connect:async function(){this.connected=true;return {getPrimaryService:async()=>({getCharacteristic:async uuid=>chars[uuid.slice(4,8)]})};},
         disconnect(){this.connected=false;records.queued=0;}
@@ -77,11 +99,12 @@ async function trial(chunk, cancel = false, loseResult = false) {
         assert.deepEqual(Uint8Array.from(records.manifest),manifest);
         assert.deepEqual(Uint8Array.from(records.received),image);
         const batches=Math.ceil(Math.ceil(138/chunk)/8)+Math.ceil(Math.ceil(image.length/chunk)/8);
-        assert.equal(records.reads,batches+2,'Status read budget must match eight-packet windows');
+        assert.equal(records.reads,fast?0:batches+2,'Status read budget must match transport');
     }
     return {chunk,cancel,loseResult,writes:records.writes,statusReads:records.reads};
 }
 (async()=>{
-    for(const args of [[16,false,false],[180,false,false],[16,true,false],[180,false,true]]) console.log(await trial(...args));
-    console.log('4 transport scenarios passed; no hardware accessed.');
+    for(const args of [[16,false,false],[180,false,false],[16,true,false],[180,false,true],
+        [500,false,false,true],[500,true,false,true],[500,false,true,true]]) console.log(await trial(...args));
+    console.log('7 transport scenarios passed; no hardware accessed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

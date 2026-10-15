@@ -34,7 +34,23 @@
         const chars = {};
         // Serialized GATT requests avoid "operation already in progress" on Windows.
         for (const [key, id] of Object.entries(UUID)) chars[key] = await bounded(service.getCharacteristic(id), signal);
+        chars.fast = !!(chars.data.properties?.writeWithoutResponse && chars.status.properties?.notify);
+        if (chars.fast) {
+            const states = ['idle', 'manifest', 'receiving', 'ready', 'restarting', 'error'];
+            chars.onStatus = event => {
+                const value = event.target.value;
+                if (value.byteLength !== 10 || !states[value.getUint8(0)]) return;
+                chars.latest = { state: states[value.getUint8(0)], offset: value.getUint32(1, true),
+                    total: value.getUint32(5, true), error: value.getUint8(9) };
+            };
+            chars.status.addEventListener('characteristicvaluechanged', chars.onStatus);
+            try { await bounded(chars.status.startNotifications(), signal); }
+            catch (error) { cleanup(chars); throw error; }
+        }
         return chars;
+    }
+    function cleanup(chars) {
+        if (chars?.onStatus) chars.status.removeEventListener('characteristicvaluechanged', chars.onStatus);
     }
     async function bootInfo(chars, signal) {
         const deadline = Date.now() + 20000;
@@ -49,10 +65,14 @@
     async function waitState(chars, accept, signal, ms = 15000) {
         const deadline = Date.now() + ms;
         do {
-            const status = await json(chars.status, signal);
-            if (status.state === 'error') throw new Error('La R2 detuvo OTA: ' + status.error);
-            if (accept(status)) return status;
-            await sleep(30);
+            check(signal);
+            const status = chars.fast ? chars.latest : await json(chars.status, signal);
+            if (status?.state === 'error') {
+                const detail = chars.fast ? await json(chars.status, signal) : status;
+                throw new Error('La R2 detuvo OTA: ' + detail.error);
+            }
+            if (status && accept(status)) return status;
+            await sleep(chars.fast ? 5 : 30);
         } while (Date.now() < deadline);
         throw new Error('La R2 no confirmó el bloque OTA; no se activó el firmware.');
     }
@@ -64,7 +84,7 @@
             const packet = new Uint8Array(length + 4);
             new DataView(packet.buffer).setUint32(0, offset, true);
             packet.set(bytes.subarray(offset, offset + length), 4);
-            await bounded(chars.data.writeValueWithResponse(packet), signal);
+            await bounded(chars.fast ? chars.data.writeValueWithoutResponse(packet) : chars.data.writeValueWithResponse(packet), signal);
             offset += length;
             // Firmware v1 queues eight packets. Drain at that boundary before sending more.
             if (++batch === 8 || offset === bytes.length) {
@@ -114,7 +134,8 @@
             const prepared = await api('/api/esp32/ota/prepare/' + pcb.id, { method: 'POST', body: { firmware_id: firmwareId, device: info } });
             if (!prepared.ok) throw new Error(prepared.error);
             job = prepared.data.job_id;
-            const chunk = Math.min(180, Math.max(1, info.chunk || 16));
+            const chunk = Math.min(chars.fast ? 500 : 180, Math.max(1, info.chunk || 16));
+            chars.latest = null;
             await bounded(chars.control.writeValueWithResponse(new Uint8Array([1])), signal);
             await waitState(chars, s => s.state === 'manifest', signal);
             await stream(chars, decode(prepared.data.manifest), chunk, signal, true, progress);
@@ -131,6 +152,7 @@
             while (device.gatt.connected && Date.now() < disconnectDeadline) await sleep(100);
             if (device.gatt.connected) throw new Error('La R2 no confirmó el reinicio; verifica la OTA pendiente.');
             stage('Reconectando y comprobando la nueva versión');
+            cleanup(chars);
             chars = await reconnect(device, signal);
             info = await bootInfo(chars, signal);
             const result = await api('/api/esp32/ota/result/' + job, { method: 'POST', body: info });
@@ -147,6 +169,7 @@
             throw error;
         } finally {
             signal?.removeEventListener('abort', abortDevice);
+            cleanup(chars);
             device?.gatt?.disconnect(); committing(false);
         }
     }

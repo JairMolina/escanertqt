@@ -32,7 +32,7 @@ class DeviceInfo(BaseModel):
     proof: str = Field(pattern=r'^[a-f0-9]{64}$')
     boot_valid: bool = Field(strict=True)
     partition: int = Field(ge=0,le=4_194_304,strict=True)
-    chunk: int = Field(default=16,ge=1,le=180)
+    chunk: int = Field(default=16,ge=1,le=500)
 
 
 class OtaPrepare(BaseModel):

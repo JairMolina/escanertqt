@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.80 — 2026-10-15
+- R2: OTA rápida con Write Without Response, bloques de hasta 500 bytes y notificaciones de avance; ventanas de ocho paquetes respetan la cola del receptor. FW 4.1 conserva el transporte anterior.
+- Catálogo: plantilla R2 4.1.1 sin datos de unidad, seleccionada como versión más reciente. Conserva firmware anteriores, cifrado, identidad, cancelación y verificación del nuevo arranque.
+- Integra la base 1.3.79 de la Orange Pi sin modificar el monitor serial, el flujo R1 ni los reportes. Prueba física aislada previa: 1.135.600 bytes enviados y validados en 71,758 s; el tiempo de Chrome queda por medir.
+
 ## v1.3.79 — 2026-10-14
 - **Programación R2 ESP32 · Monitor serial:** panel estilo Arduino IDE (velocidad, abrir/cerrar, limpiar, enviar texto con fin de línea, «Reiniciar placa» por RTS/DTR) para leer el arranque (`waiting for download`, `rst:`…). Se cierra solo antes de grabar o leer la MAC, muestra la salida de esptool y de la verificación, y se reabre al terminar (opcional).
 - **Grabación por serial más rápida:** sincroniza a 115200 y envía los datos a la «Velocidad de grabación» elegida (921600 por defecto, como Arduino IDE; se recuerda en el navegador). Si falla a alta velocidad, pide volver a BOOT y reintenta una vez a 115200.

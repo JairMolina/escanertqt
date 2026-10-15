@@ -27,6 +27,19 @@ def attestation(meta,key,mac,partition=0x10000,nonce=None):
 
 
 class OtaTests(unittest.TestCase):
+    def test_fast_template_and_transport_limit(self):
+        from app.routers.esp32 import DeviceInfo
+        from pydantic import ValidationError
+        self.assertEqual(DeviceInfo(**dict(self.info,chunk=500)).chunk,500)
+        with self.assertRaises(ValidationError):
+            DeviceInfo(**dict(self.info,chunk=501))
+        catalogue=fw.catalogue('30')
+        self.assertEqual(catalogue['default_id'],'base-R2-v411')
+        meta,image=fw.prepare(self.pid,'base-R2-v411',True)
+        self.assertEqual((meta['fw'],meta['nombre'],meta['key_id']),
+                         ('4.1.1',self.meta['nombre'],self.meta['key_id']))
+        self.assertEqual(fw.inspect(image)[0]['fw'],'4.1.1')
+
     @classmethod
     def setUpClass(cls):
         db.init_db()

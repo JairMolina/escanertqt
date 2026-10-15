@@ -270,6 +270,11 @@ def ensure(c):
         meta,image,filename=normalize(path.read_bytes(),path.name)
         c.execute('INSERT INTO esp32_firmwares(id,hw,fw,filename,sha256,metadata,image,created,operator) VALUES(?,?,?,?,?,?,?,?,?)',
                   ('base-R2-v41',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,1,'sistema'))
+    path=ROOT/'firmware/esp32_r2/TQT_R2_V4_1_1.merged.bin'
+    if path.is_file() and not c.execute("SELECT 1 FROM esp32_firmwares WHERE id='base-R2-v411'").fetchone():
+        meta,image,filename=normalize(path.read_bytes(),path.name)
+        c.execute('INSERT INTO esp32_firmwares(id,hw,fw,filename,sha256,metadata,image,created,operator) VALUES(?,?,?,?,?,?,?,?,?)',
+                  ('base-R2-v411',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,2,'sistema'))
     seed_r1(c)
 
 
