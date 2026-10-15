@@ -42,11 +42,42 @@ ni la API de producción. Opción --restore prepara la imagen4.1 original para
 restaurarla después desde el firmware de prueba. Ante activación incierta queda
 seguimiento privado; no se declara éxito sin nueva INFO auténtica.
 
-Pendiente: usuario debe conectar USB–TTL COM3 y confirmar LISTO/BOOT+RESET solo
-al estar todo preparado. Hasta este punto la copia4.1.1 NO se grabó. Comprobar
-MAC de silicio8C:8C:29:C3:D6:A4 antes de escribir; avisar al terminar para
-liberar BOOT/reiniciar y retirar contactos tras INFO. Medir OTA completa y
-restauración antes de proponer cambios de firmware/web definitivos.
+## Prueba física completada el 15 de octubre de 2026
+
+Tras LISTO del usuario en COM3/BOOT, esptool confirmó primero la MAC de silicio
+8C:8C:29:C3:D6:A4. Se grabaron1.201.136 bytes a460.800 baudios en17.3 segundos
+y se verificó el hash de Flash. Se avisó inmediatamente para liberar BOOT y
+reiniciar. El usuario confirmó reinicio/alimentación normal y Bluetooth libre.
+La herramienta autenticó INFO real antes de iniciar la actualización local.
+
+OTA completa 4.1.1→4.1.1 mediante cliente local Bleak, sin usar la web:
+
+| Medición física | Resultado |
+|---|---|
+| Aplicación enviada | 1.135.600 bytes |
+| MTU negociado / datos por paquete | 517 / 500 bytes |
+| Tiempo de transferencia, incluida validación antes de READY | 71.758 s |
+| Velocidad media | 15.45 KiB/s |
+| Confirmaciones recibidas por notificación | 951 |
+| Partición anterior / nuevo arranque | 0x10000 / 0x150000 |
+| Hash esperado y confirmado tras reiniciar | 2e21a2723f1ee914c0e876978a13a125ee52d1adbb70df2b9855504d0660b465 |
+
+Se validaron versión, prueba HMAC de INFO, hash exacto, nonce nuevo y partición
+distinta después del reinicio. Resultado `verified=true` en
+`outputs/r2_ble_probe/ota_fast_result.json`. Enlace desconectado al finalizar,
+sin movimientos de relés ni cambios/despliegues en la web.
+
+Los71.758s corresponden al envío y validación receptora; preparación, conexión
+y verificación del reinicio son adicionales. Los14min de la web anterior eran
+una estimación de un envío cancelado, no una medición completa. El resultado
+local no demuestra todavía el tiempo de una futura implementación en Chrome.
+
+Estado físico final: R2 0069 conserva la copia temporal4.1.1 para continuar la
+integración sin otra grabación serial. Catálogo e inventario de producción no
+se modificaron por esta prueba; allí sigue el registro4.1 previo. Los originales
+4.1 y Freki están intactos. La opción --restore existe, pero NO se ejecutó ni
+se afirma verificada. Pendiente decidir integración definitiva o restauración;
+no cambiar la web hasta que el usuario solicite continuar con esa integración.
 
 Capacidades: ECC HW/FW para trazabilidad, C++ para SDK/cola y verificación para
 compilación nativa/cifrado/medición; CM para checkpoint y memoria del proyecto.
