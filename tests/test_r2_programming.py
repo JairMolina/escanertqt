@@ -101,7 +101,7 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(fw.inspect(bytes((fw.ROOT/'firmware/esp32_r2/TQT_R2_V4_0.merged.bin').read_bytes()))[0]['ota_protocol'],0)
         layout=fw.inspect(image)[2];meta['app_sha256']=image[layout['end']-32:layout['end']].hex()
         inv.set_firmware(self.p['id'],'4.0')
-        self.assertFalse(ota.capability(self.p['id'])['eligible'])
+        self.assertTrue(ota.capability(self.p['id'])['eligible'])
         j=r2.start(self.p['id'],'base-R2-v40-ota',self.station,self.operator)
         r2.ready(j['id'],self.operator,self.mac);r2.claim(self.station,True)
         self.assertTrue(self.result(j['id'],attestation(meta,self.key,self.mac))['verified'])

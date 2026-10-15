@@ -322,8 +322,9 @@
             otaPanel.hidden = S.tipoEsp !== 'R2' || !S.tarjeta;
             otaHint.textContent = ownPending ? 'Hay una actualización pendiente de comprobar. Conecta la R2 encendida para verificarla.' :
                 saved ? 'Verifica o descarta la OTA pendiente de ' + (saved.nombre || 'otra R2') + ' antes de iniciar otra.' :
-                S.capability?.eligible ? 'FW ' + S.capability.current_fw + ': admite OTA. Mantén alimentación estable y libera la conexión Bluetooth de la R1 durante la actualización.' :
-                'Necesita USB serial: instala la base 4.0 OTA o FW 4.1.1. Tras validarla podrás actualizar por Bluetooth.';
+                S.capability?.eligible ? 'Se comprobarán por Bluetooth la identidad y la capacidad OTA reales, aunque figure sin programar. Mantén alimentación estable y libera Bluetooth de la R1.' :
+                S.capability?.reason==='legacy' ? 'El firmware registrado es anterior a 4.0: necesita instalar la base OTA por USB.' :
+                'Falta la credencial de esta unidad: instala la base OTA por USB desde esta web.';
             btnVerifyR2.disabled=blocked || !S.tarjeta?.mac || !S.capability?.eligible;
             btnVerifyR2.hidden=esR1;
             nextR1.hidden=esR1 || r2States.get(S.tarjeta?.id)?.state!=='updated';

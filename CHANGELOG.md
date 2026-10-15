@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.82 — 2026-10-15
+- R2: permite intentar OTA si el inventario quedó sin FW/MAC pero conserva la credencial de la unidad. La identidad, FW4.0+, arranque y protocolo OTA se verifican desde la tarjeta antes de transmitir; un 4.0 antiguo sin OTA sigue rechazándose. FW registrado anterior a4.0 mantiene la indicación USB.
+- La MAC borrada solo se toma del INFO autenticado y se guarda tras confirmar el nuevo arranque; se rechazan MAC de otra PCB y cambios de MAC durante la operación. No se marca una tarjeta programada por habilitar el botón.
+
 ## v1.3.81 — 2026-10-15
 - R2: instalación inicial USB con base 4.0 OTA rápida, conservando el antiguo 4.0 sin OTA. Verificación automática mediante el agente Windows con MAC exacta, INFO autenticado, identidad, HW/FW y hash del firmware elegido; sin selector Bluetooth después del serial.
 - Registro persistente de intentos, errores, método, última programación y verificación; las comprobaciones de solo lectura conservan la fecha de instalación. Estado actualizado/desactualizado/sin programar/error en lista y detalle, reconociendo OTA verificadas anteriores.
