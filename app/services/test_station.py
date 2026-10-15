@@ -126,6 +126,9 @@ def create(sid, tid, operator, confirmed):
             raise ValueError("El agente de pruebas está desconectado.")
         if not json.loads(p["state"]).get("serial_connected"):
             raise ValueError("Conecta el puerto COM antes de iniciar.")
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='r2_programming_attempts'").fetchone():
+            if c.execute("SELECT 1 FROM r2_programming_attempts WHERE station=? AND state IN ('flashing','queued','running') AND created>?",(sid,time.time()-600)).fetchone():
+                raise ValueError('La estación está programando o verificando una R2.')
         if c.execute(
             "SELECT 1 FROM stm32_jobs WHERE station=? AND state IN ('queued','running')",
             (sid,),
@@ -185,6 +188,9 @@ def command(sid, action, body):
             (sid,),
         ).fetchone():
             raise ValueError("La estación está programando firmware.")
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='r2_programming_attempts'").fetchone():
+            if c.execute("SELECT 1 FROM r2_programming_attempts WHERE station=? AND state IN ('flashing','queued','running') AND created>?",(sid,time.time()-600)).fetchone():
+                raise ValueError('La estación está programando o verificando una R2.')
         if action in ("serial", "ble") and body.get("command") in ("PPON", "POFF"):
             body["inventory"] = snapshot(body.get("tarjeta_id"), c)
         jid = secrets.token_hex(16)

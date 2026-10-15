@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.87 — 2026-10-15
+- Integra la versión desplegada 1.3.84: conserva etiquetas de cable DYMO, terminal única y optimizaciones J-Link.
+- R2: base genérica 4.0 XXXX, alta firmada y cifrada, FW 4.2 con nombre exacto del inventario y OTA rápida con recuperación GATT.
+- R2 0067: flujo físico verificado por web y lectura BLE independiente; eFuses desactivados.
+
 ## v1.3.84 — 2026-10-15
 - **Etiquetas cable:** el número va en vertical (girado 90°, se lee de abajo hacia arriba) en la mitad izquierda; vista previa igual.
 

@@ -10,6 +10,13 @@
 .prog-item[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg-2)); }
 .prog-item .nm { font-family: var(--font-mono); font-weight: 600; }
 .prog-item .dim { margin-left: auto; color: var(--muted); font-size: 12px; }
+.prog-item { flex-wrap: wrap; }
+.prog-item .nm { overflow-wrap: anywhere; }
+.prog-r2-state { font-size: 12px; font-weight: 600; color: var(--bad,#ef7777); }
+.prog-r2-state::before { content: '● '; }
+.prog-r2-state[data-s="updated"] { color: var(--ok,#48ce95); }
+.prog-r2-state[data-s="outdated"], .prog-r2-state[data-s="busy"] { color: var(--warn,#efb44b); }
+.prog-estado[hidden] { display:none; }
 
 .prog-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .prog-nm { font-family: var(--font-mono); font-weight: 700; font-size: 16px; }

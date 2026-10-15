@@ -52,4 +52,9 @@ station/resultados/
 firmware/stm32_r1/CubeIDE/**/Debug/
 firmware/stm32_r1/CubeIDE/**/Release/
 firmware/esp32_r2/**/build/
+# Private offline identities and personalized sketches must never enter Git.
+firmware/esp32_r2/**/identidades/
+firmware/esp32_r2/**/proyectos/
+firmware/esp32_r2/**/firmwares/
+**/compilar.lock
 *.launch

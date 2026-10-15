@@ -82,8 +82,13 @@ class Esp32FirmwareTests(unittest.TestCase):
         self.assertEqual(f.inspect(other)[0]['fw'],'4.0')
 
     def test_invalid_names_rejected(self):
-        for name in ['TQT_R2_V31_0001','TQT_R1_V30_0001','TQT-R2-V30-0001','TQT_R2_V30_1','bad\"']:
+        for name in ['TQT_R2_V31_0001','TQT_R1_V30_0001','TQT-R2_V30-0001','TQT_R2_V30_1','bad\"']:
             with self.assertRaises(ValueError,msg=name): f.personalize(self.raw,name)
+
+    def test_exact_inventory_name_preserved_without_separator_conversion(self):
+        image,meta=f.personalize(self.raw,'TQT-R2-V30-0067')
+        self.assertEqual(meta['nombre'],'TQT-R2-V30-0067')
+        self.assertEqual(f.inspect(image)[0]['nombre'],'TQT-R2-V30-0067')
 
     def test_corrupt_app_bootloader_partition_and_sha_rejected(self):
         _,pos,layout=f.inspect(self.raw)

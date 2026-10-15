@@ -8,9 +8,64 @@ from fastapi.concurrency import run_in_threadpool
 from app.database import db
 from app.routers.inventario import _conteos, _notificar_tarjeta
 from app.routers.ws import manager
+from fastapi import Depends
+from app.routers.stm32 import station_token
+from app.services import r2_programming as r2
+from app.services import r2_enrollment as enrollment
 from app.services import esp32_firmware as svc, esp32_ota as ota, usuarios
 
 router=APIRouter(prefix='/api/esp32',tags=['Programación R2 ESP32'])
+agent_router=APIRouter(prefix='/api/stm32/agent/r2',tags=['Verificación automática R2'])
+
+class R2Attempt(BaseModel):
+    firmware_id: str = Field(min_length=1,max_length=32)
+    station_id: str = Field(min_length=24,max_length=24)
+    method: str = Field(default='serial',pattern='^(serial|verify)$')
+
+class R2Ready(BaseModel):
+    mac: str = Field(pattern=r'^(?:[a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$')
+
+class R2Failure(BaseModel):
+    error: str = Field(min_length=1,max_length=1000)
+
+class OtaStop(BaseModel):
+    error: str = Field(default='',max_length=1000)
+
+class R2Claim(BaseModel):
+    available: bool = False
+
+@router.get('/r2/status')
+def r2_status():
+    return run(r2.statuses)
+
+@router.post('/r2/{pcb_id}/attempts')
+def r2_start(pcb_id: int,body: R2Attempt,req: Request):
+    return run(r2.start,pcb_id,body.firmware_id,body.station_id,operator(req),body.method)
+
+@router.get('/r2/attempts/{identifier}')
+def r2_job(identifier: str,req: Request):
+    return run(r2.get,identifier,operator(req))
+
+@router.post('/r2/attempts/{identifier}/ready')
+def r2_ready(identifier: str,body: R2Ready,req: Request):
+    return run(r2.ready,identifier,operator(req),body.mac)
+
+@router.post('/r2/attempts/{identifier}/failure')
+def r2_failure(identifier: str,body: R2Failure,req: Request):
+    return run(r2.fail,identifier,operator(req),body.error)
+
+@agent_router.post('/claim')
+def r2_claim(body: R2Claim,st=Depends(station_token)):
+    return run(r2.claim,st['id'],body.available)
+
+@agent_router.post('/{identifier}/result')
+async def r2_result(identifier: str,body: dict,st=Depends(station_token)):
+    res=await run_in_threadpool(run,r2.finish,st['id'],identifier,body)
+    if res.get('verified'):
+        await manager.broadcast('PCB_ACTUALIZADA',{'pcb':res['pcb'],'conteos':await run_in_threadpool(_conteos)})
+        if res['pcb'].get('tarjeta_id'):
+            await _notificar_tarjeta(await run_in_threadpool(db.get_tarjeta_by_id,res['pcb']['tarjeta_id']))
+    return res
 
 
 class Upload(BaseModel):
@@ -33,11 +88,36 @@ class DeviceInfo(BaseModel):
     boot_valid: bool = Field(strict=True)
     partition: int = Field(ge=0,le=4_194_304,strict=True)
     chunk: int = Field(default=16,ge=1,le=500)
+    name_format: int = Field(default=1,ge=1,le=2,strict=True)
 
 
 class OtaPrepare(BaseModel):
     firmware_id: str = Field(min_length=1,max_length=32)
     device: DeviceInfo
+
+class EnrollmentDevice(BaseModel):
+    nombre: str = Field(min_length=1,max_length=23)
+    hw: str = Field(pattern=r'^\d+(?:\.\d+)+$',max_length=7)
+    fw: str = Field(pattern=r'^4\.0$')
+    mac: str = Field(pattern=r'^(?:[a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$')
+    nonce: str = Field(pattern=r'^[a-f0-9]{32}$')
+    app_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    boot_valid: bool = Field(strict=True)
+    enrollment: int = Field(ge=1,le=1,strict=True)
+    enroll_key_id: str = Field(pattern=r'^[a-f0-9]{16}$')
+    device_pub: str = Field(pattern=r'^04[a-f0-9]{128}$')
+
+class EnrollmentPrepare(BaseModel):
+    firmware_id: str = Field(min_length=1,max_length=32)
+    device: EnrollmentDevice
+
+@router.post('/enroll/prepare/{pcb_id}')
+def enrollment_prepare(pcb_id: int,body: EnrollmentPrepare,req: Request):
+    return run(enrollment.prepare,pcb_id,body.firmware_id,body.device.model_dump(),operator(req))
+
+@router.post('/enroll/result/{identifier}')
+def enrollment_result(identifier: str,body: DeviceInfo,req: Request):
+    return run(enrollment.finish,identifier,body.model_dump(),operator(req))
 
 
 def operator(req):
@@ -69,8 +149,8 @@ async def ota_result(identifier: str,body: DeviceInfo,req: Request):
 
 
 @router.post('/ota/cancel/{identifier}')
-def ota_cancel(identifier: str,req: Request):
-    return run(ota.cancel,identifier,operator(req))
+def ota_cancel(identifier: str,req: Request,body: OtaStop | None = None):
+    return run(ota.cancel,identifier,operator(req),body.error if body else '')
 
 
 def run(fn,*args):
@@ -121,4 +201,5 @@ def image(pcb_id: int,firmware_id: str | None = Query(default=None,max_length=32
         'X-TQT-Nombre-Ble':meta['nombre'],'X-TQT-Firmware':meta['fw'],
         'X-TQT-Hardware':meta['hw'],'X-TQT-Sha256':meta['sha256'],
         'X-TQT-Firmware-Id':meta['firmware_id'],'X-TQT-OTA-Protocol':str(meta['ota_protocol']),
+        'X-TQT-Bootstrap':'1' if meta.get('bootstrap') else '0',
         'X-TQT-Key-Id':meta['key_id'],'Cache-Control':'no-store'})

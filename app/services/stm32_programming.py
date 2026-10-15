@@ -179,6 +179,9 @@ def create_job(pcb, station, expected, operator, physical_confirmed=False, firmw
             raise ValueError('Cambió el inventario o firmware. Vuelve a cargar los datos antes de programar.')
         if c.execute("SELECT 1 FROM stm32_jobs WHERE (pcb=? OR station=?) AND state IN ('queued','running')", (pcb, station)).fetchone():
             raise ValueError('La tarjeta o estación ya tiene un trabajo en curso.')
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='r2_programming_attempts'").fetchone():
+            if c.execute("SELECT 1 FROM r2_programming_attempts WHERE station=? AND state IN ('flashing','queued','running') AND created>?",(station,time.time()-600)).fetchone():
+                raise ValueError('La estación está programando o verificando una R2.')
         if c.execute("SELECT 1 FROM sqlite_master WHERE name='tqt_test_runs'").fetchone():
             if c.execute("SELECT 1 FROM tqt_test_runs WHERE (station=? OR requested_card=?) AND state IN ('queued','running')",(station,data.get('tarjeta_id'))).fetchone():
                 raise ValueError('La tarjeta o estación está ejecutando una prueba física; espera a que termine.')

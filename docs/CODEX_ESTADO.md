@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-15 15:57 UTC
-Commit de referencia: `2af724627e1c` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-15 21:26 UTC
+Commit de referencia: `8580b278d2a4` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Desplegada y verificada web 1.3.80 en Orange Pi desde commit 2af724627e1ccfbc7d2821c32f5fdec8cec8b10c, rama codex/r2-ota-rapida GitHub. Base 1.3.79 recuperada del servidor y preservada. R2 OTA rapida 500 bytes NR+notificaciones, ventana8, compatibilidad FW4.1, plantilla 4.1.1 predeterminada sin secretos. Pruebas: suite ESP32 35 OK mas OTA final15 OK (36 casos unicos), JS7 OK, Playwright R2 desktop/movil y R1 sin catalogo/OTA OK. API publica/local y contenedor healthy; SQLite integrity OK y hashes de todas las filas anteriores intactos; unica adicion base-R2-v411. Respaldo pre-r2-ota-1380-20261015T155624Z.db SHA256 2ae2b22d4d18b4210c130dfdb6dd48e413eb9db11ad5a5abde1217826909ef4c. CM y ECC-verification utilizados.
+Cierre fisico local1.3.86: R2 0067 completada desde base generica4.0 y OTA4.2, transicion final por web exitosa. Nombre ESP32 exactamente igual al inventario TQT-R2-V30-0067; FW4.2 HW3.0 MAC8C:8C:29:C3:D7:EA. Lectura BLE fresca autentica y hash coinciden con imagen personalizada y trabajo final. Un solo registro y ninguna OTA pendiente. eFuses desactivados. ECC HWFW/seguridad/verificacion y CM aplicados.
 
 ## Siguiente paso
-Medir OTA desde Chrome/Edge real con R2 0069; conserva firmware temporal4.1.1 ya probado por cliente nativo, inventario4.1 hasta una verificacion real de la web. No se afirmo prueba fisica del navegador ni se tocaron COM3/reles. Actualizar desde rama codex/r2-ota-rapida con tracking reparado; main no se modifico.
+Prueba0067 cerrada. Produccion sigue sin desplegar; hacerlo solo por peticion expresa y conservando clave privada del emisor y credenciales de unidades fuera de Git. Proxima unidad nueva puede validar ruta directa de ultima base generica con nombre con guiones; esa revision se compilo y probo por protocolo, la0067 recorrio base inicial y transicion.
 
 ## Evidencia
-tests/test_esp32_ota.py; tests/esp32_ota_transport.cjs; docs/ESP32_R2_OTA_PRUEBA_AISLADA.md; despliegue publico 1.3.80 healthy
+Usuario: OTA verificada FW4.2 en web1.3.86. Trabajo9a5e54b583bff4ea0a427c64 verified. Lectura BLE independiente exactname TQT-R2-V30-0067,boot_validtrue,name_format2,particion0x150000,appSHA78d28604f878255f8f5ff7e937d302becda538748bdd65ae02f6e7921966554a. validate_final67 comprueba HMAC fresco,hash personalizado,MAC,FW/HW,estado ble_ota,unicidad y cero pendientes.58 pruebas servidor/agente y12 transporte previamenteOK; sin cambios de codigo en este cierre.

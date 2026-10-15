@@ -27,6 +27,25 @@ def attestation(meta,key,mac,partition=0x10000,nonce=None):
 
 
 class OtaTests(unittest.TestCase):
+    def test_exact_inventory_name_migrates_legacy_receiver_before_renaming(self):
+        before=inv.get_pcb(self.pid)
+        bridge=ota.prepare(self.pid,'base-R2-v42',self.info,self.operator)
+        self.assertTrue(bridge['migration_required'])
+        self.assertEqual(bridge['nombre'],self.info['nombre'])
+        boot=attestation(dict(nombre=bridge['nombre'],hw='3.0',fw='4.2',app_sha256=bridge['app_sha256']),self.key,self.pcb['mac'],0x150000)
+        boot['name_format']=2
+        partial=ota.finish(bridge['job_id'],boot,self.operator)
+        self.assertTrue(partial['migration_required']);self.assertFalse(partial['verified'])
+        self.assertEqual(inv.get_pcb(self.pid)['firmware'],before['firmware'])
+        final=ota.prepare(self.pid,'base-R2-v42',boot,self.operator)
+        self.assertFalse(final['migration_required']);self.assertEqual(final['nombre'],self.pcb['nombre'])
+        verified=attestation(dict(nombre=self.pcb['nombre'],hw='3.0',fw='4.2',app_sha256=final['app_sha256']),self.key,self.pcb['mac'],0x10000)
+        verified['name_format']=2
+        result=ota.finish(final['job_id'],verified,self.operator)
+        self.assertTrue(result['verified']);self.assertEqual(result['nombre_ble'],self.pcb['nombre'])
+        wrong=attestation(dict(nombre='TQT-R2-V30-9999',hw='3.0',fw='4.2',app_sha256=final['app_sha256']),self.key,self.pcb['mac'])
+        with self.assertRaises(ValueError):ota.verify_info(wrong,self.key,self.pcb)
+
     def test_fast_template_and_transport_limit(self):
         from app.routers.esp32 import DeviceInfo
         from pydantic import ValidationError
@@ -34,7 +53,7 @@ class OtaTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             DeviceInfo(**dict(self.info,chunk=501))
         catalogue=fw.catalogue('30')
-        self.assertEqual(catalogue['default_id'],'base-R2-v411')
+        self.assertEqual(catalogue['default_id'],'base-R2-v42')
         meta,image=fw.prepare(self.pid,'base-R2-v411',True)
         self.assertEqual((meta['fw'],meta['nombre'],meta['key_id']),
                          ('4.1.1',self.meta['nombre'],self.meta['key_id']))
@@ -132,13 +151,37 @@ class OtaTests(unittest.TestCase):
         self.prepare()
         with self.assertRaises(ValueError): self.prepare()
 
-    def test_capability_requires_installed_version_mac_and_key(self):
+    def test_capability_probes_provisioned_units_even_if_inventory_cleared(self):
         self.assertTrue(ota.capability(self.pid)['eligible'])
         inv.set_firmware(self.pid,'4.0')
+        self.assertTrue(ota.capability(self.pid)['eligible'])
+        inv.set_firmware(self.pid,'3.1')
         self.assertFalse(ota.capability(self.pid)['eligible'])
         other=iso.crear_par(iso.nuevo_lote()['id'])['r2']
         inv.set_firmware(other['id'],'4.1')
-        self.assertFalse(ota.capability(other['id'])['eligible'])
+        self.assertTrue(ota.capability(other['id'])['eligible'])
+        self.assertTrue(ota.capability(other['id'])['needs_enrollment'])
+
+    def test_erased_fw_and_mac_use_authenticated_device_identity_until_verified_boot(self):
+        with db.get_db() as c:
+            c.execute('UPDATE pcb_inventario SET firmware=NULL,mac=NULL WHERE id=?',(self.pid,))
+        self.assertTrue(ota.capability(self.pid)['eligible'])
+        job=self.prepare()
+        self.assertIsNone(inv.get_pcb(self.pid)['mac'])
+        self.assertIsNone(inv.get_pcb(self.pid)['firmware'])
+        boot=attestation(self.meta,self.key,self.pcb['mac'],partition=0x150000)
+        result=ota.finish(job['job_id'],boot,self.operator)
+        self.assertEqual(result['pcb']['mac'],self.pcb['mac'])
+        self.assertEqual(result['pcb']['firmware'],'4.1')
+
+    def test_erased_inventory_never_accepts_legacy_device_or_another_units_mac(self):
+        with db.get_db() as c:
+            c.execute('UPDATE pcb_inventario SET firmware=NULL,mac=NULL WHERE id=?',(self.pid,))
+        old=attestation(dict(self.meta,fw='3.1'),self.key,self.pcb['mac'])
+        with self.assertRaises(ValueError):self.prepare(old)
+        other=iso.crear_par(iso.nuevo_lote()['id'])['r2']
+        duplicate=attestation(self.meta,self.key,other['mac'])
+        with self.assertRaisesRegex(ValueError,'otra PCB'):self.prepare(duplicate)
 
     def test_confirmed_same_version_requires_new_boot_partition(self):
         job=self.prepare()

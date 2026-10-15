@@ -13,7 +13,7 @@ import time
 import urllib.request
 import tqt_hex as hx
 
-USER_AGENT = 'TQT-Station/1.3.63'
+USER_AGENT = 'TQT-Station/1.3.81'
 _control = threading.local()
 
 
@@ -193,6 +193,23 @@ class BleWorker:
     async def paso(self):
         """Un ciclo: informa estado, toma un trabajo y reporta su resultado. Los errores de red no salen de aquí."""
         import asyncio
+        # Uses the same BLE worker: no competing connection or extra local listening port.
+        try:
+            work = await asyncio.to_thread(self.api, 'r2/claim', {'available': self.disponible and not self.conectado})
+        except Exception:
+            work = None  # Older servers do not expose this optional endpoint.
+        if work:
+            try:
+                body = await self.verificar_r2(work)
+            except Exception as exc:
+                body = {'ok': False, 'error': str(exc)[:1000]}
+            for attempt in range(3):
+                try:
+                    await asyncio.to_thread(self.api, 'r2/'+work['id']+'/result', body)
+                    break
+                except Exception:
+                    await asyncio.sleep(1)
+            return body
         try:
             work = await asyncio.to_thread(self.api, 'ble/claim', {
                 'ble_disponible': self.disponible, 'conectado': self.conectado,
@@ -223,6 +240,29 @@ class BleWorker:
             except Exception as e:
                 print('Error BLE:', str(e)[:200])
             await asyncio.sleep(0.7)
+
+    async def verificar_r2(self, work):
+        """Read-only authenticated INFO; never sends PPON/POFF or OTA commands."""
+        import asyncio
+        address=work.get('mac')
+        if not address: raise ValueError('Falta la MAC leída por serial o registrada.')
+        device=await self.lib.BleakScanner.find_device_by_address(address,timeout=12)
+        if device is None: raise ValueError('No se encontró la R2 esperada por su MAC. Comprueba alimentación y libera Bluetooth.')
+        if device.name and device.name.replace('_','-')!=work['nombre'].replace('_','-'): raise ValueError('La MAC encontrada anuncia otro nombre de R2.')
+        client=self.lib.BleakClient(device,timeout=15)
+        try:
+            await client.connect()
+            char='d45a0002-6a76-4e41-9f38-a7043f0ec069'
+            for _ in range(30):
+                raw=bytes(await client.read_gatt_char(char,use_cached=False))
+                if len(raw)>2048: raise ValueError('INFO excede el tamaño permitido.')
+                info=json.loads(raw)
+                if info.get('boot_valid') is True:
+                    return {'ok':True,'address':device.address,'info':info}
+                await asyncio.sleep(.25)
+            raise ValueError('La R2 no confirmó su arranque por Bluetooth.')
+        finally:
+            await client.disconnect()
 
     def hilo(self):
         import asyncio

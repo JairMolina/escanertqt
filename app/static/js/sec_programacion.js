@@ -36,6 +36,39 @@
         const S = { vivo: true, tipoEsp: 'R2', pendientes: [], filtro: '', tarjeta: null, busy: false, puertos: [], puertoSel: null, completed: null, capability: null, otaCommitting: false };
         const timers = new Set();
         const unsubs = [];
+        let r2States = new Map();
+        const autoVerified=new Set();
+        let verificationCancelled=false;
+        const stateNames = {updated:'Actualizada',outdated:'Desactualizada',unprogrammed:'Sin programar',error:'Error de programación / verificación',busy:'Verificando…'};
+        function r2Badge(p) {
+            const state=r2States.get(p.id) || {state:'unprogrammed'};
+            return h('span',{class:'prog-r2-state',dataset:{s:state.state},title:state.error || `Instalado: ${state.installed_fw || 'sin verificar'} · vigente: ${state.latest_fw || '—'}`},stateNames[state.state]);
+        }
+        async function refreshR2States() {
+            const r=await api('/api/esp32/r2/status');
+            if(r.ok && S.vivo) { r2States=new Map(r.data.items.map(x=>[x.pcb_id,x])); pintarLista(); pintarR2Estado(); }
+        }
+        async function localStation() {
+            const r=await api('/api/stm32/stations');
+            if(!r.ok) throw new Error(r.error);
+            const available=r.data.filter(s=>s.local && s.online);
+            let saved=''; try { saved=localStorage.getItem('tqt.station.stm32') || ''; } catch(_) {}
+            const station=available.find(s=>s.id===saved) || (available.length===1 ? available[0] : null);
+            if(!station) throw new Error('Selecciona la estación de esta laptop en TQT R1 y mantén su agente Windows actualizado.');
+            return station.id;
+        }
+        async function waitVerification(id) {
+            const end=Date.now()+90000;
+            while(S.vivo && Date.now()<end) {
+                if(verificationCancelled) throw new Error('Verificación detenida por el operador; no se marcó una programación nueva.');
+                const r=await api('/api/esp32/r2/attempts/'+id);
+                if(!r.ok) throw new Error(r.error);
+                if(r.data.state==='verified') return r.data.result;
+                if(r.data.state==='error') throw new Error(r.data.error);
+                await new Promise(resolve=>setTimeout(resolve,700));
+            }
+            throw new Error('No llegó la verificación Bluetooth. Revisa alimentación, agente y conexión de la R1.');
+        }
 
         let r1Gate = { ok: true, motivo: '' };
         let firmwareRequest = 0, uploadBusy = false, firmwareLoading = false;
@@ -46,7 +79,7 @@
         const firmwareLabel = h('label', { for: 'esp-r2-fw' }, 'Firmware R2 a programar');
         const firmwarePanel = h('div', { class: 'field' }, firmwareLabel, firmwareSelect, firmwareHint, h('div', { class: 'row wrap' }, uploadBtn, uploadInput));
         let esptoolProm = null;
-        function cargarEsptool() { return esptoolProm || (esptoolProm = import(ESPTOOL_URL).catch((e) => { esptoolProm = null; throw e; })); }
+        function cargarEsptool() { return esptoolProm || (esptoolProm = import(ESPTOOL_URL)); }
 
         // ------------------------------------------------------------ lista de pendientes (buscar/elegir)
         const buscar = h('input', { class: 'input', type: 'search', id: 'prog-q', autocomplete: 'off', placeholder: 'Número o nombre (p. ej. 0021 o TQT-R2-V30-0021)…' });
@@ -58,6 +91,7 @@
             if (!S.vivo || tipo !== S.tipoEsp) return;
             if (!r.ok) { lista.replaceChildren(T.banner('bad', 'alert', r.network ? 'Sin conexión con el servidor.' : `No se pudo cargar: ${r.error}`)); return; }
             S.pendientes = ((r.data && r.data.items) || []).filter((p) => p.tipo === tipo);   // v1.3.79: pestaña R2 o R1 (ESP32 BLE serial); la R1 elegida ya no se pierde al refrescar
+            if(tipo==='R2') await refreshR2States();
             if (S.tarjeta && S.completed !== S.tarjeta.id && !S.pendientes.some((p) => p.id === S.tarjeta.id)) { S.tarjeta = null; pintarDetalle(); }
             pintarLista();
         }
@@ -75,7 +109,7 @@
                 const b = h('button', {
                     class: 'prog-item', type: 'button', disabled: S.busy, 'aria-pressed': String(S.tarjeta && S.tarjeta.id === p.id),
                     onclick: () => seleccionar(p),
-                }, T.tipoChip(p.tipo), h('span', { class: 'nm' }, p.nombre), h('span', { class: 'dim' }, p.id_tarjeta_num ? '#' + String(p.id_tarjeta_num).padStart(4, '0') : 'Suelta'));
+                }, T.tipoChip(p.tipo), h('span', { class: 'nm' }, p.nombre), ...(p.tipo==='R2' ? [r2Badge(p)] : []), h('span', { class: 'dim' }, p.id_tarjeta_num ? '#' + String(p.id_tarjeta_num).padStart(4, '0') : 'Suelta'));
                 lista.appendChild(b);
             });
         }
@@ -136,7 +170,6 @@
         }
 
         // ------------------------------------------------------------ monitor serial + resultado
-        // v1.3.82: una sola terminal (la negra del monitor serial) para el registro de grabación y la salida serial
         const escribir = (linea) => monAppend(linea + '\n');
         const relleno = h('div', { class: 'prog-bar-fill' });
         const barra = h('div', { class: 'prog-bar' }, relleno);
@@ -261,10 +294,10 @@
                 await mon.port.setSignals({ dataTerminalReady: false, requestToSend: false });
             } catch (e) { monAppend('✗ No se pudo reiniciar por RTS/DTR: ' + (e && e.message ? e.message : e) + '\n'); }
         }
-        try { const g = +localStorage.getItem('prog_flash_baud'); selFlashBaud = BAUDS_FLASH.includes(g) ? g : null; } catch (e) { /* sin storage */ }
-        const selBaudFlash = h('select', { id: 'prog-flash-baud', class: 'input', onchange: () => { try { localStorage.setItem('prog_flash_baud', selBaudFlash.value); } catch (e) { /* nada */ } } },
+        try { const g = +localStorage.getItem('prog_flash_baud_override'); selFlashBaud = BAUDS_FLASH.includes(g) ? g : null; } catch (e) { /* sin storage */ }
+        const selBaudFlash = h('select', { id: 'prog-flash-baud', class: 'input', onchange: () => { try { localStorage.setItem('prog_flash_baud_override', selBaudFlash.value); } catch (e) { /* nada */ } } },
             ...BAUDS_FLASH.map((b) => h('option', { value: String(b) }, String(b))));
-        selBaudFlash.value = String(selFlashBaud || 921600);
+        selBaudFlash.value = String(selFlashBaud || 460800);
         unsubs.push(() => { cancelAnimationFrame(mon.raf); monDetener(); });
 
         function enableFirmware() {
@@ -272,14 +305,15 @@
             firmwareSelect.disabled = blocked || !firmwareSelect.options.length;
             uploadBtn.disabled = blocked;
             btnFlash.disabled = blocked || !S.tarjeta || S.completed === S.tarjeta.id || !firmwareSelect.value || (S.tarjeta?.tipo === 'R1' && !r1Gate.ok);
-            btnFlash.textContent = 'Instalar por serial';
+            btnFlash.textContent = S.tipoEsp==='R2' && (S.capability?.needs_enrollment || !S.capability?.eligible) ? 'Instalar base genérica 4.0 por USB' : 'Instalar por serial';
             const esR1 = S.tipoEsp === 'R1';   // R1: firmware fijo (ESP32_BLE_SERIAL), sin catálogo ni subida
+            if(!S.busy) usbPanel.open=esR1 || S.capability?.needs_enrollment || !S.capability?.eligible;
             firmwareLabel.textContent = esR1 ? 'Firmware ESP32 de la R1 (fijo)' : 'Firmware R2 a programar';
             uploadBtn.hidden = esR1; firmwareSelect.hidden = esR1;
             selBaudFlash.disabled = blocked; monUI();
             const saved = window.TQTR2OTA?.pending();
             const ownPending = saved?.pcb_id === S.tarjeta?.id;
-            const selectedOta = firmwareSelect.selectedOptions[0]?.dataset.ota === '1';
+            const selectedOta = firmwareSelect.selectedOptions[0]?.dataset.ota === '1' && firmwareSelect.selectedOptions[0]?.dataset.bootstrap!=='1';
             btnOta.disabled = blocked || !S.capability?.eligible || !selectedOta || Boolean(saved) || !navigator.bluetooth;
             btnOtaVerify.hidden = !ownPending; btnOtaDiscard.hidden = !saved;
             btnOtaVerify.disabled = btnOtaDiscard.disabled = blocked;
@@ -287,8 +321,14 @@
             otaPanel.hidden = S.tipoEsp !== 'R2' || !S.tarjeta;
             otaHint.textContent = ownPending ? 'Hay una actualización pendiente de comprobar. Conecta la R2 encendida para verificarla.' :
                 saved ? 'Verifica o descarta la OTA pendiente de ' + (saved.nombre || 'otra R2') + ' antes de iniciar otra.' :
-                S.capability?.eligible ? 'FW ' + S.capability.current_fw + ': admite OTA. Mantén alimentación estable y libera la conexión Bluetooth de la R1 durante la actualización.' :
-                'Primera instalación: instala FW 4.1 o superior por serial desde esta web. Después podrás actualizar por Bluetooth.';
+                S.capability?.needs_enrollment ? 'Con base4.0 genérica: selecciona el dispositivo XXXX por Bluetooth. La web le asignará esta tarjeta e instalará el firmware elegido.' :
+                S.capability?.eligible ? 'Se comprobarán por Bluetooth la identidad y la capacidad OTA reales, aunque figure sin programar. Mantén alimentación estable y libera Bluetooth de la R1.' :
+                S.capability?.reason==='legacy' ? 'El firmware registrado es anterior a 4.0: necesita instalar la base OTA por USB.' :
+                'Falta la credencial de esta unidad: instala la base OTA por USB desde esta web.';
+            btnVerifyR2.disabled=blocked || !S.tarjeta?.mac || !S.capability?.eligible;
+            btnVerifyR2.hidden=esR1;
+            nextR1.hidden=esR1 || r2States.get(S.tarjeta?.id)?.state!=='updated';
+            pintarR2Estado();
         }
         async function loadFirmwares(reset = false) {
             const n = ++firmwareRequest;
@@ -309,13 +349,18 @@
                 firmwareSelect.replaceChildren(); firmwareHint.textContent = r.error;
                 enableFirmware(); return;
             }
-            firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id, dataset: { ota: String(f.ota_protocol || 0) } },
-                `FW ${f.fw}` + (f.hw ? ` · HW ${f.hw}` : '') + (f.ota_protocol ? ' · OTA' : '') + (f.id === r.data.default_id ? ' · más reciente' : ''))));
+            firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id, dataset: { ota: String(f.ota_protocol || 0),bootstrap:f.bootstrap?'1':'0' } },
+                `FW ${f.fw}` + (f.hw ? ` · HW ${f.hw}` : '') + (f.bootstrap ? ' · Base genérica XXXX · USB' : f.ota_protocol ? ' · OTA' : '') + (f.id === r.data.default_id ? ' · más reciente' : ''))));
             firmwareSelect.value = !reset && r.data.items.some(f => f.id === selected) ? selected : (r.data.default_id || '');
             firmwareHint.textContent = tipo === 'R1' ? (r.data.items.length ? `ESP32_BLE_SERIAL FW ${r.data.items[0].fw}: es el mismo para todas las R1 (el nombre BLE lo graba el STM32). Se verifica solo la MAC.` : 'Falta el firmware fijo de la R1 en el servidor (firmware/esp32_r1).')
                 : r.data.items.length ? 'El nombre se toma de la R2 elegida; HW y FW se leen del archivo. Puedes elegir una versión anterior.' : 'No hay firmware compatible con el hardware de esta R2.';
             if (!r1Gate.ok) firmwareHint.textContent = r1Gate.motivo;
             enableFirmware();
+            if(S.tipoEsp==='R2' && S.tarjeta?.mac && S.capability?.eligible && !autoVerified.has(S.tarjeta.id)) {
+                autoVerified.add(S.tarjeta.id);
+                const selectedId=S.tarjeta.id;
+                setTimeout(()=>{if(S.vivo && S.tarjeta?.id===selectedId && !S.busy) btnVerifyR2.click();},0);
+            }
         }
         uploadInput.addEventListener('change', async () => {
             const file = uploadInput.files?.[0]; uploadInput.value = '';
@@ -368,15 +413,15 @@
             finally { uploadBusy = false; if (S.vivo) enableFirmware(); }
         });
         firmwareSelect.addEventListener('change', enableFirmware);
-        async function compilarFirmware(pcb) {
-            const resp = await fetch(`/api/esp32/bin/${pcb.id}?firmware_id=${encodeURIComponent(firmwareSelect.value)}`, { method: 'POST' });
+        async function compilarFirmware(pcb,firmwareId=firmwareSelect.value) {
+            const resp = await fetch(`/api/esp32/bin/${pcb.id}?firmware_id=${encodeURIComponent(firmwareId)}`, { method: 'POST' });
             if (!resp.ok) {
                 let msg = `Error ${resp.status}`;
                 try { const j = await resp.json(); msg = j.detail || msg; } catch (e) { /* sin JSON */ }
                 throw new Error('No se pudo preparar el firmware: ' + msg);
             }
             const hd = k => resp.headers.get('X-TQT-' + k) || '';
-            return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), hardware: hd('Hardware'), firmwareId: hd('Firmware-Id'), sha: hd('Sha256') || hd('Fuente-Sha256'), otaProtocol: Number(hd('OTA-Protocol') || 0), keyId: hd('Key-Id') };
+            return { bin: new Uint8Array(await resp.arrayBuffer()), nombreBle: hd('Nombre-Ble'), firmware: hd('Firmware'), hardware: hd('Hardware'), firmwareId: hd('Firmware-Id'), sha: hd('Sha256') || hd('Fuente-Sha256'), otaProtocol: Number(hd('OTA-Protocol') || 0), keyId: hd('Key-Id'),bootstrap:hd('Bootstrap')==='1' };
         }
         async function leerMacPorSerial(port, requireProfile = false) {
             await monDetener();
@@ -448,6 +493,13 @@
                 h('div', { class: 'prog-mac-row' }, h('span', { class: 'hint' }, 'MAC:'), macTxt,
                     h('button', { class: 'btn btn-sm', type: 'button', onclick: () => util.copiar(mac, 'MAC copiada') }, icon('paste'), 'Copiar')),
                 h('button', { class: 'btn', type: 'button', onclick: () => { S.tarjeta = null; pintarDetalle(); buscar.focus(); } }, 'Elegir otra tarjeta'));
+            if(pcb.tipo==='R2') resultado.append(r2States.get(pcb.id)?.state==='updated'
+                ? h('button',{class:'btn btn-primary',type:'button',onclick:continuarR1},'Continuar con TQT R1')
+                : h('p',{class:'hint'},'Base verificada. Actualiza por Bluetooth al firmware más reciente antes de continuar con TQT R1.'));
+            if(pcb.tipo==='R1') resultado.append(h('button',{class:'btn btn-primary',type:'button',onclick:async()=>{
+                modo('r3');
+                if(pcb.tarjeta_id) {const r=await api('/api/tarjetas/'+pcb.tarjeta_id);if(r.ok && r.data.r3?.nombre) await stm3.escaneo(r.data.r3.nombre);}
+            }},'Continuar con TQT R3'));
         }
 
         async function ejecutar() {
@@ -459,13 +511,19 @@
             otaProgress.hidden = true;
             pintarLista(); pintarPuertos(); resetPasos(); enableFirmware();
             const pcb = S.tarjeta;
-            let transport = null;
+            let transport = null, attempt=null;
             try {
                 await monDetener();   // el monitor libera el puerto antes de flashear
                 marcarPaso('compilar', 'activo');
                 escribir(pcb.tipo === 'R2' ? 'Preparando firmware y nombre desde inventario…' : 'Preparando firmware fijo de R1…');
-                const esptoolP = cargarEsptool(); esptoolP.catch(() => {});   // se descarga mientras se prepara el firmware
-                const fw = await compilarFirmware(pcb); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
+                const esptoolP = cargarEsptool(); esptoolP.catch(() => {});
+                const initialBase=pcb.tipo==='R2' && (S.capability?.needs_enrollment || !S.capability?.eligible);
+                const fw = await compilarFirmware(pcb,initialBase ? 'base-R2-v40-generic' : firmwareSelect.value); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
+                if(esR2 && fw.otaProtocol && !fw.bootstrap) {
+                    const prepared=await api('/api/esp32/r2/'+pcb.id+'/attempts',{method:'POST',body:{firmware_id:fw.firmwareId,station_id:await localStation(),method:'serial'}});
+                    if(!prepared.ok) throw new Error(prepared.error);
+                    attempt=prepared.data.id;
+                }
                 marcarPaso('compilar', 'ok');
                 escribir(`Firmware listo (${(binario.length / 1024).toFixed(0)} KB)${fw.firmware ? ' · FW ' + fw.firmware + (fw.hardware ? ' · HW ' + fw.hardware : '') : ''}${fw.nombreBle ? ' · nombre BLE ' + fw.nombreBle : ''}.`);
 
@@ -478,7 +536,7 @@
                 const esptool = await esptoolP;
                 // sincroniza siempre a 115200 (romBaudrate) y sube a la velocidad elegida para los datos
                 let usar = +selBaudFlash.value || 115200, intento = 0, loader = null, escritoAlgo = false;
-                const terminal = { clean() { /* nada */ }, writeLine: (s) => escribir(s), write: (s) => escribir(String(s).replace(/\n$/, '')) };
+                const terminal = { clean() {}, writeLine: (s) => escribir(s), write: (s) => escribir(String(s).replace(/\n$/, '')) };
                 for (;;) {
                     transport = new esptool.Transport(port, true);
                     loader = new esptool.ESPLoader({ transport, baudrate: usar, romBaudrate: 115200, terminal });
@@ -507,7 +565,7 @@
                         transport = null;
                         if (usar <= 115200 || intento > 0) throw err;
                         escribir(`⚠ Falló a ${usar} baud (${err && err.message ? err.message : err}). Reintentando a 115200…`);
-                        if (!await confirmar('Reintentar a 115200', (escritoAlgo ? 'La grabación se interrumpió a alta velocidad. ' : 'No se pudo sincronizar a alta velocidad. ') + 'Vuelve a poner la R2 en modo descarga (GPIO0/BOOT en bajo + RESET) y confirma para reintentar a 115200.', 'Ya está en BOOT')) throw err;
+                        // BOOT is still held during this phase; retry the ROM loader automatically.
                         usar = 115200; intento++; escritoAlgo = false; relleno.style.width = '0';
                     }
                 }
@@ -531,20 +589,38 @@
                 if (pcb.mac && pcb.mac.toUpperCase() !== mac && !await confirmar('MAC diferente', `${pcb.nombre} ya tiene la MAC ${pcb.mac} y la placa respondió ${mac}. ¿Reemplazarla? Hazlo solo si confirmaste que es la misma placa física.`, 'Reemplazar MAC')) throw new Error('MAC en conflicto: no se cambió el registro.');
                 marcarPaso('mac', 'ok');
                 escribir('MAC leída: ' + mac + (leido.nombre ? ' · nombre ' + leido.nombre : ''));
+                if(fw.bootstrap){
+                    resultado.hidden=false;
+                    resultado.replaceChildren(T.banner('info','info','Base genérica4.0 instalada y leída: '+leido.nombre+'. Aún no está asignada ni marcada como programada.'),
+                        h('p',{class:'hint'},'Libera los contactos, deja la R2 alimentada y pulsa Actualizar por Bluetooth para asignar '+pcb.nombre+' e instalar el firmware elegido.'));
+                    await loadFirmwares();return;
+                }
 
                 const cuerpo = { mac }; if (!esR2 && fw.firmwareId) cuerpo.firmware_id = fw.firmwareId;   // R1: solo MAC; pcb.firmware es el del STM32
                 if (esR2 && fw.firmware) Object.assign(cuerpo, { firmware: fw.firmware, firmware_id: fw.firmwareId, nombre_verificado: leido.nombre, hardware_verificado: leido.hardware, ota_protocol_verificado: leido.otaProtocol, key_id_verificado: leido.keyId });   
-                const res = await api(`/api/pcb/${pcb.id}/programacion`, { method: 'PUT', body: cuerpo });
+                let res;
+                if(attempt) {
+                    verificationCancelled=false;btnStopVerify.hidden=false;
+                    escribir('Verificando automáticamente por Bluetooth: identidad, MAC, HW, FW y hash…');
+                    const ready=await api('/api/esp32/r2/attempts/'+attempt+'/ready',{method:'POST',body:{mac}});
+                    if(!ready.ok) throw new Error(ready.error);
+                    const verified=await waitVerification(attempt);
+                    res={ok:true,data:verified.pcb};
+                } else res = await api(`/api/pcb/${pcb.id}/programacion`, { method: 'PUT', body: cuerpo });
                 if (!res.ok) throw new Error(res.network ? 'Sin conexión con el servidor: no se guardó.' : res.error);
                 escribir('Guardado ✓');
                 toast(`${pcb.nombre}: MAC ${mac} guardada`, { kind: 'ok' });
                 S.tarjeta = Object.assign({}, pcb, res.data);
-                mostrarResultado(S.tarjeta, mac, fw);
                 await loadFirmwares();
+                await refreshR2States();
+                mostrarResultado(S.tarjeta, mac, fw);
             } catch (e) {
+                if(attempt) await api('/api/esp32/r2/attempts/'+attempt+'/failure',{method:'POST',body:{error:String(e.message || e).slice(0,1000)}});
+                await refreshR2States();
                 marcarActivoComoError();
                 escribir('✗ ' + (e && e.message ? e.message : String(e)));
             } finally {
+                btnStopVerify.hidden=true;
                 if (transport) { try { await transport.disconnect(); } catch (e) { /* ya cerrado */ } }
                 try { if (port.readable || port.writable) await port.close(); } catch (e) { /* sin puerto abierto */ }
                 S.busy = false; enableFirmware();
@@ -579,9 +655,10 @@
                     },
                     committing: value => { S.otaCommitting = value; enableFirmware(); } }, recovery);
                 S.tarjeta = result.pcb;
+                await refreshR2States();
                 escribir('OTA verificada ✓ · FW ' + result.fw);
                 otaProgress.textContent = 'Actualización y nuevo arranque verificados · FW ' + result.fw;
-                mostrarResultado(S.tarjeta, S.tarjeta.mac, { firmware: result.fw, hardware: S.tarjeta.version, nombreBle: S.tarjeta.nombre.replace(/-/g, '_') });
+                mostrarResultado(S.tarjeta, S.tarjeta.mac, { firmware: result.fw, hardware: S.tarjeta.version, nombreBle: result.nombre_ble || S.tarjeta.nombre.replace(/-/g, '_') });
                 toast('R2 actualizada y verificada por Bluetooth', { kind: 'ok' });
             } catch (e) { escribir('✗ ' + e.message); otaProgress.textContent = e.message; }
             finally { S.busy = false; otaController = null; S.otaCommitting = false; await loadFirmwares(); enableFirmware(); pintarLista(); pintarPuertos(); }
@@ -589,14 +666,58 @@
 
         // ------------------------------------------------------------ panel de detalle
         const cabecera = h('div', { class: 'prog-cab' });
-        const detalle = h('div', { class: 'prog-detalle', hidden: true },
-            cabecera, pasosEl,
+        const r2Estado=h('div',{class:'prog-estado',role:'status','aria-live':'polite'});
+        function pintarR2Estado() {
+            if(!r2Estado) return;
+            r2Estado.hidden=S.tipoEsp!=='R2' || !S.tarjeta;
+            if(!r2Estado.hidden) {
+                const state=r2States.get(S.tarjeta.id), evidence=state?.evidence;
+                const method={serial:'USB serial',ble_ota:'Bluetooth OTA',verify:'Verificación Bluetooth'}[evidence?.method] || '';
+                const when=evidence?.programmed_at ? new Date(evidence.programmed_at*1000).toLocaleString() : '';
+                r2Estado.replaceChildren(r2Badge(S.tarjeta),h('span',{class:'hint'},
+                    `Instalado: ${state?.installed_fw || 'sin verificar'} · Vigente: ${state?.latest_fw || '—'}`),
+                    ...(evidence ? [h('span',{class:'hint'},method+(when ? ' · '+when : ''))] : []));
+            }
+        }
+        async function continuarR1() {
+            const pcb=S.tarjeta;
+            modo('stm');
+            if(pcb?.tarjeta_id) {
+                const r=await api('/api/tarjetas/'+pcb.tarjeta_id);
+                if(r.ok && r.data.r1?.nombre) return stm.escaneo(r.data.r1.nombre);
+            }
+        }
+        const nextR1=h('button',{class:'btn',type:'button',hidden:true,onclick:continuarR1},'Continuar con TQT R1');
+        const btnStopVerify=h('button',{class:'btn',type:'button',hidden:true,onclick:()=>{verificationCancelled=true;}},'Detener verificación');
+        const btnVerifyR2=h('button',{class:'btn',type:'button',onclick:async()=>{
+            if(S.busy || !S.tarjeta) return;
+            let id=null; verificationCancelled=false;S.busy=true;btnStopVerify.hidden=false;enableFirmware();
+            try {
+                const state=r2States.get(S.tarjeta.id);
+                const catalogue=await api('/api/esp32/firmwares?tipo=R2&hw='+S.tarjeta.version);
+                const installed=catalogue.ok && catalogue.data.items.find(x=>x.fw===state?.installed_fw && x.ota_protocol);
+                if(!installed) throw new Error('No hay una imagen OTA del firmware registrado para contrastar su hash. Instala por serial.');
+                const r=await api('/api/esp32/r2/'+S.tarjeta.id+'/attempts',{method:'POST',body:{firmware_id:installed.id,station_id:await localStation(),method:'verify'}});
+                if(!r.ok) throw new Error(r.error); id=r.data.id;
+                escribir('Buscando y verificando automáticamente la R2 registrada…');
+                const verified=await waitVerification(id); S.tarjeta=verified.pcb;
+                escribir('Identidad, MAC y firmware verificados por Bluetooth ✓');
+            } catch(e) {
+                if(id) await api('/api/esp32/r2/attempts/'+id+'/failure',{method:'POST',body:{error:e.message.slice(0,1000)}});
+                escribir('✗ '+e.message);
+            } finally {S.busy=false;btnStopVerify.hidden=true;await refreshR2States();enableFirmware();}
+        }},'Verificar R2 automáticamente');
+        const maintenance=h('details',{class:'prog-config'},h('summary',null,'Mantenimiento / diagnóstico'),
+            h('div',{class:'field'},h('label',{for:'prog-flash-baud'},'Velocidad de grabación'),selBaudFlash,
+                h('p',{class:'hint'},'Predeterminada: 460800 baud; reducción automática a 115200 ante un fallo. La velocidad debe validarse con el adaptador del banco.')));
+        const usbPanel=h('details',{class:'prog-config',open:true},h('summary',null,'Instalación USB / recuperación'),pasosEl,
             h('div', { class: 'field' }, h('label', null, 'Puerto de la tarjeta'), puertosWrap,
                 h('div', { class: 'hint' }, 'Solo se listan aquí los puertos que ya autorizaste antes. «Elegir puerto» abre la lista real de puertos COM de Windows (el navegador la pide una vez por puerto; luego queda recordado).')),
             h('div', { class: 'hint' }, 'Antes de sincronizar, pon la tarjeta en modo programador; el registro avisa si no avanza.'),
-            h('div', { class: 'field' }, h('label', { for: 'prog-flash-baud' }, 'Velocidad de grabación'), selBaudFlash,
-                h('div', { class: 'hint' }, 'Se sincroniza a 115200 y los datos van a esta velocidad; si falla, reintenta a 115200.')),
-            monPanel, barra, otaProgress, h('div', { class: 'row' }, btnFlash), otaPanel, resultado);
+            maintenance,h('div',{class:'row'},btnFlash));
+        const detalle = h('div', { class: 'prog-detalle', hidden: true },
+            cabecera,r2Estado,h('div',{class:'row wrap'},btnVerifyR2,btnStopVerify,nextR1),
+            otaPanel,monPanel,usbPanel,barra,otaProgress,resultado);
         const vacio = T.empty('flash', 'Elige una tarjeta', 'Búscala por número o nombre a la izquierda, o elige una de la lista.');
 
         function seleccionar(p) {
@@ -632,15 +753,18 @@
         const r3Host = h('div');
         const stm3 = window.TQTSTM32(r3Host, Object.assign({}, ctx, { tipo: 'R3' }));
         const MODOS = {
-            stm: { host: stmHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('stm') }, 'R1 · STM32 / J-Link') },
-            esp: { host: espHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('esp') }, 'R2 · ESP32 · USB serial') },
+            stm: { host: stmHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('stm') }, 'TQT R1') },
+            esp: { host: espHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('esp') }, 'TQT R2') },
             espR1: { host: espHost, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('espR1') }, 'R1 · ESP32 · BLE serial') },
-            r3: { host: r3Host, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('r3') }, 'R3 · STM32 / J-Link') },
+            r3: { host: r3Host, btn: h('button', { class: 'btn', type: 'button', onclick: () => modo('r3') }, 'TQT R3') },
         };
-        let actual = 'stm';
+        const flowHint=h('p',{class:'hint',role:'status','aria-live':'polite'});
+        let actual = 'esp';
         function modo(id) {
             if (S.busy || uploadBusy || stm.ocupada() || stm3.ocupada()) return;
             actual = id;
+            flowHint.textContent=id==='esp' ? 'Etapa 1 de 3 · Verifica o programa TQT R2; después continúa con TQT R1.'
+                : id==='r3' ? 'Etapa 3 de 3 · Programa TQT R3.' : 'Etapa 2 de 3 · Programa STM32 y ESP32 de TQT R1; después continúa con TQT R3.';
             const tipo = id === 'espR1' ? 'R1' : id === 'esp' ? 'R2' : S.tipoEsp;
             if (tipo !== S.tipoEsp) {   // misma interfaz ESP32 para R2 y R1; cambia la lista y el firmware
                 S.tipoEsp = tipo; S.tarjeta = null; S.completed = null; S.filtro = ''; buscar.value = ''; S.pendientes = [];
@@ -648,15 +772,16 @@
                 pintarDetalle(); pintarLista(); cargarPendientes(); loadFirmwares(true);
             }
             Object.entries(MODOS).forEach(([k, m]) => {
-                m.host.hidden = m.host !== MODOS[id].host; m.btn.classList.toggle('btn-primary', k === id); m.btn.setAttribute('aria-pressed', String(k === id));
+                const active=k===id || (k==='stm' && id==='espR1');
+                m.host.hidden = m.host !== MODOS[id].host; m.btn.classList.toggle('btn-primary', active); m.btn.setAttribute('aria-pressed', String(active));
             });
         }
-        host.prepend(h('div', { class: 'row wrap' }, MODOS.esp.btn, MODOS.stm.btn, MODOS.r3.btn));   // R1 ESP32 se abre desde «Programar ESP32 R1» del panel STM32
-        host.append(stmHost, r3Host); modo('stm');
+        host.prepend(h('div',null,h('div', { class: 'row wrap',role:'group','aria-label':'Etapas recomendadas: R2, R1, R3' }, MODOS.esp.btn, MODOS.stm.btn, MODOS.r3.btn),flowHint));
+        host.append(stmHost, r3Host); modo('esp');
 
         cargarPendientes(); loadFirmwares();
         refrescarPuertosAutorizados();
-        if (navigator.serial) cargarEsptool().catch(() => { /* se reintenta al programar */ });   // precarga esptool
+        if (navigator.serial) cargarEsptool().catch(() => {});
 
         let tRec = null;
         function recargarSuave() { clearTimeout(tRec); tRec = setTimeout(() => { timers.delete(tRec); if (S.vivo && !S.busy) cargarPendientes(); }, 250); timers.add(tRec); }
@@ -666,7 +791,16 @@
 
         return {
             actualizar() { stm.actualizar(); stm3.actualizar(); if (!S.busy && !uploadBusy) { cargarPendientes(); loadFirmwares(); } },
-            escaneo(codigo) { if (actual === 'r3') return stm3.escaneo(codigo); modo('stm'); return stm.escaneo(codigo); },
+            async escaneo(codigo) {
+                if(S.busy || uploadBusy) return {ok:false,texto:'Hay una programación en curso.'};
+                if(actual==='r3' || /TQT[-_]R3[-_]/i.test(codigo)) {modo('r3');return stm3.escaneo(codigo);}
+                if(/TQT[-_]R1[-_]/i.test(codigo) || actual==='stm' || actual==='espR1') {modo('stm');return stm.escaneo(codigo);}
+                modo('esp');
+                const r=await api('/api/consulta?codigo='+encodeURIComponent(codigo));
+                const p=r.ok && (r.data.tarjeta?.r2 || (r.data.pcb?.tipo==='R2' && r.data.pcb) || r.data.serie?.r2);
+                if(!p) return {ok:false,texto:r.error || 'No se encontró la R2.'};
+                seleccionar(p);return {ok:true,texto:p.nombre};
+            },
             desmontar() {
                 S.vivo = false;
                 if (!S.otaCommitting) otaController?.abort();
