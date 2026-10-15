@@ -121,15 +121,23 @@
         if(!checked.ok)throw new Error(checked.error);
         return assigned;
     }
-    async function reconnect(device, signal) {
+    async function readDevice(device, signal) {
         const deadline = Date.now() + 45000;
-        let last;
+        let last, chars;
         do {
             check(signal);
-            try { return await connect(device, signal); }
-            catch (e) { last = e; device.gatt.disconnect(); await sleep(500); }
+            try {
+                chars = await connect(device, signal);
+                const info = await bootInfo(chars, signal);
+                return {chars,info};
+            } catch (e) {
+                last = e; cleanup(chars); chars = null;
+                device.gatt.disconnect(); check(signal);
+                if(String(e?.message).includes('información OTA inválida')) throw e;
+                await sleep(500);
+            }
         } while (Date.now() < deadline);
-        throw new Error('No se reconectó la R2. Usa «Verificar OTA pendiente» cuando esté encendida. ' + (last?.message || ''));
+        throw new Error('No se pudo conectar y leer la R2. Comprueba alimentación y libera Bluetooth. ' + (last?.message || ''));
     }
     async function execute(options, recovery = false) {
         const { pcb, firmwareId, api, signal, stage, progress, committing } = options;
@@ -141,7 +149,9 @@
             save(null);
             if(result.data.migration_required) {
                 if(options.migrationAttempt) throw new Error('No se confirmó la transición al nombre exacto.');
-                cleanup(chars);device.gatt.disconnect();committing(false);
+                // Reuse the fresh connection that just authenticated the bridge.
+                // A queued disconnect event can otherwise tear down the next connect.
+                cleanup(chars);committing(false);
                 stage('Compatibilidad instalada; aplicando el nombre exacto del inventario');
                 return await execute({...options,migrationAttempt:true},false);
             }
@@ -158,8 +168,8 @@
             devices.set(name,device);
             signal?.addEventListener('abort', abortDevice);
             stage('Conectando y verificando la identidad de la R2');
-            chars = await connect(device, signal);
-            let info = await bootInfo(chars, signal);
+            let info;
+            ({chars,info} = await readDevice(device, signal));
             if(info.enrollment===1 && !recovery) info=await enroll(chars,pcb,firmwareId,api,info,signal,stage);
             if (![name,legacy].includes(info.nombre) || info.ota_protocol !== 1) throw new Error('La placa no corresponde a la R2 elegida o no tiene OTA compatible.');
             if (recovery) {
@@ -201,8 +211,7 @@
             }
             stage('Reconectando y comprobando la nueva versión');
             cleanup(chars);
-            chars = await reconnect(device, signal);
-            info = await bootInfo(chars, signal);
+            ({chars,info} = await readDevice(device, signal));
             const result = await api('/api/esp32/ota/result/' + job, { method: 'POST', body: info });
             if (!result.ok) throw new Error(result.error);
             return await completed(result);
