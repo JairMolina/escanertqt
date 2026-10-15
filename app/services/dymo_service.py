@@ -208,6 +208,7 @@ def calcular_diseno_r3(formato: FormatoEtiqueta, nombres: List[str]) -> List[Mit
 # --- Etiqueta de cable (v1.3.83) -----------------------------------------------------------------------------------
 # La etiqueta rectangular se divide a la mitad en vertical: solo la mitad izquierda lleva el número (grande y centrado);
 # la derecha va en blanco porque se enrolla sobre el cable y queda visible solo el número.
+# v1.3.84: el número va en vertical (girado 90°), a lo largo de la mitad izquierda.
 CABLE_FUENTE_PT = 36.0
 
 
@@ -240,14 +241,14 @@ def _v8_imagen(nombre: str, png: str, c: "Caja") -> str:
 """
 
 
-def _v8_texto(nombre: str, texto: str, pt: float, c: "Caja", alineacion: str = "Left") -> str:
+def _v8_texto(nombre: str, texto: str, pt: float, c: "Caja", alineacion: str = "Left", rotacion: str = "Rotation0") -> str:
     return f"""    <ObjectInfo>
         <TextObject>
             <Name>{nombre}</Name>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
             <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
             <LinkedObjectName></LinkedObjectName>
-            <Rotation>Rotation0</Rotation>
+            <Rotation>{rotacion}</Rotation>
             <IsMirrored>False</IsMirrored>
             <IsVariable>False</IsVariable>
             <GroupID>-1</GroupID>
@@ -668,7 +669,7 @@ class DymoService:
     def generate_cable_label_xml(cls, numero: str, label_format: Optional[str] = None) -> str:
         """`.label` (DYMO Label v8) con el número solo en la mitad izquierda."""
         f = obtener_formato(label_format)
-        objeto = _v8_texto("NUMERO", numero, CABLE_FUENTE_PT, caja_cable(f), "Center")
+        objeto = _v8_texto("NUMERO", numero, CABLE_FUENTE_PT, caja_cable(f), "Center", "Rotation90")   # v1.3.84: número vertical
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
     <PaperOrientation>{f.v8_orientacion}</PaperOrientation>
@@ -709,7 +710,7 @@ class DymoService:
         <TextObject>
           <Name>NUMERO</Name>
           {cls._brushes()}
-          <Rotation>Rotation0</Rotation>
+          <Rotation>Rotation90</Rotation>
           <OutlineThickness>1</OutlineThickness>
           <IsOutlined>False</IsOutlined>
           <BorderStyle>SolidLine</BorderStyle>
