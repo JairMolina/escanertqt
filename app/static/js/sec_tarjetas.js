@@ -295,7 +295,7 @@
             }
             async function reporteDia() {
                 const r = rango(); st.dia = null; btnXls.hidden = btnQuitarDia.hidden = btnMailDia.hidden = !r; marcarAtajo();
-                if (!r) { diaRes.replaceChildren(h('span', { class: 'muted' }, 'Elige un día o un rango (desde – hasta) para ver cuántas tarjetas se completaron o entregaron.')); lista(); return; }
+                if (!r) { diaRes.replaceChildren(h('span', { class: 'muted' }, 'Elige un día o un rango (desde – hasta) para ver qué tarjetas se programaron, completaron o entregaron.')); lista(); return; }
                 diaRes.replaceChildren(h('span', { class: 'muted' }, 'Consultando…'));
                 const res = await api(`/api/reporte-dia?desde=${r.a}&hasta=${r.b}`);
                 if (!res.ok) { diaRes.replaceChildren(h('span', { class: 'hint err' }, res.error)); lista(); return; }
@@ -303,7 +303,7 @@
                 const enLote = st.tars ? st.tars.filter((t) => st.dia.has(t.id)).length : 0;
                 const q = r.uno ? `fecha=${r.a}` : `desde=${r.a}&hasta=${r.b}`;
                 btnXls.href = `/api/reporte-dia/excel?${q}`; btnXls.setAttribute('download', r.uno ? `Tarjetas_${r.a}.xlsx` : `Tarjetas_${r.a}_a_${r.b}.xlsx`);
-                diaRes.replaceChildren(kpiDia(d.completadas, 'completadas', 'ok'), kpiDia(d.entregadas, 'entregadas', 'info'),
+                diaRes.replaceChildren(kpiDia(d.programadas || 0, 'con programación', 'ok'), kpiDia(d.completadas, 'completadas', 'ok'), kpiDia(d.entregadas, 'entregadas', 'info'),
                     h('span', { class: 'muted' }, (r.uno ? '' : `${d.dias} días · `) + (d.items.length ? `${enLote} de ${d.items.length} en este lote · la tabla muestra solo esas` : `Sin movimientos ${r.uno ? 'ese día' : 'en ese rango'}`)));
                 lista();
             }
@@ -314,7 +314,7 @@
             let diaAbierto = false; try { diaAbierto = localStorage.getItem('tqt.tar.reporte') === '1'; } catch (e) { /* nada */ }
             const diaBox = h('details', { class: 'esc-blk esc-dia', open: diaAbierto || !!desdeIn.value },
                 h('summary', { class: 'esc-dia-sum' }, h('span', { class: 'esc-dia-lbl' }, icon('clock'), 'Reporte por fecha'),
-                    h('span', { class: 'muted esc-dia-sum-h' }, 'Tarjetas completadas o entregadas por día o rango')),
+                    h('span', { class: 'muted esc-dia-sum-h' }, 'Tarjetas programadas, completadas o entregadas por día o rango')),
                 h('div', { class: 'esc-dia-bar' },
                     h('label', { class: 'esc-dia-campo' }, h('span', { class: 'muted' }, 'Desde'), desdeIn),
                     h('label', { class: 'esc-dia-campo' }, h('span', { class: 'muted' }, 'Hasta'), hastaIn),

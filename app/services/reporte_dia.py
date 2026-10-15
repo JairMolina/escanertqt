@@ -66,6 +66,12 @@ def tarjetas_del_dia(fecha: str, db_path: Optional[Path] = None) -> Dict[str, An
     return tarjetas_del_rango(fecha, fecha, db_path)
 
 
+# v1.3.79: tarjetas con programación en el rango (MAC o firmware guardado en R1/R2/R3). escaneos.creado_en está en UTC: se compara en hora local.
+_PROGRAMADAS = ("SELECT DISTINCT t2.id FROM escaneos e JOIN pcb_inventario p ON p.nombre = e.valor "
+                "JOIN tarjetas_produccion t2 ON p.id IN (t2.pcb_r1_id, t2.pcb_r2_id, t2.pcb_r3_id) "
+                "WHERE e.evento IN ('MAC_GUARDADA', 'FIRMWARE_GUARDADO') AND date(e.creado_en, 'localtime') BETWEEN ? AND ?")
+
+
 def tarjetas_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optional[Path] = None) -> Dict[str, Any]:
     d1, d2 = validar_rango(desde, hasta)
     a, b = d1.isoformat(), d2.isoformat()
@@ -76,16 +82,20 @@ def tarjetas_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optiona
              LEFT JOIN pcb_inventario p1 ON p1.id = t.pcb_r1_id
              LEFT JOIN pcb_inventario p2 ON p2.id = t.pcb_r2_id
              LEFT JOIN pcb_inventario p3 ON p3.id = t.pcb_r3_id
-             WHERE t.fecha_finalizado BETWEEN ? AND ? OR t.fecha_real BETWEEN ? AND ?
+             WHERE t.fecha_finalizado BETWEEN ? AND ? OR t.fecha_real BETWEEN ? AND ? OR t.id IN (_PROG_)
              ORDER BY l.anio, l.mes, l.fecha_inicio, t.id_tarjeta_num"""
     with db.get_db(db_path) as c:
-        filas = [dict(r) for r in c.execute(sql, (a, b, a, b))]
+        sql = sql.replace("_PROG_", _PROGRAMADAS)
+        filas = [dict(r) for r in c.execute(sql, (a, b, a, b, a, b))]
+        prog = {r[0] for r in c.execute(_PROGRAMADAS, (a, b))}
     for f in filas:
         f["lote"] = db.nombre_lote_de({k: f.pop(k) for k in ("mes", "anio", "tipo_lote", "fecha_inicio", "codigo_lote")})
         f["completada"] = bool(f["fecha_finalizado"]) and a <= f["fecha_finalizado"] <= b
         f["entregada"] = bool(f["fecha_real"]) and a <= f["fecha_real"] <= b
+        f["programada"] = f["id"] in prog
     return {"fecha": a, "desde": a, "hasta": b, "dias": (d2 - d1).days + 1,
-            "completadas": sum(f["completada"] for f in filas), "entregadas": sum(f["entregada"] for f in filas), "items": filas}
+            "completadas": sum(f["completada"] for f in filas), "entregadas": sum(f["entregada"] for f in filas),
+            "programadas": sum(f["programada"] for f in filas), "items": filas}
 
 
 # ---------------------------------------------------------------- Excel
