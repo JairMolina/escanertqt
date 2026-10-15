@@ -16,6 +16,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'station'))
 import agent
 
 
+
+def guardar_segmentos(directory, commands, flash):
+    """Simula los «savebin rbN.bin, inicio, tamaño» de Commander a partir de una imagen de 512 KB."""
+    for c in commands:
+        if c.startswith('savebin rb'):
+            nombre, inicio, tam = [x.strip() for x in c[len('savebin '):].split(',')]
+            a = int(inicio, 16) - hx.FLASH_BEGIN
+            (directory / nombre).write_bytes(bytes(flash[a:a + int(tam, 16)]))
+
 class STM32Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -211,10 +220,11 @@ class STM32Tests(unittest.TestCase):
     def test_agent_checks_readback_without_hardware(self):
         d,image=self.prepared();work=dict(payload=d,hex=image)
         def fake(exe,directory,commands,serial):
-            if any('savebin readback.bin' in x for x in commands):
+            if any(x.startswith('savebin rb') for x in commands):
+                self.assertIn('loadfile firmware.hex', commands)   # graba y lee en una sola conexión
                 mem,_=hx.leer_hex(directory/'firmware.hex'); raw=bytearray([255])*0x80000
                 for a,b in mem.items():raw[a-hx.FLASH_BEGIN]=b
-                (directory/'readback.bin').write_bytes(raw)
+                guardar_segmentos(directory, commands, raw)
                 # Commander parses sizes as hexadecimal, including an unprefixed 12.
                 uid_command = next(x for x in commands if x.startswith('savebin uid.bin'))
                 size = int(uid_command.rsplit(',', 1)[1].strip(), 16)
@@ -225,7 +235,7 @@ class STM32Tests(unittest.TestCase):
         self.assertEqual(stages, ['preparing','writing','reading','restarting','reporting'])
         def corrupt(*args):
             text=fake(*args)
-            p=args[1]/'readback.bin'
+            p=args[1]/'rb0.bin'
             if p.exists():
                 b=bytearray(p.read_bytes());b[8]^=1;p.write_bytes(b)
             return text
@@ -352,7 +362,7 @@ class R3Test(unittest.TestCase):
             flash[a - hx.FLASH_BEGIN] = b
         def fake(exe, directory, commands, serial=''):
             if any(c.startswith('savebin') for c in commands):
-                (directory / 'readback.bin').write_bytes(bytes(flash))
+                guardar_segmentos(directory, commands, flash)
                 (directory / 'uid.bin').write_bytes(bytes(range(1, 13)))
             return ''
         with patch.object(agent, 'commander', side_effect=fake):

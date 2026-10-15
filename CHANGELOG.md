@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.81 — 2026-10-15
+- **Programación:** se quita la pestaña duplicada «R1 · ESP32 · BLE serial»; el flujo ESP32 de la R1 se abre con «Programar ESP32 R1» del panel STM32. Caché de `sec_programacion.js` a `?v=1381`.
+- **Agente J-Link más rápido (R1/R3):** SWD a 4 MHz con reintento automático a 1 MHz (`TQT_SWD_KHZ`), grabación y lectura en una sola conexión, y lectura de verificación solo de las páginas del HEX y la de identidad (R1 48 KB, R3 14 KB; antes 512 KB). Sondeo de trabajos cada 1 s. Requiere reinstalar el agente en cada laptop.
+- **ESP32:** esptool se precarga al abrir Programación y se descarga en paralelo con el firmware.
+
 ## v1.3.80 — 2026-10-15
 - R2: OTA rápida con Write Without Response, bloques de hasta 500 bytes y notificaciones de avance; ventanas de ocho paquetes respetan la cola del receptor. FW 4.1 conserva el transporte anterior.
 - Catálogo: plantilla R2 4.1.1 sin datos de unidad, seleccionada como versión más reciente. Conserva firmware anteriores, cifrado, identidad, cancelación y verificación del nuevo arranque.

@@ -46,7 +46,7 @@
         const firmwareLabel = h('label', { for: 'esp-r2-fw' }, 'Firmware R2 a programar');
         const firmwarePanel = h('div', { class: 'field' }, firmwareLabel, firmwareSelect, firmwareHint, h('div', { class: 'row wrap' }, uploadBtn, uploadInput));
         let esptoolProm = null;
-        function cargarEsptool() { return esptoolProm || (esptoolProm = import(ESPTOOL_URL)); }
+        function cargarEsptool() { return esptoolProm || (esptoolProm = import(ESPTOOL_URL).catch((e) => { esptoolProm = null; throw e; })); }
 
         // ------------------------------------------------------------ lista de pendientes (buscar/elegir)
         const buscar = h('input', { class: 'input', type: 'search', id: 'prog-q', autocomplete: 'off', placeholder: 'Número o nombre (p. ej. 0021 o TQT-R2-V30-0021)…' });
@@ -464,6 +464,7 @@
                 await monDetener();   // el monitor libera el puerto antes de flashear
                 marcarPaso('compilar', 'activo');
                 escribir(pcb.tipo === 'R2' ? 'Preparando firmware y nombre desde inventario…' : 'Preparando firmware fijo de R1…');
+                const esptoolP = cargarEsptool(); esptoolP.catch(() => {});   // se descarga mientras se prepara el firmware
                 const fw = await compilarFirmware(pcb); const binario = fw.bin; const esR2 = pcb.tipo === 'R2';
                 marcarPaso('compilar', 'ok');
                 escribir(`Firmware listo (${(binario.length / 1024).toFixed(0)} KB)${fw.firmware ? ' · FW ' + fw.firmware + (fw.hardware ? ' · HW ' + fw.hardware : '') : ''}${fw.nombreBle ? ' · nombre BLE ' + fw.nombreBle : ''}.`);
@@ -474,7 +475,7 @@
                     if (!await confirmar('Modo descarga de la ' + pcb.tipo, 'Conecta el USB–TTL, mantén GPIO0 (BOOT) en bajo y haz RESET. Confirma cuando esté listo.', 'Ya está en BOOT')) throw new Error('Cancelado antes de programar: no se grabó nada.');
                 }
                 marcarPaso('boot', 'ok');
-                const esptool = await cargarEsptool();
+                const esptool = await esptoolP;
                 // sincroniza siempre a 115200 (romBaudrate) y sube a la velocidad elegida para los datos
                 let usar = +selBaudFlash.value || 115200, intento = 0, loader = null, escritoAlgo = false;
                 const terminal = { clean() { /* nada */ }, writeLine: (s) => { escribir(s); monAppend(s + '\n'); }, write: (s) => { const t = String(s).replace(/\n$/, ''); escribir(t); monAppend(t + '\n'); } };
@@ -650,11 +651,12 @@
                 m.host.hidden = m.host !== MODOS[id].host; m.btn.classList.toggle('btn-primary', k === id); m.btn.setAttribute('aria-pressed', String(k === id));
             });
         }
-        host.prepend(h('div', { class: 'row wrap' }, MODOS.esp.btn, MODOS.stm.btn, MODOS.espR1.btn, MODOS.r3.btn));
+        host.prepend(h('div', { class: 'row wrap' }, MODOS.esp.btn, MODOS.stm.btn, MODOS.r3.btn));   // R1 ESP32 se abre desde «Programar ESP32 R1» del panel STM32
         host.append(stmHost, r3Host); modo('stm');
 
         cargarPendientes(); loadFirmwares();
         refrescarPuertosAutorizados();
+        if (navigator.serial) cargarEsptool().catch(() => { /* se reintenta al programar */ });   // precarga esptool
 
         let tRec = null;
         function recargarSuave() { clearTimeout(tRec); tRec = setTimeout(() => { timers.delete(tRec); if (S.vivo && !S.busy) cargarPendientes(); }, 250); timers.add(tRec); }

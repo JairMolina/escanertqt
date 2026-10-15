@@ -300,10 +300,15 @@ def validate(work, directory):
     return image, mem
 
 
-def commander(exe, directory, commands, serial=''):
+# 4 MHz SWD graba y lee ~4x más rápido que 1 MHz; si el cableado no lo aguanta se reintenta a 1 MHz.
+SWD_KHZ = int(os.environ.get('TQT_SWD_KHZ', '4000'))
+SWD_KHZ_SEGURO = 1000
+
+
+def commander(exe, directory, commands, serial='', speed=SWD_KHZ):
     script = directory/'commands.jlink'
     script.write_text('\n'.join(commands)+'\n', encoding='ascii')
-    args = [exe, '-Device', 'STM32F103RE', '-If', 'SWD', '-Speed', '1000',
+    args = [exe, '-Device', 'STM32F103RE', '-If', 'SWD', '-Speed', str(speed),
             '-AutoConnect', '1', '-ExitOnError', '1', '-NoGui', '1', '-CommandFile', str(script)]
     if serial:
         args += ['-USB', serial]
@@ -343,6 +348,18 @@ def commander(exe, directory, commands, serial=''):
     return trace
 
 
+def paginas_leidas(mem, pagina=0x800):
+    """Rangos (inicio, tamaño) de las páginas Flash con bytes del HEX, más la página de identidad."""
+    paginas = sorted({(a-hx.FLASH_BEGIN)//pagina for a in mem} | {(hx.IDENTITY_BEGIN-hx.FLASH_BEGIN)//pagina})
+    rangos = []
+    for p in paginas:
+        if rangos and rangos[-1][1] == p:
+            rangos[-1][1] = p+1
+        else:
+            rangos.append([p, p+1])
+    return [(hx.FLASH_BEGIN+a*pagina, (b-a)*pagina) for a, b in rangos]
+
+
 def flash(work, exe, serial='', progress=lambda stage: None):
     with tempfile.TemporaryDirectory(prefix='tqt_stm32_') as tmp:
         directory = Path(tmp)
@@ -350,13 +367,28 @@ def flash(work, exe, serial='', progress=lambda stage: None):
         image, mem = validate(work, directory)
         # Fixed filenames avoid user strings inside Commander commands.
         progress('writing')
-        trace = commander(exe, directory, ['r', 'h', 'loadfile firmware.hex', 'h', 'q'], serial)
+        # Una sola conexión graba y lee de vuelta; solo se leen las páginas que ocupa el HEX
+        # y la de identidad, no los 512 KB completos.
+        segmentos = paginas_leidas(mem)
+        comandos = ['r', 'h', 'loadfile firmware.hex', 'h'] + [
+            f'savebin rb{i}.bin, 0x{a:08X}, 0x{n:X}' for i, (a, n) in enumerate(segmentos)] + [
+            'savebin uid.bin, 0x1FFFF7E8, 0xC', 'q']
+        try:
+            trace = commander(exe, directory, comandos, serial)
+        except ProgrammingCancelled:
+            raise
+        except ValueError:
+            if SWD_KHZ <= SWD_KHZ_SEGURO:
+                raise
+            trace = commander(exe, directory, comandos, serial, speed=SWD_KHZ_SEGURO)
         progress('reading')
-        trace += commander(exe, directory, ['h', 'savebin readback.bin, 0x08000000, 0x80000',
-                          'savebin uid.bin, 0x1FFFF7E8, 0xC', 'q'], serial)
-        readback = (directory/'readback.bin').read_bytes()
-        if len(readback) != 0x80000:
-            raise ValueError('Lectura Flash incompleta. No se confirma programación.')
+        readback = bytearray(b'\xff'*0x80000)
+        for i, (a, n) in enumerate(segmentos):
+            parte = directory/f'rb{i}.bin'
+            parte = parte.read_bytes() if parte.exists() else b''
+            if len(parte) != n:
+                raise ValueError('Lectura Flash incompleta. No se confirma programación.')
+            readback[a-hx.FLASH_BEGIN:a-hx.FLASH_BEGIN+n] = parte
         for address, expected in mem.items():
             if readback[address-hx.FLASH_BEGIN] != expected:
                 raise ValueError(f'La verificación difiere en 0x{address:08X}.')
@@ -478,7 +510,7 @@ def main():
             break
         except Exception as e:
             print('Conexión/reporte pendiente:', str(e)[:300])
-        time.sleep(3)
+        time.sleep(1)
 
 
 if __name__ == '__main__':
