@@ -85,6 +85,7 @@ app = FastAPI(
     openapi_url="/openapi.json" if os.getenv("TQT_DOCS") == "1" else None,
 )
 app.include_router(esp32.router)
+app.include_router(esp32.agent_router)
 
 # Sin CORS: la interfaz se sirve desde este mismo origen (https://IP:8443). Sin middleware CORS el
 # navegador bloquea que OTROS sitios abiertos en el celular/PC escriban en la API con JSON.

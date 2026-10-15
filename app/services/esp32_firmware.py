@@ -194,7 +194,7 @@ def inspect(raw, kind='R2'):
         if not any(a<=pos and pos+PROFILE_V2.size<=b for a,b in layout['segments']):
             raise ValueError('Perfil OTA incompleto.')
         flags,key=struct.unpack_from('<I32s',raw,pos+92)
-        if flags!=1 or tuple(int(v) for v in fw.split('.'))<(4,1):
+        if flags!=1 or tuple(int(v) for v in fw.split('.'))<(4,0):
             raise ValueError('Capacidad/version OTA no soportada.')
         if [(p['offset'],p['size'],p['subtype']) for p in apps]!=[(0x10000,0x140000,0x10),(0x150000,0x140000,0x11)]:
             raise ValueError('OTA requiere las dos particiones Arduino de 1280 KiB.')
@@ -276,6 +276,11 @@ def ensure(c):
         c.execute('INSERT INTO esp32_firmwares(id,hw,fw,filename,sha256,metadata,image,created,operator) VALUES(?,?,?,?,?,?,?,?,?)',
                   ('base-R2-v411',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,2,'sistema'))
     seed_r1(c)
+    path=ROOT/'firmware/esp32_r2/TQT_R2_BASE_V4_0_OTA.merged.bin'
+    if path.is_file() and not c.execute("SELECT 1 FROM esp32_firmwares WHERE id='base-R2-v40-ota'").fetchone():
+        meta,image,filename=normalize(path.read_bytes(),path.name)
+        c.execute('INSERT INTO esp32_firmwares(id,hw,fw,filename,sha256,metadata,image,created,operator) VALUES(?,?,?,?,?,?,?,?,?)',
+                  ('base-R2-v40-ota',meta['hw'],meta['fw'],filename,meta['sha256'],json.dumps(meta),image,3,'sistema'))
 
 
 def seed_r1(c):

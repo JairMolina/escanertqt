@@ -9,6 +9,9 @@
         status: 'd45a0005-6a76-4e41-9f38-a7043f0ec069'
     };
     const STORAGE = 'tqt-r2-ota-pending';
+    const devices = new Map();
+    // Only devices already granted to this origin can be reused without a native chooser.
+    navigator.bluetooth?.getDevices?.().then(items => items.forEach(d => devices.set(d.name,d))).catch(()=>{});
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     const decode = value => new Uint8Array(Uint8Array.from(atob(value), c => c.charCodeAt(0)));
     function pending() { try { return JSON.parse(sessionStorage.getItem(STORAGE) || 'null'); } catch (_) { return null; } }
@@ -113,9 +116,11 @@
         const abortDevice = () => device?.gatt?.disconnect();
         try {
             // Keep requestDevice in the click gesture, before network operations.
-            const selection = navigator.bluetooth.requestDevice({ filters: [{ name: pcb.nombre.replace(/-/g, '_') }], optionalServices: [SERVICE] });
+            const name=pcb.nombre.replace(/-/g, '_');
+            const selection = devices.get(name) || navigator.bluetooth.requestDevice({ filters: [{ name }], optionalServices: [SERVICE] });
             stage('Selecciona la R2 conectada por Bluetooth');
             device = await bounded(selection, signal, 120000);
+            devices.set(name,device);
             signal?.addEventListener('abort', abortDevice);
             stage('Conectando y verificando la identidad de la R2');
             chars = await connect(device, signal);
@@ -163,9 +168,9 @@
                 if (device?.gatt?.connected && chars?.control) {
                     try { await bounded(chars.control.writeValueWithResponse(new Uint8Array([3])), null, 3000); } catch (_) { /* disconnect also aborts */ }
                 }
-                await api('/api/esp32/ota/cancel/' + job, { method: 'POST' });
+                await api('/api/esp32/ota/cancel/' + job, { method: 'POST',body:{error:String(error?.message || error).slice(0,1000)} });
             }
-            if (committed) error.message += ' Quedó un resultado pendiente de verificación; no repitas la instalación por serial.';
+            if (committed) throw new Error(String(error?.message || error) + ' Quedó un resultado pendiente de verificación; no repitas la instalación por serial.');
             throw error;
         } finally {
             signal?.removeEventListener('abort', abortDevice);

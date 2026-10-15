@@ -55,8 +55,8 @@ def mac(value):
 
 
 def verify_info(info,key,pcb):
-    if info.get('ota_protocol')!=1 or info.get('boot_valid') is not True or version(info.get('fw'))<(4,1):
-        raise ValueError('La R2 debe tener V4.1+ confirmada y capacidad OTA; instala por serial primero.')
+    if info.get('ota_protocol')!=1 or info.get('boot_valid') is not True or version(info.get('fw'))<(4,0):
+        raise ValueError('La R2 debe confirmar su arranque y capacidad OTA; instala una base OTA por serial primero.')
     if info.get('nombre')!=pcb['nombre'].replace('-','_') or not isinstance(info.get('hw'),str) or info['hw'].replace('.','')!=pcb['version']:
         raise ValueError('El nombre/HW de la R2 Bluetooth no coincide con el inventario.')
     if not pcb.get('mac') or mac(info.get('mac'))!=mac(pcb['mac']):
@@ -81,7 +81,13 @@ def capability(pcb_id):
         if not pcb or pcb['tipo']!='R2': raise ValueError('Elige una R2.')
         key=c.execute('SELECT 1 FROM esp32_unit_keys WHERE pcb=?',(pcb_id,)).fetchone()
     current=pcb.get('firmware') or ''
-    eligible=bool(key and pcb.get('mac') and re.fullmatch(r'\d+(?:\.\d+)+',current) and version(current)>=(4,1))
+    # 4.0 original has no OTA. A recorded authenticated installation distinguishes the new base.
+    from app.services import r2_programming as r2
+    with db.transaction() as c:
+        r2.ensure(c)
+        proof=c.execute('SELECT firmware FROM r2_programming_state WHERE pcb=?',(pcb_id,)).fetchone()
+    eligible=bool(key and pcb.get('mac') and re.fullmatch(r'\d+(?:\.\d+)+',current) and
+                  (version(current)>=(4,1) or (current=='4.0' and proof and proof['firmware']=='4.0')))
     return dict(eligible=eligible,current_fw=current,requires_serial=not eligible)
 
 
@@ -90,6 +96,9 @@ def prepare(pcb_id,firmware_id,info,operator):
         ensure(c)
         pcb=inv.get_pcb(pcb_id,conn=c)
         keyrow=c.execute('SELECT secret FROM esp32_unit_keys WHERE pcb=?',(pcb_id,)).fetchone()
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='r2_programming_attempts'").fetchone():
+            if c.execute("SELECT 1 FROM r2_programming_attempts WHERE pcb=? AND state IN ('flashing','queued','running') AND created>?",(pcb_id,time.time()-600)).fetchone():
+                raise ValueError('La R2 está programándose o verificándose en la estación.')
         if not pcb or pcb['tipo']!='R2' or not keyrow:
             raise ValueError('Primero instala R2 V4.1 por serial desde esta web.')
         key=bytes(keyrow['secret']);verify_info(info,key,pcb)
@@ -143,16 +152,25 @@ def finish(identifier,info,operator):
         if info['partition']==payload['source_partition'] or info['nonce']==payload['nonce']:
             raise ValueError('La R2 no confirmó el arranque en la partición nueva.')
         updated=inv.guardar_programacion(pcb['id'],pcb['mac'],payload['fw'],operator,conn=c)
+        from app.services import r2_programming as r2
+        r2.record(c,updated,'ble_ota',info)
         result=dict(verified=True,pcb=updated,fw=payload['fw'],app_sha256=payload['app_sha256'])
         c.execute("UPDATE esp32_ota_jobs SET state='verified',result=? WHERE id=?",(json.dumps(result),identifier))
         db.log_evento('ESP32_OTA_VERIFICADA',None,None,f'{payload["nombre"]}; FW {payload["fw"]}; job={identifier}; sha={payload["app_sha256"]}',operator,conn=c)
         return result
 
 
-def cancel(identifier,operator):
+def cancel(identifier,operator,error=''):
     with db.transaction() as c:
         ensure(c)
-        row=c.execute('SELECT state FROM esp32_ota_jobs WHERE id=? AND operator=?',(identifier,operator)).fetchone()
+        row=c.execute('SELECT * FROM esp32_ota_jobs WHERE id=? AND operator=?',(identifier,operator)).fetchone()
         if not row: raise ValueError('Trabajo OTA no encontrado.')
-        if row['state']=='prepared': c.execute("UPDATE esp32_ota_jobs SET state='cancelled' WHERE id=?",(identifier,))
+        if row['state']=='prepared':
+            c.execute("UPDATE esp32_ota_jobs SET state='cancelled',result=? WHERE id=?",(json.dumps(dict(verified=False,error=error[:1000])),identifier))
+            if error:
+                from app.services import r2_programming as r2
+                r2.ensure(c)
+                now=time.time()
+                c.execute('INSERT INTO r2_programming_attempts VALUES(?,?,?,?,?,?,?,?,?,?,NULL,?)',
+                          ('ota-'+identifier,row['pcb'],row['firmware'],'',operator,'ble_ota','error',now,now,row['payload'],error[:1000]))
     return dict(cancelled=row['state']!='verified')

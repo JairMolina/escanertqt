@@ -220,6 +220,10 @@ def _operador(request: Request) -> str:
 
 
 def _crear_trabajo(datos: TrabajoBLE, operador: str) -> Dict[str, Any]:
+    with db.get_db() as c:
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='r2_programming_attempts'").fetchone():
+            if c.execute("SELECT 1 FROM r2_programming_attempts WHERE station=? AND state IN ('flashing','queued','running') AND created>?",(datos.station_id,time.time()-600)).fetchone():
+                raise HTTPException(400,'La estación está programando o verificando una R2.')
     if datos.accion == "enviar" and not datos.comando:
         raise HTTPException(422, "Indica el comando (PPON o POFF).")
     if not _estacion_en_linea(datos.station_id):

@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.81 — 2026-10-15
+- R2: instalación inicial USB con base 4.0 OTA rápida, conservando el antiguo 4.0 sin OTA. Verificación automática mediante el agente Windows con MAC exacta, INFO autenticado, identidad, HW/FW y hash del firmware elegido; sin selector Bluetooth después del serial.
+- Registro persistente de intentos, errores, método, última programación y verificación; las comprobaciones de solo lectura conservan la fecha de instalación. Estado actualizado/desactualizado/sin programar/error en lista y detalle, reconociendo OTA verificadas anteriores.
+- Programación abre TQT R2 y recomienda R2 → R1 → R3. BLE preferido para unidades compatibles; USB y velocidad quedan en diagnóstico/recuperación. 460800 baud predeterminado validado con CH340; reintento automático a 115200. Se conserva el monitor serial y la programación STM32/ESP32 de R1 y R3.
+- Pruebas físicas aisladas en R2 0069: base USB y hash correctos; verificación automática BLE 2,85 s; OTA base4.0 → 4.1.1 con API local, 71,698 s de envío/validación; verificación real desde la web local sin selector. No supone medición de la OTA en Web Bluetooth ni ensayo de corte de alimentación.
+
 ## v1.3.80 — 2026-10-15
 - R2: OTA rápida con Write Without Response, bloques de hasta 500 bytes y notificaciones de avance; ventanas de ocho paquetes respetan la cola del receptor. FW 4.1 conserva el transporte anterior.
 - Catálogo: plantilla R2 4.1.1 sin datos de unidad, seleccionada como versión más reciente. Conserva firmware anteriores, cifrado, identidad, cancelación y verificación del nuevo arranque.

@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-15 15:57 UTC
-Commit de referencia: `2af724627e1c` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-15 17:03 UTC
+Commit de referencia: `c0912136159a` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Desplegada y verificada web 1.3.80 en Orange Pi desde commit 2af724627e1ccfbc7d2821c32f5fdec8cec8b10c, rama codex/r2-ota-rapida GitHub. Base 1.3.79 recuperada del servidor y preservada. R2 OTA rapida 500 bytes NR+notificaciones, ventana8, compatibilidad FW4.1, plantilla 4.1.1 predeterminada sin secretos. Pruebas: suite ESP32 35 OK mas OTA final15 OK (36 casos unicos), JS7 OK, Playwright R2 desktop/movil y R1 sin catalogo/OTA OK. API publica/local y contenedor healthy; SQLite integrity OK y hashes de todas las filas anteriores intactos; unica adicion base-R2-v411. Respaldo pre-r2-ota-1380-20261015T155624Z.db SHA256 2ae2b22d4d18b4210c130dfdb6dd48e413eb9db11ad5a5abde1217826909ef4c. CM y ECC-verification utilizados.
+Implementada web1.3.81 local en codex/r2-flujo-automatico: R2 por defecto, etapas R2-R1-R3, BLE preferido, USB/velocidad en mantenimiento, semaforos ligados a evidencia MAC/HW/FW/hash; agente verifica automaticamente sin selector y guarda metodo/fechas/intentos/errores. Base4.0 OTA rapida compilada sin reemplazar4.0original;4.1eslenta,4.1.1rapida compatible. Pruebas fisicas0069: COM4 CH340460800, base4.0 escrita17.2s hashOK; BLE automatico2.85s; OTA4.0a4.1.1 APIlocal71.698s,15.47KiB/s,hash/nonce/particion/arranqueOK; web local real verifica viaagente sin selector. 97 casos Python (ESP3236,STM3237,TestStation11,R2/agente13) y JS7; Playwright serial simulado fallback460800a115200 y estados/mobile. SQLite aislado integro y persistente. Originales3 respaldados. CM, ECC HWFW/C++/seguridad/verificacion y ui-ux-pro-max aplicados.
 
 ## Siguiente paso
-Medir OTA desde Chrome/Edge real con R2 0069; conserva firmware temporal4.1.1 ya probado por cliente nativo, inventario4.1 hasta una verificacion real de la web. No se afirmo prueba fisica del navegador ni se tocaron COM3/reles. Actualizar desde rama codex/r2-ota-rapida con tracking reparado; main no se modifico.
+Pendiente despliegue1.3.81 y actualizar agente Windows en estaciones; produccion sigue1.3.80 sin tocar datos. R20069 fisica finalmente4.1.1 desconectada BLE. Pendientes fisicos: transferencia OTA por WebBluetooth, grabacion WebSerial completa, fallback115200 real y cortes/rollback. No usar bases/credenciales del entorno aislado como produccion.
 
 ## Evidencia
-tests/test_esp32_ota.py; tests/esp32_ota_transport.cjs; docs/ESP32_R2_OTA_PRUEBA_AISLADA.md; despliegue publico 1.3.80 healthy
+docs/R2_FLUJO_AUTOMATICO.md; tests/test_r2_programming.py; tests/test_r2_agent.py; tests/r2_auto_ui.playwright.js; outputs/r2_ble_probe/ota_base40_to_latest_api_result.json
