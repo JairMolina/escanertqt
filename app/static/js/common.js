@@ -141,17 +141,19 @@
         const sm = x.sin_mac || [];
         if (falta.includes('R1') || falta.includes('R2')) return { key: 'incompleta', label: 'Falta ' + falta.join(', '), kind: 'warn', icon: 'alert' };
         if (sm.length) return { key: 'sin_mac', label: 'Sin MAC: ' + sm.join(', ') + (falta.length ? ' · falta ' + falta.join(', ') : ''), kind: 'info', icon: 'clock' };
-        if (falta.length) return { key: 'incompleta', label: 'Falta ' + falta.join(', '), kind: 'warn', icon: 'alert' };
+        if (falta.length) return { key: 'incompleta', label: 'Falta ' + falta.join(', ') + (r1r2Programadas(x) ? ' · R1 y R2 programadas' : ''), kind: 'warn', icon: 'alert' };
         if (x.validada) return { key: 'completa', programada: tarjetaProgramada(x), validada: true, label: 'Completa · validada', kind: 'ok', icon: 'check' };
         return tarjetaProgramada(x) ? { key: 'completa', programada: true, label: 'Completa · programada', kind: 'ok', icon: 'check' } : { key: 'completa', label: 'Completa', kind: 'ok', icon: 'check' };
     }
     /** v1.3.52: tarjeta PROGRAMADA = R1, R2 y R3 presentes y las tres programadas (misma regla por placa que `programada`: R1/R2 con MAC y firmware, R3 con firmware).
      *  Es un avance dentro de «completa» (nunca hay programada sin MAC ni sin las 3 placas). Orden: Falta placa → Sin MAC → Programada → Completa. */
+    /** v1.3.79: avance de programación sin esperar la R3 (R2 ESP32 → STM32 R1 → ESP32 R1): R1 y R2 con MAC y firmware. */
+    function r1r2Programadas(t) { const x = t || {}; return !!(x.r1 && x.r2) && ['r1', 'r2'].every((r) => programada(Object.assign({}, x[r], { firmware: x[r].firmware || x['firmware_' + r] || null }))); }
     function tarjetaProgramada(t) { const x = t || {}; return !!(x.r1 && x.r2 && x.r3) && ['r1', 'r2', 'r3'].every((r) => programada(Object.assign({}, x[r], { firmware: x[r].firmware || x['firmware_' + r] || null }))); }
     /** Filtro por estado: 'programada' es derivado; el resto usa estadoTarjeta().key. */
     // 'validada' = t.validada del backend (v1.3.65: confirmada en Pruebas y validación › Placas validadas)
-    const cumpleEstado = (t, key) => !key || (key === 'programada' ? tarjetaProgramada(t) : key === 'validada' ? !!(t && t.validada) : estadoTarjeta(t).key === key);
-    const TARJETA_ESTADOS = [{ key: 'incompleta', label: 'Falta placa' }, { key: 'sin_mac', label: 'Sin MAC' }, { key: 'programada', label: 'Programadas' }, { key: 'validada', label: 'Validadas' }, { key: 'completa', label: 'Completas' }];
+    const cumpleEstado = (t, key) => !key || (key === 'programada' ? tarjetaProgramada(t) : key === 'r1r2' ? r1r2Programadas(t) : key === 'validada' ? !!(t && t.validada) : estadoTarjeta(t).key === key);
+    const TARJETA_ESTADOS = [{ key: 'incompleta', label: 'Falta placa' }, { key: 'sin_mac', label: 'Sin MAC' }, { key: 'r1r2', label: 'R1 y R2 programadas' }, { key: 'programada', label: 'Programadas (R1+R2+R3)' }, { key: 'validada', label: 'Validadas' }, { key: 'completa', label: 'Completas' }];
     // v1.3.44: lote de mes ("Septiembre 2026"), semana ("Semana 40 · 28 sep–4 oct 2026") o día ("15 sep 2026").
     const MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     function fechaLote(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; }
@@ -771,7 +773,7 @@
         const prog = tarjetaProgramada(t);
         const pasos = [
             { k: 'emp', t: 'Emparejada', ok: true, f: (t.created_at || '').slice(0, 10) },
-            { k: 'prog', t: 'Programada', ok: prog, f: '' },
+            { k: 'prog', t: 'Programada', ok: prog, f: !prog && r1r2Programadas(t) ? 'R1 y R2 · falta R3' : '' },
             { k: 'comp', t: 'Completa', ok: e.key === 'completa', f: t.fecha_finalizado || '' },
             { k: 'ent', t: 'Entregada', ok: e.key === 'completa' && !!t.fecha_real, f: t.fecha_real || '' },
         ];
@@ -826,7 +828,7 @@
     window.TQT = {
         versionP,
         hydrateIcons, MESES, esc, h, store, api, parseNombre, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
-        CICLO_LABEL, estadoTarjeta, tarjetaProgramada, cumpleEstado, TARJETA_ESTADOS,
+        CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
         loteNombre, ordenarLotes, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, banner, empty,
         toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, openLotes,
