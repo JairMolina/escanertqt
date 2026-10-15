@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e === 'listo') {
             const p = impresora();
             if (p && !p.isConnected) box.append(T.banner('warn', 'alert', h('b', null, `${p.name} aparece desconectada. `), 'Enciéndela, revisa el cable USB y pulsa Actualizar. Si tienes otra LabelWriter conectada, elígela en la lista.'));
-            if (!D.enLocalhost()) box.append(T.banner('warn', 'info', h('b', null, 'Consejo: '), `abre esta pantalla como https://localhost:${location.port || 8443}/dymo en la PC de la impresora. Con la dirección de red (${location.hostname}) Chrome puede pedir un permiso extra.`));
+            // v1.3.89: sin el consejo de abrir https://localhost:8443/dymo: esa dirección solo existe en el servidor, no en las laptops
             return;
         }
         if (e === 'buscando') return;
@@ -94,14 +94,23 @@ document.addEventListener('DOMContentLoaded', () => {
             box.append(T.banner('warn', 'info', h('b', null, 'Desde el celular no se imprime directo. '), 'Usa "Abrir en DYMO" para bajar el archivo, o entra a esta pantalla desde la PC que tiene la DYMO conectada.'));
             return;
         }
-        const titulo = { sin_framework: 'No se cargó el módulo de DYMO', no_servicio: 'No se detecta DYMO Label / DYMO Connect', sin_impresoras: 'DYMO Connect no ve la impresora' }[e] || 'Sin conexión';
-        const pasos = e === 'sin_impresoras'
-            ? ['Enciende la LabelWriter y revisa el cable USB.', 'En DYMO Label o DYMO Connect confirma que aparece la impresora y pulsa Actualizar aquí.']
-            : e === 'sin_framework' ? ['Recarga la página con Ctrl+F5.', 'Si sigue igual, falta el archivo js/vendor/dymo.connect.framework.js del proyecto.']
-                : [h('span', null, h('b', null, 'Abre DYMO Label (o DYMO Connect)'), ' en esta PC y deja la impresora conectada.'),
-                    h('span', null, 'La primera vez abre ', h('a', { href: D.CHECK_URL, target: '_blank', rel: 'noopener' }, D.CHECK_URL), ' y acepta el certificado (Avanzado → Continuar). Debe verse una respuesta corta.'),
-                    h('span', null, 'Vuelve a esta página y pulsa ', h('b', null, 'Actualizar'), '.'),
-                    D.enLocalhost() ? null : h('span', null, `Abre esta pantalla desde https://localhost:${location.port || 8443}/dymo en vez de la dirección de red.`)];
+        const bloqueado = e === 'no_servicio' && state.dymo.redLocal === 'denied';
+        const titulo = bloqueado ? 'Chrome bloqueó el acceso a la impresora de esta PC'
+            : { sin_framework: 'No se cargó el módulo de DYMO', no_servicio: 'No se detecta DYMO Connect en esta PC', sin_impresoras: 'DYMO Connect no ve la impresora' }[e] || 'Sin conexión';
+        const pasos = bloqueado
+            ? [h('span', null, 'Haz clic en el ', h('b', null, 'candado'), ' (o el ícono de ajustes) junto a la dirección ', h('b', null, location.hostname), ' → ', h('b', null, 'Configuración del sitio'), '.'),
+                h('span', null, 'En ', h('b', null, 'Acceso a la red local'), ' (o «Dispositivos de la red local») elige ', h('b', null, 'Permitir'), '.'),
+                h('span', null, 'Recarga esta página y pulsa ', h('b', null, 'Actualizar'), '.')]
+            : e === 'sin_impresoras'
+                ? ['Enciende la LabelWriter y revisa el cable USB.', 'En DYMO Connect confirma que aparece la impresora y pulsa Actualizar aquí.']
+                : e === 'sin_framework' ? ['Recarga la página con Ctrl+F5.', 'Si sigue igual, falta el archivo js/vendor/dymo.connect.framework.js del proyecto.']
+                    : [h('span', null, h('b', null, 'Instala y abre DYMO Connect for Desktop'), ' en esta PC (debe verse el ícono de DYMO junto al reloj de Windows) y deja la impresora conectada por USB.'),
+                        h('span', null, 'Solo la primera vez en esta PC: abre ', h('a', { href: D.CHECK_URL, target: '_blank', rel: 'noopener' }, 'la prueba del servicio DYMO'),
+                            '. Es una dirección local (127.0.0.1 = esta misma PC, no internet). Si Chrome avisa «La conexión no es privada», pulsa ', h('b', null, 'Configuración avanzada → Continuar'),
+                            '. Debe verse una respuesta corta (true); si dice «No se puede acceder», DYMO Connect no está abierto.'),
+                        h('span', null, 'Si Chrome pregunta si este sitio puede ', h('b', null, 'acceder a dispositivos de tu red local'), ', pulsa ', h('b', null, 'Permitir'), '.'),
+                        h('span', null, 'Vuelve a esta página y pulsa ', h('b', null, 'Actualizar'), '.'),
+                        h('span', null, 'Mientras tanto puedes usar ', h('b', null, 'Descargar .label'), ' y abrir el archivo en DYMO Connect para imprimir.')];
         box.append(T.banner('bad', 'alert', h('b', null, titulo + '. '), state.dymo.detalle || ''),
             h('ol', { class: 'pasos' }, pasos.filter(Boolean).map((p) => h('li', null, p))));
     }

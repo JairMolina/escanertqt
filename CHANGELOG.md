@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.89 — 2026-10-15
+- **Etiquetas DYMO en laptops:** se quita el consejo de abrir `https://localhost:8443/dymo` (solo existe en el servidor). La ayuda detecta cuando Chrome bloquea el «Acceso a la red local» (sitio público → DYMO Connect en 127.0.0.1) y explica cómo permitirlo; los pasos de DYMO Connect y del certificado local quedan más claros y se ofrece «Descargar .label» como alternativa. Caché `dymo_connect.js`/`dymo.js` a `?v=1389`.
+
 ## v1.3.88 — 2026-10-15
 - Base R2 4.0: reconoce varias compilaciones registradas para permitir cargas desde Arduino IDE sin invalidar la base fija anterior.
 - Incluye grabador local repetitivo del BIN fijo, comprobación previa sin abrir puerto e instrucciones Arduino. Corrige cabeceras de versión y eFuses en las fuentes, sin cambiar la lógica ni los BIN ya probados.

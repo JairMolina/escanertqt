@@ -62,6 +62,15 @@
     const esLabelWriter = (p) => (!p.printerType || p.printerType === 'LabelWriterPrinter') && /LabelWriter/i.test(`${p.modelName || ''} ${p.name || ''} ${p.printerType || ''}`) ;
     const es550 = (p) => /550/.test(`${p.modelName || ''} ${p.name || ''}`);
 
+    /** v1.3.89: permiso de Chrome «Acceso a la red local» (sitio público → 127.0.0.1). 'granted' | 'denied' | 'prompt' | null (sin soporte). */
+    async function permisoRedLocal() {
+        if (!navigator.permissions || !navigator.permissions.query) return null;
+        for (const name of ['local-network-access', 'loopback-network']) {
+            try { return (await navigator.permissions.query({ name })).state; } catch (e) { /* nombre no soportado */ }
+        }
+        return null;
+    }
+
     /** Diagnóstico completo. Nunca lanza. */
     async function detect(force) {
         if (isMobile()) return { estado: 'movil', printers: [], preferred: null, detalle: 'Los celulares no pueden imprimir directo en la DYMO.' };
@@ -72,11 +81,11 @@
         let env = null;
         try { env = f.checkEnvironment(); } catch (e) { env = null; }
         if (env && env.isWebServicePresent === false) {
-            return { estado: 'no_servicio', printers: [], preferred: null, detalle: (env.errorDetails || 'No responde el servicio de DYMO Connect.'), env };
+            return { estado: 'no_servicio', printers: [], preferred: null, detalle: (env.errorDetails || 'No responde el servicio de DYMO Connect.'), env, redLocal: await permisoRedLocal() };
         }
         let raw;
         try { raw = await withTimeout(f.getPrintersAsync(), T_PRINTERS, 'DYMO Connect no respondió a tiempo'); }
-        catch (e) { return { estado: 'no_servicio', printers: [], preferred: null, detalle: String((e && e.message) || e), env }; }
+        catch (e) { return { estado: 'no_servicio', printers: [], preferred: null, detalle: String((e && e.message) || e), env, redLocal: await permisoRedLocal() }; }
 
         const printers = listPrinters(raw).filter(esLabelWriter);
         if (!printers.length) return { estado: 'sin_impresoras', printers: [], preferred: null, detalle: 'DYMO Connect responde, pero no ve ninguna LabelWriter.', env };
