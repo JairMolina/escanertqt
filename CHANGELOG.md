@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.82 — 2026-10-15
+- **Programación ESP32 (R2 y R1):** se quita la terminal clara duplicada; el registro de grabación, esptool y la verificación salen en la terminal negra del monitor serial, que queda abierta y como principal. Caché `sec_programacion.js/.css` a `?v=1382`.
+
 ## v1.3.81 — 2026-10-15
 - **Programación:** se quita la pestaña duplicada «R1 · ESP32 · BLE serial»; el flujo ESP32 de la R1 se abre con «Programar ESP32 R1» del panel STM32. Caché de `sec_programacion.js` a `?v=1381`.
 - **Agente J-Link más rápido (R1/R3):** SWD a 4 MHz con reintento automático a 1 MHz (`TQT_SWD_KHZ`), grabación y lectura en una sola conexión, y lectura de verificación solo de las páginas del HEX y la de identidad (R1 48 KB, R3 14 KB; antes 512 KB). Sondeo de trabajos cada 1 s. Requiere reinstalar el agente en cada laptop.

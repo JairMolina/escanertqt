@@ -136,8 +136,8 @@
         }
 
         // ------------------------------------------------------------ monitor serial + resultado
-        const log = h('pre', { class: 'prog-log', 'aria-live': 'polite' }, 'Elige una tarjeta y un puerto, y pulsa «Compilar y flashear».\n');
-        const escribir = (linea) => { log.textContent += linea + '\n'; log.scrollTop = log.scrollHeight; };
+        // v1.3.82: una sola terminal (la negra del monitor serial) para el registro de grabación y la salida serial
+        const escribir = (linea) => monAppend(linea + '\n');
         const relleno = h('div', { class: 'prog-bar-fill' });
         const barra = h('div', { class: 'prog-bar' }, relleno);
         const otaProgress = h('p', { class: 'hint', hidden: true, role: 'status', 'aria-live': 'polite' });
@@ -168,7 +168,7 @@
         const monEstado = h('span', { class: 'hint', role: 'status' }, 'Cerrado');
         const chkAbrir = h('input', { type: 'checkbox', id: 'prog-mon-auto', checked: true });
         let selFlashBaud = null;
-        const monPanel = h('details', { class: 'prog-config prog-mon' }, h('summary', null, 'Monitor serial'),
+        const monPanel = h('details', { class: 'prog-config prog-mon', open: true }, h('summary', null, 'Terminal y monitor serial'),
             h('div', { class: 'row wrap' },
                 h('div', { class: 'field' }, h('label', { for: 'prog-mon-baud' }, 'Velocidad'), monBaud), monToggle, monReiniciar, monLimpiar, monEstado),
             monLog,
@@ -478,7 +478,7 @@
                 const esptool = await esptoolP;
                 // sincroniza siempre a 115200 (romBaudrate) y sube a la velocidad elegida para los datos
                 let usar = +selBaudFlash.value || 115200, intento = 0, loader = null, escritoAlgo = false;
-                const terminal = { clean() { /* nada */ }, writeLine: (s) => { escribir(s); monAppend(s + '\n'); }, write: (s) => { const t = String(s).replace(/\n$/, ''); escribir(t); monAppend(t + '\n'); } };
+                const terminal = { clean() { /* nada */ }, writeLine: (s) => escribir(s), write: (s) => escribir(String(s).replace(/\n$/, '')) };
                 for (;;) {
                     transport = new esptool.Transport(port, true);
                     loader = new esptool.ESPLoader({ transport, baudrate: usar, romBaudrate: 115200, terminal });
@@ -557,7 +557,7 @@
             if (!S.tarjeta || S.busy || uploadBusy || firmwareLoading || !window.TQTR2OTA) return;
             const pcb = S.tarjeta, firmwareId = firmwareSelect.value;
             otaController = new AbortController(); S.busy = true; S.completed = null;
-            resultado.hidden = true; log.textContent = ''; relleno.style.width = '0';
+            resultado.hidden = true; relleno.style.width = '0';
             otaProgress.hidden = false; otaProgress.textContent = 'Preparando actualización Bluetooth…';
             let lastProgressUpdate = 0;
             enableFirmware(); pintarLista(); pintarPuertos(); resetPasos();
@@ -596,7 +596,7 @@
             h('div', { class: 'hint' }, 'Antes de sincronizar, pon la tarjeta en modo programador; el registro avisa si no avanza.'),
             h('div', { class: 'field' }, h('label', { for: 'prog-flash-baud' }, 'Velocidad de grabación'), selBaudFlash,
                 h('div', { class: 'hint' }, 'Se sincroniza a 115200 y los datos van a esta velocidad; si falla, reintenta a 115200.')),
-            log, barra, otaProgress, h('div', { class: 'row' }, btnFlash), monPanel, otaPanel, resultado);
+            monPanel, barra, otaProgress, h('div', { class: 'row' }, btnFlash), otaPanel, resultado);
         const vacio = T.empty('flash', 'Elige una tarjeta', 'Búscala por número o nombre a la izquierda, o elige una de la lista.');
 
         function seleccionar(p) {
@@ -615,7 +615,7 @@
             const p = S.tarjeta;
             cabecera.replaceChildren(T.tipoChip(p.tipo), h('span', { class: 'prog-nm' }, p.nombre),
                 h('span', { class: 'dim' }, `Hardware V${p.version}${p.id_tarjeta_num ? ' · Tarjeta #' + String(p.id_tarjeta_num).padStart(4, '0') : ' · suelta'}`));
-            resetPasos(); log.textContent = ''; relleno.style.width = '0'; resultado.hidden = true;
+            resetPasos(); relleno.style.width = '0'; resultado.hidden = true;
         }
 
         // ------------------------------------------------------------ montaje
