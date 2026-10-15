@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-15 22:26 UTC
-Commit de referencia: `9a5037c548b7` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-15 22:54 UTC
+Commit de referencia: `abaee0b80ed0` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Integracion1.3.87 sobre Git real desplegado ee604de/rama r2-ota-rapida1.3.84 tras fetch y SSH. Conserva DYMO cablevertical,terminalunica,JLinkrapido y suma R2generica4.0/FW4.2/nombreexacto/OTArecuperable. Fuentes editables y base fija en ESP32_BLE_SERIAL/TQT_R2_Programacion_Web_y_Local. Compilacion offline nativa0067 con identidad existente, BIN/HEX privados en C:/Users/usuario/.tqt/R2. Checkoutprincipal pasa a codex/r2-integracion-1387; notas anteriores preservadas e integradas. CM/ECCverificacion usadas.
+Web 1.3.88 desplegada en Orange Pi desde abaee0b80ed0 sobre produccion ee604de. Conserva integracion R2 generica4.0/FW4.2/nombre exacto/OTA rapida, DYMO y JLink. Admite multiples bases recompiladas registradas. Agregado programar_base.ps1 para BIN fijo sin recompilar; cabeceras y copia publica ESP32_BLE_SERIAL actualizadas y verificadas sin secretos. Firmante correcto instalado y credencial0067 reservada selectivamente; no cambia estado programado ni MAC/FW productivos.
 
 ## Siguiente paso
-Produccion permanece1.3.84 sin despliegue. Para desplegar conservar emisor privado y credenciales de unidades, transferir0067 local de forma selectiva sin reemplazar BD productiva. Nuevas tarjetas creadas completamenteoffline requieren conservar JSON privado y registrar identidad antes OTAweb; no se añadio importador. Fuentes actuales4.2 listas para editar4.3 o posterior.
+Revisar con usuario fuentes FW4.2 y flujo de futuras versiones. No se grabo hardware en este avance. Arduino IDE genera build distinto: registrar su BIN completo una vez; produccion en masa puede usar BIN fijo con script. Nuevas identidades offline deben conservar credencial y registrarse antes de OTA web; no hay importador automatico.
 
 ## Evidencia
-140 pruebas R2/local ESP32 STM32 DYMO teststation+12 transporteOK. Playwright18083 escritorio/movil390sin errores ni overflow,terminal1; principal18082 integra1.3.87 preservando0067FW4.2/MAC. Native offline1130907B/42084RAM,BIN4MB+HEX:perfil exacto0067/hw3/fw4.2/protocolo1,clave coincideweb,eFuseescrituraoff. BIN offlineSHAd067d9379a76c2ce369e2b16969e3ce24b50d3a2aca80fdd384ff919c8466a1e. Archivospublicos e index revisados sin credencial; DYMOidenticoaee604de. Sin nueva grabacionhardware.
+Despliegue abaee0b80ed048101bae048e028a642576f87cee healthy; API interna y publica inventariotqt.site version1.3.88, catalogo default base-R2-v42, generica4.0/R1 presentes. SQLite integrity OK y todas filas originales preservadas:100 tarjetas,300 PCB,7 usuarios,4 firmwares,7 claves,4 trabajos; solo nuevos firmwares y clave0067. Backup pre-r2-ota-1388-20261015T225310Z.db SHA d76464cb3d2f5027d605995f961ca4893433cb15ded8b6596ce7e1e8b912688f. 6 tests enrollment PASS; programar_base -Comprobar PASS sin abrir COM. Integracion previa140tests+12JS y Playwright escritorio/movil. Paquete26archivos con hashes comprobados.
