@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.2 — 2026-10-16
+- Validación mantiene Web Serial y recupera exclusivamente Bluetooth Windows/Bleak por MAC, con un puente BLE sin abrir el COM. Sustituye el cambio completo de modo de 1.4.1.
+- Conexión automática R1/R2 por MAC de inventario y S29; admite nombres antiguos sin alterar firmware. Autorización por operador/estación, comandos de un solo uso y evidencia nativa autenticada.
+- Prueba física TQT 0039 / COM7: 14/14 etapas aprobadas en 108,2 s, final abierto. Resultado aprobado con advertencias por 28/99 líneas seriales ilegibles excluidas de evidencia. Solo base local aislada; producción sin cambios.
+- Ver docs/VALIDACION_142.md para operación, verificaciones y límites.
+
 ## v1.4.1 — 2026-10-16
 - Pruebas TQT: encabezado en tres bloques, ON/OFF junto a cada conexión y selector de tarjetas con historial antes de R1/R2; selección numérica por Enter.
 - Bluetooth del navegador admite alias de la misma identidad (guiones, guiones bajos y V3_0/V30), conserva permisos y rechaza ambigüedad u otra unidad.

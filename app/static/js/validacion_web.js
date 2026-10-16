@@ -696,15 +696,16 @@
                 await series(2, 'serial', 1);
                 await this._step(6, async () => {
                     const reported = normalizeMac(this.latest ? this.latest.fields.MAC : '');
-                    const device = await this.ble.localizar({ nombre: this.ready_name, dispositivo: 'R1', gesto: this.hooks.gesto });
+                    const device = await this.ble.localizar({ nombre: this.ready_name, mac: reported, dispositivo: 'R1', gesto: this.hooks.gesto });
                     this._checkCancel('Cancelada');
                     await this.ble.connect(device, 'R1');
                     r1Name = device.name || '';
                     // La MAC BLE no es observable desde el navegador: el vínculo se demuestra con PB=2 en los movimientos.
-                    this.mac_comparison = 'no_expuesta_navegador';
-                    this.ble_identity.r1 = { nombre: r1Name, metodo: 'identidad equivalente autorizada + vínculo funcional PB=2', mac_reportada_r1: reported, id_opaco_navegador: device.id || null };
-                    this.ui('ble_ident', 'R1', r1Name, '', this.mac_comparison);
-                    return r1Name + ' | identidad equivalente; MAC BLE no expuesta por el navegador (se verifica por movimiento PB=2)';
+                    this.mac_comparison = this.ble instanceof WindowsBleLink ? 'mac_windows' : 'no_expuesta_navegador';
+                    this.ble_identity.r1 = { nombre: r1Name, metodo: this.ble instanceof WindowsBleLink ? 'MAC Windows + vínculo funcional PB=2' : 'identidad equivalente autorizada + vínculo funcional PB=2', mac_reportada_r1: reported, id_opaco_navegador: device.id || null,
+                        observed_address: this.ble instanceof WindowsBleLink ? this.ble.address : null };
+                    this.ui('ble_ident', 'R1', r1Name, this.ble_identity.r1.observed_address || '', this.mac_comparison);
+                    return r1Name + (this.ble instanceof WindowsBleLink ? ' | MAC Windows ' + this.ble.address + '; vínculo por movimiento PB=2' : ' | identidad equivalente; MAC BLE no expuesta por el navegador (se verifica por movimiento PB=2)');
                 });
                 await series(7, 'ble', 2);
                 if ([7, 8, 9, 10].every(i => this.steps[i].state === 'aprobado')) this.mac_comparison = 'vinculo_funcional';
@@ -713,7 +714,7 @@
                     const related = normalizeMac(this.latest ? this.latest.fields.MACR : '');
                     const nombre = this.expected.r2_nombre || '';
                     if (!nombre) throw new NoVerification('El inventario no tiene nombre BLE de R2; no se enviaron comandos a otro BLE.');
-                    const device = await this.ble.localizar({ nombre, dispositivo: 'R2', gesto: this.hooks.gesto });
+                    const device = await this.ble.localizar({ nombre, mac: related, dispositivo: 'R2', gesto: this.hooks.gesto });
                     this._require(String(device.name || '').toUpperCase().includes('R2'), 'El nombre BLE no identifica a R2: ' + device.name);
                     this._checkCancel('Cancelada');
                     await this.ble.connect(device, 'R2');
@@ -721,9 +722,10 @@
                     const declarada = await this.ble.macDeclarada();
                     if (declarada && related && normalizeMac(declarada) !== related)
                         throw new TestFailure('La R2 conectada declara MAC ' + declarada + ' distinta de MACR=' + related + '; no se enviaron comandos.');
-                    const method = declarada ? 'MAC declarada por R2 (info OTA) = MACR reportada por R1' : 'nombre BLE de inventario; MAC no expuesta (se verifica por err=13/14 en R1)';
-                    this.ble_identity.r2 = { nombre: r2Name, metodo: method, mac_declarada_r2: declarada, macr_reportada_r1: related, id_opaco_navegador: device.id || null };
-                    this.ui('ble_ident', 'R2', r2Name, '', method);
+                    const method = this.ble instanceof WindowsBleLink ? 'MAC Windows ' + this.ble.address + ' = MACR de S29; vínculo por err=13/14' : declarada ? 'MAC declarada por R2 (info OTA) = MACR reportada por R1' : 'nombre BLE de inventario; MAC no expuesta (se verifica por err=13/14 en R1)';
+                    this.ble_identity.r2 = { nombre: r2Name, metodo: this.ble instanceof WindowsBleLink ? 'MAC Windows = MACR de S29' : method, mac_declarada_r2: declarada, macr_reportada_r1: related, id_opaco_navegador: device.id || null,
+                        observed_address: this.ble instanceof WindowsBleLink ? this.ble.address : null };
+                    this.ui('ble_ident', 'R2', r2Name, this.ble_identity.r2.observed_address || '', this.ble_identity.r2.metodo);
                     this.log('R2 conectada automáticamente por ' + method + ': ' + r2Name);
                     return 'R2 ' + r2Name + ', criterio: ' + method;
                 });
@@ -763,7 +765,7 @@
                     date: isoMs(), card: this.ready_name, serial_port: portName,
                     firmware: f.VER || null, hardware: f.HW || null, card_id: f.ID || null,
                     // MAC observada por BLE: no disponible en el navegador (nunca device.id).
-                    r1_ble_address: null, r2_ble_address: null, r1_ble_name: r1Name || null, r2_ble_name: r2Name || null,
+                    r1_ble_address: this.ble_identity.r1?.observed_address || null, r2_ble_address: this.ble_identity.r2?.observed_address || null, r1_ble_name: r1Name || null, r2_ble_name: r2Name || null,
                     ble_identity: this.ble_identity,
                     reported_mac: f.MAC || null, reported_mac_r2: f.MACR || null,
                     inventory_source: 'Inventario TQT SQLite; snapshot del servidor', inventory_mac: d.mac_r1 || null,
@@ -827,6 +829,58 @@
     }
 
     // ------------------------------------------------------------ estado público y API K1
+    class WindowsBleLink {
+        constructor(stationId, tarjetaId) {
+            this.stationId = stationId; this.tarjetaId = tarjetaId; this.runId = null;
+            this.device = null; this.dispositivo = null; this.nombre = ''; this.address = '';
+        }
+        get connected() { return !!this.device; }
+        async request(operation, device, command) {
+            if (!this.stationId || !this.tarjetaId) throw new Error('Conecta el puente Bluetooth Windows de esta laptop; el serial sigue en el navegador.');
+            const request_id = crypto.randomUUID().replace(/-/g, '');
+            const body = { station_id: this.stationId, tarjeta_id: this.tarjetaId, run_id: this.runId,
+                request_id, operation, role: device.role, mac: device.address, command: command || null,
+                status_raw: command ? motor?.latest?.raw || '' : '' };
+            const job = await http('/web/ble/commands', body);
+            const until = Date.now() + 60000;
+            do {
+                const r = await http('/web/ble/commands/' + job.id);
+                if (r.state === 'done' || r.state === 'error') {
+                    if (!r.result?.ok) throw new Error(r.result?.error || 'Bluetooth Windows rechazó el comando.');
+                    return r.result.data;
+                }
+                await dormir(200);
+            } while (Date.now() < until);
+            throw new Error('El puente BLE no confirmó el comando; no se repite automáticamente.');
+        }
+        async localizar({ nombre, mac, dispositivo }) {
+            if (normalizeMac(mac).length !== 12) throw new NoVerification('Falta la MAC leída por serial para ' + dispositivo);
+            return { name: nombre, address: normalizeMac(mac).match(/../g).join(':'), role: dispositivo };
+        }
+        async connect(device, dispositivo) {
+            if (this.connected) await this.disconnect();
+            setBle('conectando', 'Windows · buscando por MAC ' + device.address, dispositivo);
+            try {
+                const r = await this.request('connect', device);
+                if (normalizeMac(r.address) !== normalizeMac(device.address)) throw new NoVerification('El puente conectó otra MAC.');
+                device.name = r.name; this.device = device; this.dispositivo = dispositivo;
+                this.nombre = r.name || ''; this.address = r.address;
+                setBle('ok', this.nombre + ' · ' + this.address + ' · Windows', dispositivo);
+            } catch (e) { setBle('error', e.message); throw e; }
+        }
+        async send(command) {
+            if (!this.connected) throw new Error('Bluetooth Windows desconectado.');
+            await this.request('send', this.device, command);
+            if (motor) motor.log('TX BLE Windows: ' + command + ' → ' + this.address);
+        }
+        async macDeclarada() { return null; } // Native address is observed by Windows, not declared by OTA.
+        async disconnect() {
+            const d = this.device;
+            this.device = null; this.nombre = ''; this.address = ''; this.dispositivo = null;
+            try { if (d) await this.request('disconnect', d); }
+            finally { setBle('off', 'Bluetooth Windows desconectado'); }
+        }
+    }
     const CFG = { ackMs: 180, quietMs: 300, repeatVerifyMs: 5000 };
     const st = { serial: { estado: 'off', puerto: '', texto: 'Sin puerto' }, ble: { estado: 'off', dispositivo: null, texto: 'Sin Bluetooth' } };
     const subs = new Set(), monitores = new Set();
@@ -835,10 +889,21 @@
     function estado() { return { serial: Object.assign({}, st.serial), ble: Object.assign({}, st.ble) }; }
     function setSerial(estadoS, texto) { st.serial = { estado: estadoS, puerto: port ? (window.TQTSerial ? TQTSerial.describir(port) : 'Puerto serial') : '', texto: texto || '' }; emitir(); }
     function setBle(estadoB, texto, dispositivo) { st.ble = { estado: estadoB, dispositivo: estadoB === 'off' || estadoB === 'error' ? null : (dispositivo || st.ble.dispositivo), texto: texto || '' }; emitir(); }
-    const bleLink = new BleLink(msg => { if (motor && motor.running) motor.log(msg); else monitores.forEach(fn => fn({ kind: 'log', text: msg })); },
+    let bleLink = new BleLink(msg => { if (motor && motor.running) motor.log(msg); else monitores.forEach(fn => fn({ kind: 'log', text: msg })); },
         (e, texto, disp) => setBle(e, texto, disp));
 
-    function soportado() { return !!(window.isSecureContext && navigator.serial && navigator.bluetooth && window.TQTSerial); }
+    async function usarBleWindows({ stationId, tarjetaId } = {}) {
+        if (enCurso) throw new Error('La prueba usa el Bluetooth.');
+        if (!(bleLink instanceof WindowsBleLink)) {
+            await bleLink.disconnect();
+            bleLink = new WindowsBleLink(stationId, tarjetaId);
+        } else {
+            if (bleLink.connected && (bleLink.stationId !== stationId || bleLink.tarjetaId !== tarjetaId)) await bleLink.disconnect();
+            bleLink.stationId = stationId; bleLink.tarjetaId = tarjetaId;
+        }
+    }
+
+    function soportado() { return !!(window.isSecureContext && navigator.serial && window.TQTSerial); }
     function onEstado(fn) { subs.add(fn); return () => subs.delete(fn); }
     function onMonitor(fn) { monitores.add(fn); return () => monitores.delete(fn); }
 
@@ -943,6 +1008,7 @@
             try {
                 const run = await http('/web/runs', { tarjeta_id: tarjetaId });
                 const jid = run.id;
+                if (bleLink instanceof WindowsBleLink) { bleLink.runId = jid; bleLink.tarjetaId = tarjetaId; }
                 let m;
                 pub = new Publicador(jid, () => m && !m.cancelled && m.stop('Cancelación solicitada desde el servidor'));
                 const emitirEv = (kind, ...args) => {
@@ -970,6 +1036,7 @@
                 return { jid, resultado };
             } finally {
                 pub && pub.cerrar();
+                if (bleLink instanceof WindowsBleLink) bleLink.runId = null;
                 enCurso = false;
             }
         });
@@ -997,7 +1064,7 @@
     async function conectarBle({ dispositivo, nombre, mac } = {}) {
         if (enCurso) throw new Error('La prueba automática usa el Bluetooth.');
         if (!['R1', 'R2'].includes(dispositivo) || !nombre) throw new Error('Selecciona la tarjeta y su dispositivo R1/R2.');
-        const device = await bleLink.localizar({ nombre, dispositivo, gesto: ({ autorizar }) => autorizar() });
+        const device = await bleLink.localizar({ nombre, mac, dispositivo, gesto: ({ autorizar }) => autorizar() });
         await bleLink.connect(device, dispositivo);
         if (dispositivo === 'R2') {
             const actual = await bleLink.macDeclarada();
@@ -1012,10 +1079,10 @@
         if (enCurso) throw new Error('La prueba automática usa el Bluetooth.');
         await bleLink.disconnect();
     }
-    async function serialManual({ accion, inventory } = {}) {
+    async function manualOperation(inventory, action) {
         if (enCurso) throw new Error('Hay una operación en curso.');
         if (!link || !cx || st.serial.estado !== 'ok') throw new Error('Conecta el puerto serial.');
-        if (!['ON', 'OFF'].includes(accion) || !inventory) throw new Error('Selecciona una tarjeta y una acción válida.');
+        if (!inventory) throw new Error('Selecciona una tarjeta.');
         enCurso = true;
         const m = new Motor({ serial: link, ble: bleLink, cfg: CFG, hooks: {},
             ui: (kind, ...args) => monitores.forEach(fn => fn({ kind, text: kind === 'log' ? args[0] : '', status: kind === 'status' ? args[0] : null })) });
@@ -1028,12 +1095,18 @@
             if (m.ready_name && norm(m.ready_name) !== norm(inventory.nombre)) throw new NoVerification('Nombre físico distinto del inventario.');
             if (num(sample, 'TQT') !== 0) throw new NoVerification('Espera a que termine el movimiento actual.');
             m._position(sample);
+            return await action(m);
+        } finally { motor = null; enCurso = false; }
+    }
+    async function serialManual({ accion, inventory } = {}) {
+        if (!['ON', 'OFF'].includes(accion)) throw new Error('Acción inválida.');
+        return manualOperation(inventory, async m => {
             const command = accion === 'ON' ? 'PPON' : 'POFF';
             await m._send(serialAction(command));
             return { ok: true, enviado: command, respuesta: 'Orden enviada; comprueba los sensores. No constituye una prueba aprobada.' };
-        } finally { motor = null; enCurso = false; }
+        });
     }
-    async function bleManual({ dispositivo, accion, nombre } = {}) {
+    async function bleManual({ dispositivo, accion, nombre, inventory } = {}) {
         const comando = accion === 'ON' ? 'PPON' : accion === 'OFF' ? 'POFF' : null;
         if (!comando || !['R1', 'R2'].includes(dispositivo)) return { ok: false, enviado: null, respuesta: null, error: 'Acción o dispositivo inválido.' };
         if (enCurso) return { ok: false, enviado: null, respuesta: null, error: 'La prueba automática usa el Bluetooth; espera a que termine.' };
@@ -1041,6 +1114,13 @@
         const respuestas = [];
         const quitar = onMonitor(e => { if (e.kind === 'log' && e.text.startsWith('RX BLE: ')) respuestas.push(e.text.slice(8)); });
         try {
+            if (bleLink instanceof WindowsBleLink) {
+                if (!bleLink.connected || bleLink.dispositivo !== dispositivo) throw new Error('Conecta primero R1 o R2 por MAC.');
+                return await manualOperation(inventory, async () => {
+                    await bleLink.send(comando);
+                    return { ok: true, enviado: comando + ' → ' + bleLink.address, respuesta: 'Enviado por Bluetooth Windows; verifica sensores.' };
+                });
+            }
             if (!(bleLink.connected && bleLink.dispositivo === dispositivo && (!nombre || norm(bleLink.nombre) === norm(nombre)))) {
                 const prefijo = 'TQT';
                 let device = null;
@@ -1072,10 +1152,10 @@
     }
 
     window.TQTValWeb = {
-        soportado, estado, onEstado, elegirPuerto, iniciar, bleManual, conectarBle, desconectarBle, serialManual,
+        soportado, estado, onEstado, elegirPuerto, iniciar, bleManual, conectarBle, desconectarBle, serialManual, usarBleWindows,
         // v1.4.0: extras (no forman parte de K1 pero son útiles para la UI)
         desconectar, onMonitor, reutilizarPuerto, vista, contexto: CONTEXTO,
         _interno: { parseStatus, readReady, position, serialAction, normalizeMac, communicate, buildWarnings,
-            SerialLink, BleLink, Motor, Publicador, TestFailure, NoVerification, Interrupted, CFG, STEP_NAMES, FIELDS, huellaMac, bleNames },
+            SerialLink, BleLink, WindowsBleLink, Motor, Publicador, TestFailure, NoVerification, Interrupted, CFG, STEP_NAMES, FIELDS, huellaMac, bleNames },
     };
 })();

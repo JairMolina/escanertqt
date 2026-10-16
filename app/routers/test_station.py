@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from app.routers.stm32 import station_token, operator, run
 from app.services import test_station as svc, stm32_programming as stm
+from app.services import native_ble
 from app.database import db
 
 router = APIRouter(prefix="/api/validacion/tqt", tags=["Pruebas TQT"])
@@ -63,6 +64,39 @@ class WebIdentity(BaseModel):
 
 class Installer(BaseModel):
     name: str = Field(default="Banco de pruebas local", max_length=60, min_length=1)
+    ble_only: bool = False
+
+
+class NativeBleCommand(BaseModel):
+    station_id: str = Field(pattern='^[a-f0-9]{24}$')
+    request_id: str = Field(pattern='^[a-f0-9]{32}$')
+    operation: Literal['scan', 'connect', 'send', 'disconnect']
+    role: Literal['R1', 'R2']
+    tarjeta_id: int = Field(gt=0)
+    run_id: str | None = Field(default=None, pattern='^[a-f0-9]{32}$')
+    mac: str | None = Field(default=None, max_length=32)
+    command: Literal['PPON', 'POFF'] | None = None
+    status_raw: str = Field(default='', max_length=4096)
+
+
+@router.get('/web/ble/stations')
+def native_stations(req: Request):
+    return run(native_ble.stations, operator(req))
+
+
+@router.post('/web/ble/commands')
+def native_prepare(body: NativeBleCommand, req: Request):
+    return run(native_ble.prepare, operator(req), body.model_dump())
+
+
+@router.get('/web/ble/commands/{identifier}')
+def native_result(identifier: str, req: Request):
+    return run(native_ble.result, operator(req), identifier)
+
+
+@agent_router.post('/ble/{identifier}/authorize')
+def native_authorize(identifier: str, st=Depends(station_token)):
+    return run(native_ble.authorize, st['id'], identifier)
 
 
 @router.get("/stations")
@@ -248,7 +282,7 @@ def installer(body: Installer, req: Request):
                 z.write(f, f.relative_to(root))
         z.writestr(
             "config.json",
-            json.dumps(dict(server=str(req.base_url).rstrip("/"), **st), indent=2),
+            json.dumps(dict(server=str(req.base_url).rstrip("/"), ble_only=body.ble_only, **st), indent=2),
         )
     return Response(
         stream.getvalue(),

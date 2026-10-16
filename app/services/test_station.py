@@ -576,6 +576,8 @@ def _web_evidence(c, jid):
 
 def web_finish(operator, jid, report):
     init()
+    from app.services import native_ble
+    native_ble.init()
     if not isinstance(report, dict):
         raise ValueError("Informe inválido.")
     _salud_numerica(report.get("serial_health"))
@@ -606,8 +608,9 @@ def web_finish(operator, jid, report):
         ble = report.get("ble_identity") if isinstance(report.get("ble_identity"), dict) else {}
         r2info = ble.get("r2") if isinstance(ble.get("r2"), dict) else {}
         declared = r2info.get("mac_declarada_r2")
+        observed = native_ble.connections(c, jid)
         r2_link = (bool(ident) and all(ok(i) for i in (11, 12, 13)) and {13, 14} <= errs
-                   and norm(report.get("r2_ble_name")) == norm(d.get("r2_nombre"))
+                   and (norm(report.get("r2_ble_name")) == norm(d.get("r2_nombre")) or norm(observed.get('R2')) == norm(d['mac_r2']))
                    and (not declared or norm(declared) == norm(report.get("reported_mac_r2"))))
         effective = dict(report)
         effective.update(
@@ -623,8 +626,8 @@ def web_finish(operator, jid, report):
             effective["serial_health"] = dict(report.get("serial_health") or {}, frames=0)
         checks = compare(d, effective)
         checks["ble_metodo"] = {
-            "r1": "vinculo_funcional_pb2" if r1_link else "no_verificado",
-            "r2": ("mac_declarada_r2" if declared else "vinculo_funcional_err13_14") if r2_link else "no_verificado",
+            "r1": ("mac_windows_y_pb2" if observed.get('R1') else "vinculo_funcional_pb2") if r1_link else "no_verificado",
+            "r2": ("mac_windows_y_err13_14" if observed.get('R2') else "mac_declarada_r2" if declared else "vinculo_funcional_err13_14") if r2_link else "no_verificado",
         }
         checks["evidencia_s29"] = len(statuses)
         result = verdict(effective, checks)

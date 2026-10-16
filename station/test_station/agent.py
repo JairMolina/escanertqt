@@ -6,6 +6,7 @@ from dataclasses import asdict
 from tqtstation.engine import TestStation, NoVerification
 from tqtstation.serial_port import SerialLink
 from tqtstation.ble import BLELink
+from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
 
 
@@ -140,6 +141,8 @@ class Bridge:
         try:
             if self.engine.running:
                 raise RuntimeError("Prueba automática activa; comando bloqueado.")
+            if self.cfg.get('ble_only') and action != 'ble_bridge':
+                raise ValueError('Este puente solo permite Bluetooth; no abre serial.')
             if action in ("serial", "ble") and data.get("command") in ("PPON", "POFF"):
                 d = data.get("inventory") or {}
                 if (
@@ -159,7 +162,11 @@ class Bridge:
                     raise NoVerification(
                         "BLE conectado a una tarjeta diferente de la seleccionada."
                     )
-            if action == "ports":
+            if action == 'ble_bridge':
+                if self.serial.connected:
+                    raise ValueError('El puente BLE no puede poseer el puerto serial.')
+                result = execute_native_ble(self.ble, lambda: self.api('ble/' + cmd['id'] + '/authorize', {}))
+            elif action == "ports":
                 result = self.serial.ports()
             elif action == "connect_serial":
                 if data["port"] not in self.serial.ports():
@@ -237,6 +244,8 @@ class Bridge:
             try:
                 self.flush()
                 state = {
+                    "ble_bridge": 1,
+                    "ble_only": bool(self.cfg.get('ble_only')),
                     "serial_connected": self.serial.connected,
                     "port": self.serial.port_name,
                     "ble_address": self.ble.address,
@@ -248,7 +257,7 @@ class Bridge:
                 job = self.api("claim", state)
                 if job.get("cancel") and self.engine.running:
                     self.engine.stop()
-                if job.get("run"):
+                if job.get("run") and not self.cfg.get('ble_only'):
                     self.start(job["run"])
                 if job.get("command"):
                     self.command_thread = threading.Thread(
@@ -268,7 +277,7 @@ class Bridge:
                 return
             except Exception as e:
                 print("Reporte/conexión pendiente:", str(e), flush=True)
-            time.sleep(1)
+            time.sleep(0.25 if self.cfg.get('ble_only') else 1)
 
 
 def main():

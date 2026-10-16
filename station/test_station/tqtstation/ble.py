@@ -39,22 +39,22 @@ class BLELink:
             future.cancel()
             raise TimeoutError('Tiempo agotado en Bluetooth')
 
-    async def _scan(self):
+    async def _scan(self, target=None):
         from bleak import BleakScanner
         result = await BleakScanner.discover(timeout=7.0, return_adv=True)
         found = []
         self.devices = {}
         for d, adv in result.values():
             name = (adv.local_name or d.name or '').strip()
-            if 'TQT' in name.upper():
+            if 'TQT' in name.upper() or (target and d.address.upper() == target.upper()):
                 addr = d.address.upper()
                 self.devices[addr] = d
                 found.append(FoundDevice(name, addr))
         return sorted(found, key=lambda d:(d.name.upper(), d.address))
 
-    def scan(self):
+    def scan(self, target=None):
         self.log('Buscando BLE durante 7 segundos…')
-        result = self._call(self._scan(), timeout=15)
+        result = self._call(self._scan(target), timeout=15)
         self.log(f'BLE: {len(result)} dispositivo(s) TQT encontrados')
         return result
 

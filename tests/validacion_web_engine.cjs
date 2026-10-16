@@ -279,6 +279,40 @@ prueba('v1.4.1: BLE reutiliza identidad antigua sin selector y rechaza otro núm
     }
 });
 
+prueba('v1.4.2: Bluetooth Windows conserva Web Serial y conecta por MAC con nombre antiguo', async () => {
+    const c = { ...ctx, window: { isSecureContext: true }, navigator: { serial: { addEventListener() {} } } };
+    vm.createContext(c);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../app/static/js/serial_web.js'), 'utf8'), c);
+    let closed = 0, writes = 0;
+    c.window.TQTSerial = c.TQTSerial = { ...c.window.TQTSerial,
+        soportado: () => true, elegir: async () => ({}), describir: () => 'COM7',
+        abrir: async () => ({ descripcion: 'COM7', activo: () => true,
+            escribir: async () => { writes++; }, cerrar: async () => { closed++; } }) };
+    const requests = []; let operation;
+    c.window.TQT = { api: async (url, opts) => {
+        if (opts.body) { operation = opts.body.operation; requests.push(opts.body); return { ok: true, data: { id: 1 } }; }
+        return { ok: true, data: { state: 'done', result: { ok: true, data: operation === 'connect'
+            ? { address: '8C:8C:29:C3:E0:EE', name: 'TQT_R2_V2_0_0039' } : {} } } };
+    } };
+    vm.runInContext(src, c);
+    const api = c.window.TQTValWeb;
+    await api.elegirPuerto();
+    const initial = api.estado().serial;
+    await api.usarBleWindows({ stationId: 'a'.repeat(24), tarjetaId: 3 });
+    await api.conectarBle({ dispositivo: 'R2', nombre: 'TQT-R2-V30-0039', mac: '8C:8C:29:C3:E0:EE' });
+    assert.strictEqual(api.estado().ble.estado, 'ok');
+    assert.ok(api.estado().ble.texto.includes('TQT_R2_V2_0_0039'));
+    assert.strictEqual(requests[0].mac, '8C:8C:29:C3:E0:EE');
+    assert.strictEqual(requests[0].role, 'R2');
+    assert.strictEqual(requests[0].operation, 'connect');
+    assert.deepStrictEqual(api.estado().serial, initial);
+    assert.strictEqual(closed, 0); assert.strictEqual(writes, 0);
+    await api.desconectarBle();
+    assert.strictEqual(api.estado().ble.estado, 'off');
+    assert.strictEqual(closed, 0);
+    await api.desconectar();
+});
+
 (async () => {
     let fallos = 0;
     for (const [n, f] of pruebas) {

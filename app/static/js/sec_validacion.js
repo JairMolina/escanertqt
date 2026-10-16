@@ -106,11 +106,9 @@
       reported_id_r2: "Identificador de R2",
       state: "Cotejo completo con inventario",
     };
-    let preferWindows = false;
-    try { preferWindows = localStorage.getItem("tqt.validacion.windows") === "1"; } catch (_) {}
     const web = () => {
       try {
-        return !preferWindows && !!window.TQTValWeb?.soportado?.();
+        return !!window.TQTValWeb?.soportado?.();
       } catch (e) {
         return false;
       }
@@ -241,7 +239,11 @@
     );
     let bleFound = "";
     const modeHint = h("p", { class: "hint" });
-    const modeBtn = button("", cambiarModo);
+    const modeBtn = button("Actualizar Bluetooth Windows", cambiarModo);
+    const nativeInfo = h("p", { class: "hint tqt-native-info", "aria-live": "polite" });
+    const nativeInstall = button("Preparar puente Bluetooth", () => install(true));
+    let nativeStationId = "", nativeReady = false;
+    try { nativeStationId = localStorage.getItem("tqt.station.ble") || ""; } catch (_) {}
     const disconnectSerial = button("Desconectar serial", async () => {
       if (web()) { try { await window.TQTValWeb.desconectar(); } catch (e) { message(e.message, true); } paintWebEstado(); }
       else await cmd("disconnect_serial");
@@ -263,7 +265,7 @@
     const blePanel = h("section", { class: "prog-panel tqt-card tqt-ble-panel" },
       h("h3", null, "Bluetooth R1 / R2"), connBle.el, bleRole,
       h("div", { class: "row wrap" }, connectBle, disconnectBle),
-      h("div", { class: "row wrap" }, bleOn, bleOff), bleHint, manualOut);
+      h("div", { class: "row wrap" }, bleOn, bleOff), nativeInfo, nativeInstall, bleHint, manualOut);
     const historyPanel = h("section", { class: "prog-panel tqt-card tqt-history-panel" },
       h("h3", null, "Historial de la tarjeta seleccionada"), historyHost);
     host.append(
@@ -388,6 +390,7 @@
       card = inv.ok ? inv.data : null;
       paintCard(inv.ok ? "" : inv.error);
       await history(my);
+      if (web()) await refreshNative().catch(e => message(e.message, true));
       updateControls();
       return true;
     }
@@ -579,19 +582,21 @@
           signal?.addEventListener("abort", ab, { once: true });
         });
     }
+    async function refreshNative() {
+      if (!web() || active || manualBusy || !window.TQTValWeb?.usarBleWindows) return;
+      const r = await api("/api/validacion/tqt/web/ble/stations");
+      const online = r.ok ? (r.data || []).filter(s => s.online && !s.serial_connected && !s.running) : [];
+      const chosen = online.find(s => s.id === nativeStationId) || (online.length === 1 ? online[0] : null);
+      nativeReady = !!chosen;
+      nativeInfo.textContent = chosen ? "Bluetooth Windows: " + chosen.name + " · conectado (solo BLE)"
+        : online.length > 1 ? "Hay varios puentes. Prepara el de esta laptop para asociarlo."
+        : "Puente Bluetooth Windows desconectado. El serial continúa directo en el navegador.";
+      if (chosen) { nativeStationId = chosen.id; try { localStorage.setItem("tqt.station.ble", chosen.id); } catch (_) {} }
+      await window.TQTValWeb.usarBleWindows({ stationId: chosen?.id || "", tarjetaId: tarjeta?.id || null });
+      updateControls();
+    }
     async function cambiarModo() {
-      if (active || manualBusy) return;
-      try {
-        if (web()) { await window.TQTValWeb.desconectar(); await window.TQTValWeb.desconectarBle(); window.TQTValWeb.vista?.(false); }
-        else if (curStation()?.serial_connected || curStation()?.ble_address) {
-          message("Desconecta el serial y Bluetooth del banco Windows antes de cambiar al navegador.", true); return;
-        }
-        preferWindows = !preferWindows;
-        try { localStorage.setItem("tqt.validacion.windows", preferWindows ? "1" : "0"); } catch (_) {}
-        window.TQTValWeb?.vista?.(web());
-        if (web()) paintWebEstado(); else await stations();
-        updateControls();
-      } catch (e) { message(e.message, true); }
+      try { await refreshNative(); } catch (e) { message(e.message, true); }
     }
     async function serialAction(accion) {
       if (!web()) return cmd("serial", { command: accion === "ON" ? "PPON" : "POFF" });
@@ -606,6 +611,7 @@
       const role = bleRole.value || "R1";
       const pcb = role === "R1" ? tarjeta?.r1 : tarjeta?.r2;
       if (!pcb?.nombre) { message("La tarjeta no tiene " + role + " registrada.", true); return; }
+      if (web()) await refreshNative();
       if (!web()) {
         bleFound = "";
         await cmd("scan_ble", { role });
@@ -631,7 +637,7 @@
       try {
         const pcb = dispositivo === "R1" ? tarjeta?.r1 : tarjeta?.r2;
         if (!pcb?.nombre) throw new Error("Selecciona una tarjeta con " + dispositivo + " registrada.");
-        const r = await window.TQTValWeb.bleManual({ dispositivo, accion, nombre: pcb.nombre });
+        const r = await window.TQTValWeb.bleManual({ dispositivo, accion, nombre: pcb.nombre, inventory: card });
         manualOut.textContent = r?.ok
           ? accion + " → " + dispositivo + " · enviado " + (r.enviado || "—") + " · respuesta " + (r.respuesta || "sin respuesta")
           : accion + " → " + dispositivo + " · error: " + (r?.error || "sin respuesta");
@@ -649,19 +655,20 @@
       webBox.hidden = !isWeb;
       agentBox.hidden = isWeb;
       modeHint.textContent = isWeb
-        ? "Conexión directa desde este navegador. Mantén esta pestaña visible durante la prueba."
-        : "Banco Windows: módulo anterior (pyserial + Bleak), con búsqueda automática por MAC. Necesita el agente local de pruebas.";
-      modeBtn.textContent = isWeb ? "Usar Windows por MAC" : "Usar conexión del navegador";
-      modeBtn.disabled = busy || (!isWeb && !window.TQTValWeb?.soportado?.());
-      bleHint.textContent = isWeb ? "Autoriza R1 y R2 aquí una vez. Se reutilizan los permisos y se admiten nombres antiguos. La MAC física no es observable en Web Bluetooth." : "La rutina conecta R1 por MAC y después R2 por MACR, sin selector Bluetooth del navegador.";
-      connectBle.disabled = disconnectBle.disabled = bleRole.disabled = busy || !card || (!isWeb && !curStation()?.online);
+        ? "Serial directo desde este navegador · Bluetooth Windows por MAC. Mantén esta pestaña visible durante la prueba."
+        : "Este navegador no admite Web Serial. Se conserva el banco Windows como respaldo.";
+      modeBtn.disabled = nativeInstall.disabled = busy;
+      nativeInstall.hidden = !isWeb;
+      bleHint.textContent = "La rutina conecta R1 por MAC y después R2 por MACR mediante Bleak, sin seleccionar dispositivos por nombre. El puente no abre el COM.";
+      connectBle.disabled = disconnectBle.disabled = bleRole.disabled = busy || !card || (isWeb ? !nativeReady : !curStation()?.online);
       disconnectSerial.disabled = busy;
       serialManual.querySelectorAll("button,select").forEach(b => b.disabled = busy || !card || (isWeb ? window.TQTValWeb?.estado?.()?.serial?.estado !== "ok" : !curStation()?.serial_connected));
       if (isWeb) { commandSelect.hidden = true; serialManual.querySelectorAll("button").forEach(b => { if (!["ON serial", "OFF serial"].includes(b.textContent)) b.hidden = true; }); }
       else { commandSelect.hidden = false; serialManual.querySelectorAll("button").forEach(b => b.hidden = false); }
       const s = curStation();
-      const ready = isWeb ? true : !!(s?.online && s.serial_connected);
-      start.disabled = busy || !card || !ready;
+      const ready = isWeb ? window.TQTValWeb?.estado?.()?.serial?.estado === "ok" : !!(s?.online && s.serial_connected);
+      const bridgeReady = !isWeb || !window.TQTValWeb?.usarBleWindows || nativeReady;
+      start.disabled = busy || !card || !ready || !bridgeReady;
       stop.disabled = !active;
       search.disabled = !!active;
       cardList.querySelectorAll("button").forEach((b) => (b.disabled = !!active));
@@ -1256,17 +1263,17 @@
       reportHost.focus({ preventScroll: true });
       reportHost.firstElementChild.scrollIntoView({ block: "start" });
     }
-    async function install() {
+    async function install(bleOnly = false) {
       try {
         const response = await fetch("/api/validacion/tqt/installer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Banco TQT Windows" }),
+          body: JSON.stringify({ name: bleOnly ? "Bluetooth TQT Windows (solo BLE)" : "Banco TQT Windows", ble_only: bleOnly === true }),
         });
         if (!response.ok) throw Error("No se pudo descargar el agente.");
         try {
           const m = /filename="?TQT_Pruebas_([^".]+)\.zip/.exec(response.headers.get("Content-Disposition") || "");
-          if (m) { saveStation(m[1]); stationId = m[1]; }
+          if (m) { if (bleOnly) { nativeStationId = m[1]; localStorage.setItem("tqt.station.ble", m[1]); } else { saveStation(m[1]); stationId = m[1]; } }
         } catch (e) {}
         const url = URL.createObjectURL(await response.blob());
         const a = h("a", { href: url, download: "TQT_Pruebas_Windows.zip" });
@@ -1305,6 +1312,7 @@
       } catch (e) {}
     }
     if (!web()) stations().catch(() => {});
+    else refreshNative().catch(() => {});
     // v1.4.0: cerrar o recargar la pestaña con una prueba web en curso pide confirmación del navegador.
     const antesDeDescargar = (ev) => {
       if (active?.web) {
@@ -1314,7 +1322,7 @@
     };
     window.addEventListener("beforeunload", antesDeDescargar);
     const refresh = setInterval(() => {
-      if (alive && !active && !manualBusy && !web()) stations().catch(() => {});
+      if (alive && !active && !manualBusy) { if (web()) refreshNative().catch(() => {}); else stations().catch(() => {}); }
     }, 3000);
     const tid = new URLSearchParams(location.hash.split("?")[1] || "").get("tarjeta");
     if (tid) selectCard({ id: Number(tid) || tid }).catch(() => {});

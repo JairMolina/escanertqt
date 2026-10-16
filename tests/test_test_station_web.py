@@ -117,6 +117,30 @@ class WebRuns(unittest.TestCase):
         r = self.report(ble_identity={"r2": {"mac_declarada_r2": "00:11:22:33:44:55"}})
         self.assertEqual(s.web_finish(OP, j["id"], r)["result"], "no_verificado")
 
+    def test_legacy_r2_name_requires_native_agent_mac_evidence(self):
+        from app.services import native_ble
+        import secrets
+        old_name = 'TQT_R2_V2_0_0039'
+        j = self.start()
+        s.web_events(OP, j['id'], self.evidence())
+        forged = self.report(r2_ble_name=old_name, ble_identity={'r2': {'observed_address': self.d['mac_r2']}})
+        self.assertEqual(s.web_finish(OP, j['id'], forged)['result'], 'no_verificado')
+        j = self.start()
+        sid = stm.station_create('BLE-only test', OP)['id']
+        s.claim(sid, dict(ble_bridge=1, serial_connected=False, running=False))
+        body = dict(station_id=sid, request_id=secrets.token_hex(16), tarjeta_id=self.d['id'],
+                    run_id=j['id'], role='R2', operation='connect', mac=self.d['mac_r2'])
+        cmd = native_ble.prepare(OP, body)['id']
+        s.claim(sid, dict(ble_bridge=1))
+        native_ble.authorize(sid, cmd)
+        import json
+        with db.get_db() as c:
+            c.execute("UPDATE tqt_test_commands SET state='done',result=? WHERE id=?", (json.dumps(dict(ok=True,data=dict(address=self.d['mac_r2'],name=old_name))), cmd))
+        s.web_events(OP, j['id'], self.evidence())
+        result = s.web_finish(OP, j['id'], self.report(r2_ble_name=old_name))
+        self.assertEqual(result['result'], 'aprobado')
+        self.assertEqual(result['report']['inventory_check']['ble_metodo']['r2'], 'mac_windows_y_err13_14')
+
     def test_same_rules_partial_steps_and_ack_retries(self):
         j = self.start()
         s.web_events(OP, j["id"], self.evidence())
