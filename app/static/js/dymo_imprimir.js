@@ -69,6 +69,20 @@
         ocupado = true;
         try {
             const d = await D().detect();
+            // v1.4.2: DYMO compartida (Raspberry) si el operador la eligió en Etiquetas DYMO o si esta PC no tiene DYMO Connect.
+            const R = window.TQTDymoRemoto;
+            let pref = null; try { pref = window.TQT && window.TQT.store && window.TQT.store.get('tqt.dymo.impresora'); } catch (e) { /* nada */ }
+            if (R && (pref === R.VALOR || d.estado !== 'listo') && (await R.estado()).disponible) {
+                const pasos = [['tarjeta', 'etiqueta Aprobada', { tipo: 'aprobada', tarjeta_id: t.id }], ['cable', `cable ${num}`, { tipo: 'cable', numero: num }]];
+                let error = null;
+                for (let i = 0; i < pasos.length; i++) {
+                    const [tipo, nombre, pedido] = pasos[i];
+                    prog(i + 1, 2, `DYMO compartida ${i + 1}/2: ${nombre}…`);
+                    try { await R.imprimir(pedido); impresas.push({ tipo, numero: num, estado: 'enviada' }); }
+                    catch (e) { impresas.push({ tipo, numero: num, estado: 'error', error: e.message }); error = error || `${nombre}: ${/no está aprobada|403/.test(e.message) ? NO_APROBADA : e.message}`; }
+                }
+                return { ok: !error, impresas, error, via: 'dymo_compartida' };
+            }
             const urlTarjeta = (tipo) => `/api/dymo/label/${t.id}/xml?tipo=${tipo}&aprobada=1`;
             const urlCable = (tipo) => `/api/dymo/cable/xml?numero=${encodeURIComponent(num)}&tipo=${tipo}`;
             if (d.estado !== 'listo') {

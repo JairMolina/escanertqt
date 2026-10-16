@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.4 — 2026-10-16
+- **DYMO compartida (Raspberry Pi):** cualquier usuario imprime en la LabelWriter conectada a la Raspberry sin mover la etiquetadora. En Etiquetas DYMO aparece «DYMO compartida» en el selector de impresora (tarjeta, lote, escaneo, R3 y cable); en Pruebas TQT, «Imprimir etiquetas» la usa si se eligió o si la PC no tiene DYMO Connect. La web espera a que la Raspberry confirme «impresa».
+- Servidor: cola `/api/dymo/remoto` (sesión) y agente `/api/dymo/remoto/agente/*` (token Bearer propio, solo conexiones salientes desde la Raspberry). Cada etiqueta se entrega una vez; lo no tomado en 10 min se cancela (no sale tarde) y lo tomado sin confirmar queda «desconocido» (nunca se reimprime solo). «Aprobada» conserva la regla de la última prueba TQT aprobada. Sin agente en línea con impresora lista, no se encola. Alta del agente: `python -m app.services.dymo_remoto "Raspberry DYMO"` en el contenedor (muestra el token una vez).
+- SVG para imprimir: tarjeta sin contorno de vista previa, nuevo SVG de R3 y fuente de respaldo Inconsolata (Linux). Etiqueta de cable SVG: «TQT» y el número ya caben en la franja (antes se cortaban a 36 pt). Caché `dymo.js`, `dymo_remoto.js`, `dymo_imprimir.js` a `?v=1420` y `sec_validacion.js` a `?v=1440`.
+
 ## v1.4.3 — 2026-10-16
 - Integra la versión real de producción 1.4.1 (76d71a1) con los ajustes locales 1.4.1/1.4.2 (8983d99), sin descartar ninguna corrección.
 - Conserva liberación de COM tras salir de una prueba y desbloqueo de tarjetas con pestañas abandonadas de otro operador, además de Web Serial + puente BLE Windows por MAC y la distribución de Validación.

@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'use strict';
     const T = window.TQT;
     const D = window.TQTDymo;
+    const R = window.TQTDymoRemoto;   // v1.4.2: DYMO compartida (Raspberry)
+    const REMOTA = R ? R.VALOR : null;
     const { h, api, toast } = T;
     const $ = (id) => document.getElementById(id);
     T.hydrateIcons();
@@ -19,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MODULE_MM = 25.4 / 300 * 6;     // 6 puntos por módulo a 300 dpi (igual que el servidor)
     const QUIET = 2;
     const NS = 'http://www.w3.org/2000/svg';
-    const state = { tarjetas: [], cur: null, zoom: 3, dymo: { estado: 'buscando', printers: [], preferred: null }, busy: false };
+    const state = { tarjetas: [], cur: null, zoom: 3, dymo: { estado: 'buscando', printers: [], preferred: null }, busy: false, remota: { disponible: false, agentes: [], en_cola: 0 } };
     const ESC = { tarjetas: new Map(), r3: [], token: null, id: null, moviles: 0, est: null, ultN: 0 };   // v1.3.45: lote escaneado
 
     // ------------------------------------------------------------------ trama y modo
@@ -80,8 +82,28 @@ document.addEventListener('DOMContentLoaded', () => {
     // ------------------------------------------------------------------ conexión con DYMO Connect
     function setPill(k, txt) { $('pill').dataset.k = k; $('pillTxt').textContent = txt; }
 
+    // v1.4.2: la opción «DYMO compartida» del selector manda la etiqueta a la Raspberry (cualquier PC o celular)
+    const remota = () => Boolean(REMOTA) && $('selPrinter').value === REMOTA;
+    function textoRemota() {
+        const r = state.remota, a = r.agentes[0];
+        return `DYMO compartida${a ? ' · ' + a.nombre : ''} (${r.disponible ? 'lista' : a && a.en_linea ? 'impresora no lista' : 'fuera de línea'})`;
+    }
+    function pillRemota() {
+        const r = state.remota;
+        setPill(r.disponible ? 'ok' : 'bad', r.disponible ? `DYMO compartida lista${r.en_cola ? ` · ${r.en_cola} en cola` : ''}` : 'DYMO compartida fuera de línea o sin impresora');
+    }
+    async function remotaEstado() {
+        if (!R) return;
+        state.remota = await R.estado();
+        const op = [...$('selPrinter').options].find((o) => o.value === REMOTA);
+        if (op) op.textContent = textoRemota();
+        if (remota()) { pillRemota(); refrescarBotones(); }
+    }
+    setInterval(() => { if (!document.hidden && !state.busy) remotaEstado(); }, 15000);
+
     function ayuda() {
         const box = $('ayuda'); box.replaceChildren();
+        if (remota()) return;
         const e = state.dymo.estado;
         if (e === 'listo') {
             const p = impresora();
@@ -107,7 +129,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function conectar(force) {
         setPill('', 'Buscando DYMO Connect…'); state.dymo = { estado: 'buscando', printers: [], preferred: null };
         const sel = $('selPrinter'); sel.disabled = true; refrescarBotones();
-        const d = await D.detect(force); state.dymo = d;
+        const [d, rem] = await Promise.all([D.detect(force), R ? R.estado() : null]); state.dymo = d;
+        if (rem) state.remota = rem;
         sel.replaceChildren();
         if (d.estado === 'listo') {
             d.printers.forEach((p) => sel.append(h('option', { value: p.name, selected: p.name === d.preferred ? '' : null }, `${p.name}${p.isConnected ? '' : ' (desconectada)'}`)));
@@ -117,28 +140,38 @@ document.addEventListener('DOMContentLoaded', () => {
             sel.append(h('option', null, d.estado === 'movil' ? 'No disponible en celulares' : 'Sin impresora'));
             setPill(d.estado === 'movil' ? 'warn' : 'bad', { no_servicio: 'Sin DYMO Connect · se imprime con el navegador', sin_impresoras: 'Impresora no encontrada', sin_framework: 'Módulo DYMO no cargado', movil: 'Celular: solo descarga' }[d.estado] || 'Sin conexión');
         }
+        if (REMOTA && state.remota.agentes.length) {
+            sel.append(h('option', { value: REMOTA }, textoRemota()));
+            sel.disabled = false;
+            if (T.store.get('tqt.dymo.impresora') === REMOTA) sel.value = REMOTA;
+            if (remota()) pillRemota();
+        }
         ayuda(); refrescarBotones();
     }
     /** La impresora elegida en el selector (objeto del diagnóstico) o null. */
     const impresora = () => state.dymo.printers.find((p) => p.name === $('selPrinter').value) || null;
     function pillListo() {
+        if (remota()) { pillRemota(); return; }
         const p = impresora(); const n = state.dymo.printers.length;
         if (p && !p.isConnected) setPill('warn', 'DYMO Connect detectado · impresora desconectada');
         else setPill('ok', `DYMO Connect detectado · ${n} impresora${n === 1 ? '' : 's'}`);
         ayuda();
     }
-    $('selPrinter').addEventListener('change', () => { T.store.set('tqt.dymo.impresora', $('selPrinter').value); pillListo(); refrescarBotones(); });
+    $('selPrinter').addEventListener('change', () => {
+        T.store.set('tqt.dymo.impresora', $('selPrinter').value);
+        if (remota() || state.dymo.estado === 'listo') { pillListo(); ayuda(); refrescarBotones(); } else conectar(false);
+    });
     $('btnRefresh').addEventListener('click', () => conectar(true));
 
     // ------------------------------------------------------------------ estado de botones y avisos
     function refrescarBotones() {
         const t = state.cur; const ok = Boolean(t) && modo(t).k !== 'NO';
-        const pr = state.dymo.estado === 'listo' ? impresora() : null; const dym = Boolean(pr && pr.isConnected) || navegador();   // v1.3.90: sin DYMO Connect se imprime con el navegador
+        const pr = state.dymo.estado === 'listo' ? impresora() : null; const dym = remota() ? state.remota.disponible : Boolean(pr && pr.isConnected) || navegador();   // v1.3.90: sin DYMO Connect se imprime con el navegador
         $('btnPrint').disabled = state.busy || !ok || !dym;
         $('btnOpen').disabled = state.busy || !t;
         $('btnPrintAll').disabled = state.busy || !dym || !state.tarjetas.some((x) => modo(x).k !== 'NO');
         $('btnDownAll').disabled = state.busy || !state.tarjetas.some((x) => modo(x).k !== 'NO');
-        $('btnPrint').title = dym ? '' : 'Requiere DYMO Connect y una impresora conectada en esta PC';
+        $('btnPrint').title = dym ? '' : remota() ? 'La DYMO compartida no está en línea' : 'Requiere DYMO Connect y una impresora conectada en esta PC';
         $('btnEscPrint').disabled = state.busy || !dym || !(ESC.tarjetas.size + ESC.r3.length);
     }
     async function refresh() {
@@ -219,6 +252,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } finally { setTimeout(fin, 1000); } }, 150);
     }
     async function imprimirTarjeta(printer, t, c) {
+        if (printer === REMOTA) { await R.imprimir({ tipo: 'tarjeta', tarjeta_id: t.id, copias: c }); await marcarImpresa(t); return; }
         if (navegador()) { encolar(buildLabel(t), c, () => marcarImpresa(t)); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
@@ -243,7 +277,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         const t = state.cur; if (!t) return;
         state.busy = true; refrescarBotones(); progreso(0, 1, 'Preparando etiqueta…');
         try {
-            progreso(0.5, 1, `Enviando a ${$('selPrinter').value}…`);
+            progreso(0.5, 1, `Enviando a ${remota() ? 'la DYMO compartida' : $('selPrinter').value}…`);
             await imprimirTarjeta($('selPrinter').value, t, copias());
             progreso(1, 1, `Etiqueta de la tarjeta ${t.id_tarjeta_num} enviada a la impresora.`); toast('Enviada a la DYMO', { kind: 'ok' }); ocultarProg(2500);
         } catch (e) {
@@ -270,7 +304,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         for (const t of list) {
             progreso(hechas, list.length, `Imprimiendo ${hechas + 1} de ${list.length}: tarjeta ${t.id_tarjeta_num}…`);
             try { await imprimirTarjeta(printer, t, c); hechas++; }
-            catch (e) { fallos.push(`${t.id_tarjeta_num}: ${e.message}`); if (/no respondió|DYMO Connect|servicio/i.test(e.message)) break; }
+            catch (e) { fallos.push(`${t.id_tarjeta_num}: ${e.message}`); if (/no respondió|DYMO Connect|servicio|compartida/i.test(e.message)) break; }
         }
         progreso(hechas, list.length, `${hechas} de ${list.length} etiquetas enviadas.`);
         if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} sin imprimir. `), fallos.slice(0, 4).join(' · ')));
@@ -470,6 +504,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         return txt;
     }
     async function imprimirR3(printer, par, c) {
+        if (printer === REMOTA) { await R.imprimir({ tipo: 'r3', nombres: par.filter(Boolean), copias: c }); return; }
         if (navegador()) { encolar(h('div', { class: 'dymo-label r3doble' }, mitad(par[0]), mitad(par[1])), c); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
@@ -485,7 +520,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         for (const par of etiquetas) {
             progreso(hechas, etiquetas.length, `Imprimiendo ${hechas + 1} de ${etiquetas.length}: ${par.join(' + ')}…`);
             try { await imprimirR3(printer, par, c); hechas++; }
-            catch (e) { fallos.push(`${par.join(' + ')}: ${e.message}`); if (/no respondió|DYMO Connect|servicio/i.test(e.message)) break; }
+            catch (e) { fallos.push(`${par.join(' + ')}: ${e.message}`); if (/no respondió|DYMO Connect|servicio|compartida/i.test(e.message)) break; }
         }
         progreso(hechas, etiquetas.length, `${hechas} de ${etiquetas.length} etiquetas ${tq} enviadas.`);
         if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} etiqueta${fallos.length === 1 ? '' : 's'} ${tq} sin imprimir. `), fallos.slice(0, 4).join(' · ')));
@@ -602,6 +637,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         return txt;
     }
     async function imprimirCable(printer, num, c) {
+        if (printer === REMOTA) { await R.imprimir({ tipo: 'cable', numero: num, copias: c }); return; }
         if (navegador()) { encolar(nodoCable(num), c); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
@@ -617,7 +653,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         for (const num of lista) {
             progreso(hechas, lista.length, `Imprimiendo ${hechas + 1} de ${lista.length}: cable ${num}…`);
             try { await imprimirCable(printer, num, c); hechas++; }
-            catch (e) { fallos.push(`${num}: ${e.message}`); if (/no respondió|DYMO Connect|servicio/i.test(e.message)) break; }
+            catch (e) { fallos.push(`${num}: ${e.message}`); if (/no respondió|DYMO Connect|servicio|compartida/i.test(e.message)) break; }
         }
         progreso(hechas, lista.length, `${hechas} de ${lista.length} etiquetas de cable enviadas.`);
         if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} etiqueta${fallos.length === 1 ? '' : 's'} de cable sin imprimir. `), fallos.slice(0, 4).join(' · ')));

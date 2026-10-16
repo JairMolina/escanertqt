@@ -887,6 +887,8 @@
         const n = (r?.impresas || []).length;
         printOut.textContent = r?.ok && r.via === "navegador"
           ? "Sin DYMO Connect: se abrió el cuadro de impresión del navegador con las 2 etiquetas; elige la LabelWriter y confirma la salida física."
+          : r?.ok && r.via === "dymo_compartida"
+          ? "Impresas 2/2 en la DYMO compartida (Raspberry)."
           : r?.ok
           ? "Enviadas " + n + "/2 a la impresora (envío a cola; confirma la salida física)."
           : "Enviadas " + n + "/2. Error: " + (r?.error || "sin detalle") + ". Puedes reintentar.";

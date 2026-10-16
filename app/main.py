@@ -20,7 +20,7 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station, esp32
+from app.routers import test_station, esp32, dymo_remoto
 from app.ssl_cert import ensure_ssl_certificates
 
 # Configurar logging
@@ -183,7 +183,7 @@ def _permiso_rol(rol: Optional[str], ruta: str, metodo: str):
 async def _exigir_sesion(request: Request):
     """None si puede pasar; si no, la respuesta de rechazo (401 JSON para la API, redirección a /login para las páginas)."""
     ruta = request.url.path
-    if ruta in RUTAS_PUBLICAS or ruta.startswith(PREFIJOS_PUBLICOS) or ruta.startswith('/api/stm32/agent/'):
+    if ruta in RUTAS_PUBLICAS or ruta.startswith(PREFIJOS_PUBLICOS) or ruta.startswith(('/api/stm32/agent/', '/api/dymo/remoto/agente/')):
         return None
     if request.scope.get("type") == "websocket":
         return None
@@ -245,6 +245,7 @@ app.include_router(validacion.router)
 app.include_router(validacion.agent_router)
 app.include_router(test_station.router)
 app.include_router(test_station.agent_router)
+app.include_router(dymo_remoto.router)   # v1.4.2: DYMO compartida (Raspberry)
 
 
 def _serve_file(file_path: Path, fallback_path: Path = None) -> FileResponse:

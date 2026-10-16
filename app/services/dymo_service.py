@@ -52,6 +52,8 @@ SILENCIO_MODULOS = 2                     # zona de silencio del QR (DYMO admite 
 SEPARACION_MM = 1.5                      # aire entre el QR y el texto
 FUENTE = "Consolas"                      # monoespaciada de Windows: 17 caracteres a 8 pt = 26.4 mm (Courier New = 28.8)
 FUENTE_PT = 9.5
+# v1.4.2: en Linux (DYMO compartida en la Raspberry) no hay Consolas; Inconsolata es más angosta, así que el texto cabe.
+FUENTE_SVG = f"{FUENTE}, Inconsolata, 'DejaVu Sans Mono', 'Courier New', monospace"
 FUENTE_AVANCE_EM = 0.55                  # ancho de un carácter de Consolas en unidades de em
 INTERLINEADO = 1.25                      # alto de línea / tamaño de fuente
 MIN_FUENTE_PT = 7.0
@@ -721,17 +723,34 @@ class DymoService:
 {objeto}</DieCutLabel>"""
 
     @classmethod
+    def generate_r3_svg(cls, nombres: List[str], label_format: Optional[str] = None) -> str:
+        """v1.4.2: SVG a escala real (1 unidad = 1 mm) de la etiqueta R3 doble, mismo diseño que el .label (QR + nombre por mitad)."""
+        f = obtener_formato(label_format)
+        pt = R3_FUENTE_PT * PT_A_MM
+        partes = []
+        for md in calcular_diseno_r3(f, nombres):
+            mod = md.puntos_por_modulo / DOTS_PER_MM
+            x0, y0 = md.qr.x + SILENCIO_MODULOS * mod, md.qr.y + SILENCIO_MODULOS * mod
+            partes.append("".join(f'<rect x="{x0 + c * mod:.4f}" y="{y0 + r * mod:.4f}" width="{mod:.4f}" height="{mod:.4f}"/>'
+                                  for r, fila in enumerate(matriz_qr(md.nombre)) for c, v in enumerate(fila) if v))
+            partes.append(f'<text x="{md.texto.x:.3f}" y="{md.texto.y + md.texto.h / 2:.3f}" dominant-baseline="central" '
+                          f'font-family="{FUENTE_SVG}" font-weight="700" font-size="{pt:.4f}">{xml_escape(md.nombre)}</text>')
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f.ancho_mm:g}mm" height="{f.alto_mm:g}mm" viewBox="0 0 {f.ancho_mm:g} {f.alto_mm:g}">'
+                f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/><g fill="#000" shape-rendering="crispEdges">{"".join(partes)}</g></svg>')
+
+    @classmethod
     def generate_cable_svg(cls, numero: str, label_format: Optional[str] = None) -> str:
         """v1.4.0: SVG a escala real (1 unidad = 1 mm) de la etiqueta de cable, para el respaldo de impresión del navegador."""
         f = obtener_formato(label_format)
         c, ln = caja_cable(f), caja_linea_cable(f)
-        pt = CABLE_FUENTE_PT * PT_A_MM
+        # v1.4.2: dos líneas («TQT» y el número) deben caber en la franja de c.w mm; a 36 pt se salían del borde izquierdo.
+        pt = min(CABLE_FUENTE_PT * PT_A_MM, c.w / 2.1, c.h / (max(len(numero), 3) * 0.6))
         cx, cy = c.x + c.w / 2, c.y + c.h / 2
         textos = "".join(f'<text transform="translate({cx + dx:.3f} {cy:.3f}) rotate(-90)" text-anchor="middle" dominant-baseline="central">{xml_escape(t)}</text>'
-                         for dx, t in ((-pt * 0.55, "TQT"), (pt * 0.55, numero)))
+                         for dx, t in ((-pt * 0.52, "TQT"), (pt * 0.52, numero)))
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f.ancho_mm:g}mm" height="{f.alto_mm:g}mm" viewBox="0 0 {f.ancho_mm:g} {f.alto_mm:g}">'
                 f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/>'
-                f'<g fill="#000" font-family="{FUENTE}, \'Courier New\', monospace" font-weight="700" font-size="{pt:.4f}">{textos}</g>'
+                f'<g fill="#000" font-family="{FUENTE_SVG}" font-weight="700" font-size="{pt:.4f}">{textos}</g>'
                 f'<line x1="{ln.x + ln.w / 2:.3f}" y1="{ln.y:.3f}" x2="{ln.x + ln.w / 2:.3f}" y2="{ln.abajo:.3f}" stroke="#000" stroke-width="0.5" '
                 f'stroke-dasharray="{CABLE_GUION_MM} {CABLE_HUECO_MM}"/></svg>')
 
@@ -867,9 +886,9 @@ class DymoService:
     # ------------------------------------------------------------------ vistas previas a escala real
     @classmethod
     def generate_svg_preview(cls, tarjeta: Dict[str, Any], label_format: Optional[str] = None, guia: bool = True,
-                             aprobada: bool = False) -> str:
+                             aprobada: bool = False, borde: bool = True) -> str:
         """SVG a escala real (1 unidad = 1 mm): módulos del QR como rectángulos (bordes nítidos, sin PNG), 4 líneas de
-        texto y, con `guia`, la zona segura de 3 mm en línea punteada."""
+        texto y, con `guia`, la zona segura de 3 mm en línea punteada. v1.4.2: `borde=False` para imprimir (sin contorno)."""
         d = cls.diseno(tarjeta, label_format)
         f = d.formato
         matriz = matriz_qr(cls.format_qr_payload(tarjeta))
@@ -889,11 +908,13 @@ class DymoService:
         s = d.zona_segura
         guia_svg = (f'<rect x="{s.x}" y="{s.y}" width="{s.w}" height="{s.h}" fill="none" stroke="#000" stroke-width="0.15" '
                     f'stroke-dasharray="1 1" class="guia"/>') if guia else ""
+        marco = (f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" rx="2.5" fill="#fff" stroke="#000" stroke-width="0.2"/>' if borde
+                 else f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/>')
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f.ancho_mm:g}mm" height="{f.alto_mm:g}mm" '
                 f'viewBox="0 0 {f.ancho_mm:g} {f.alto_mm:g}">'
-                f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" rx="2.5" fill="#fff" stroke="#000" stroke-width="0.2"/>'
+                f'{marco}'
                 f'<g fill="#000" shape-rendering="crispEdges">{celdas}</g>'
-                f'<g fill="#000" font-family="{FUENTE}, \'Courier New\', monospace" font-weight="700" font-size="{pt_mm:.4f}">{texto}</g>'
+                f'<g fill="#000" font-family="{FUENTE_SVG}" font-weight="700" font-size="{pt_mm:.4f}">{texto}</g>'
                 f'{guia_svg}</svg>')
 
     @classmethod
