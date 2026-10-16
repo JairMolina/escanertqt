@@ -45,7 +45,13 @@
                 if (value.byteLength !== 10 || !states[value.getUint8(0)]) return;
                 chars.latest = { state: states[value.getUint8(0)], offset: value.getUint32(1, true),
                     total: value.getUint32(5, true), error: value.getUint8(9) };
+                // v1.4.0: wake pending waiters on the notification itself (no timer polling; background-tab safe).
+                for (const wake of [...chars.waiters]) wake();
             };
+            chars.waiters = new Set();
+            chars.onDisconnect = () => { chars.dropped = true; for (const wake of [...chars.waiters]) wake(); };
+            device.addEventListener?.('gattserverdisconnected', chars.onDisconnect);
+            chars.device = device;
             chars.status.addEventListener('characteristicvaluechanged', chars.onStatus);
             try { await bounded(chars.status.startNotifications(), signal); }
             catch (error) { cleanup(chars); throw error; }
@@ -54,6 +60,8 @@
     }
     function cleanup(chars) {
         if (chars?.onStatus) chars.status.removeEventListener('characteristicvaluechanged', chars.onStatus);
+        if (chars?.onDisconnect) chars.device?.removeEventListener?.('gattserverdisconnected', chars.onDisconnect);
+        if (chars?.waiters) { chars.dropped = true; for (const wake of [...chars.waiters]) wake(); chars.waiters.clear(); }
     }
     async function bootInfo(chars, signal) {
         const deadline = Date.now() + 20000;
@@ -65,17 +73,44 @@
         } while (Date.now() < deadline);
         throw new Error('La R2 todavía no confirmó su arranque.');
     }
+    // v1.4.0: fast mode waits on BLE notifications (event-driven); the timer is only the no-confirmation limit.
+    function waitEvent(chars, accept, signal, ms) {
+        return new Promise((resolve, reject) => {
+            let done = false, timer, wake, abort;
+            const finish = fn => { if (done) return; done = true; clearTimeout(timer); chars.waiters.delete(wake);
+                signal?.removeEventListener('abort', abort); fn(); };
+            const evaluate = () => {
+                if (done) return;
+                if (signal?.aborted) return finish(() => reject(new Error('Actualización cancelada.')));
+                const status = chars.latest;
+                if (status?.state === 'error') {
+                    done = true; clearTimeout(timer); chars.waiters.delete(wake); signal?.removeEventListener('abort', abort);
+                    return json(chars.status, signal).catch(() => status)
+                        .then(detail => reject(new Error('La R2 detuvo OTA: ' + detail.error)));
+                }
+                if (status && accept(status)) return finish(() => resolve(status));
+                if (chars.dropped) return finish(() => reject(new Error('Bluetooth se desconectó durante la OTA.')));
+            };
+            wake = evaluate;
+            abort = () => finish(() => reject(new Error('Actualización cancelada.')));
+            signal?.addEventListener('abort', abort, { once: true });
+            timer = setTimeout(() => finish(() => reject(new Error('La R2 no confirmó el bloque OTA; no se activó el firmware.'))), ms);
+            chars.waiters.add(wake);
+            evaluate(); // covers a notification that arrived before waiting
+        });
+    }
     async function waitState(chars, accept, signal, ms = 15000) {
+        check(signal);
+        if (chars.fast) return waitEvent(chars, accept, signal, ms);
         const deadline = Date.now() + ms;
         do {
             check(signal);
-            const status = chars.fast ? chars.latest : await json(chars.status, signal);
+            const status = await json(chars.status, signal);
             if (status?.state === 'error') {
-                const detail = chars.fast ? await json(chars.status, signal) : status;
-                throw new Error('La R2 detuvo OTA: ' + detail.error);
+                throw new Error('La R2 detuvo OTA: ' + status.error);
             }
             if (status && accept(status)) return status;
-            await sleep(chars.fast ? 5 : 30);
+            await sleep(30);
         } while (Date.now() < deadline);
         throw new Error('La R2 no confirmó el bloque OTA; no se activó el firmware.');
     }
