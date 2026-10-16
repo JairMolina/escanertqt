@@ -47,6 +47,20 @@ class Events(BaseModel):
     items: list[Event] = Field(max_length=100)
 
 
+# v1.4.0: ejecuciones desde el navegador (Web Serial/Web Bluetooth) con banco seguro fijo.
+class WebStart(BaseModel):
+    tarjeta_id: int = Field(gt=0)
+
+
+class WebEvents(BaseModel):
+    items: list[Event] = Field(default_factory=list, max_length=100)
+
+
+class WebIdentity(BaseModel):
+    detectada: dict
+    confirmar: bool = False
+
+
 class Installer(BaseModel):
     name: str = Field(default="Banco de pruebas local", max_length=60, min_length=1)
 
@@ -107,12 +121,32 @@ def history(tarjeta_id: int | None = None):
         return [
             dict(r)
             for r in c.execute(
-                "SELECT id,requested_card,tarjeta_id,operator,state,created,updated,result FROM tqt_test_runs"
+                "SELECT id,requested_card,tarjeta_id,operator,state,created,updated,result,origin FROM tqt_test_runs"
                 + where
                 + " ORDER BY created DESC LIMIT 500",
                 (tarjeta_id,) if tarjeta_id else (),
             )
         ]
+
+
+@router.post("/web/runs")
+def web_start(body: WebStart, req: Request):
+    return run(svc.web_create, body.tarjeta_id, operator(req))
+
+
+@router.post("/web/runs/{jid}/events")
+def web_events(jid: str, body: WebEvents, req: Request):
+    return run(svc.web_events, operator(req), jid, [x.model_dump() for x in body.items])
+
+
+@router.post("/web/runs/{jid}/identity")
+def web_identity(jid: str, body: WebIdentity, req: Request):
+    return run(svc.web_identity, operator(req), jid, body.detectada, body.confirmar)
+
+
+@router.post("/web/runs/{jid}/result")
+def web_result(jid: str, body: dict, req: Request):
+    return run(svc.web_finish, operator(req), jid, body)
 
 
 @router.get("/runs/{jid}")

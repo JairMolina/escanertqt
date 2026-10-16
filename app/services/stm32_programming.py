@@ -162,7 +162,7 @@ def stations(client_ip=None):
     with db.get_db() as c:
         return [dict(id=r['id'], name=r['name'], online=time.time()-r['last_seen']<20,
                      local=bool(client_ip) and STATION_IP.get(r['id']) == client_ip)
-                for r in c.execute('SELECT * FROM stm32_stations ORDER BY name')]
+                for r in c.execute("SELECT * FROM stm32_stations WHERE id NOT LIKE 'web-%' ORDER BY name")]  # v1.4.0: sin bancos lógicos del navegador
 
 
 def create_job(pcb, station, expected, operator, physical_confirmed=False, firmware_id=None):
