@@ -1,5 +1,21 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.0 — 2026-10-16
+Pruebas TQT (`#/validacion`) pasan a correr en el navegador; el agente de Windows queda como respaldo. Pendiente de aceptación en el banco físico.
+- **1. Banco fijo:** sin selector de banco ni confirmación repetida; pulsar «Iniciar» es la intención del operador. Contexto fijo «banco de pruebas · modo seguro» (en la ruta web lo fija el servidor; en la del agente el campo `banco` se envía pero el backend lo ignora).
+- **2. 14 etapas fijas:** las 14 filas se ven desde el inicio con indicador a la izquierda, no se reordenan ni se borran; la que no se ejecuta queda con su motivo (cancelada / no verificada).
+- **3. Resultado arriba:** Aprobada / Aprobada con advertencias / Fallida / No verificada / Cancelada, con contador x/14, MAC registradas, del firmware y observadas, duración, HW/FW e interfaz usada.
+- **4. Tarjeta e historial a la derecha:** búsqueda/escaneo y el historial de la tarjeta junto a la prueba.
+- **5. Serial directo:** nueva capa `serial_web.js` (`TQTSerial`: un propietario por puerto, lector incremental, cola de escritura, liberación de locks) y motor `validacion_web.js` (`TQTValWeb`) con las 14 etapas: 57600 8N1, ACK 180 ms, guardia 300 ms, barrera S29, PPON/POFF por Web Bluetooth. Reutiliza puertos/dispositivos autorizados; si falta permiso BLE pide un clic («Autorizar R1/R2 BLE»). Backend `/api/validacion/tqt/web/runs` (crear, eventos por lotes, identidad, resultado) con las mismas reglas de aprobación y cotejo que el agente; el historial existente sigue igual. En la ruta web, fuera de la prueba, el registro muestra el monitor RX del puerto.
+- **6. HW/FW:** semáforo de vigencia del firmware leído contra `/api/firmware` (sin compatibilidad por HW todavía).
+- **7 y 8. Imprimir etiquetas:** con la prueba Aprobada, un botón imprime la etiqueta vigente con la leyenda «Aprobada» y la etiqueta de cable con el número, sin salir de la sección (`dymo_imprimir.js`, endpoint `/api/dymo/cable/svg`). Sin DYMO Connect abre el cuadro de impresión del navegador. «Aprobada» solo aparece en este flujo.
+- **9. Últimos ON/OFF por etapa**, **10. ON/OFF manuales por BLE** (R1 o R2 conectada) y **11. indicadores serial/Bluetooth** visibles en la vista.
+- **12. Tarjeta distinta:** si la conectada no es la seleccionada se pide confirmar; al aceptar, la prueba continúa sin reiniciar y el resultado se guarda bajo la detectada (se registran selección, detectada y consentimiento).
+- **Salir con prueba en curso:** cambiar de sección con una prueba web en curso pide confirmación (si se acepta, se cancela y queda no verificada); cerrar o recargar la pestaña también avisa.
+- **C. Programación:** R1 y R3 usan la misma plantilla de estado que R2 (`prog_estado.js`). Matriz de comunicación en `docs/V140_MATRIZ_SERIAL.md`.
+- **D. OTA R2:** el envío avanza por notificaciones BLE, sin bucle de espera con temporizador; aviso discreto de mantener la pestaña visible (si Chrome/Windows suspenden la página puede tardar más).
+- **Limitaciones / pendiente:** en la ruta web no hay comandos seriales manuales (solo monitor RX y ON/OFF BLE). Web Bluetooth no expone la MAC BLE: el vínculo se acepta solo con evidencia S29, si no queda «no verificado». Solo Chrome/Edge de escritorio en HTTPS. Programación R2 aún no migra a `TQTSerial`; STM32 R1/R3 sigue por J-Link con el puente. La detección de cancelación de R1/R3 en la plantilla común no se probó con un trabajo real. Punto 13 (Skytec) sin ejecutar. Caché a `?v=1400`.
+
 ## v1.3.94 — 2026-10-16
 - **Etiquetas DYMO:** la hoja ya no muestra todo desplegado. Debajo de la conexión hay cuatro botones (Tarjetas · Escanear · R3 · Cable) y solo se ve la zona elegida; se recuerda la última en ese navegador. «Escanear» muestra cuántas etiquetas hay en la lista y, si llega un escaneo del celular, la página cambia sola a esa zona. Los avisos de impresión y la ampliación de la vista quedan fuera de las zonas (sirven para todas). Caché `dymo.js` a `?v=1394`.
 

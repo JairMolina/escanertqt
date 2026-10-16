@@ -514,7 +514,7 @@
     }
     const curStation = () => stationsCache.find((s) => s.id === stationId);
     // ---------------------------------------------------------------- ruta web (K1)
-    let unsubEstado = null;
+    let unsubEstado = null, unsubMonitor = null;
     function paintWebEstado() {
       let e = null;
       try {
@@ -558,9 +558,10 @@
               kind: "primary",
               onClick: async () => {
                 fin(true);
-                if (typeof detectada === "object" && detectada?.id) {
-                  if (active) active.tarjetaId = detectada.id;
-                  await selectCard(detectada, { force: true });
+                const detId = typeof detectada === "object" ? detectada?.tarjeta_id ?? detectada?.id : null;
+                if (detId) {
+                  if (active) active.tarjetaId = detId;
+                  await selectCard({ id: detId, id_tarjeta_num: det }, { force: true });
                 }
                 message("Continuando con la tarjeta " + det + ".");
               },
@@ -570,6 +571,46 @@
           onClose: () => fin(false),
         });
       });
+    }
+    function solicitarGesto(signal) {
+      // v1.4.0: Web Bluetooth necesita un gesto; autorizar() se llama dentro del clic (sin await previo).
+      return ({ dispositivo, nombre, autorizar }) =>
+        new Promise((resolve, reject) => {
+          const Int = window.TQTValWeb?._interno?.Interrupted || Error;
+          let done = false, hoja = null;
+          const fin = (ok, v) => {
+            if (done) return;
+            done = true;
+            signal?.removeEventListener("abort", ab);
+            ok ? resolve(v) : reject(v);
+          };
+          const ab = () => {
+            fin(false, new Int("Prueba detenida por el usuario"));
+            try { hoja?.close(); } catch (e) {}
+          };
+          const txt = h("p", null, "La prueba necesita permiso de Bluetooth para " + dispositivo + ". Pulsa «Autorizar» y elige «" + nombre + "» en el selector del navegador.");
+          hoja = T.sheet({
+            title: "Autorizar Bluetooth " + dispositivo,
+            body: [txt],
+            actions: [
+              {
+                label: "Autorizar " + dispositivo + " BLE",
+                kind: "primary",
+                onClick: () =>
+                  autorizar().then(
+                    (d) => fin(true, d),
+                    (e) => {
+                      txt.textContent = "No se autorizó (" + (e?.message || e) + "). Reintenta o cancela.";
+                      return false;
+                    },
+                  ),
+              },
+              { label: "Cancelar prueba", kind: "ghost", onClick: () => fin(false, new Int("Cancelada: no se autorizó Bluetooth " + dispositivo)) },
+            ],
+            onClose: () => fin(false, new Int("Cancelada: no se autorizó Bluetooth " + dispositivo)),
+          });
+          signal?.addEventListener("abort", ab, { once: true });
+        });
     }
     async function bleManual(accion) {
       if (active || manualBusy) return;
@@ -714,7 +755,20 @@
           break;
         case "done":
           run.issue = a[1] || "";
+          // v1.4.0: el motor web marca la cancelación en el tercer argumento ({cancelada}).
+          if (a[2]?.cancelada) run.cancelRequested = true;
           break;
+        case "identity_prompt":
+          // El motor ya escribe la línea IDENTIDAD en el LOG; la UI muestra el diálogo vía confirmarIdentidad.
+          announcer.textContent = "Tarjeta conectada distinta: confirma si continúas con la " + cardNum(a[0]?.detectada) + ".";
+          break;
+        case "identity_change": {
+          // v1.4.0 (B.12): identidad confirmada; las evidencias siguientes son de la detectada.
+          const det = a[0]?.detectada;
+          if (det?.tarjeta_id && active) active.tarjetaId = det.tarjeta_id;
+          run.observed.identityChange = a[0] || null;
+          break;
+        }
       }
       paintSummary();
     }
@@ -806,9 +860,12 @@
       printBtn.disabled = true;
       printOut.textContent = "Imprimiendo etiquetas de la tarjeta " + cardNum(printTarjeta) + "…";
       try {
-        const r = await P.aprobadaYCable({ tarjeta: printTarjeta });
+        // v1.4.0: el clic es un gesto del operador; sin DYMO Connect se usa el diálogo de impresión del navegador.
+        const r = await P.aprobadaYCable({ tarjeta: printTarjeta, respaldoNavegador: true });
         const n = (r?.impresas || []).length;
-        printOut.textContent = r?.ok
+        printOut.textContent = r?.ok && r.via === "navegador"
+          ? "Sin DYMO Connect: se abrió el cuadro de impresión del navegador con las 2 etiquetas; elige la LabelWriter y confirma la salida física."
+          : r?.ok
           ? "Enviadas " + n + "/2 a la impresora (envío a cola; confirma la salida física)."
           : "Enviadas " + n + "/2. Error: " + (r?.error || "sin detalle") + ". Puedes reintentar.";
         printBtn.textContent = "Reimprimir etiquetas";
@@ -928,6 +985,7 @@
           tarjetaId: card.id,
           onEvento: (e) => alive && handleEvent(e),
           confirmarIdentidad,
+          solicitarGesto: solicitarGesto(webAbort.signal),
           signal: webAbort.signal,
         });
         jid = res?.jid || null;
@@ -1214,8 +1272,20 @@
       paintWebEstado();
       try {
         unsubEstado = window.TQTValWeb.onEstado?.(() => alive && paintWebEstado()) || null;
+        // v1.4.0: monitor en ruta web: tramas RX y avisos del puerto fuera de la prueba automática.
+        unsubMonitor = window.TQTValWeb.onMonitor?.((ev) => {
+          if (alive && !active && ev?.text) logLine((ev.kind === "line" ? "RX: " : "") + ev.text);
+        }) || null;
       } catch (e) {}
     } else stations().catch(() => {});
+    // v1.4.0: cerrar o recargar la pestaña con una prueba web en curso pide confirmación del navegador.
+    const antesDeDescargar = (ev) => {
+      if (active?.web) {
+        ev.preventDefault();
+        ev.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", antesDeDescargar);
     const refresh = setInterval(() => {
       if (alive && !active && !manualBusy && !web()) stations().catch(() => {});
     }, 3000);
@@ -1224,6 +1294,20 @@
     return {
       escaneo: scan,
       ocupada: () => !!active,
+      // v1.4.0: salir de la vista con una prueba web en curso la cancela; se pide confirmación antes.
+      confirmarSalida: () =>
+        !active?.web ||
+        new Promise((resolve) =>
+          T.sheet({
+            title: "Prueba en curso",
+            body: [h("p", null, "Hay una prueba en curso en este navegador. Si sales de Pruebas TQT se cancelará y quedará como no verificada.")],
+            actions: [
+              { label: "Seguir en la prueba", kind: "ghost", onClick: () => resolve(false) },
+              { label: "Salir y cancelar la prueba", kind: "danger", onClick: () => resolve(true) },
+            ],
+            onClose: () => resolve(false),
+          }),
+        ),
       actualizar: () => (web() ? paintWebEstado() : stations()),
       desmontar() {
         alive = false;
@@ -1232,6 +1316,8 @@
         clearTimeout(pollTimer);
         clearTimeout(searchTimer);
         try { if (typeof unsubEstado === "function") unsubEstado(); } catch (e) {}
+        try { if (typeof unsubMonitor === "function") unsubMonitor(); } catch (e) {}
+        window.removeEventListener("beforeunload", antesDeDescargar);
         // Una prueba web en curso se cancela al salir de la vista (el motor libera puertos y locks).
         try { webAbort?.abort(); } catch (e) {}
       },

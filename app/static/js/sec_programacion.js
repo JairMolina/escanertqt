@@ -325,6 +325,8 @@
                 S.capability?.eligible ? 'Se comprobarán por Bluetooth la identidad y la capacidad OTA reales, aunque figure sin programar. Mantén alimentación estable y libera Bluetooth de la R1.' :
                 S.capability?.reason==='legacy' ? 'El firmware registrado es anterior a 4.0: necesita instalar la base OTA por USB.' :
                 'Falta la credencial de esta unidad: instala la base OTA por USB desde esta web.';
+            // v1.4.0 (D.7): la OTA avanza por eventos BLE, pero si Chrome/Windows suspenden la página puede tardar más.
+            if (!saved && (S.capability?.eligible || S.capability?.needs_enrollment)) otaHint.textContent += ' Mantén esta pestaña visible durante el envío: si el navegador o Windows suspenden la página, la OTA puede tardar más.';
             btnVerifyR2.disabled=blocked || !S.tarjeta?.mac || !S.capability?.eligible;
             btnVerifyR2.hidden=esR1;
             nextR1.hidden=esR1 || r2States.get(S.tarjeta?.id)?.state!=='updated';

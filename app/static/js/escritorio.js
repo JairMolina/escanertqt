@@ -458,7 +458,7 @@
         desmontar();
         const host = h('section', { class: 'esc-sec', id: 'sec-' + def.id, 'aria-labelledby': 'escTitulo', dataset: { sec: def.id } });
         refs.main.replaceChildren(host);
-        const cur = { id: def.id, def, host, inst: null, limpiar: [], alLote: [] };
+        const cur = { id: def.id, def, host, inst: null, limpiar: [], alLote: [], hash: location.hash };
         S.cur = cur; S.params = params;
         titulo(def.titulo);
         marcarNav(def.id);
@@ -472,6 +472,19 @@
     function ruta() {
         cerrarMenu(false);
         let r = leerHash();
+        // v1.4.0: la sección activa puede pedir confirmación antes de salir (p. ej. prueba web de Validación en curso).
+        // confirmarSalida() devuelve true (salir) o una promesa (hoja propia); mientras tanto se queda en la sección.
+        const c = S.cur, saltar = S.saltarConfirmar; S.saltarConfirmar = false;
+        if (!saltar && c && (!r || r.id !== c.id) && c.inst && typeof c.inst.confirmarSalida === 'function') {
+            const v = c.inst.confirmarSalida();
+            if (v !== true) {
+                const destino = location.hash;
+                if (c.hash) history.replaceState(null, '', c.hash);
+                marcarNav(c.id);
+                if (v && typeof v.then === 'function') v.then((ok) => { if (ok && S.cur === c) { S.saltarConfirmar = true; location.hash = destino; } }, () => {});
+                return;
+            }
+        }
         if (!r) { r = { id: 'resumen', params: new URLSearchParams() }; history.replaceState(null, '', '#/resumen'); }
         const def = secciones.get(r.id);
         if (!def) { history.replaceState(null, '', '#/resumen'); r = { id: 'resumen', params: new URLSearchParams() }; return montarId(r); }
@@ -481,7 +494,7 @@
     function montarId(r) {
         const def = secciones.get(r.id);
         if (def.href) { location.href = def.href; return; }
-        if (S.cur && S.cur.id === r.id) { S.params = r.params; if (S.cur.inst && S.cur.inst.parametros) S.cur.inst.parametros(r.params); return; }
+        if (S.cur && S.cur.id === r.id) { S.params = r.params; S.cur.hash = location.hash; if (S.cur.inst && S.cur.inst.parametros) S.cur.inst.parametros(r.params); return; }
         montar(def, r.params);
     }
     function irSeccion(id) { const d = secciones.get(id); if (!d) return; if (!permitida(id)) { T.avisoAcceso('sec:' + d.titulo); return; } if (d.href) location.href = d.href; else ir(id); }

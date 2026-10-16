@@ -99,6 +99,8 @@ async function api(p) {
 }
 let printed = null, ident = null;
 global.window = {
+  addEventListener() {},
+  removeEventListener() {},
   TQTValWeb: {
     soportado: () => true,
     estado: () => ({ serial: { estado: "ok", puerto: "USB" }, ble: { estado: "off", dispositivo: null } }),
