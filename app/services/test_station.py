@@ -1,6 +1,6 @@
 """Durable test runs; inventory is authoritative. Never releases or alters a card."""
 
-import json, re, secrets, time
+import hashlib, json, re, secrets, time
 from app.database import db
 from app.services import stm32_programming as stm
 
@@ -30,6 +30,15 @@ def init():
         CREATE TABLE IF NOT EXISTS tqt_test_presence(station TEXT PRIMARY KEY REFERENCES stm32_stations(id), seen REAL NOT NULL, state TEXT NOT NULL);
         """
         )
+        # v1.4.0: origen de la ejecución (agent/web), contexto fijo y cambio de identidad confirmado.
+        cols = {r[1] for r in c.execute("PRAGMA table_info(tqt_test_runs)")}
+        for name, ddl in (
+            ("origin", "ALTER TABLE tqt_test_runs ADD COLUMN origin TEXT NOT NULL DEFAULT 'agent'"),
+            ("context", "ALTER TABLE tqt_test_runs ADD COLUMN context TEXT"),
+            ("identity", "ALTER TABLE tqt_test_runs ADD COLUMN identity TEXT"),
+        ):
+            if name not in cols:
+                c.execute(ddl)
 
 
 def snapshot(tid, c):
@@ -109,6 +118,7 @@ def read(jid):
     d = dict(r)
     d["inventory"] = json.loads(d["inventory"])
     d["report"] = json.loads(d["report"]) if d["report"] else None
+    d["identity"] = json.loads(d["identity"]) if d.get("identity") else None
     return d
 
 
@@ -268,21 +278,61 @@ def events(sid, jid, items):
         ).fetchone()
         if not r:
             raise ValueError("La prueba no pertenece a esta estación.")
-        for item in items:
-            old = c.execute(
-                "SELECT data FROM tqt_test_events WHERE run=? AND seq=?",
-                (jid, item["seq"]),
-            ).fetchone()
-            data = json.dumps(item["data"], ensure_ascii=False)
-            if old and old["data"] != data:
-                raise ValueError("No se permite reemplazar evidencia.")
-            if not old:
-                c.execute(
-                    "INSERT INTO tqt_test_events VALUES(?,?,?)",
-                    (jid, item["seq"], data),
-                )
-        c.execute("UPDATE tqt_test_runs SET updated=? WHERE id=?", (time.time(), jid))
+        _store_events(c, jid, items)
     return {"ok": True}
+
+
+def _store_events(c, jid, items):
+    """Idempotente por seq: repetir un lote no duplica; nunca reemplaza evidencia."""
+    for item in items:
+        old = c.execute(
+            "SELECT data FROM tqt_test_events WHERE run=? AND seq=?",
+            (jid, item["seq"]),
+        ).fetchone()
+        data = json.dumps(item["data"], ensure_ascii=False)
+        if old and old["data"] != data:
+            raise ValueError("No se permite reemplazar evidencia.")
+        if not old:
+            c.execute(
+                "INSERT INTO tqt_test_events VALUES(?,?,?)",
+                (jid, item["seq"], data),
+            )
+    c.execute("UPDATE tqt_test_runs SET updated=? WHERE id=?", (time.time(), jid))
+
+
+def verdict(report, checks):
+    """Reglas de aprobación únicas para agente y navegador (no se acepta un booleano del cliente)."""
+    steps = report.get("steps", []) if isinstance(report.get("steps"), list) else []
+    health = report.get("serial_health", {}) if isinstance(report.get("serial_health"), dict) else {}
+    quality = report.get("communication_quality", {})
+    quality = quality if isinstance(quality, dict) else {}
+    passed = (
+        report.get("result") == "aprobado"
+        and len(steps) == 14
+        and all(isinstance(s, dict) and s.get("state") == "aprobado" for s in steps)
+        and health.get("frames", 0) > 0
+    )
+    result = (
+        "fallido"
+        if report.get("result") == "fallido"
+        or any(isinstance(s, dict) and s.get("state") == "fallido" for s in steps)
+        else "no_verificado"
+    )
+    if (
+        passed
+        and checks["state"] == "coincide"
+        and quality.get("state") != "no_verificable"
+        and not any(
+            health.get(k, 0) for k in ["retries", "partial_warnings", "ack_errors"]
+        )
+    ):
+        result = (
+            "aprobado_con_advertencias"
+            if report.get("warnings")
+            or quality.get("state") == "advertencias"
+            else "aprobado"
+        )
+    return result
 
 
 def finish(sid, jid, report):
@@ -299,35 +349,7 @@ def finish(sid, jid, report):
             raise ValueError("La prueba ya tiene un resultado permanente.")
         d = json.loads(row["inventory"])
         checks = compare(d, report)
-        steps = report.get("steps", [])
-        health = report.get("serial_health", {})
-        passed = (
-            report.get("result") == "aprobado"
-            and len(steps) == 14
-            and all(s.get("state") == "aprobado" for s in steps)
-            and health.get("frames", 0) > 0
-        )
-        result = (
-            "fallido"
-            if report.get("result") == "fallido"
-            or any(s.get("state") == "fallido" for s in steps)
-            else "no_verificado"
-        )
-        if (
-            passed
-            and checks["state"] == "coincide"
-            and report.get("communication_quality", {}).get("state") != "no_verificable"
-            and not any(
-                health.get(k, 0) for k in ["retries", "partial_warnings", "ack_errors"]
-            )
-        ):
-            result = (
-                "aprobado_con_advertencias"
-                if report.get("warnings")
-                or report.get("communication_quality", {}).get("state")
-                == "advertencias"
-                else "aprobado"
-            )
+        result = verdict(report, checks)
         combined = {
             "source_report": report,
             "inventory_check": checks,
@@ -336,6 +358,253 @@ def finish(sid, jid, report):
             "release_authorized": False,
         }
         # Unverified identity never links automatically to a different physical card.
+        tid = row["requested_card"] if checks["state"] == "coincide" else None
+        c.execute(
+            "UPDATE tqt_test_runs SET state='finished',tarjeta_id=?,updated=?,report=?,result=? WHERE id=?",
+            (tid, time.time(), json.dumps(combined, ensure_ascii=False), result, jid),
+        )
+    return read(jid)
+
+
+# ---------------------------------------------------------------------------
+# v1.4.0: ejecuciones de origen navegador (Web Serial + Web Bluetooth).
+# El navegador del operador autenticado ejecuta las 14 etapas; el servidor guarda
+# eventos, aplica las MISMAS reglas de aprobación/cotejo (verdict/compare) y además
+# reconstruye la identidad desde las tramas S29 crudas recibidas. Límite de confianza:
+# el servidor no observa el hardware; el informe no es una atestación criptográfica.
+WEB_CONTEXT = "banco de pruebas · modo seguro"
+S29_FIELDS = (
+    "BLK", "OUT1", "OUT2", "OUT3", "INT1", "INT2", "INT3", "EST1", "EST2", "EST3",
+    "MOTOR", "SEN_MOT", "TIEMPO", "DBG", "VIVA", "TQT", "ON", "OFF", "PB", "err",
+    "RESET", "VER", "HW", "MOV", "Mensaje", "IDR", "MACR", "ID", "MAC",
+)
+_POST_RE = re.compile(r'AT\$POST=1,0,"(?P<body>[^"]*)"')
+
+
+def parse_s29(line):
+    """Misma gramática que tqtstation.protocol.parse_status; None si la trama no es S29 completa."""
+    found = _POST_RE.search(str(line or ""))
+    if not found:
+        return None
+    body = found.group("body")
+    m = re.match(r"S29(?P<sep>[^\w\s])", body)
+    if not m:
+        return None
+    entries = body[4:].split(m.group("sep"))
+    if len(entries) != 29:
+        return None
+    values = {}
+    for expected, entry in zip(S29_FIELDS, entries):
+        if not entry.startswith(expected) or len(entry) <= len(expected):
+            return None
+        v = entry[len(expected):]
+        if v[0] not in ":;=,":
+            return None
+        values[expected] = v[1:]
+    return values
+
+
+def _int(v):
+    try:
+        return int(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def web_station(c, operator):
+    """Banco lógico por operador (FK de tqt_test_runs.station). Sin token utilizable ni presencia."""
+    sid = "web-" + hashlib.sha256(str(operator).lower().encode()).hexdigest()[:20]
+    c.execute(
+        "INSERT OR IGNORE INTO stm32_stations(id,name,token_hash,owner) VALUES(?,?,?,?)",
+        (sid, "Navegador · " + str(operator)[:40], hashlib.sha256(secrets.token_bytes(32)).hexdigest(), operator),
+    )
+    return sid
+
+
+def _summary(d):
+    return {"tarjeta_id": d["id"], "nombre": d["nombre"], "numero": d.get("id_tarjeta_num"),
+            "r2_nombre": d.get("r2_nombre"), "mac_r1": d.get("mac_r1"), "mac_r2": d.get("mac_r2")}
+
+
+def web_create(tid, operator):
+    init()
+    with db.transaction() as c:
+        sid = web_station(c, operator)
+        now = time.time()
+        # Una pestaña cerrada sin informe queda interrumpida, nunca se reanuda.
+        c.execute(
+            "UPDATE tqt_test_runs SET state='interrupted',result='no_verificado',updated=? WHERE station=? AND state IN ('queued','running') AND updated<?",
+            (now, sid, now - 120),
+        )
+        if c.execute(
+            "SELECT 1 FROM tqt_test_runs WHERE (station=? OR requested_card=?) AND state IN ('queued','running')",
+            (sid, tid),
+        ).fetchone():
+            raise ValueError("La tarjeta ya tiene una prueba activa o ya tienes una prueba en curso.")
+        d = snapshot(tid, c)
+        jid = secrets.token_hex(16)
+        c.execute(
+            "INSERT INTO tqt_test_runs(id,station,requested_card,operator,state,created,updated,inventory,origin,context) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (jid, sid, tid, operator, "running", now, now, json.dumps(d), "web", WEB_CONTEXT),
+        )
+    return read(jid)
+
+
+def _web_row(c, jid, operator, states=("running",)):
+    row = c.execute("SELECT * FROM tqt_test_runs WHERE id=?", (jid,)).fetchone()
+    if not row or row["origin"] != "web":
+        raise ValueError("Prueba web no encontrada.")
+    if row["station"] != web_station(c, operator):
+        raise ValueError("La prueba pertenece a otro operador.")
+    if states and row["state"] not in states:
+        raise ValueError("La prueba ya no está en curso (" + row["state"] + "); no se acepta más evidencia.")
+    return row
+
+
+def web_events(operator, jid, items):
+    init()
+    with db.transaction() as c:
+        row = _web_row(c, jid, operator)
+        _store_events(c, jid, items)
+        return {"ok": True, "cancel": bool(row["cancel"])}
+
+
+def web_identity(operator, jid, detected, confirm):
+    """Punto 12: la tarjeta conectada no es la elegida. Resuelve por MAC R1 exacta y exige
+    pareja/ID/nombre coherentes; con confirm=True cambia atómicamente la ejecución."""
+    init()
+    detected = detected if isinstance(detected, dict) else {}
+    mac = norm(detected.get("mac"))
+    if not re.fullmatch(r"[0-9A-F]{12}", mac):
+        raise ValueError("La R1 no informó una MAC válida; no se puede identificar la tarjeta.")
+    with db.transaction() as c:
+        row = _web_row(c, jid, operator)
+        if row["identity"]:
+            raise ValueError("La identidad ya se confirmó una vez en esta ejecución.")
+        rows = c.execute(
+            """SELECT t.id FROM tarjetas_produccion t JOIN pcb_inventario p ON p.id=t.pcb_r1_id
+            WHERE REPLACE(REPLACE(UPPER(p.mac),':',''),'-','')=?""",
+            (mac,),
+        ).fetchall()
+        if not rows:
+            raise ValueError("La MAC R1 " + detected.get("mac", "") + " no está registrada en ninguna tarjeta del inventario.")
+        if len(rows) > 1:
+            raise ValueError("La MAC R1 detectada aparece en varias tarjetas; identidad ambigua.")
+        new = snapshot(rows[0]["id"], c)
+        if norm(new["mac_r2"]) != norm(detected.get("macr")):
+            raise ValueError("La MACR informada por R1 no coincide con la R2 emparejada de " + new["nombre"] + ".")
+        if detected.get("id") not in (None, "") and _int(detected.get("id")) != _int(new["r1_serie"]):
+            raise ValueError("El ID informado por R1 contradice el número de " + new["nombre"] + ".")
+        if detected.get("nombre") and norm(detected.get("nombre")) != norm(new["nombre"]):
+            raise ValueError("El nombre informado por R1 contradice el inventario de " + new["nombre"] + ".")
+        old = json.loads(row["inventory"])
+        if new["id"] == row["requested_card"]:
+            raise ValueError("La tarjeta detectada es la seleccionada; revisa nombre/MAC en inventario.")
+        out = {"seleccionada": _summary(old), "detectada": _summary(new)}
+        if confirm is not True:
+            return out
+        change = {
+            "seleccionada_inicial": _summary(old), "detectada": _summary(new),
+            "evidencia": {k: str(detected.get(k, ""))[:64] for k in ("nombre", "id", "mac", "macr", "idr")},
+            "operador": operator, "consentimiento": True, "fecha": time.time(),
+        }
+        try:
+            c.execute(
+                "UPDATE tqt_test_runs SET requested_card=?,inventory=?,identity=?,updated=? WHERE id=?",
+                (new["id"], json.dumps(new), json.dumps(change, ensure_ascii=False), time.time(), jid),
+            )
+        except Exception as exc:  # índice único: la detectada ya tiene otra prueba activa
+            if "UNIQUE" in str(exc).upper():
+                raise ValueError("La tarjeta detectada ya tiene una prueba activa.")
+            raise
+        out.update(inventory=new, identity_change=change)
+        return out
+
+
+def _web_evidence(c, jid):
+    """S29 crudas y nombres de tarjeta tal como llegaron en los eventos de la ejecución."""
+    statuses, cards = [], []
+    for r in c.execute("SELECT data FROM tqt_test_events WHERE run=? ORDER BY seq", (jid,)):
+        try:
+            e = json.loads(r["data"])
+        except ValueError:
+            continue
+        args = e.get("args") or []
+        if e.get("kind") == "status" and args and isinstance(args[0], dict):
+            f = parse_s29(args[0].get("raw"))
+            if f:
+                statuses.append(f)
+        elif e.get("kind") == "card" and args:
+            cards.append(str(args[0]))
+    return statuses, cards
+
+
+def web_finish(operator, jid, report):
+    init()
+    if not isinstance(report, dict):
+        raise ValueError("Informe inválido.")
+    with db.transaction() as c:
+        row = _web_row(c, jid, operator, states=None)
+        if row["report"]:
+            if json.loads(row["report"]).get("source_report") == report:
+                return {"id": jid, "state": row["state"]}
+            raise ValueError("La prueba ya tiene un resultado permanente.")
+        if row["state"] != "running":
+            raise ValueError("La prueba ya no está en curso (" + row["state"] + "); el informe no se acepta.")
+        d = json.loads(row["inventory"])
+        statuses, cards = _web_evidence(c, jid)
+        steps = report.get("steps") if isinstance(report.get("steps"), list) else []
+        ok = lambda idx: len(steps) == 14 and isinstance(steps[idx], dict) and steps[idx].get("state") == "aprobado"
+        # Identidad: sólo cuenta si los valores del informe aparecen en una S29 cruda recibida.
+        ident = next((f for f in statuses if norm(f.get("MAC")) == norm(report.get("reported_mac"))
+                      and norm(f.get("MACR")) == norm(report.get("reported_mac_r2"))
+                      and _int(f.get("ID")) is not None and _int(f.get("ID")) == _int(report.get("card_id"))), None)
+        last = statuses[-1] if statuses else {}
+        # R1 BLE: la MAC no es observable en el navegador; el vínculo se acepta solo si R1
+        # registró movimientos por Bluetooth (PB=2) con al menos dos MOV distintos.
+        pb2 = {f.get("MOV") for f in statuses if _int(f.get("PB")) == 2 and _int(f.get("TQT")) == 0}
+        r1_link = bool(ident) and all(ok(i) for i in (6, 7, 8, 9, 10)) and len(pb2) >= 2
+        # R2 BLE: nombre exacto del inventario + err=13 y err=14 nuevos observados por R1;
+        # si la R2 declaró su MAC (info OTA) debe ser la MACR.
+        errs = {_int(f.get("err")) for f in statuses}
+        ble = report.get("ble_identity") if isinstance(report.get("ble_identity"), dict) else {}
+        r2info = ble.get("r2") if isinstance(ble.get("r2"), dict) else {}
+        declared = r2info.get("mac_declarada_r2")
+        r2_link = (bool(ident) and all(ok(i) for i in (11, 12, 13)) and {13, 14} <= errs
+                   and norm(report.get("r2_ble_name")) == norm(d.get("r2_nombre"))
+                   and (not declared or norm(declared) == norm(report.get("reported_mac_r2"))))
+        effective = dict(report)
+        effective.update(
+            card=cards[-1] if cards else None,
+            reported_mac=ident.get("MAC") if ident else None,
+            reported_mac_r2=ident.get("MACR") if ident else None,
+            card_id=ident.get("ID") if ident else None,
+            r1_ble_address=ident.get("MAC") if r1_link else None,
+            r2_ble_address=ident.get("MACR") if r2_link else None,
+            status_final={"IDR": last.get("IDR")},
+        )
+        if not statuses:
+            effective["serial_health"] = dict(report.get("serial_health") or {}, frames=0)
+        checks = compare(d, effective)
+        checks["ble_metodo"] = {
+            "r1": "vinculo_funcional_pb2" if r1_link else "no_verificado",
+            "r2": ("mac_declarada_r2" if declared else "vinculo_funcional_err13_14") if r2_link else "no_verificado",
+        }
+        checks["evidencia_s29"] = len(statuses)
+        result = verdict(effective, checks)
+        combined = {
+            "source_report": report,
+            "inventory_check": checks,
+            "inventory": d,
+            "result": result,
+            "release_authorized": False,
+            "origin": "web",
+            "context": row["context"] or WEB_CONTEXT,
+            "identity_change": json.loads(row["identity"]) if row["identity"] else None,
+            "cancelada": bool(report.get("cancelled")) or bool(row["cancel"]),
+            "trust_note": "Informe construido por el navegador del operador; el servidor validó estructura, "
+                          "tramas S29 crudas e inventario, sin observación directa del hardware.",
+        }
         tid = row["requested_card"] if checks["state"] == "coincide" else None
         c.execute(
             "UPDATE tqt_test_runs SET state='finished',tarjeta_id=?,updated=?,report=?,result=? WHERE id=?",
