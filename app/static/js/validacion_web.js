@@ -43,6 +43,11 @@
     const POST_RE = /AT\$POST=1,0,"([^"]*)"/;
     const normalizeMac = v => String(v || '').toUpperCase().replace(/[^0-9A-F]/g, '');
     const norm = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    // v1.4.0: el servidor no envía las MAC del inventario a la ruta web, solo huellas SHA-256(sal|MAC).
+    async function huellaMac(sal, mac) {
+        const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(sal || '') + '|' + normalizeMac(mac)));
+        return Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, '0')).join('');
+    }
     function readReady(line) { const m = READY_RE.exec(line); return m ? m[1] : null; }
     function parseStatus(line) {
         const found = POST_RE.exec(line);
@@ -254,6 +259,9 @@
             this.log = log; this.onCambio = onCambio || (() => {});
             this.device = null; this.char = null; this.dispositivo = null; this.nombre = '';
             this._intencional = false;
+            // v1.4.0: un solo listener RX por característica; se quita al desconectar/reconectar.
+            this._rxChar = null;
+            this._rx = ev => this.log('RX BLE: ' + new TextDecoder().decode(ev.target.value).trim());
             this._alPerder = () => {
                 if (this._intencional) return;
                 this.device = null; this.char = null;
@@ -301,7 +309,9 @@
                 if (!(p.write || p.writeWithoutResponse)) throw new Error('Característica BLE no escribible');
                 if (p.notify || p.indicate) {
                     try {
-                        ch.addEventListener('characteristicvaluechanged', ev => this.log('RX BLE: ' + new TextDecoder().decode(ev.target.value).trim()));
+                        this._quitarRx();
+                        ch.addEventListener('characteristicvaluechanged', this._rx);
+                        this._rxChar = ch;
                         await acotado(ch.startNotifications(), 10000);
                     } catch (e) { this.log('BLE sin notificaciones: ' + e.message); }
                 }
@@ -310,6 +320,7 @@
                 this.log('BLE conectado: ' + this.nombre + ' (' + dispositivo + ')');
                 this.onCambio('ok', this.nombre, dispositivo);
             } catch (e) {
+                this._quitarRx();
                 this._intencional = true;
                 try { device.gatt.connected && device.gatt.disconnect(); } catch (_) {}
                 this._intencional = false;
@@ -334,7 +345,12 @@
                 return info && info.mac ? String(info.mac) : null;
             } catch (_) { return null; }
         }
+        _quitarRx() {
+            if (this._rxChar) { try { this._rxChar.removeEventListener('characteristicvaluechanged', this._rx); } catch (_) {} }
+            this._rxChar = null;
+        }
         async disconnect(silencioso) {
+            this._quitarRx();
             const d = this.device;
             this.device = null; this.char = null; this.dispositivo = null; this.nombre = '';
             if (d) {
@@ -433,16 +449,23 @@
             return this._wait(start, (tag, v) => tag === 'status' && num(v, 'TQT') === 0, timeout);
         }
         // Guardia del agente (agent.py safe_send): no mover sin identidad/MAC de la tarjeta esperada.
-        _guard() {
+        // v1.4.0: compara con la MAC del inventario o, en la ruta web, con su huella (mac_r1_h/mac_r2_h + huella_sal).
+        async _macIgual(obs, campo) {
+            const d = this.expected || {};
+            if (!normalizeMac(obs)) return false;
+            if (d[campo]) return normalizeMac(obs) === normalizeMac(d[campo]);
+            return !!d[campo + '_h'] && (await huellaMac(d.huella_sal, obs)) === d[campo + '_h'];
+        }
+        async _guard() {
             const d = this.expected, v = this.latest ? this.latest.fields : {};
-            if (!d || norm(v.MAC) !== norm(d.mac_r1) || norm(v.MACR) !== norm(d.mac_r2) || norm(this.ready_name) !== norm(d.nombre))
+            if (!d || !(await this._macIgual(v.MAC, 'mac_r1')) || !(await this._macIgual(v.MACR, 'mac_r2')) || norm(this.ready_name) !== norm(d.nombre))
                 throw new NoVerification('Identidad/MAC no coincide con la tarjeta seleccionada; movimiento bloqueado.');
         }
         async _send(data) {
-            if (this.running && (data === ACTIONS.PPON || data === ACTIONS.POFF)) this._guard();
+            if (this.running && (data === ACTIONS.PPON || data === ACTIONS.POFF)) await this._guard();
             await this.serial.send(data);
         }
-        async _bleSend(cmd) { if (this.running) this._guard(); await this.ble.send(cmd); }
+        async _bleSend(cmd) { if (this.running) await this._guard(); await this.ble.send(cmd); }
         async _step(idx, fn, title) {
             this._checkCancel('Cancelada');
             const step = this.steps[idx];
@@ -578,12 +601,12 @@
             this.log('Solicitud de detener: no se enviarán más comandos. El firmware puede terminar un movimiento ya iniciado.');
         }
         // v1.4.0 (punto 12): cotejo de identidad; ante otra tarjeta pide confirmación y continúa sin reiniciar.
-        _coincide(fields, name) {
+        async _coincide(fields, name) {
             const d = this.expected;
-            return norm(fields.MAC) === norm(d.mac_r1) && norm(fields.MACR) === norm(d.mac_r2) && (!name || norm(name) === norm(d.nombre));
+            return (await this._macIgual(fields.MAC, 'mac_r1')) && (await this._macIgual(fields.MACR, 'mac_r2')) && (!name || norm(name) === norm(d.nombre));
         }
         async _resolverIdentidad(fields, name, momento) {
-            if (this._coincide(fields, name)) return;
+            if (await this._coincide(fields, name)) return;
             const detectada = { nombre: name || '', id: fields.ID || '', mac: fields.MAC || '', macr: fields.MACR || '', idr: fields.IDR || '' };
             if (this.identity_change) throw new TestFailure('La identidad física no coincide con la tarjeta confirmada; no se moverá el motor.');
             this.log('IDENTIDAD: la tarjeta conectada no es la seleccionada (' + momento + '). Detectada ID ' + detectada.id + ' MAC ' + detectada.mac + ' MACR ' + detectada.macr);
@@ -715,9 +738,11 @@
                 const health = Object.assign({}, this.serial.health), quality = communicate(health);
                 const warnings = buildWarnings(health, this.warnings);
                 const d = this.expected || {};
-                const r1 = !d.mac_r1 ? 'no_verificado' : (normalizeMac(d.mac_r1) === normalizeMac(f.MAC) && this.mac_comparison === 'vinculo_funcional') ? 'coincide' : (f.MAC && normalizeMac(d.mac_r1) !== normalizeMac(f.MAC)) ? 'no_coincide' : 'no_verificado';
+                const tiene1 = !!(d.mac_r1 || d.mac_r1_h), tiene2 = !!(d.mac_r2 || d.mac_r2_h);
+                const igual1 = await this._macIgual(f.MAC, 'mac_r1'), igual2 = await this._macIgual(f.MACR, 'mac_r2');
+                const r1 = !tiene1 ? 'no_verificado' : (igual1 && this.mac_comparison === 'vinculo_funcional') ? 'coincide' : (f.MAC && !igual1) ? 'no_coincide' : 'no_verificado';
                 const r2ok = [12, 13].every(i => this.steps[i].state === 'aprobado');
-                const r2 = !d.mac_r2 ? 'no_verificado' : (normalizeMac(d.mac_r2) === normalizeMac(f.MACR) && r2ok) ? 'coincide' : (f.MACR && normalizeMac(d.mac_r2) !== normalizeMac(f.MACR)) ? 'no_coincide' : 'no_verificado';
+                const r2 = !tiene2 ? 'no_verificado' : (igual2 && r2ok) ? 'coincide' : (f.MACR && !igual2) ? 'no_coincide' : 'no_verificado';
                 const state = (r1 === 'no_coincide' || r2 === 'no_coincide') ? 'no_coincide' : (r1 === 'coincide' && r2 === 'coincide') ? 'coincide' : 'incompleto';
                 const check = { state, r1, r2, detail: 'Inventario: R1 ' + r1 + ', R2 ' + r2 + ' (MAC de firmware + vínculo funcional BLE)', matched_by: 'inventario_web' };
                 if (label === 'aprobado' && state === 'no_coincide') { label = 'no_verificado'; issue = 'La MAC no coincide con inventario. ' + check.detail; }
@@ -987,15 +1012,18 @@
         } finally { quitar(); }
     }
 
+    // v1.4.0: reconexión automática SOLO con la vista de Validación montada (no abrir el COM en Programación).
+    let vistaActiva = false;
+    function vista(activa) { vistaActiva = !!activa; }
     if (navigator.serial) {
-        navigator.serial.addEventListener('connect', () => { if (!cx && !enCurso) reutilizarPuerto().catch(() => {}); });
+        navigator.serial.addEventListener('connect', () => { if (vistaActiva && !cx && !enCurso) reutilizarPuerto().catch(() => {}); });
     }
 
     window.TQTValWeb = {
         soportado, estado, onEstado, elegirPuerto, iniciar, bleManual,
         // v1.4.0: extras (no forman parte de K1 pero son útiles para la UI)
-        desconectar, onMonitor, reutilizarPuerto, contexto: CONTEXTO,
+        desconectar, onMonitor, reutilizarPuerto, vista, contexto: CONTEXTO,
         _interno: { parseStatus, readReady, position, serialAction, normalizeMac, communicate, buildWarnings,
-            SerialLink, BleLink, Motor, Publicador, TestFailure, NoVerification, Interrupted, CFG, STEP_NAMES, FIELDS },
+            SerialLink, BleLink, Motor, Publicador, TestFailure, NoVerification, Interrupted, CFG, STEP_NAMES, FIELDS, huellaMac },
     };
 })();

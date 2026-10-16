@@ -59,7 +59,10 @@ class El {
 }
 class Text { constructor(t) { this.textContent = t; this.parent = null; } }
 global.Node = El;
-global.document = { createElement: (t) => new El(t), createTextNode: (t) => new Text(t), body: new El("body") };
+const docListeners = {};
+global.document = { createElement: (t) => new El(t), createTextNode: (t) => new Text(t), body: new El("body"), hidden: false,
+  addEventListener: (t, f) => ((docListeners[t] = docListeners[t] || []).push(f)),
+  removeEventListener: (t, f) => (docListeners[t] = (docListeners[t] || []).filter((x) => x !== f)) };
 global.location = { hash: "#/validacion" };
 global.localStorage = { getItem: () => "", setItem() {} };
 global.fetch = async () => ({ ok: true, json: async () => ({ fields: [], help: {}, errors: {} }), text: async () => "" });
@@ -86,7 +89,7 @@ let sheetOpts = null;
 const T = { banner: (k, i, ...t) => h("div", { class: "banner" }, t), sheet: (o) => { sheetOpts = o; return { close() {} }; } };
 const T42 = { id: 42, id_tarjeta_num: "0042", r1: { nombre: "TQT_R1_V30_0042", version: "30", firmware: "4.9", mac: "AA" }, r2: { nombre: "TQT_R2_V30_0042", version: "30", firmware: "4.10", mac: "BB" }, r3: null };
 const T44 = { ...T42, id: 44, id_tarjeta_num: "0044" };
-const runRow = { id: "run1", tarjeta_id: 44, requested_card: 42, state: "finished", result: "aprobado", created: 1000, updated: 1100, operator: "op", inventory: { id_tarjeta_num: "0044", nombre: "TQT_R1_V30_0044", mac_r1: "AA", mac_r2: "BB" }, report: { inventory_check: { state: "coincide" }, source_report: { steps: Array.from({ length: 14 }, () => ({ state: "aprobado" })) } } };
+const runRow = { id: "run1", tarjeta_id: 44, requested_card: 42, state: "finished", result: "aprobado", origin: "web", station: "web-abc", created: 1000, updated: 1100, operator: "op", inventory: { id_tarjeta_num: "0044", nombre: "TQT_R1_V30_0044", mac_r1: "AA", mac_r2: "BB" }, report: { inventory_check: { state: "coincide" }, source_report: { steps: Array.from({ length: 14 }, () => ({ state: "aprobado" })) } } };
 async function api(p) {
   if (p.startsWith("/api/tarjetas?")) return { ok: true, data: { items: [T42], total: 1 } };
   if (p === "/api/tarjetas/42") return { ok: true, data: T42 };
@@ -97,7 +100,7 @@ async function api(p) {
   if (p === "/api/firmware") return { ok: true, data: { R1: ["4.2", "4.10", "4.9"], R2: ["4.10"], R3: [] } };
   return { ok: false, error: "no simulado " + p };
 }
-let printed = null, ident = null;
+let printed = null, ident = null, vistas = [], desconexiones = 0;
 global.window = {
   addEventListener() {},
   removeEventListener() {},
@@ -105,10 +108,13 @@ global.window = {
     soportado: () => true,
     estado: () => ({ serial: { estado: "ok", puerto: "USB" }, ble: { estado: "off", dispositivo: null } }),
     onEstado: () => () => {},
+    vista: (v) => vistas.push(v),
+    desconectar: async () => { desconexiones++; },
     async iniciar({ tarjetaId, onEvento, confirmarIdentidad }) {
       assert.strictEqual(tarjetaId, 42);
       onEvento({ data: { kind: "step", args: [0, "ejecutando", ""] } });
       ident = await confirmarIdentidad({ seleccionada: "0042", detectada: { id: 44, id_tarjeta_num: "0044" } });
+      document.hidden = true; (docListeners.visibilitychange || []).forEach((f) => f()); document.hidden = false;
       onEvento({ data: { kind: "status", args: [{ fields: { ON: "1", OFF: "0", VER: "4.9" } }] } });
       for (let i = 0; i < 14; i++) onEvento({ data: { kind: "step", args: [i, "aprobado", "ok"] } });
       return { jid: "run1", resultado: "aprobado" };
@@ -151,7 +157,13 @@ eval(fs.readFileSync(path.join(__dirname, "../app/static/js/sec_validacion.js"),
   print.click();
   await new Promise((r) => setTimeout(r, 10));
   assert.strictEqual(printed.id, 44, "imprime la tarjeta confirmada, no la seleccionada al inicio");
+  assert.ok(host.textContent.includes("Navegador · Web Serial 57600"), "interfaz web por origin (estación web-<hash>)");
+  assert.ok(host.textContent.includes("segundo plano"), "aviso al ocultar la pestaña durante la prueba");
+  assert.strictEqual((docListeners.visibilitychange || []).length, 0, "listener de visibilidad retirado al terminar");
   sec.desmontar();
+  await new Promise((r) => setTimeout(r, 5));
+  assert.deepStrictEqual(vistas, [true, false], "bandera de vista montada/desmontada");
+  assert.strictEqual(desconexiones, 1, "al salir se libera el COM");
   // Respaldo por agente: estación elegida automáticamente, sin selector ni casilla.
   window.TQTValWeb = undefined;
   const host2 = new El("div");

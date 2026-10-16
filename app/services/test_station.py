@@ -1,6 +1,6 @@
 """Durable test runs; inventory is authoritative. Never releases or alters a card."""
 
-import hashlib, json, re, secrets, time
+import hashlib, json, re, secrets, sqlite3, time
 from app.database import db
 from app.services import stm32_programming as stm
 
@@ -300,12 +300,21 @@ def _store_events(c, jid, items):
     c.execute("UPDATE tqt_test_runs SET updated=? WHERE id=?", (time.time(), jid))
 
 
+def _salud_numerica(health):
+    """v1.4.0: los contadores de serial_health deben ser numéricos (400, no TypeError/500)."""
+    for k in ("frames", "retries", "partial_warnings", "ack_errors"):
+        v = health.get(k, 0) if isinstance(health, dict) else 0
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise ValueError("serial_health." + k + " debe ser numérico.")
+
+
 def verdict(report, checks):
     """Reglas de aprobación únicas para agente y navegador (no se acepta un booleano del cliente)."""
     steps = report.get("steps", []) if isinstance(report.get("steps"), list) else []
     health = report.get("serial_health", {}) if isinstance(report.get("serial_health"), dict) else {}
     quality = report.get("communication_quality", {})
     quality = quality if isinstance(quality, dict) else {}
+    _salud_numerica(health)
     passed = (
         report.get("result") == "aprobado"
         and len(steps) == 14
@@ -426,6 +435,22 @@ def _summary(d):
             "r2_nombre": d.get("r2_nombre"), "mac_r1": d.get("mac_r1"), "mac_r2": d.get("mac_r2")}
 
 
+def huella_mac(sal, mac):
+    """SHA-256(sal|MAC normalizada); igual que huellaMac() de validacion_web.js."""
+    return hashlib.sha256((str(sal) + "|" + re.sub(r"[^0-9A-F]", "", str(mac or "").upper())).encode()).hexdigest()
+
+
+def _publico(d, sal):
+    """v1.4.0: inventario para el navegador sin MAC (solo huellas); el cotejo real lo hace el servidor."""
+    out = {k: v for k, v in d.items() if k not in ("mac_r1", "mac_r2")}
+    out.update(huella_sal=sal, mac_r1_h=huella_mac(sal, d.get("mac_r1")), mac_r2_h=huella_mac(sal, d.get("mac_r2")))
+    return out
+
+
+def _sin_mac(resumen):
+    return {k: v for k, v in resumen.items() if k not in ("mac_r1", "mac_r2")}
+
+
 def web_create(tid, operator):
     init()
     with db.transaction() as c:
@@ -443,11 +468,16 @@ def web_create(tid, operator):
             raise ValueError("La tarjeta ya tiene una prueba activa o ya tienes una prueba en curso.")
         d = snapshot(tid, c)
         jid = secrets.token_hex(16)
-        c.execute(
-            "INSERT INTO tqt_test_runs(id,station,requested_card,operator,state,created,updated,inventory,origin,context) VALUES(?,?,?,?,?,?,?,?,?,?)",
-            (jid, sid, tid, operator, "running", now, now, json.dumps(d), "web", WEB_CONTEXT),
-        )
-    return read(jid)
+        try:
+            c.execute(
+                "INSERT INTO tqt_test_runs(id,station,requested_card,operator,state,created,updated,inventory,origin,context) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (jid, sid, tid, operator, "running", now, now, json.dumps(d), "web", WEB_CONTEXT),
+            )
+        except sqlite3.IntegrityError:  # v1.4.0: carrera con los índices únicos de ejecución activa
+            raise ValueError("La tarjeta ya tiene una prueba activa o ya tienes una prueba en curso.")
+    out = read(jid)
+    out["inventory"] = _publico(out["inventory"], jid)
+    return out
 
 
 def _web_row(c, jid, operator, states=("running",)):
@@ -500,7 +530,7 @@ def web_identity(operator, jid, detected, confirm):
         old = json.loads(row["inventory"])
         if new["id"] == row["requested_card"]:
             raise ValueError("La tarjeta detectada es la seleccionada; revisa nombre/MAC en inventario.")
-        out = {"seleccionada": _summary(old), "detectada": _summary(new)}
+        out = {"seleccionada": _sin_mac(_summary(old)), "detectada": _sin_mac(_summary(new))}
         if confirm is not True:
             return out
         change = {
@@ -517,13 +547,15 @@ def web_identity(operator, jid, detected, confirm):
             if "UNIQUE" in str(exc).upper():
                 raise ValueError("La tarjeta detectada ya tiene una prueba activa.")
             raise
-        out.update(inventory=new, identity_change=change)
+        out.update(inventory=_publico(new, jid), identity_change=dict(
+            change, seleccionada_inicial=_sin_mac(change["seleccionada_inicial"]), detectada=_sin_mac(change["detectada"])))
         return out
 
 
 def _web_evidence(c, jid):
-    """S29 crudas y nombres de tarjeta tal como llegaron en los eventos de la ejecución."""
-    statuses, cards = [], []
+    """S29 crudas y nombres de tarjeta tal como llegaron en los eventos de la ejecución.
+    v1.4.0: cada S29 se anota con la etapa en curso (evento 'step') en el campo interno '_etapa'."""
+    statuses, cards, etapa = [], [], -1
     for r in c.execute("SELECT data FROM tqt_test_events WHERE run=? ORDER BY seq", (jid,)):
         try:
             e = json.loads(r["data"])
@@ -533,7 +565,10 @@ def _web_evidence(c, jid):
         if e.get("kind") == "status" and args and isinstance(args[0], dict):
             f = parse_s29(args[0].get("raw"))
             if f:
+                f["_etapa"] = etapa
                 statuses.append(f)
+        elif e.get("kind") == "step" and args and isinstance(args[0], int) and not isinstance(args[0], bool):
+            etapa = max(etapa, args[0])
         elif e.get("kind") == "card" and args:
             cards.append(str(args[0]))
     return statuses, cards
@@ -543,6 +578,7 @@ def web_finish(operator, jid, report):
     init()
     if not isinstance(report, dict):
         raise ValueError("Informe inválido.")
+    _salud_numerica(report.get("serial_health"))
     with db.transaction() as c:
         row = _web_row(c, jid, operator, states=None)
         if row["report"]:
@@ -564,9 +600,9 @@ def web_finish(operator, jid, report):
         # registró movimientos por Bluetooth (PB=2) con al menos dos MOV distintos.
         pb2 = {f.get("MOV") for f in statuses if _int(f.get("PB")) == 2 and _int(f.get("TQT")) == 0}
         r1_link = bool(ident) and all(ok(i) for i in (6, 7, 8, 9, 10)) and len(pb2) >= 2
-        # R2 BLE: nombre exacto del inventario + err=13 y err=14 nuevos observados por R1;
-        # si la R2 declaró su MAC (info OTA) debe ser la MACR.
-        errs = {_int(f.get("err")) for f in statuses}
+        # R2 BLE: nombre exacto del inventario + err=13 y err=14 observados por R1 en S29
+        # posteriores a la etapa 11 (conexión R2); si la R2 declaró su MAC (info OTA) debe ser la MACR.
+        errs = {_int(f.get("err")) for f in statuses if f.get("_etapa", -1) > 11}
         ble = report.get("ble_identity") if isinstance(report.get("ble_identity"), dict) else {}
         r2info = ble.get("r2") if isinstance(ble.get("r2"), dict) else {}
         declared = r2info.get("mac_declarada_r2")

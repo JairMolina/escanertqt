@@ -55,6 +55,36 @@ class TestDymoAprobada(unittest.TestCase):
         self.assertEqual(c.get("/api/dymo/cable/svg?numero=ab").status_code, 422)
         self.assertEqual(c.get("/api/dymo/label/999999/xml?aprobada=1").status_code, 404)
 
+    def test_aprobada_exige_ultima_prueba_aprobada(self):
+        """v1.4.0: ?aprobada=1 solo con la última ejecución TQT de la tarjeta en 'aprobado' (si no, 403)."""
+        import time
+        import _aislamiento as iso
+        from app.services import test_station
+        t = iso.crear_par(iso.nuevo_lote()["id"])
+        c = cliente_sin_sesion(app)
+        c.cookies.set(usuarios.COOKIE, usuarios.emitir_sesion("developer@skyguardian.mx"))
+        urls = ["/api/dymo/svg/%d" % t["id"], "/api/dymo/label/%d/xml" % t["id"], "/api/dymo/label/%d/archivo" % t["id"]]
+        for u in urls:
+            self.assertEqual(c.get(u, params={"aprobada": "true"}).status_code, 403, u)
+            self.assertEqual(c.get(u).status_code, 200, u)  # sin leyenda sigue igual
+        test_station.init()
+
+        def ejecucion(jid, result, creada):
+            with db.get_db() as cx:
+                sid = test_station.web_station(cx, "op@test.mx")
+                cx.execute("INSERT INTO tqt_test_runs(id,station,requested_card,tarjeta_id,operator,state,created,updated,inventory,result,origin)"
+                           " VALUES(?,?,?,?,?,'finished',?,?,'{}',?,'web')",
+                           (jid, sid, t["id"], t["id"] if result == "aprobado" else None, "op@test.mx", creada, creada, result))
+        ahora = time.time()
+        ejecucion("apr-%d" % t["id"], "aprobado", ahora)
+        for u in urls:
+            r = c.get(u, params={"aprobada": "true"})
+            self.assertEqual(r.status_code, 200, u)
+        self.assertIn("Aprobada", c.get(urls[0], params={"aprobada": "true"}).text)
+        # una prueba posterior no aprobada vuelve a bloquear la leyenda
+        ejecucion("fal-%d" % t["id"], "fallido", ahora + 1)
+        self.assertEqual(c.get(urls[0], params={"aprobada": "true"}).status_code, 403)
+
 
 if __name__ == "__main__":
     unittest.main()

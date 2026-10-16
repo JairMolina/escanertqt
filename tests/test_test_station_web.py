@@ -43,16 +43,17 @@ class WebRuns(unittest.TestCase):
         base.update(over)
         return base
 
-    def evidence(self, d=None, pb2=True, errs=(13, 14), **over):
+    def evidence(self, d=None, pb2=True, errs=(13, 14), etapa_err=12, **over):
         d = d or self.d
         lines = [s29(**self.ident(d, **over))]
         if pb2:
             lines += [s29(**self.ident(d, PB=2, MOV=3, **over)), s29(**self.ident(d, PB=2, MOV=4, **over))]
-        lines += [s29(**self.ident(d, err=e, **over)) for e in errs]
-        items = [{"seq": 1, "data": {"kind": "card", "args": [d["nombre"].replace("-", "_")]}}]
-        items += [{"seq": i + 2, "data": {"kind": "status", "args": [{"fields": {}, "raw": raw}]}}
-                  for i, raw in enumerate(lines)]
-        return items
+        datos = [{"kind": "card", "args": [d["nombre"].replace("-", "_")]}]
+        datos += [{"kind": "status", "args": [{"fields": {}, "raw": raw}]} for raw in lines]
+        # v1.4.0: los err=13/14 solo cuentan en S29 posteriores a la etapa 11 (conexión R2).
+        datos.append({"kind": "step", "args": [etapa_err, "ejecutando", ""]})
+        datos += [{"kind": "status", "args": [{"fields": {}, "raw": s29(**self.ident(d, err=e, **over))}]} for e in errs]
+        return [{"seq": i + 1, "data": x} for i, x in enumerate(datos)]
 
     def report(self, d=None, **over):
         d = d or self.d
@@ -192,6 +193,59 @@ class WebRuns(unittest.TestCase):
         with self.assertRaises(ValueError):
             s.web_identity(OP, j["id"], {"mac": d2["mac_r1"], "macr": d2["mac_r2"], "id": "99999"}, True)
         self.assertEqual(s.read(j["id"])["requested_card"], self.d["id"])
+
+    def test_r2_errs_before_stage_12_do_not_count(self):
+        j = self.start()
+        s.web_events(OP, j["id"], self.evidence(etapa_err=10))
+        r = s.web_finish(OP, j["id"], self.report())
+        self.assertNotEqual(r["result"], "aprobado")
+        self.assertEqual(r["report"]["inventory_check"]["ble_metodo"]["r2"], "no_verificado")
+
+    def test_web_create_hides_inventory_macs(self):
+        j = self.start()
+        inv_pub = j["inventory"]
+        self.assertNotIn("mac_r1", inv_pub)
+        self.assertNotIn("mac_r2", inv_pub)
+        self.assertEqual(inv_pub["huella_sal"], j["id"])
+        self.assertEqual(inv_pub["mac_r1_h"], s.huella_mac(j["id"], self.d["mac_r1"]))
+        self.assertEqual(inv_pub["mac_r2_h"], s.huella_mac(j["id"], self.d["mac_r2"].lower()))
+        self.assertNotIn(s.norm(self.d["mac_r1"]), s.norm(str(inv_pub)))
+        # el servidor conserva el inventario completo para el cotejo
+        self.assertEqual(s.read(j["id"])["inventory"]["mac_r1"], self.d["mac_r1"])
+        t2, d2 = self.card()
+        det = {"mac": d2["mac_r1"], "macr": d2["mac_r2"], "id": d2["r1_serie"], "nombre": ""}
+        prev = s.web_identity(OP, j["id"], det, False)
+        self.assertNotIn("mac_r1", prev["seleccionada"])
+        out = s.web_identity(OP, j["id"], det, True)
+        self.assertNotIn("mac_r1", out["inventory"])
+        self.assertNotIn("mac_r1", out["identity_change"]["seleccionada_inicial"])
+
+    def test_web_create_unique_index_race_is_value_error(self):
+        orig = s.snapshot
+
+        def carrera(tid, c):
+            d = orig(tid, c)
+            sid = s.web_station(c, OP)
+            c.execute("INSERT INTO tqt_test_runs(id,station,requested_card,operator,state,created,updated,inventory,origin)"
+                      " VALUES('carrera',?,?,?,'running',?,?,'{}','web')", (sid, tid, OP, time.time(), time.time()))
+            return d
+        s.snapshot = carrera
+        try:
+            with self.assertRaises(ValueError):
+                self.start()
+        finally:
+            s.snapshot = orig
+        with db.get_db() as c:
+            self.assertIsNone(c.execute("SELECT 1 FROM tqt_test_runs WHERE id='carrera'").fetchone())
+
+    def test_verdict_non_numeric_frames_is_400(self):
+        with self.assertRaises(ValueError):
+            s.verdict({"result": "aprobado", "serial_health": {"frames": "50"}}, {"state": "coincide"})
+        client = TestClient(app, base_url="https://testserver")
+        jid = client.post("/api/validacion/tqt/web/runs", json={"tarjeta_id": self.d["id"]}).json()["id"]
+        r = client.post("/api/validacion/tqt/web/runs/" + jid + "/result",
+                        json={"result": "aprobado", "steps": [], "serial_health": {"frames": [1]}})
+        self.assertEqual(r.status_code, 400, r.text)
 
     def test_parse_s29_matches_protocol(self):
         f = s.parse_s29(s29(MAC="AA:BB:CC:DD:EE:FF", MOV=7))

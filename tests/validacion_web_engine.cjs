@@ -8,7 +8,7 @@ const assert = require('assert');
 
 const src = fs.readFileSync(path.join(__dirname, '../app/static/js/validacion_web.js'), 'utf8');
 const ctx = { window: { isSecureContext: true }, navigator: {}, TextEncoder, TextDecoder, performance, setTimeout, clearTimeout,
-    setInterval, clearInterval, console, Promise, JSON, sessionStorage: { getItem() { return null; }, setItem() {}, removeItem() {} } };
+    setInterval, clearInterval, console, Promise, JSON, crypto: require('crypto').webcrypto, sessionStorage: { getItem() { return null; }, setItem() {}, removeItem() {} } };
 vm.createContext(ctx);
 vm.runInContext(src, ctx);
 const W = ctx.window.TQTValWeb, I = W._interno;
@@ -185,6 +185,48 @@ prueba('publicador: lotes ordenados, latido vacío y aviso de cancelación', asy
     assert.deepStrictEqual(enviados.map(x => x.length), [100, 30]);
     assert.strictEqual(enviados[1][0], 101);
     assert.strictEqual(cancel, 1);
+});
+
+prueba('v1.4.0: inventario web sin MAC (huellas) mantiene cotejo y guardia; huella igual que Python', async () => {
+    assert.strictEqual(await I.huellaMac('j1', 'aa:bb:cc:dd:ee:ff'), 'bb5ff059be77f2b53a82fbaea3154dd52e3d6ae49e20ab817218bb0ee3c5f380');
+    const pub = { nombre: INV.nombre, r2_nombre: INV.r2_nombre, r1_serie: INV.r1_serie, huella_sal: 'j1',
+        mac_r1_h: await I.huellaMac('j1', INV.mac_r1), mac_r2_h: await I.huellaMac('j1', INV.mac_r2) };
+    let r = await montar(new Fixture()).motor.run({ expected: pub, portName: 'FAKE' });
+    assert.strictEqual(r.result, 'aprobado', r.issue);
+    assert.strictEqual(r.inventory_check.state, 'coincide');
+    const fx = new Fixture();
+    r = await montar(fx).motor.run({ expected: Object.assign({}, pub, { mac_r1_h: await I.huellaMac('j1', '000000000042') }), portName: 'FAKE' });
+    assert.notStrictEqual(r.result, 'aprobado');
+    assert.ok(!fx.writes.some(w => w.includes('$SMSG=ON') || w.includes('$SMSG=OFF')), 'sin identidad no se mueve el motor');
+});
+
+prueba('v1.4.0: BleLink no acumula listeners RX al reconectar y los quita al desconectar', async () => {
+    let n = 0;
+    const ch = { properties: { write: true, notify: true }, addEventListener: (t) => { if (t === 'characteristicvaluechanged') n++; },
+        removeEventListener: (t) => { if (t === 'characteristicvaluechanged') n--; }, startNotifications: async () => {} };
+    const dev = { name: 'TQT_R1', addEventListener() {}, removeEventListener() {},
+        gatt: { connected: true, disconnect() {}, connect: async () => ({ getPrimaryService: async () => ({ getCharacteristic: async () => ch }) }) } };
+    const b = new I.BleLink(() => {});
+    await b.connect(dev, 'R1'); await b.connect(dev, 'R1'); await b.connect(dev, 'R1');
+    assert.strictEqual(n, 1);
+    await b.disconnect(true);
+    assert.strictEqual(n, 0);
+});
+
+prueba('v1.4.0: el evento serial connect solo reabre el COM con la vista de Validación montada', async () => {
+    let alConectar = null, consultas = 0;
+    const c2 = { window: { isSecureContext: true, TQTSerial: { autorizados: async () => { consultas++; return []; } } },
+        navigator: { serial: { addEventListener: (t, f) => { if (t === 'connect') alConectar = f; } } },
+        TextEncoder, TextDecoder, performance, setTimeout, clearTimeout, setInterval, clearInterval, console, Promise, JSON,
+        sessionStorage: { getItem() { return null; }, setItem() {}, removeItem() {} } };
+    c2.TQTSerial = c2.window.TQTSerial;
+    vm.createContext(c2); vm.runInContext(src, c2);
+    alConectar(); await new Promise(r => setTimeout(r, 5));
+    assert.strictEqual(consultas, 0, 'fuera de Validación no se toca el puerto');
+    c2.window.TQTValWeb.vista(true); alConectar(); await new Promise(r => setTimeout(r, 5));
+    assert.strictEqual(consultas, 1);
+    c2.window.TQTValWeb.vista(false); alConectar(); await new Promise(r => setTimeout(r, 5));
+    assert.strictEqual(consultas, 1);
 });
 
 (async () => {

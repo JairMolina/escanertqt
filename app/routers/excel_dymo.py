@@ -262,6 +262,20 @@ def _tarjeta_o_404(tarjeta_id: int) -> Dict[str, Any]:
     return tarjeta
 
 
+def _exigir_aprobada(tarjeta_id: int) -> None:
+    """v1.4.0: la leyenda «Aprobada» solo se emite si la última prueba TQT de la tarjeta quedó 'aprobado'."""
+    from app.services import test_station  # import diferido: evita ciclos al cargar routers
+    test_station.init()
+    with db.get_db() as c:
+        r = c.execute(
+            "SELECT result FROM tqt_test_runs WHERE requested_card=? OR tarjeta_id=? ORDER BY created DESC LIMIT 1",
+            (tarjeta_id, tarjeta_id),
+        ).fetchone()
+    if not r or r["result"] != "aprobado":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="La tarjeta no tiene una prueba TQT aprobada como última ejecución; no se imprime «Aprobada».")
+
+
 def _formato_o_400(label_format: str) -> str:
     try:
         return obtener_formato(label_format).codigo
@@ -287,6 +301,8 @@ def get_dymo_xml(
 ):
     fmt = _formato_o_400(label_format)
     tarjeta = _tarjeta_o_404(tarjeta_id)
+    if aprobada:
+        _exigir_aprobada(tarjeta_id)
     xml = (DymoService.generate_dcd_xml(tarjeta, fmt, texto_como, aprobada=aprobada) if tipo == "dymo"
            else DymoService.generate_dymo_xml(tarjeta, fmt, aprobada))
     return Response(content=xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "no-store"})
@@ -306,7 +322,10 @@ def get_dymo_archivo(
 ):
     """`.dymo` (DYMO Connect, LabelWriter 550) con Content-Disposition attachment: Windows lo abre con DYMO Connect."""
     fmt = _formato_o_400(label_format)
-    datos, nombre = DymoService.archivo_dymo(_tarjeta_o_404(tarjeta_id), fmt, tipo, aprobada)
+    tarjeta = _tarjeta_o_404(tarjeta_id)
+    if aprobada:
+        _exigir_aprobada(tarjeta_id)
+    datos, nombre = DymoService.archivo_dymo(tarjeta, fmt, tipo, aprobada)
     return _adjunto(datos, nombre)
 
 
@@ -478,5 +497,8 @@ def get_dymo_svg(
     aprobada: bool = Query(False, description="v1.4.0: leyenda «Aprobada» debajo de los datos"),
 ):
     fmt = _formato_o_400(label_format)
-    return Response(content=DymoService.generate_svg_preview(_tarjeta_o_404(tarjeta_id), label_format=fmt, guia=guia, aprobada=aprobada),
+    tarjeta = _tarjeta_o_404(tarjeta_id)
+    if aprobada:
+        _exigir_aprobada(tarjeta_id)
+    return Response(content=DymoService.generate_svg_preview(tarjeta, label_format=fmt, guia=guia, aprobada=aprobada),
                     media_type="image/svg+xml")

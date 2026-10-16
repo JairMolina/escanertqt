@@ -15,13 +15,16 @@
     'use strict';
     const D = () => window.TQTDymo;
     let ocupado = false;   // evita doble clic / dos tandas simultáneas
-    const FATAL = /no respondi|no encuentra|Elige|cargó|Sin conexión/i;
+    const FATAL = /no respondi|no encuentra|Elige|cargó|Sin conexión|no está aprobada/i;
 
     const numeroCable = (t) => String(t.id_tarjeta_num == null ? '' : t.id_tarjeta_num).replace(/\D/g, '').padStart(4, '0').slice(-6);
 
+    // v1.4.0: el servidor exige que la última prueba TQT de la tarjeta esté aprobada (403 si no).
+    const NO_APROBADA = 'La última prueba TQT de esta tarjeta no está aprobada; no se imprime «Aprobada».';
     async function xml(url) {
         let res;
         try { res = await fetch(url, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        if (res.status === 403) throw new Error(NO_APROBADA);
         if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`);
         const txt = await res.text();
         if (!D().esXmlEtiqueta(txt)) throw new Error('El servidor no devolvió un XML de etiqueta válido.');
@@ -73,8 +76,11 @@
                     const motivo = { movil: 'Los celulares no pueden imprimir directo en la DYMO.', no_servicio: 'No se encontró DYMO Connect en esta PC. Instálalo o ábrelo para imprimir con un clic.', sin_impresoras: 'DYMO Connect no ve ninguna LabelWriter.', sin_framework: 'No se cargó el módulo de DYMO.' }[d.estado] || d.detalle || 'DYMO no disponible.';
                     return { ok: false, impresas, error: motivo, estado: d.estado };
                 }
+                const svgAprobada = `/api/dymo/svg/${t.id}?aprobada=1&guia=false`;
+                const pre = await fetch(svgAprobada, { cache: 'no-store' }).catch(() => null);
+                if (!pre || !pre.ok) return { ok: false, impresas, error: pre && pre.status === 403 ? NO_APROBADA : 'No se pudo obtener la etiqueta del servidor.' };
                 prog(1, 2, 'Abriendo el cuadro de impresión del navegador…');
-                await imprimirNavegador([`/api/dymo/svg/${t.id}?aprobada=1&guia=false`, `/api/dymo/cable/svg?numero=${encodeURIComponent(num)}`]);
+                await imprimirNavegador([svgAprobada, `/api/dymo/cable/svg?numero=${encodeURIComponent(num)}`]);
                 impresas.push({ tipo: 'tarjeta', numero: num, estado: 'enviada' }, { tipo: 'cable', numero: num, estado: 'enviada' });
                 return { ok: true, impresas, error: null, via: 'navegador' };
             }

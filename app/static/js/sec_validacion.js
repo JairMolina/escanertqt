@@ -642,7 +642,7 @@
       webBox.hidden = !isWeb;
       agentBox.hidden = isWeb;
       modeHint.textContent = isWeb
-        ? "Conexión directa desde este navegador (Web Serial y Web Bluetooth). El inventario conserva cada ejecución."
+        ? "Conexión directa desde este navegador (Web Serial y Web Bluetooth). Mantén esta pestaña visible durante la prueba: si el navegador la pasa a segundo plano, sus temporizadores se ralentizan. El inventario conserva cada ejecución."
         : "Este navegador no admite conexión directa: se usa el agente de pruebas de Windows en línea. El inventario conserva cada ejecución.";
       const s = curStation();
       const ready = isWeb ? true : !!(s?.online && s.serial_connected);
@@ -808,7 +808,7 @@
         ...fact("Inicio", started ? fmtDate(started) : ""),
         ...fact("Duración", started ? fmtDur((ended || Date.now() / 1000) - started) : ""),
         ...fact("HW / FW leídos", rep.hardware || o.hw || rep.firmware || o.ver ? "HW " + (rep.hardware || o.hw || "—") + " · FW " + (rep.firmware || o.ver || "—") : ""),
-        ...fact("Interfaz", (active ? active.web : r?.station === "web" || lastRunWeb) ? "Navegador · Web Serial 57600 + Web Bluetooth" : started ? "Agente Windows · serial 57600 + BLE" : ""),
+        ...fact("Interfaz", (active ? active.web : r?.origin === "web" || lastRunWeb) ? "Navegador · Web Serial 57600 + Web Bluetooth" : started ? "Agente Windows · serial 57600 + BLE" : ""),
         ...fact("Comandos", started ? run.commands.serial + " serial · " + run.commands.ble + " BLE registrados" + (r ? " · LOG completo en el reporte" : "") : ""),
         ...(run.issue ? fact("Motivo", run.issue) : []),
       );
@@ -978,7 +978,12 @@
     async function beginWeb() {
       prepareRun(true);
       webAbort = new AbortController();
-      message("Prueba iniciada en este navegador. No cierres la pestaña ni cambies de tarjeta.");
+      message("Prueba iniciada en este navegador. No cierres la pestaña ni cambies de tarjeta; mantenla visible durante la prueba.");
+      // v1.4.0: Chrome ralentiza temporizadores en segundo plano; queda registrado en el LOG.
+      const alOcultar = () => {
+        if (document.hidden && active?.web) logLine("ADVERTENCIA: la pestaña pasó a segundo plano durante la prueba; los tiempos pueden alargarse.");
+      };
+      document.addEventListener("visibilitychange", alOcultar);
       let jid = null, err = null;
       try {
         const res = await window.TQTValWeb.iniciar({
@@ -995,6 +1000,7 @@
         jid = e?.jid || active?.id || null;
       }
       webAbort = null;
+      document.removeEventListener("visibilitychange", alOcultar);
       let r = null;
       if (jid) {
         try {
@@ -1270,6 +1276,8 @@
     loadList(false);
     if (web()) {
       paintWebEstado();
+      // v1.4.0: la reconexión automática del COM solo opera con esta vista montada.
+      try { window.TQTValWeb.vista?.(true); } catch (e) {}
       try {
         unsubEstado = window.TQTValWeb.onEstado?.(() => alive && paintWebEstado()) || null;
         // v1.4.0: monitor en ruta web: tramas RX y avisos del puerto fuera de la prueba automática.
@@ -1317,6 +1325,9 @@
         clearTimeout(searchTimer);
         try { if (typeof unsubEstado === "function") unsubEstado(); } catch (e) {}
         try { if (typeof unsubMonitor === "function") unsubMonitor(); } catch (e) {}
+        try { window.TQTValWeb?.vista?.(false); } catch (e) {}
+        // Libera el COM para Programación (si hay prueba en curso, desconectar() lo rechaza y se ignora).
+        if (web()) Promise.resolve().then(() => window.TQTValWeb?.desconectar?.()).catch(() => {});
         window.removeEventListener("beforeunload", antesDeDescargar);
         // Una prueba web en curso se cancela al salir de la vista (el motor libera puertos y locks).
         try { webAbort?.abort(); } catch (e) {}
