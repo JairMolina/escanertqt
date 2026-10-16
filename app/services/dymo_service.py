@@ -217,6 +217,32 @@ def caja_cable(formato: "FormatoEtiqueta") -> "Caja":
     return Caja(m, m, formato.ancho_mm / 2 - 2 * m, formato.alto_mm - 2 * m)
 
 
+# v1.3.90: línea punteada vertical al centro (referencia para doblar/pegar la etiqueta sobre el cable).
+CABLE_LINEA_ANCHO_MM = 0.6
+CABLE_GUION_MM, CABLE_HUECO_MM = 1.6, 1.2
+
+
+def caja_linea_cable(formato: "FormatoEtiqueta") -> "Caja":
+    m = MARGEN_SEGURO_MM
+    return Caja(formato.ancho_mm / 2 - CABLE_LINEA_ANCHO_MM / 2, m, CABLE_LINEA_ANCHO_MM, formato.alto_mm - 2 * m)
+
+
+def png_linea_punteada(c: "Caja") -> str:
+    """PNG (base64) a 300 dpi con una línea vertical punteada negra que llena la caja `c`."""
+    from PIL import Image, ImageDraw
+    ppm = 300 / 25.4
+    w, h = max(3, round(c.w * ppm)), max(10, round(c.h * ppm))
+    img = Image.new("1", (w, h), 1)
+    d = ImageDraw.Draw(img)
+    guion, paso = round(CABLE_GUION_MM * ppm), round((CABLE_GUION_MM + CABLE_HUECO_MM) * ppm)
+    x0, x1 = w // 2 - 1, w // 2 + 1
+    for y in range(0, h, paso):
+        d.rectangle([x0, y, x1, min(h - 1, y + guion - 1)], fill=0)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
 def _v8_imagen(nombre: str, png: str, c: "Caja") -> str:
     return f"""    <ObjectInfo>
         <ImageObject>
@@ -670,6 +696,8 @@ class DymoService:
         """`.label` (DYMO Label v8) con el número solo en la mitad izquierda."""
         f = obtener_formato(label_format)
         objeto = _v8_texto("NUMERO", numero, CABLE_FUENTE_PT, caja_cable(f), "Center", "Rotation90")   # v1.3.84: número vertical
+        linea = caja_linea_cable(f)
+        objeto += _v8_imagen("LINEA", png_linea_punteada(linea), linea)   # v1.3.90: línea punteada al centro
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
     <PaperOrientation>{f.v8_orientacion}</PaperOrientation>
@@ -686,6 +714,7 @@ class DymoService:
         f = obtener_formato(label_format)
         m = MARGEN_SEGURO_MM
         c = caja_cable(f)
+        ln = caja_linea_cable(f)
         negro = cls._color(1, 0, 0, 0)
         fuente = (f"<FontInfo><FontName>{FUENTE}</FontName><FontSize>{CABLE_FUENTE_PT:g}</FontSize><IsBold>True</IsBold>"
                   f"<IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>")
@@ -728,6 +757,20 @@ class DymoService:
           </FormattedText>
           <ObjectLayout><DYMOPoint><X>{_pulg(c.x)}</X><Y>{_pulg(c.y)}</Y></DYMOPoint><Size><Width>{_pulg(c.w)}</Width><Height>{_pulg(c.h)}</Height></Size></ObjectLayout>
         </TextObject>
+        <ImageObject>
+          <Name>LINEA</Name>
+          {cls._brushes()}
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          <Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0" /></Margin>
+          <Data>{png_linea_punteada(ln)}</Data>
+          <ScaleMode>Fill</ScaleMode>
+          <HorizontalAlignment>Center</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <ObjectLayout><DYMOPoint><X>{_pulg(ln.x)}</X><Y>{_pulg(ln.y)}</Y></DYMOPoint><Size><Width>{_pulg(ln.w)}</Width><Height>{_pulg(ln.h)}</Height></Size></ObjectLayout>
+        </ImageObject>
       </LabelObjects>
     </DynamicLayoutManager>
   </DYMOLabel>

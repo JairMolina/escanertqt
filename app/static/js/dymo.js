@@ -94,6 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
             box.append(T.banner('warn', 'info', h('b', null, 'Desde el celular no se imprime directo. '), 'Usa "Abrir en DYMO" para bajar el archivo, o entra a esta pantalla desde la PC que tiene la DYMO conectada.'));
             return;
         }
+        if (e === 'no_servicio' || e === 'sin_framework') box.append(T.banner('ok', 'printer', h('b', null, 'Puedes imprimir igual desde esta PC. '),
+            'Sin DYMO Connect, los botones de imprimir abren el cuadro de impresión de Chrome: elige la DYMO LabelWriter, papel 30334 (57 × 32 mm) y escala 100 %. Solo necesita el driver de la LabelWriter en Windows. Lo de abajo es opcional (imprime directo, sin cuadro).'));
         const bloqueado = e === 'no_servicio' && state.dymo.redLocal === 'denied';
         const titulo = bloqueado ? 'Chrome bloqueó el acceso a la impresora de esta PC'
             : { sin_framework: 'No se cargó el módulo de DYMO', no_servicio: 'No se detecta DYMO Connect en esta PC', sin_impresoras: 'DYMO Connect no ve la impresora' }[e] || 'Sin conexión';
@@ -126,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sel.disabled = false; pillListo();
         } else {
             sel.append(h('option', null, d.estado === 'movil' ? 'No disponible en celulares' : 'Sin impresora'));
-            setPill(d.estado === 'movil' ? 'warn' : 'bad', { no_servicio: 'DYMO Connect no detectado', sin_impresoras: 'Impresora no encontrada', sin_framework: 'Módulo DYMO no cargado', movil: 'Celular: solo descarga' }[d.estado] || 'Sin conexión');
+            setPill(d.estado === 'movil' ? 'warn' : 'bad', { no_servicio: 'Sin DYMO Connect · se imprime con el navegador', sin_impresoras: 'Impresora no encontrada', sin_framework: 'Módulo DYMO no cargado', movil: 'Celular: solo descarga' }[d.estado] || 'Sin conexión');
         }
         ayuda(); refrescarBotones();
     }
@@ -144,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ------------------------------------------------------------------ estado de botones y avisos
     function refrescarBotones() {
         const t = state.cur; const ok = Boolean(t) && modo(t).k !== 'NO';
-        const pr = state.dymo.estado === 'listo' ? impresora() : null; const dym = Boolean(pr && pr.isConnected);
+        const pr = state.dymo.estado === 'listo' ? impresora() : null; const dym = Boolean(pr && pr.isConnected) || navegador();   // v1.3.90: sin DYMO Connect se imprime con el navegador
         $('btnPrint').disabled = state.busy || !ok || !dym;
         $('btnOpen').disabled = state.busy || !t;
         $('btnPrintAll').disabled = state.busy || !dym || !state.tarjetas.some((x) => modo(x).k !== 'NO');
@@ -197,7 +199,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const op = [...$('selTarjeta').options].find((o) => o.value === String(t.id));
         if (op) op.textContent = `#${t.id_tarjeta_num} · ${modo(t).k === 'FINAL' ? 'final' : 'identificación'} · impresa`;
     }
+    // ------------------------------------------------------------------ v1.3.90: impresión con el navegador (sin DYMO Connect)
+    // Si la PC no tiene DYMO Connect (o Chrome no deja hablar con él), las etiquetas se arman igual que la vista previa y se
+    // imprimen con el cuadro de impresión de Chrome a 57 × 32 mm. Solo necesita el driver de la LabelWriter en Windows.
+    const NAV = { nodos: [], alFinal: [], t: 0 };
+    const navegador = () => !['listo', 'buscando', 'movil'].includes(state.dymo.estado);
+    function encolar(nodo, c, despues) {
+        for (let i = 0; i < c; i++) NAV.nodos.push(i ? nodo.cloneNode(true) : nodo);
+        if (despues) NAV.alFinal.push(despues);
+        clearTimeout(NAV.t); NAV.t = setTimeout(imprimirNavegador, 60);   // toda la tanda sale en un solo cuadro de impresión
+    }
+    function imprimirNavegador() {
+        const nodos = NAV.nodos.splice(0), alFinal = NAV.alFinal.splice(0);
+        if (!nodos.length) return;
+        const fr = h('iframe', { title: 'Impresión de etiquetas', 'aria-hidden': 'true', style: 'position:fixed;right:0;bottom:0;width:0;height:0;border:0' });
+        document.body.append(fr);
+        const doc = fr.contentDocument;
+        const estilos = [...document.querySelectorAll('style')].map((x) => x.textContent).join('\n');
+        doc.open();
+        doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas TQT</title><style>${estilos}
+@page { size: 57mm 32mm; margin: 0; }
+html, body { margin: 0; padding: 0; background: #fff; }
+.dymo-label { outline: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; }
+.dymo-label:last-child { break-after: auto; page-break-after: auto; }
+.dymo-label::after, .r3m + .r3m::before { display: none !important; }
+.cable-vacia { border-left: 0.3mm dashed #000 !important; }
+</style></head><body></body></html>`);
+        doc.close();
+        doc.body.append(...nodos.map((n) => doc.importNode(n, true)));
+        const fin = () => { fr.remove(); alFinal.forEach((f) => { try { f(); } catch (e) { /* nada */ } }); };
+        toast(`Se abrió el cuadro de impresión (${nodos.length} etiqueta${nodos.length === 1 ? '' : 's'}): elige la DYMO LabelWriter, papel 30334 (57 × 32 mm) y escala 100 %.`, { ms: 8000 });
+        setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } finally { setTimeout(fin, 1000); } }, 150);
+    }
     async function imprimirTarjeta(printer, t, c) {
+        if (navegador()) { encolar(buildLabel(t), c, () => marcarImpresa(t)); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
             try { await D.print(printer, await xmlDe(t, tipo), c); await marcarImpresa(t); return; }
@@ -448,6 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return txt;
     }
     async function imprimirR3(printer, par, c) {
+        if (navegador()) { encolar(h('div', { class: 'dymo-label r3doble' }, mitad(par[0]), mitad(par[1])), c); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
             try { await D.print(printer, await xmlR3(par, tipo), c); return; }
@@ -554,10 +590,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const lista = []; for (let n = a; n <= b; n++) lista.push(String(n).padStart(4, '0'));
         return { lista, error: '' };
     }
+    const nodoCable = (num) => h('div', { class: 'dymo-label cable', role: 'img', 'aria-label': `Etiqueta de cable: ${num}` },
+        h('div', { class: 'cable-num' }, num), h('div', { class: 'cable-vacia', 'aria-hidden': 'true' }));
     function cableVista() {
         const { lista, error } = cableNumeros(); const num = lista[0] || '0000';
-        $('cableLabel').replaceChildren(h('div', { class: 'dymo-label cable', role: 'img', 'aria-label': `Etiqueta de cable: ${num}` },
-            h('div', { class: 'cable-num' }, num), h('div', { class: 'cable-vacia', 'aria-hidden': 'true' })));
+        $('cableLabel').replaceChildren(nodoCable(num));
         $('cableZoomHost').style.transform = `scale(${state.zoom})`;
         const lbl = $('cableLabel').firstChild; $('cableZoomHost').style.width = `${lbl.offsetWidth * state.zoom}px`; $('cableZoomHost').style.height = `${lbl.offsetHeight * state.zoom}px`;
         $('cableInfo').textContent = error || (lista.length ? `${lista.length} etiqueta${lista.length === 1 ? '' : 's'} (${lista[0]}${lista.length > 1 ? ' … ' + lista[lista.length - 1] : ''})` : 'Vista previa · 57 × 32 mm, número en la mitad izquierda');
@@ -572,6 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return txt;
     }
     async function imprimirCable(printer, num, c) {
+        if (navegador()) { encolar(nodoCable(num), c); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
             try { await D.print(printer, await xmlCable(num, tipo), c); return; }

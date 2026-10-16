@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.90 — 2026-10-15
+- **Etiquetas DYMO en cualquier laptop:** si la PC no tiene DYMO Connect (o Chrome no deja hablar con él), los botones de imprimir (tarjeta, lote, escaneo, R3 y cable) abren el cuadro de impresión de Chrome con las etiquetas a 57 × 32 mm, una por página y en una sola tanda; solo necesita el driver de la LabelWriter. Las tarjetas se marcan impresas al cerrar el cuadro. Con DYMO Connect se sigue imprimiendo directo.
+- **Etiquetas cable:** línea punteada vertical al centro, impresa (referencia para pegar la etiqueta); también en la vista previa. Caché `dymo.js` a `?v=1390`.
+
 ## v1.3.89 — 2026-10-15
 - **Etiquetas DYMO en laptops:** se quita el consejo de abrir `https://localhost:8443/dymo` (solo existe en el servidor). La ayuda detecta cuando Chrome bloquea el «Acceso a la red local» (sitio público → DYMO Connect en 127.0.0.1) y explica cómo permitirlo; los pasos de DYMO Connect y del certificado local quedan más claros y se ofrece «Descargar .label» como alternativa. Caché `dymo_connect.js`/`dymo.js` a `?v=1389`.
 

@@ -37,6 +37,10 @@ class TestDymoCable(unittest.TestCase):
         self.assertIn('Center', DymoService.generate_cable_label_xml("0007"))
         for xml in (DymoService.generate_cable_label_xml("0007"), DymoService.generate_cable_dcd_xml("0007")):
             self.assertIn('<Rotation>Rotation90</Rotation>', xml)   # v1.3.84: número vertical
+            self.assertIn('<Name>LINEA</Name>', xml)                # v1.3.90: línea punteada al centro
+        from app.services.dymo_service import caja_linea_cable
+        ln = caja_linea_cable(f)
+        self.assertAlmostEqual(ln.x + ln.w / 2, f.ancho_mm / 2)
 
     def test_numero_invalido_y_archivo(self):
         self.assertEqual(self.c.get("/api/dymo/cable/xml?numero=12a").status_code, 422)
