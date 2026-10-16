@@ -6,3 +6,4 @@
 *.dymo binary
 *.ico binary
 *.hex binary
+*.cmd text eol=crlf

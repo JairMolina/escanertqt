@@ -218,7 +218,7 @@ def caja_cable(formato: "FormatoEtiqueta") -> "Caja":
 
 
 # v1.3.90: línea punteada vertical al centro (referencia para doblar/pegar la etiqueta sobre el cable).
-CABLE_LINEA_ANCHO_MM = 0.6
+CABLE_LINEA_ANCHO_MM = 1.5   # v1.3.91: caja más ancha y trazo de 0.5 mm para que DYMO no la descarte
 CABLE_GUION_MM, CABLE_HUECO_MM = 1.6, 1.2
 
 
@@ -232,14 +232,14 @@ def png_linea_punteada(c: "Caja") -> str:
     from PIL import Image, ImageDraw
     ppm = 300 / 25.4
     w, h = max(3, round(c.w * ppm)), max(10, round(c.h * ppm))
-    img = Image.new("1", (w, h), 1)
+    img = Image.new("L", (w, h), 255)
     d = ImageDraw.Draw(img)
     guion, paso = round(CABLE_GUION_MM * ppm), round((CABLE_GUION_MM + CABLE_HUECO_MM) * ppm)
-    x0, x1 = w // 2 - 1, w // 2 + 1
+    x0, x1 = w // 2 - 3, w // 2 + 3   # ~0.5 mm a 300 dpi
     for y in range(0, h, paso):
         d.rectangle([x0, y, x1, min(h - 1, y + guion - 1)], fill=0)
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    img.convert("1").save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 

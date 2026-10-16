@@ -37,7 +37,9 @@
         /* Cable (v1.3.83): la etiqueta se divide a la mitad en vertical; el número va solo en la mitad izquierda */
         .dymo-label.cable { padding: 0; gap: 0; display: grid; grid-template-columns: 1fr 1fr; }
         .cable-num { display: flex; align-items: center; justify-content: center; font-size: 30pt; font-weight: 700; line-height: 1; writing-mode: vertical-rl; transform: rotate(180deg); }   /* v1.3.84: vertical, se lee de abajo hacia arriba */
-        .cable-vacia { border-left: 0.3mm dashed #000; }   /* v1.3.90: la línea punteada se imprime (referencia para pegar) */
+        .cable-vacia { min-width: 0; }
+        /* v1.3.91: línea punteada vertical al centro, se imprime (referencia para pegar); elemento propio, por encima de todo */
+        .cable-linea { position: absolute; left: 50%; top: 1.5mm; bottom: 1.5mm; width: 0; margin-left: -0.25mm; border-left: 0.5mm dashed #000; z-index: 2; pointer-events: none; }
         #cableBox > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
         #cableBox > summary::-webkit-details-marker { display: none; }
         #cableBox > summary::before { content: "▸"; color: var(--ink-3, #8a93a6); transition: transform .15s ease; }
@@ -172,6 +174,6 @@
 <script src="/static/js/qrcode-generator.js?v=1316"></script>
 <script src="/static/js/vendor/dymo.connect.framework.js?v=1316"></script>
 <script src="/static/js/dymo_connect.js?v=1389"></script>
-<script src="/static/js/dymo.js?v=1390"></script>
+<script src="/static/js/dymo.js?v=1391"></script>
 </body>
 </html>

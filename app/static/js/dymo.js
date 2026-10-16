@@ -94,27 +94,14 @@ document.addEventListener('DOMContentLoaded', () => {
             box.append(T.banner('warn', 'info', h('b', null, 'Desde el celular no se imprime directo. '), 'Usa "Abrir en DYMO" para bajar el archivo, o entra a esta pantalla desde la PC que tiene la DYMO conectada.'));
             return;
         }
-        if (e === 'no_servicio' || e === 'sin_framework') box.append(T.banner('ok', 'printer', h('b', null, 'Puedes imprimir igual desde esta PC. '),
-            'Sin DYMO Connect, los botones de imprimir abren el cuadro de impresión de Chrome: elige la DYMO LabelWriter, papel 30334 (57 × 32 mm) y escala 100 %. Solo necesita el driver de la LabelWriter en Windows. Lo de abajo es opcional (imprime directo, sin cuadro).'));
-        const bloqueado = e === 'no_servicio' && state.dymo.redLocal === 'denied';
-        const titulo = bloqueado ? 'Chrome bloqueó el acceso a la impresora de esta PC'
-            : { sin_framework: 'No se cargó el módulo de DYMO', no_servicio: 'No se detecta DYMO Connect en esta PC', sin_impresoras: 'DYMO Connect no ve la impresora' }[e] || 'Sin conexión';
-        const pasos = bloqueado
-            ? [h('span', null, 'Haz clic en el ', h('b', null, 'candado'), ' (o el ícono de ajustes) junto a la dirección ', h('b', null, location.hostname), ' → ', h('b', null, 'Configuración del sitio'), '.'),
-                h('span', null, 'En ', h('b', null, 'Acceso a la red local'), ' (o «Dispositivos de la red local») elige ', h('b', null, 'Permitir'), '.'),
-                h('span', null, 'Recarga esta página y pulsa ', h('b', null, 'Actualizar'), '.')]
-            : e === 'sin_impresoras'
-                ? ['Enciende la LabelWriter y revisa el cable USB.', 'En DYMO Connect confirma que aparece la impresora y pulsa Actualizar aquí.']
-                : e === 'sin_framework' ? ['Recarga la página con Ctrl+F5.', 'Si sigue igual, falta el archivo js/vendor/dymo.connect.framework.js del proyecto.']
-                    : [h('span', null, h('b', null, 'Instala y abre DYMO Connect for Desktop'), ' en esta PC (debe verse el ícono de DYMO junto al reloj de Windows) y deja la impresora conectada por USB.'),
-                        h('span', null, 'Solo la primera vez en esta PC: abre ', h('a', { href: D.CHECK_URL, target: '_blank', rel: 'noopener' }, 'la prueba del servicio DYMO'),
-                            '. Es una dirección local (127.0.0.1 = esta misma PC, no internet). Si Chrome avisa «La conexión no es privada», pulsa ', h('b', null, 'Configuración avanzada → Continuar'),
-                            '. Debe verse una respuesta corta (true); si dice «No se puede acceder», DYMO Connect no está abierto.'),
-                        h('span', null, 'Si Chrome pregunta si este sitio puede ', h('b', null, 'acceder a dispositivos de tu red local'), ', pulsa ', h('b', null, 'Permitir'), '.'),
-                        h('span', null, 'Vuelve a esta página y pulsa ', h('b', null, 'Actualizar'), '.'),
-                        h('span', null, 'Mientras tanto puedes usar ', h('b', null, 'Descargar .label'), ' y abrir el archivo en DYMO Connect para imprimir.')];
-        box.append(T.banner('bad', 'alert', h('b', null, titulo + '. '), state.dymo.detalle || ''),
-            h('ol', { class: 'pasos' }, pasos.filter(Boolean).map((p) => h('li', null, p))));
+        // v1.3.91: sin texto largo; un botón instala DYMO Connect (winget) y mientras tanto «Imprimir» usa el cuadro de Chrome
+        const msg = e === 'sin_impresoras' ? 'DYMO Connect no ve la impresora: conéctala por USB y pulsa Actualizar.'
+            : state.dymo.redLocal === 'denied' ? 'Chrome bloqueó el acceso: candado junto a la dirección → Acceso a la red local → Permitir.'
+                : e === 'sin_framework' ? 'No se cargó el módulo de DYMO: recarga con Ctrl+F5.'
+                    : 'Esta PC no tiene DYMO Connect. Instálalo y pulsa Actualizar; mientras, «Imprimir» usa el cuadro de impresión de Chrome.';
+        box.append(h('div', { class: 'row wrap', style: 'gap:8px;align-items:center' },
+            h('span', { class: 'hint', style: 'flex:1 1 260px' }, msg),
+            e === 'no_servicio' ? h('a', { class: 'btn btn-primary btn-sm', href: '/static/descargas/Instalar_DYMO_TQT.cmd', download: 'Instalar_DYMO_TQT.cmd' }, 'Instalar DYMO en esta PC') : null));
     }
 
     async function conectar(force) {
@@ -223,7 +210,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
 .dymo-label { outline: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; }
 .dymo-label:last-child { break-after: auto; page-break-after: auto; }
 .dymo-label::after, .r3m + .r3m::before { display: none !important; }
-.cable-vacia { border-left: 0.3mm dashed #000 !important; }
+.cable-linea { border-left: 0.5mm dashed #000 !important; }
 </style></head><body></body></html>`);
         doc.close();
         doc.body.append(...nodos.map((n) => doc.importNode(n, true)));
@@ -591,7 +578,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         return { lista, error: '' };
     }
     const nodoCable = (num) => h('div', { class: 'dymo-label cable', role: 'img', 'aria-label': `Etiqueta de cable: ${num}` },
-        h('div', { class: 'cable-num' }, num), h('div', { class: 'cable-vacia', 'aria-hidden': 'true' }));
+        h('div', { class: 'cable-num' }, num), h('div', { class: 'cable-vacia', 'aria-hidden': 'true' }), h('i', { class: 'cable-linea', 'aria-hidden': 'true' }));
     function cableVista() {
         const { lista, error } = cableNumeros(); const num = lista[0] || '0000';
         $('cableLabel').replaceChildren(nodoCable(num));
