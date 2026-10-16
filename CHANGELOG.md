@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.1 — 2026-10-16
+- Pruebas TQT: encabezado en tres bloques, ON/OFF junto a cada conexión y selector de tarjetas con historial antes de R1/R2; selección numérica por Enter.
+- Bluetooth del navegador admite alias de la misma identidad (guiones, guiones bajos y V3_0/V30), conserva permisos y rechaza ambigüedad u otra unidad.
+- Opción local de Validación «Usar Windows por MAC» recupera el motor anterior pyserial/Bleak completo; requiere su agente. Conexión manual elige por MAC, no la primera tarjeta encontrada.
+- ON/OFF serial directo exige S29 fresco y ambas MAC; no genera aprobaciones. Ver docs/VALIDACION_141.md para verificaciones y límites.
+
 ## v1.4.0 — 2026-10-16
 Pruebas TQT (`#/validacion`) pasan a correr en el navegador; el agente de Windows queda como respaldo. Pendiente de aceptación en el banco físico.
 - **1. Banco fijo:** sin selector de banco ni confirmación repetida; pulsar «Iniciar» es la intención del operador. Contexto fijo «banco de pruebas · modo seguro» (en la ruta web lo fija el servidor; en la del agente el campo `banco` se envía pero el backend lo ignora).

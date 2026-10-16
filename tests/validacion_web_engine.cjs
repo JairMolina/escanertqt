@@ -229,6 +229,56 @@ prueba('v1.4.0: el evento serial connect solo reabre el COM con la vista de Vali
     assert.strictEqual(consultas, 1);
 });
 
+prueba('v1.4.1: manual serial exige S29 fresco y ambas MAC antes de mover', async () => {
+    const fx = new Fixture();
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../app/static/js/serial_web.js'), 'utf8'), ctx);
+    const serial = {
+        crearTramador: ctx.window.TQTSerial.crearTramador,
+        soportado: () => true, elegir: async () => ({}), autorizados: async () => [], describir: () => 'FAKE',
+        abrir: async (p, options) => {
+            fx.link = { feed: options.onBytes };
+            return { descripcion: 'FAKE', activo: () => true,
+                escribir: async bytes => { setTimeout(() => fx.write(Buffer.from(bytes).toString()), 1); return bytes.length; },
+                cerrar: async () => options.onCierre('Cerrado por el operador') };
+        },
+    };
+    ctx.window.TQTSerial = ctx.TQTSerial = serial;
+    await W.elegirPuerto();
+    const inventory = { nombre: fx.name, mac_r1: fx.values.MAC, mac_r2: fx.values.MACR };
+    await W.serialManual({ accion: 'ON', inventory });
+    await new Promise(resolve => setTimeout(resolve, 10)); // UART device processes the queued write asynchronously.
+    assert.strictEqual(fx.writes.filter(v => v === '$SMSG=ON\r\n').length, 1);
+    const before = fx.writes.length;
+    await assert.rejects(W.serialManual({ accion: 'OFF', inventory: { ...inventory, mac_r2: '00:00:00:00:00:99' } }), /MAC/);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.ok(fx.writes.slice(before).includes('$SMSG=Status\r\n'), 'se consulta otra muestra fresca');
+    assert.ok(!fx.writes.slice(before).includes('$SMSG=OFF\r\n'), 'identidad distinta no mueve');
+    await W.desconectar();
+});
+
+prueba('v1.4.1: BLE reutiliza identidad antigua sin selector y rechaza otro número/rol', async () => {
+    const log = [], ble = new I.BleLink(s => log.push(s));
+    const old = { name: 'TQT_R2_V3_0_0077', id: 'opaque-never-mac' };
+    let requested = 0;
+    ctx.navigator.bluetooth = { getDevices: async () => [old], requestDevice: async () => { requested++; return old; } };
+    const selected = await ble.localizar({ nombre: 'TQT-R2-V30-0077', dispositivo: 'R2', gesto: () => { throw Error('No debe pedir selector'); } });
+    assert.strictEqual(selected, old);
+    assert.strictEqual(requested, 0);
+    assert.ok(I.bleNames('TQT-R2-V30-0077').includes(old.name));
+    ctx.navigator.bluetooth.getDevices = async () => [old, { ...old, id: 'duplicate' }];
+    await assert.rejects(ble.localizar({ nombre: 'TQT-R2-V30-0077', dispositivo: 'R2' }), /ambigua/);
+    ctx.navigator.bluetooth.getDevices = async () => [];
+    for (const name of ['TQT_R2_V30_0078', 'TQT_R1_V30_0077']) {
+        await assert.rejects(ble.localizar({ nombre: 'TQT-R2-V30-0077', dispositivo: 'R2', gesto: async ({ autorizar }) => {
+            ctx.navigator.bluetooth.requestDevice = async options => {
+                assert.ok(options.filters.some(f => f.name === 'TQT_R2_V3_0_0077'));
+                return { name };
+            };
+            return autorizar();
+        } }), /se esperaba/);
+    }
+});
+
 (async () => {
     let fallos = 0;
     for (const [n, f] of pruebas) {

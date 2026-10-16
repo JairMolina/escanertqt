@@ -43,6 +43,16 @@
     const POST_RE = /AT\$POST=1,0,"([^"]*)"/;
     const normalizeMac = v => String(v || '').toUpperCase().replace(/[^0-9A-F]/g, '');
     const norm = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    // Only spelling changes are aliases: never another role, HW or unit number.
+    function bleNames(nombre) {
+        const clean = String(nombre || '').toUpperCase();
+        const match = /^TQT[-_]R([12])[-_]V(\d+(?:[._]\d+)?)[-_](\d+)$/.exec(clean);
+        if (!match) return [clean];
+        const hw = match[2].replace(/[._]/g, '');
+        const versions = [hw];
+        if (hw.length === 2) versions.push(hw[0] + '_' + hw[1], hw[0] + '.' + hw[1]);
+        return [...new Set([clean, ...versions.flatMap(v => ['_', '-'].map(s => ['TQT', 'R' + match[1], 'V' + v, match[3]].join(s)))])];
+    }
     // v1.4.0: el servidor no envía las MAC del inventario a la ruta web, solo huellas SHA-256(sal|MAC).
     async function huellaMac(sal, mac) {
         const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(sal || '') + '|' + normalizeMac(mac)));
@@ -276,14 +286,14 @@
             if (!navigator.bluetooth) throw new Error('Este navegador no soporta Web Bluetooth.');
             let previos = [];
             try { previos = navigator.bluetooth.getDevices ? await navigator.bluetooth.getDevices() : []; } catch (_) {}
-            const iguales = previos.filter(d => (d.name || '').toUpperCase() === String(nombre).toUpperCase());
+            const iguales = previos.filter(d => norm(d.name) === norm(nombre));
             if (iguales.length > 1) throw new NoVerification(dispositivo + ' BLE ambigua: hay ' + iguales.length + ' dispositivos autorizados con el nombre ' + nombre);
             if (iguales.length === 1) { this.log('BLE: reutilizando ' + dispositivo + ' autorizado previamente (' + nombre + ')'); return iguales[0]; }
             this.log('BLE: ' + dispositivo + ' ' + nombre + ' sin permiso previo; se requiere gesto del operador para el selector nativo');
-            const autorizar = () => navigator.bluetooth.requestDevice({ filters: [{ name: nombre }], optionalServices: [SERVICE_UUID, OTA_SERVICE] });
+            const autorizar = () => navigator.bluetooth.requestDevice({ filters: bleNames(nombre).map(name => ({ name })), optionalServices: [SERVICE_UUID, OTA_SERVICE] });
             const device = await gesto({ dispositivo, nombre, autorizar });
             if (!device) throw new Interrupted('No se autorizó el dispositivo Bluetooth ' + dispositivo);
-            if ((device.name || '').toUpperCase() !== String(nombre).toUpperCase())
+            if (norm(device.name) !== norm(nombre))
                 throw new NoVerification('Se eligió «' + (device.name || '?') + '», se esperaba ' + nombre + '. No se enviaron comandos.');
             return device;
         }
@@ -692,9 +702,9 @@
                     r1Name = device.name || '';
                     // La MAC BLE no es observable desde el navegador: el vínculo se demuestra con PB=2 en los movimientos.
                     this.mac_comparison = 'no_expuesta_navegador';
-                    this.ble_identity.r1 = { nombre: r1Name, metodo: 'nombre exacto autorizado + vínculo funcional PB=2', mac_reportada_r1: reported, id_opaco_navegador: device.id || null };
+                    this.ble_identity.r1 = { nombre: r1Name, metodo: 'identidad equivalente autorizada + vínculo funcional PB=2', mac_reportada_r1: reported, id_opaco_navegador: device.id || null };
                     this.ui('ble_ident', 'R1', r1Name, '', this.mac_comparison);
-                    return r1Name + ' | criterio nombre exacto; MAC BLE no expuesta por el navegador (se verifica por movimiento PB=2)';
+                    return r1Name + ' | identidad equivalente; MAC BLE no expuesta por el navegador (se verifica por movimiento PB=2)';
                 });
                 await series(7, 'ble', 2);
                 if ([7, 8, 9, 10].every(i => this.steps[i].state === 'aprobado')) this.mac_comparison = 'vinculo_funcional';
@@ -984,6 +994,45 @@
 
     /* ON/OFF manual por BLE (PPON/POFF exactos). Bloqueado durante la prueba automática.
      * Si el dispositivo no está conectado, debe invocarse desde un clic (puede abrir el selector). */
+    async function conectarBle({ dispositivo, nombre, mac } = {}) {
+        if (enCurso) throw new Error('La prueba automática usa el Bluetooth.');
+        if (!['R1', 'R2'].includes(dispositivo) || !nombre) throw new Error('Selecciona la tarjeta y su dispositivo R1/R2.');
+        const device = await bleLink.localizar({ nombre, dispositivo, gesto: ({ autorizar }) => autorizar() });
+        await bleLink.connect(device, dispositivo);
+        if (dispositivo === 'R2') {
+            const actual = await bleLink.macDeclarada();
+            if (actual && mac && normalizeMac(actual) !== normalizeMac(mac)) {
+                await bleLink.disconnect();
+                throw new Error('La MAC declarada por R2 no corresponde al inventario. No se enviaron comandos.');
+            }
+        }
+        return estado();
+    }
+    async function desconectarBle() {
+        if (enCurso) throw new Error('La prueba automática usa el Bluetooth.');
+        await bleLink.disconnect();
+    }
+    async function serialManual({ accion, inventory } = {}) {
+        if (enCurso) throw new Error('Hay una operación en curso.');
+        if (!link || !cx || st.serial.estado !== 'ok') throw new Error('Conecta el puerto serial.');
+        if (!['ON', 'OFF'].includes(accion) || !inventory) throw new Error('Selecciona una tarjeta y una acción válida.');
+        enCurso = true;
+        const m = new Motor({ serial: link, ble: bleLink, cfg: CFG, hooks: {},
+            ui: (kind, ...args) => monitores.forEach(fn => fn({ kind, text: kind === 'log' ? args[0] : '', status: kind === 'status' ? args[0] : null })) });
+        motor = m; m.expected = inventory;
+        try {
+            // Always obtain a fresh S29 before a manual movement; never trust selected UI data alone.
+            const sample = await m._fresh_status(12, 0);
+            if (!(await m._macIgual(sample.fields.MAC, 'mac_r1')) || !(await m._macIgual(sample.fields.MACR, 'mac_r2')))
+                throw new NoVerification('Las MAC leídas no corresponden a la tarjeta seleccionada; movimiento bloqueado.');
+            if (m.ready_name && norm(m.ready_name) !== norm(inventory.nombre)) throw new NoVerification('Nombre físico distinto del inventario.');
+            if (num(sample, 'TQT') !== 0) throw new NoVerification('Espera a que termine el movimiento actual.');
+            m._position(sample);
+            const command = accion === 'ON' ? 'PPON' : 'POFF';
+            await m._send(serialAction(command));
+            return { ok: true, enviado: command, respuesta: 'Orden enviada; comprueba los sensores. No constituye una prueba aprobada.' };
+        } finally { motor = null; enCurso = false; }
+    }
     async function bleManual({ dispositivo, accion, nombre } = {}) {
         const comando = accion === 'ON' ? 'PPON' : accion === 'OFF' ? 'POFF' : null;
         if (!comando || !['R1', 'R2'].includes(dispositivo)) return { ok: false, enviado: null, respuesta: null, error: 'Acción o dispositivo inválido.' };
@@ -992,14 +1041,17 @@
         const respuestas = [];
         const quitar = onMonitor(e => { if (e.kind === 'log' && e.text.startsWith('RX BLE: ')) respuestas.push(e.text.slice(8)); });
         try {
-            if (!(bleLink.connected && bleLink.dispositivo === dispositivo && (!nombre || bleLink.nombre.toUpperCase() === nombre.toUpperCase()))) {
+            if (!(bleLink.connected && bleLink.dispositivo === dispositivo && (!nombre || norm(bleLink.nombre) === norm(nombre)))) {
                 const prefijo = 'TQT';
                 let device = null;
                 if (nombre) {
                     const previos = navigator.bluetooth.getDevices ? await navigator.bluetooth.getDevices().catch(() => []) : [];
-                    device = previos.find(d => (d.name || '').toUpperCase() === nombre.toUpperCase()) || null;
+                    const matches = previos.filter(d => norm(d.name) === norm(nombre));
+                    if (matches.length > 1) throw new Error('Identidad BLE ambigua. Usa Windows por MAC.');
+                    device = matches[0] || null;
                 }
-                if (!device) device = await navigator.bluetooth.requestDevice({ filters: nombre ? [{ name: nombre }] : [{ namePrefix: prefijo }], optionalServices: [SERVICE_UUID, OTA_SERVICE] });
+                if (!device) device = await navigator.bluetooth.requestDevice({ filters: nombre ? bleNames(nombre).map(name => ({ name })) : [{ namePrefix: prefijo }], optionalServices: [SERVICE_UUID, OTA_SERVICE] });
+                if (nombre && norm(device.name) !== norm(nombre)) throw new Error('Dispositivo distinto de la tarjeta seleccionada.');
                 if (dispositivo === 'R2' && !String(device.name || '').toUpperCase().includes('R2')) throw new Error('El dispositivo elegido no es una R2: ' + device.name);
                 if (dispositivo === 'R1' && String(device.name || '').toUpperCase().includes('R2')) throw new Error('El dispositivo elegido es una R2, no R1: ' + device.name);
                 await bleLink.connect(device, dispositivo);
@@ -1020,10 +1072,10 @@
     }
 
     window.TQTValWeb = {
-        soportado, estado, onEstado, elegirPuerto, iniciar, bleManual,
+        soportado, estado, onEstado, elegirPuerto, iniciar, bleManual, conectarBle, desconectarBle, serialManual,
         // v1.4.0: extras (no forman parte de K1 pero son útiles para la UI)
         desconectar, onMonitor, reutilizarPuerto, vista, contexto: CONTEXTO,
         _interno: { parseStatus, readReady, position, serialAction, normalizeMac, communicate, buildWarnings,
-            SerialLink, BleLink, Motor, Publicador, TestFailure, NoVerification, Interrupted, CFG, STEP_NAMES, FIELDS, huellaMac },
+            SerialLink, BleLink, Motor, Publicador, TestFailure, NoVerification, Interrupted, CFG, STEP_NAMES, FIELDS, huellaMac, bleNames },
     };
 })();

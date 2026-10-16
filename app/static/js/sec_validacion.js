@@ -106,9 +106,11 @@
       reported_id_r2: "Identificador de R2",
       state: "Cotejo completo con inventario",
     };
+    let preferWindows = false;
+    try { preferWindows = localStorage.getItem("tqt.validacion.windows") === "1"; } catch (_) {}
     const web = () => {
       try {
-        return !!window.TQTValWeb?.soportado?.();
+        return !preferWindows && !!window.TQTValWeb?.soportado?.();
       } catch (e) {
         return false;
       }
@@ -212,8 +214,8 @@
     const serialManual = h(
       "div",
       { class: "row wrap" },
-      button("ON serial", () => cmd("serial", { command: "PPON" })),
-      button("OFF serial", () => cmd("serial", { command: "POFF" })),
+      button("ON serial", () => serialAction("ON")),
+      button("OFF serial", () => serialAction("OFF")),
       button("Reset normal", () => cmd("serial", { command: "RESET" })),
       commandSelect,
       button("Enviar comando", () => cmd("serial", { command: commandSelect.value })),
@@ -230,105 +232,59 @@
         button("Desconectar COM", () => cmd("disconnect_serial")),
       ),
       h(
-        "div",
-        { class: "row wrap" },
-        button("Buscar y conectar TQT por BLE", async () => {
-          await cmd("scan_ble");
-          if (bleFound) await cmd("connect_ble", { address: bleFound });
-        }),
-        button("Desconectar BLE", () => cmd("disconnect_ble")),
-      ),
-      h("h4", null, "Comandos serial (agente)"),
-      serialManual,
-      h(
         "details",
         { class: "tqt-install" },
         h("summary", null, "Instalar agente de pruebas (respaldo)"),
-        h("p", { class: "hint" }, "Solo si este navegador no admite Web Serial/Web Bluetooth. Extrae el paquete privado y ejecuta iniciar.cmd una vez."),
+        h("p", { class: "hint" }, "Para buscar por MAC se usa el banco anterior de Windows (pyserial + Bleak). Reutiliza su agente instalado o extrae el paquete privado y ejecuta iniciar.cmd una vez."),
         button("Descargar agente de pruebas", install),
       ),
     );
     let bleFound = "";
     const modeHint = h("p", { class: "hint" });
-    host.append(
+    const modeBtn = button("", cambiarModo);
+    const disconnectSerial = button("Desconectar serial", async () => {
+      if (web()) { try { await window.TQTValWeb.desconectar(); } catch (e) { message(e.message, true); } paintWebEstado(); }
+      else await cmd("disconnect_serial");
+    });
+    const bleRole = h("select", { class: "input", "aria-label": "Dispositivo Bluetooth para controles manuales" },
+      h("option", { value: "R1" }, "R1"), h("option", { value: "R2" }, "R2"));
+    const connectBle = button("Conectar Bluetooth", conectarBluetooth);
+    const disconnectBle = button("Desconectar Bluetooth", async () => {
+      if (web()) { try { await window.TQTValWeb.desconectarBle(); } catch (e) { message(e.message, true); } paintWebEstado(); }
+      else await cmd("disconnect_ble");
+    });
+    const bleHint = h("p", { class: "hint" });
+    const introPanel = h("section", { class: "prog-panel tqt-card tqt-intro" },
       h("h2", null, "Pruebas TQT"),
-      h("p", { class: "hint tqt-bench" }, "Banco de pruebas · modo seguro"),
-      modeHint,
-      status,
-      announcer,
-      h(
-        "div",
-        { class: "tqt-layout" },
-        h(
-          "div",
-          { class: "tqt-col tqt-main" },
-          summary,
-          h(
-            "section",
-            { class: "prog-panel tqt-card" },
-            h("h3", null, "Prueba automática"),
-            h("div", { class: "row wrap" }, start, stop),
-            progress,
-            h("p", { class: "hint" }, "ON = sensor de cierre · OFF = sensor de apertura (valores crudos 0/1; no son los comandos PPON/POFF)."),
-            steps,
-            h(
-              "details",
-              { class: "tqt-livewrap" },
-              h("summary", null, "Registro de comandos y respuestas (en vivo)"),
-              liveLog,
-            ),
-          ),
-          h(
-            "section",
-            { class: "prog-panel tqt-card" },
-            h("h3", null, "Conexiones"),
-            connSerial.el,
-            connBle.el,
-            webBox,
-            agentBox,
-          ),
-          h(
-            "section",
-            { class: "prog-panel tqt-card" },
-            h("h3", null, "Controles manuales Bluetooth"),
-            h("div", { class: "row wrap" }, bleOn, bleOff),
-            manualOut,
-          ),
-          h(
-            "section",
-            { class: "prog-panel tqt-card" },
-            h("h3", null, "Sensores y estados S29"),
-            sensors,
-          ),
-        ),
-        h(
-          "aside",
-          { class: "tqt-col tqt-side" },
-          h(
-            "section",
-            { class: "prog-panel tqt-card" },
-            h("h3", null, "Tarjeta e inventario"),
-            h("label", { class: "sr-only", for: "tqt-search" }, "Buscar tarjeta"),
-            search,
-            h(
-              "div",
-              { class: "row wrap" },
-              button("Cargar QR / código", () => scan(search.value)),
-            ),
-            cardList,
-            moreBtn,
-            cardHost,
-          ),
-          h(
-            "section",
-            { class: "prog-panel tqt-card" },
-            h("h3", null, "Historial de la tarjeta seleccionada"),
-            historyHost,
-          ),
-        ),
-      ),
-      reportHost,
-    );
+      h("p", { class: "hint tqt-bench" }, "Banco de pruebas · modo seguro"), modeHint, modeBtn);
+    const serialPanel = h("section", { class: "prog-panel tqt-card tqt-serial-panel" },
+      h("h3", null, "Puerto serial"), connSerial.el, webBox, disconnectSerial, agentBox,
+      h("div", { class: "tqt-serial-manual" }, serialManual));
+    const blePanel = h("section", { class: "prog-panel tqt-card tqt-ble-panel" },
+      h("h3", null, "Bluetooth R1 / R2"), connBle.el, bleRole,
+      h("div", { class: "row wrap" }, connectBle, disconnectBle),
+      h("div", { class: "row wrap" }, bleOn, bleOff), bleHint, manualOut);
+    const historyPanel = h("section", { class: "prog-panel tqt-card tqt-history-panel" },
+      h("h3", null, "Historial de la tarjeta seleccionada"), historyHost);
+    host.append(
+      h("div", { class: "tqt-header" }, introPanel, serialPanel, blePanel),
+      status, announcer,
+      h("div", { class: "tqt-layout" },
+        h("aside", { class: "tqt-col tqt-side" },
+          h("section", { class: "prog-panel tqt-card" },
+            h("h3", null, "Elige una tarjeta"),
+            h("label", { class: "sr-only", for: "tqt-search" }, "Buscar tarjeta"), search,
+            h("div", { class: "row wrap" }, button("Cargar QR / código", () => scan(search.value))),
+            cardList, moreBtn),
+          historyPanel,
+          h("section", { class: "prog-panel tqt-card tqt-inventory-panel" }, h("h3", null, "R1 y R2 · datos del inventario"), cardHost)),
+        h("div", { class: "tqt-col tqt-main" }, summary,
+          h("section", { class: "prog-panel tqt-card" },
+            h("h3", null, "Prueba automática"), h("div", { class: "row wrap" }, start, stop), progress,
+            h("p", { class: "hint" }, "ON = sensor de cierre · OFF = sensor de apertura (valores crudos 0/1; no son los comandos PPON/POFF)."), steps,
+            h("details", { class: "tqt-livewrap" }, h("summary", null, "Registro de comandos y respuestas (en vivo)"), liveLog)),
+          h("section", { class: "prog-panel tqt-card" }, h("h3", null, "Sensores y estados S29"), sensors))),
+      reportHost);
     search.id = "tqt-search";
     function button(text, fn) {
       return h("button", { class: "btn", type: "button", onclick: fn }, text);
@@ -362,11 +318,22 @@
         e.preventDefault();
         clearTimeout(searchTimer);
         const v = search.value.trim();
-        // Código largo (QR/MAC) → ficha directa; número o nombre → filtro del listado.
-        if (v.length > 12) scan(v);
-        else loadList(false);
+        seleccionarCodigo(v);
       }
     });
+    async function seleccionarCodigo(value) {
+      const v = String(value || "").trim();
+      if (!v || active || manualBusy) return;
+      if (/^\d+$/.test(v)) {
+        const my = ++listSeq;
+        const r = await api("/api/tarjetas?" + new URLSearchParams({ search: v, limit: "100", offset: "0" }));
+        if (!alive || my !== listSeq) return;
+        const matches = r.ok ? (r.data.items || []).filter(t => Number(cardNum(t)) === Number(v)) : [];
+        if (matches.length === 1) { await selectCard(matches[0]); return; }
+        if (matches.length > 1) { message("Hay varias tarjetas con ese número; elige la correspondiente del listado.", true); await loadList(false); return; }
+      }
+      await scan(v);
+    }
     async function loadList(more) {
       const my = ++listSeq;
       if (!more) {
@@ -396,8 +363,8 @@
       const b = h(
         "button",
         { class: "tqt-cardbtn", type: "button", "aria-pressed": String(tarjeta?.id === t.id), "data-id": t.id, onclick: () => selectCard(t) },
-        h("b", null, cardNum(t)),
-        h("span", { class: "mono" }, t.r1?.nombre || "R1 sin registrar"),
+        h("div", { class: "tqt-cardbtn-head" }, h("span", { class: "badge" }, "R1"), h("b", { class: "mono" }, t.r1?.nombre || "R1 sin registrar")),
+        h("div", { class: "tqt-cardbtn-meta" }, h("span", null, t.r1?.firmware ? "Programada · FW " + t.r1.firmware : "Sin programar"), h("span", null, "#" + cardNum(t))),
       );
       return h("li", null, b);
     }
@@ -495,7 +462,7 @@
       const pick =
         online.find((s) => s.id === stationId) ||
         online.find((s) => s.id === savedStation()) ||
-        online[0] ||
+        (online.length === 1 ? online[0] : null) ||
         list.find((s) => s.id === stationId) ||
         list.find((s) => s.id === savedStation()) ||
         null;
@@ -503,7 +470,7 @@
       if (pick?.online) saveStation(stationId);
       stationInfo.textContent = pick
         ? "Agente Windows: " + pick.name + (pick.online ? " · en línea" : " · sin conexión") + (online.length > 1 ? " (" + online.length + " en línea; se usa esta)" : "")
-        : "No hay agente de pruebas registrado.";
+        : online.length > 1 ? "Hay varios bancos Windows; configura en esta laptop su estación para no usar otra computadora." : "No hay agente de pruebas registrado.";
       if (!pick || !pick.online) connSerial.set("off", pick ? "agente sin conexión" : "sin agente");
       else if (pick.serial_connected) connSerial.set("ok", "conectado · " + (pick.port || "COM") + " (agente)");
       else connSerial.set("off", "desconectado (agente en línea)");
@@ -612,6 +579,44 @@
           signal?.addEventListener("abort", ab, { once: true });
         });
     }
+    async function cambiarModo() {
+      if (active || manualBusy) return;
+      try {
+        if (web()) { await window.TQTValWeb.desconectar(); await window.TQTValWeb.desconectarBle(); window.TQTValWeb.vista?.(false); }
+        else if (curStation()?.serial_connected || curStation()?.ble_address) {
+          message("Desconecta el serial y Bluetooth del banco Windows antes de cambiar al navegador.", true); return;
+        }
+        preferWindows = !preferWindows;
+        try { localStorage.setItem("tqt.validacion.windows", preferWindows ? "1" : "0"); } catch (_) {}
+        window.TQTValWeb?.vista?.(web());
+        if (web()) paintWebEstado(); else await stations();
+        updateControls();
+      } catch (e) { message(e.message, true); }
+    }
+    async function serialAction(accion) {
+      if (!web()) return cmd("serial", { command: accion === "ON" ? "PPON" : "POFF" });
+      if (active || manualBusy || !card) return;
+      manualBusy = true; updateControls();
+      try { const r = await window.TQTValWeb.serialManual({ accion, inventory: card }); manualOut.textContent = "Serial: " + r.enviado + " · " + r.respuesta; }
+      catch (e) { message(e.message, true); }
+      finally { manualBusy = false; paintWebEstado(); }
+    }
+    async function conectarBluetooth() {
+      if (active || manualBusy || !card) return;
+      const role = bleRole.value || "R1";
+      const pcb = role === "R1" ? tarjeta?.r1 : tarjeta?.r2;
+      if (!pcb?.nombre) { message("La tarjeta no tiene " + role + " registrada.", true); return; }
+      if (!web()) {
+        bleFound = "";
+        await cmd("scan_ble", { role });
+        if (bleFound) await cmd("connect_ble", { address: bleFound });
+        return;
+      }
+      manualBusy = true; updateControls();
+      try { await window.TQTValWeb.conectarBle({ dispositivo: role, nombre: pcb.nombre, mac: pcb.mac }); }
+      catch (e) { message(e.message, true); }
+      finally { manualBusy = false; paintWebEstado(); }
+    }
     async function bleManual(accion) {
       if (active || manualBusy) return;
       if (!web()) return cmd("ble", { command: accion === "ON" ? "PPON" : "POFF" });
@@ -624,7 +629,9 @@
       updateControls();
       manualOut.textContent = "Enviando " + accion + " a " + dispositivo + "…";
       try {
-        const r = await window.TQTValWeb.bleManual({ dispositivo, accion });
+        const pcb = dispositivo === "R1" ? tarjeta?.r1 : tarjeta?.r2;
+        if (!pcb?.nombre) throw new Error("Selecciona una tarjeta con " + dispositivo + " registrada.");
+        const r = await window.TQTValWeb.bleManual({ dispositivo, accion, nombre: pcb.nombre });
         manualOut.textContent = r?.ok
           ? accion + " → " + dispositivo + " · enviado " + (r.enviado || "—") + " · respuesta " + (r.respuesta || "sin respuesta")
           : accion + " → " + dispositivo + " · error: " + (r?.error || "sin respuesta");
@@ -642,8 +649,16 @@
       webBox.hidden = !isWeb;
       agentBox.hidden = isWeb;
       modeHint.textContent = isWeb
-        ? "Conexión directa desde este navegador (Web Serial y Web Bluetooth). Mantén esta pestaña visible durante la prueba: si el navegador la pasa a segundo plano, sus temporizadores se ralentizan. El inventario conserva cada ejecución."
-        : "Este navegador no admite conexión directa: se usa el agente de pruebas de Windows en línea. El inventario conserva cada ejecución.";
+        ? "Conexión directa desde este navegador. Mantén esta pestaña visible durante la prueba."
+        : "Banco Windows: módulo anterior (pyserial + Bleak), con búsqueda automática por MAC. Necesita el agente local de pruebas.";
+      modeBtn.textContent = isWeb ? "Usar Windows por MAC" : "Usar conexión del navegador";
+      modeBtn.disabled = busy || (!isWeb && !window.TQTValWeb?.soportado?.());
+      bleHint.textContent = isWeb ? "Autoriza R1 y R2 aquí una vez. Se reutilizan los permisos y se admiten nombres antiguos. La MAC física no es observable en Web Bluetooth." : "La rutina conecta R1 por MAC y después R2 por MACR, sin selector Bluetooth del navegador.";
+      connectBle.disabled = disconnectBle.disabled = bleRole.disabled = busy || !card || (!isWeb && !curStation()?.online);
+      disconnectSerial.disabled = busy;
+      serialManual.querySelectorAll("button,select").forEach(b => b.disabled = busy || !card || (isWeb ? window.TQTValWeb?.estado?.()?.serial?.estado !== "ok" : !curStation()?.serial_connected));
+      if (isWeb) { commandSelect.hidden = true; serialManual.querySelectorAll("button").forEach(b => { if (!["ON serial", "OFF serial"].includes(b.textContent)) b.hidden = true; }); }
+      else { commandSelect.hidden = false; serialManual.querySelectorAll("button").forEach(b => b.hidden = false); }
       const s = curStation();
       const ready = isWeb ? true : !!(s?.online && s.serial_connected);
       start.disabled = busy || !card || !ready;
@@ -922,9 +937,12 @@
         if (!result?.ok) throw Error(result?.error || "Comando sin resultado; no se repite automáticamente.");
         if (action === "ports") port.replaceChildren(...result.data.map((x) => h("option", { value: x }, x)));
         if (action === "scan_ble") {
-          // v1.4.0: se toma la primera TQT encontrada (sin selector); el motor verifica identidad después.
-          bleFound = result.data[0]?.address || "";
-          if (!bleFound) throw Error("No se encontró ninguna TQT por Bluetooth.");
+          // Windows exposes the address: choose a unique MAC match, never the first scanned TQT.
+          const normalize = v => String(v || "").toUpperCase().replace(/[^0-9A-F]/g, "");
+          const expected = body.role === "R2" ? tarjeta?.r2?.mac : tarjeta?.r1?.mac;
+          const matches = expected ? result.data.filter(d => normalize(d.address) === normalize(expected)) : [];
+          bleFound = matches.length === 1 ? matches[0].address : "";
+          if (!bleFound) throw Error("No se encontró una única " + (body.role || "R1") + " con la MAC del inventario. No se conectó otro dispositivo.");
         }
         if (action === "ble") manualOut.textContent = body.command + " enviado por BLE · " + (result.data ? JSON.stringify(result.data) : "sin respuesta");
         message("Acción completada: " + action);
@@ -1274,18 +1292,19 @@
     paintSummary();
     updateControls();
     loadList(false);
-    if (web()) {
-      paintWebEstado();
+    if (window.TQTValWeb?.soportado?.()) {
+      if (web()) paintWebEstado();
       // v1.4.0: la reconexión automática del COM solo opera con esta vista montada.
-      try { window.TQTValWeb.vista?.(true); } catch (e) {}
+      try { window.TQTValWeb.vista?.(web()); } catch (e) {}
       try {
-        unsubEstado = window.TQTValWeb.onEstado?.(() => alive && paintWebEstado()) || null;
+        unsubEstado = window.TQTValWeb.onEstado?.(() => alive && web() && paintWebEstado()) || null;
         // v1.4.0: monitor en ruta web: tramas RX y avisos del puerto fuera de la prueba automática.
         unsubMonitor = window.TQTValWeb.onMonitor?.((ev) => {
           if (alive && !active && ev?.text) logLine((ev.kind === "line" ? "RX: " : "") + ev.text);
         }) || null;
       } catch (e) {}
-    } else stations().catch(() => {});
+    }
+    if (!web()) stations().catch(() => {});
     // v1.4.0: cerrar o recargar la pestaña con una prueba web en curso pide confirmación del navegador.
     const antesDeDescargar = (ev) => {
       if (active?.web) {
@@ -1327,7 +1346,7 @@
         try { if (typeof unsubMonitor === "function") unsubMonitor(); } catch (e) {}
         try { window.TQTValWeb?.vista?.(false); } catch (e) {}
         // Libera el COM para Programación (si hay prueba en curso, desconectar() lo rechaza y se ignora).
-        if (web()) Promise.resolve().then(() => window.TQTValWeb?.desconectar?.()).catch(() => {});
+        if (web()) Promise.resolve().then(async () => { await window.TQTValWeb?.desconectar?.(); await window.TQTValWeb?.desconectarBle?.(); }).catch(() => {});
         window.removeEventListener("beforeunload", antesDeDescargar);
         // Una prueba web en curso se cancela al salir de la vista (el motor libera puertos y locks).
         try { webAbort?.abort(); } catch (e) {}
