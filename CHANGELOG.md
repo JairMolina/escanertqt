@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.3 — 2026-10-16
+- Integra la versión real de producción 1.4.1 (76d71a1) con los ajustes locales 1.4.1/1.4.2 (8983d99), sin descartar ninguna corrección.
+- Conserva liberación de COM tras salir de una prueba y desbloqueo de tarjetas con pestañas abandonadas de otro operador, además de Web Serial + puente BLE Windows por MAC y la distribución de Validación.
+- Caché de validacion_web.js y sec_validacion.js a 1430. Producción permanece en 1.4.1; esta integración se publica en la rama de trabajo.
+
 ## v1.4.2 — 2026-10-16
 - Validación mantiene Web Serial y recupera exclusivamente Bluetooth Windows/Bleak por MAC, con un puente BLE sin abrir el COM. Sustituye el cambio completo de modo de 1.4.1.
 - Conexión automática R1/R2 por MAC de inventario y S29; admite nombres antiguos sin alterar firmware. Autorización por operador/estación, comandos de un solo uso y evidencia nativa autenticada.
@@ -11,6 +16,10 @@
 - Bluetooth del navegador admite alias de la misma identidad (guiones, guiones bajos y V3_0/V30), conserva permisos y rechaza ambigüedad u otra unidad.
 - Opción local de Validación «Usar Windows por MAC» recupera el motor anterior pyserial/Bleak completo; requiere su agente. Conexión manual elige por MAC, no la primera tarjeta encontrada.
 - ON/OFF serial directo exige S29 fresco y ambas MAC; no genera aprobaciones. Ver docs/VALIDACION_141.md para verificaciones y límites.
+
+## v1.4.1 (producción) — 2026-10-16
+- **Pruebas TQT (web):** salir de la sección con una prueba en curso ahora libera el puerto COM cuando la prueba termina (antes quedaba abierto y Programación no podía usarlo hasta recargar).
+- **Pruebas TQT (web):** una prueba web abandonada (sin latido por más de 2 min) de otro operador ya no bloquea la tarjeta: al iniciar se marca interrumpida / no verificada. Caché `sec_validacion.js` a `?v=1410`.
 
 ## v1.4.0 — 2026-10-16
 Pruebas TQT (`#/validacion`) pasan a correr en el navegador; el agente de Windows queda como respaldo. Pendiente de aceptación en el banco físico.

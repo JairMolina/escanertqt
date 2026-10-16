@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-16 19:36 UTC
-Commit de referencia: `01c769968089` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-16 19:42 UTC
+Commit de referencia: `8983d9972364` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Validacion local 1.4.2 conserva Web Serial y recupera exclusivamente BLE Windows/Bleak por MAC con puente ble_only. Conexion automatica R1/R2 con nombres antiguos; autorizacion por operador y comandos de un solo uso. Sustituye modo Windows completo 1.4.1. Ver docs/VALIDACION_142.md.
+Integracion 1.4.3 sobre version REAL de produccion1.4.1 commit76d71a128a44778686027164181a468ff805e7f4; ese commit no estaba en GitHub y se recupero solo codigo por bundle. Conservadas liberacion COM al salir y recuperacion tarjeta bloqueada por pestaña abandonada de otro operador, junto con cambios141/142: distribucion, WebSerial y BLE Windows por MAC.
 
 ## Siguiente paso
-Produccion sigue 1.4.0 sin desplegar. Revisar calidad UART: 28 de 99 lineas ilegibles excluidas; causa fisica no demostrada. No repetir movimientos sin nueva autorizacion. Puente privado BLE-Preview142 listo; Android y Skytec pendientes.
+Produccion comprobada sana en1.4.1; no desplegada1.4.3 ni reiniciada OrangePi. Preview backend aun requiere recarga/reinicio para version143. UART28/99 lineas corruptas pendiente diagnostico. Sin repetir prueba fisica; Android/Skytec pendientes.
 
 ## Evidencia
-Prueba fisica autorizada 0039 COM7 run44d7b1fc0e23708d0817f0bf09613c8c:14/14,108.2s,final abierto,aprobado_con_advertencias,43 S29 y ambas MAC Windows coincidentes.23 Python+14 JS+UI PASS.Playwright BLE real R1/R2 sin COM. ECC backend/seguridad aplicados.No firmware/eFuses ni produccion modificados.
+Origen76d71a1 contenedorOrangePi APP_VERSION1.4.1 y healthOK. Integracion24Python+14JS+UI PASS y diffsinmarcadores. Prueba fisica previa142 run44d7b1fc0e23708d0817f0bf09613c8c 14/14aprobada conadvertencias; no repetida. ECCverification aplicada pruebas/regresion y revisiondiff. Sin datos/credenciales publicados.

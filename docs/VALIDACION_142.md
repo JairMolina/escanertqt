@@ -34,6 +34,6 @@ Backend y adaptador incorporan pruebas de propietario, MAC, uso único, caducida
 
 Preview http://127.0.0.1:18084/monitor#/validacion, contenedor tqt-validacion141-web-1 (nombre histórico), versión 1.4.2. Base local aislada; 0039 incorporada selectivamente desde inventario real. Puente privado en %USERPROFILE%\.tqt\BLE-Preview142; no compartir config.json porque contiene su credencial.
 
-Producción permanece en 1.4.0. Su despliegue requiere autorización expresa. No se cambió Programación R1/R3 ni firmware. Revisar calidad UART en otra intervención; Android y Skytec continúan pendientes.
+Estado actualizado al integrar 1.4.3: se comprobó que producción corre 1.4.1, commit 76d71a1; esa base se incorporó preservando sus dos correcciones. Su despliegue requiere autorización expresa. No se cambió Programación R1/R3 ni firmware. Revisar calidad UART en otra intervención; Android y Skytec continúan pendientes.
 
 Capacidades aplicadas: ECC backend y seguridad para autorización y evidencia del puente; CM para continuidad, checkpoint y Git. Se conservó el diseño existente.

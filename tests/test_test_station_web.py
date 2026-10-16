@@ -186,6 +186,19 @@ class WebRuns(unittest.TestCase):
             s.web_finish(OP, j["id"], self.report())
         self.assertEqual(s.read(k["id"])["state"], "running")
 
+    def test_stale_tab_of_other_operator_does_not_block_card(self):
+        # v1.4.1: la pestaña abandonada de otro operador no bloquea la tarjeta; una activa sí.
+        j = s.web_create(self.d["id"], "otro@test.mx")
+        with self.assertRaises(ValueError):
+            self.start()
+        with db.get_db() as c:
+            c.execute("UPDATE tqt_test_runs SET updated=? WHERE id=?", (time.time() - 300, j["id"]))
+        k = self.start()
+        with db.get_db() as c:
+            state = c.execute("SELECT state FROM tqt_test_runs WHERE id=?", (j["id"],)).fetchone()["state"]
+        self.assertEqual(state, "interrupted")
+        self.assertEqual(s.read(k["id"])["state"], "running")
+
     def test_identity_switch_confirmed_keeps_trace_and_results_under_detected(self):
         t2, d2 = self.card()
         j = self.start()
