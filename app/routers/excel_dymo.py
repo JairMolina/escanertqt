@@ -283,11 +283,12 @@ def get_dymo_xml(
     label_format: str = Query("30334", description=FORMATO_DOC),
     tipo: str = Query("dymo", pattern="^(dymo|label)$", description="dymo = DYMO Connect (DCD) · label = DYMO Label v8"),
     texto_como: str = Query("text", pattern="^(text|address)$", description="Objeto para el texto: text (TextObject) o address (AddressObject, el del ejemplo oficial)"),
+    aprobada: bool = Query(False, description="v1.4.0: agrega la leyenda «Aprobada» debajo de los datos (solo la usa Validación)"),
 ):
     fmt = _formato_o_400(label_format)
     tarjeta = _tarjeta_o_404(tarjeta_id)
-    xml = (DymoService.generate_dcd_xml(tarjeta, fmt, texto_como) if tipo == "dymo"
-           else DymoService.generate_dymo_xml(tarjeta, fmt))
+    xml = (DymoService.generate_dcd_xml(tarjeta, fmt, texto_como, aprobada=aprobada) if tipo == "dymo"
+           else DymoService.generate_dymo_xml(tarjeta, fmt, aprobada))
     return Response(content=xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
@@ -301,10 +302,11 @@ def get_dymo_archivo(
     tarjeta_id: int,
     label_format: str = Query("30334", description=FORMATO_DOC),
     tipo: str = Query("dymo", pattern="^(dymo|label)$"),
+    aprobada: bool = Query(False, description="v1.4.0: leyenda «Aprobada» debajo de los datos"),
 ):
     """`.dymo` (DYMO Connect, LabelWriter 550) con Content-Disposition attachment: Windows lo abre con DYMO Connect."""
     fmt = _formato_o_400(label_format)
-    datos, nombre = DymoService.archivo_dymo(_tarjeta_o_404(tarjeta_id), fmt, tipo)
+    datos, nombre = DymoService.archivo_dymo(_tarjeta_o_404(tarjeta_id), fmt, tipo, aprobada)
     return _adjunto(datos, nombre)
 
 
@@ -363,6 +365,13 @@ def get_dymo_cable_xml(
     fmt = _formato_o_400(label_format)
     xml = DymoService.generate_cable_dcd_xml(numero, fmt) if tipo == "dymo" else DymoService.generate_cable_label_xml(numero, fmt)
     return Response(content=xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/dymo/cable/svg", summary="Etiqueta de cable como SVG a escala real (respaldo de impresión del navegador)")
+def get_dymo_cable_svg(numero: str = Query(...), label_format: str = Query("30334", description=FORMATO_DOC)):
+    if not re.fullmatch(NUMERO_CABLE, numero):
+        raise HTTPException(422, f"Número inválido: {numero}")
+    return Response(content=DymoService.generate_cable_svg(numero, _formato_o_400(label_format)), media_type="image/svg+xml")
 
 
 @router.get("/dymo/cable/archivo", summary="Descarga la etiqueta de cable como archivo .dymo o .label")
@@ -466,7 +475,8 @@ def get_dymo_svg(
     tarjeta_id: int,
     label_format: str = Query("30334", description=FORMATO_DOC),
     guia: bool = Query(True, description="Dibuja la zona segura de 3 mm en línea punteada"),
+    aprobada: bool = Query(False, description="v1.4.0: leyenda «Aprobada» debajo de los datos"),
 ):
     fmt = _formato_o_400(label_format)
-    return Response(content=DymoService.generate_svg_preview(_tarjeta_o_404(tarjeta_id), label_format=fmt, guia=guia),
+    return Response(content=DymoService.generate_svg_preview(_tarjeta_o_404(tarjeta_id), label_format=fmt, guia=guia, aprobada=aprobada),
                     media_type="image/svg+xml")

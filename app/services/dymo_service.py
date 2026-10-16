@@ -85,6 +85,7 @@ FORMATOS: Dict[str, FormatoEtiqueta] = {
     "30252": FormatoEtiqueta("30252", 89.0, 28.0, 5040, 1581, "Address", "30252 Address", "Address"),
 }
 FORMATO_POR_DEFECTO = "30334"
+LEYENDA_APROBADA = "Aprobada"   # v1.4.0: solo en la etiqueta que imprime Validación al aprobar
 
 
 def obtener_formato(label_format: Optional[str]) -> FormatoEtiqueta:
@@ -356,6 +357,12 @@ class DymoService:
         return [str(tarjeta.get("nombre_r1") or ""), mac("mac_r1"), str(tarjeta.get("nombre_r2") or ""), mac("mac_r2")]
 
     @classmethod
+    def lineas_texto(cls, tarjeta: Dict[str, Any], aprobada: bool = False) -> List[str]:
+        """v1.4.0: líneas del texto impreso. Con `aprobada` se agrega debajo la leyenda exacta «Aprobada»; el QR NO cambia."""
+        lin = cls.trama_lineas(tarjeta)
+        return lin + [LEYENDA_APROBADA] if aprobada else lin
+
+    @classmethod
     def format_label_text(cls, tarjeta: Dict[str, Any]) -> str:
         """Texto impreso de la etiqueta: las 4 líneas de la trama unidas con salto de línea, sin salto final."""
         return "\n".join(cls.trama_lineas(tarjeta))
@@ -383,14 +390,14 @@ class DymoService:
 
     # ------------------------------------------------------------------ .label (DYMO Label v8, twips)
     @classmethod
-    def generate_dymo_xml(cls, tarjeta: Dict[str, Any], label_format: Optional[str] = None) -> str:
+    def generate_dymo_xml(cls, tarjeta: Dict[str, Any], label_format: Optional[str] = None, aprobada: bool = False) -> str:
         """`.label` de DYMO Label v8 con los objetos `QR` (BarcodeObject) y `TEXTO` (TextObject)."""
         d = cls.diseno(tarjeta, label_format)
         f = d.formato
         # El servicio DLS dibuja un BarcodeObject con tamaño fijo (Small/Medium/Large, máx. 16 mm) e ignora la caja;
         # por eso el QR va como imagen 1 bit a 300 dpi, con módulos de PUNTOS_POR_MODULO puntos exactos.
         qr_png = cls.generate_qr_base64(cls.format_qr_payload(tarjeta), box_size=d.puntos_por_modulo)
-        texto = xml_escape(cls.format_label_text(tarjeta))
+        texto = xml_escape("\n".join(cls.lineas_texto(tarjeta, aprobada)))
         qr, tx = d.qr, d.texto
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
@@ -462,7 +469,8 @@ class DymoService:
                 f"<StrokeBrush>{negro}</StrokeBrush><FillBrush>{negro}</FillBrush></Brushes>")
 
     @classmethod
-    def generate_dcd_xml(cls, tarjeta: Dict[str, Any], label_format: Optional[str] = None, texto_como: str = "text") -> str:
+    def generate_dcd_xml(cls, tarjeta: Dict[str, Any], label_format: Optional[str] = None, texto_como: str = "text",
+                     aprobada: bool = False) -> str:
         """Etiqueta para DYMO Connect (`.dymo`, lo que recibe `dymo.label.framework.openLabelXml`).
         Objetos con nombre: `QR` (BarcodeObject, payload = trama de 4 líneas) y `TEXTO` (las mismas 4 líneas).
         `texto_como='address'` emite el texto como AddressObject (el único objeto de texto que trae el ejemplo oficial)
@@ -474,7 +482,7 @@ class DymoService:
         fuente = (f"<FontInfo><FontName>{FUENTE}</FontName><FontSize>{d.fuente_pt:g}</FontSize><IsBold>True</IsBold>"
                   f"<IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>")
         lineas = "".join(f"<LineTextSpan><TextSpan><Text>{xml_escape(l)}</Text>{fuente}</TextSpan></LineTextSpan>"
-                         for l in cls.trama_lineas(tarjeta))
+                         for l in cls.lineas_texto(tarjeta, aprobada))
         margen = '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0" /></Margin>'
         qr, tx, seg = d.qr, d.texto, d.zona_segura
         objeto = "AddressObject" if texto_como == "address" else "TextObject"
@@ -562,13 +570,14 @@ class DymoService:
 </DesktopLabel>"""
 
     @classmethod
-    def archivo_dymo(cls, tarjeta: Dict[str, Any], label_format: Optional[str] = None, tipo: str = "dymo") -> Tuple[bytes, str]:
+    def archivo_dymo(cls, tarjeta: Dict[str, Any], label_format: Optional[str] = None, tipo: str = "dymo",
+                     aprobada: bool = False) -> Tuple[bytes, str]:
         """(bytes, nombre) del archivo para abrir en DYMO. `.dymo` = DYMO Connect (con BOM UTF-8 como los oficiales);
         `.label` = DYMO Label v8."""
         num = tarjeta.get("id_tarjeta_num") or "0000"
         if tipo == "label":
-            return cls.generate_dymo_xml(tarjeta, label_format).encode("utf-8"), f"TQT_{num}.label"
-        return b"\xef\xbb\xbf" + cls.generate_dcd_xml(tarjeta, label_format).encode("utf-8"), f"TQT_{num}.dymo"
+            return cls.generate_dymo_xml(tarjeta, label_format, aprobada).encode("utf-8"), f"TQT_{num}.label"
+        return b"\xef\xbb\xbf" + cls.generate_dcd_xml(tarjeta, label_format, aprobada=aprobada).encode("utf-8"), f"TQT_{num}.dymo"
 
     @classmethod
     def zip_lote(cls, tarjetas: List[Dict[str, Any]], label_format: Optional[str] = None, tipo: str = "dymo") -> bytes:
@@ -712,6 +721,21 @@ class DymoService:
 {objeto}</DieCutLabel>"""
 
     @classmethod
+    def generate_cable_svg(cls, numero: str, label_format: Optional[str] = None) -> str:
+        """v1.4.0: SVG a escala real (1 unidad = 1 mm) de la etiqueta de cable, para el respaldo de impresión del navegador."""
+        f = obtener_formato(label_format)
+        c, ln = caja_cable(f), caja_linea_cable(f)
+        pt = CABLE_FUENTE_PT * PT_A_MM
+        cx, cy = c.x + c.w / 2, c.y + c.h / 2
+        textos = "".join(f'<text transform="translate({cx + dx:.3f} {cy:.3f}) rotate(-90)" text-anchor="middle" dominant-baseline="central">{xml_escape(t)}</text>'
+                         for dx, t in ((-pt * 0.55, "TQT"), (pt * 0.55, numero)))
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f.ancho_mm:g}mm" height="{f.alto_mm:g}mm" viewBox="0 0 {f.ancho_mm:g} {f.alto_mm:g}">'
+                f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/>'
+                f'<g fill="#000" font-family="{FUENTE}, \'Courier New\', monospace" font-weight="700" font-size="{pt:.4f}">{textos}</g>'
+                f'<line x1="{ln.x + ln.w / 2:.3f}" y1="{ln.y:.3f}" x2="{ln.x + ln.w / 2:.3f}" y2="{ln.abajo:.3f}" stroke="#000" stroke-width="0.5" '
+                f'stroke-dasharray="{CABLE_GUION_MM} {CABLE_HUECO_MM}"/></svg>')
+
+    @classmethod
     def generate_cable_dcd_xml(cls, numero: str, label_format: Optional[str] = None) -> str:
         """`.dymo` (DYMO Connect) con el número solo en la mitad izquierda."""
         f = obtener_formato(label_format)
@@ -842,7 +866,8 @@ class DymoService:
 
     # ------------------------------------------------------------------ vistas previas a escala real
     @classmethod
-    def generate_svg_preview(cls, tarjeta: Dict[str, Any], label_format: Optional[str] = None, guia: bool = True) -> str:
+    def generate_svg_preview(cls, tarjeta: Dict[str, Any], label_format: Optional[str] = None, guia: bool = True,
+                             aprobada: bool = False) -> str:
         """SVG a escala real (1 unidad = 1 mm): módulos del QR como rectángulos (bordes nítidos, sin PNG), 4 líneas de
         texto y, con `guia`, la zona segura de 3 mm en línea punteada."""
         d = cls.diseno(tarjeta, label_format)
@@ -855,11 +880,12 @@ class DymoService:
                          for r, fila in enumerate(matriz) for c, v in enumerate(fila) if v)
         pt_mm = d.fuente_pt * PT_A_MM
         paso = pt_mm * INTERLINEADO
-        alto = paso * len(cls.trama_lineas(tarjeta))
+        lin_txt = cls.lineas_texto(tarjeta, aprobada)
+        alto = paso * len(lin_txt)
         y_inicio = d.texto.y + (d.texto.h - alto) / 2 + paso * 0.8
         texto = "".join(
             f'<text x="{d.texto.x:.3f}" y="{y_inicio + i * paso:.3f}">{xml_escape(l) or "&#160;"}</text>'
-            for i, l in enumerate(cls.trama_lineas(tarjeta)))
+            for i, l in enumerate(lin_txt))
         s = d.zona_segura
         guia_svg = (f'<rect x="{s.x}" y="{s.y}" width="{s.w}" height="{s.h}" fill="none" stroke="#000" stroke-width="0.15" '
                     f'stroke-dasharray="1 1" class="guia"/>') if guia else ""
