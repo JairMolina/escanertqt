@@ -15,9 +15,16 @@ window.TQTSTM32 = function (host, ctx) {
     const panel = h('div', { class: 'prog-detalle' }, empty);
     const status = h('div', { class: 'prog-resultado', role: 'status', 'aria-live': 'polite' });
     // v1.3.73: semáforo de estado de programación junto al detalle de la tarjeta
-    const luzTxt = h('span', { class: 'prog-luz-txt', 'aria-live': 'polite' });
-    const estadoBox = h('div', { class: 'prog-estado' }, h('span', { class: 'prog-luz', 'aria-hidden': 'true' }), luzTxt);
-    function setLuz(k) { estadoBox.dataset.s = k; luzTxt.textContent = { ok: 'Programada', warn: 'Programando…', bad: 'Sin programar', err: 'Error al programar' }[k]; }
+    // v1.4.0: estado con la plantilla compartida TQTProgEstado (igual que R2); conexión = Agente J-Link, sin puerto serial
+    const estadoBox = window.TQTProgEstado.crear();
+    function setLuz(k, extra) {
+        const id = current?.identity;
+        const opt = station.selectedOptions[0];
+        window.TQTProgEstado.pintar(estadoBox, Object.assign({
+            estado: k, conexion: 'Agente J-Link' + (opt && opt.value ? ' · ' + (opt.dataset.name || opt.textContent) + (opt.dataset.online === 'true' ? ' (conectado)' : ' (desconectado)') : ' · sin estación elegida'),
+            fw: id?.fw || '', hw: id?.hw || ''
+        }, extra || {}));
+    }
     const station = h('select', { class: 'input', id: ID + '-est' });
     const SKEY = 'tqt.station.stm32';
     const getSaved = () => { try { return localStorage.getItem(SKEY) || ''; } catch (e) { return ''; } };
@@ -119,7 +126,7 @@ window.TQTSTM32 = function (host, ctx) {
             ['restarting', 'Reiniciando la tarjeta'],
             ['reporting', 'Guardando el resultado en la web']
         ];
-        setLuz('warn');
+        setLuz('warn', { fase: job.payload?.cancel_requested ? 'Deteniendo la programación…' : stages[Math.max(0, stages.findIndex(s => s[0] === (job.state === 'queued' ? 'queued' : (job.payload?.progress?.stage || 'preparing'))))][1], cancelada: !!job.payload?.cancel_requested });
         const stage = job.state === 'queued' ? 'queued' : (job.payload?.progress?.stage || 'preparing');
         const index = stages.findIndex(s => s[0] === stage);
         const pct = Math.round((index + 1) / stages.length * 100);
@@ -225,7 +232,10 @@ window.TQTSTM32 = function (host, ctx) {
             if (['queued', 'running'].includes(job.state)) { progress(job); timer = setTimeout(poll, 1000); return; }
             activeJob = null; activeFirmware = null; busy = false; await stations();
             if (selectedPcb) await choose(selectedPcb, true);
-            enable(); setLuz(job.state === 'verified' ? 'ok' : 'err');
+            enable();
+            const okJob = job.state === 'verified', canc = !!job.payload?.cancel_requested || /cancel/i.test(job.state);
+            setLuz(okJob ? 'ok' : 'err', okJob ? { fase: 'Terminado', resultado: 'Programado y verificado por lectura · UID ' + (job.result?.uid || '—') + '. Ya puedes desconectar la placa.' }
+                : { fase: canc ? 'Cancelada' : 'Terminado con error', cancelada: canc, error: job.result?.error || 'No se confirmó la programación. Revisa la estación y la tarjeta.' });
             message(job.state === 'verified' ? '✓ STM32 programado y verificado por lectura · FW ' + job.payload.identity.fw + ' · UID ' + job.result.uid + '. Ya puedes desconectar la placa.' : (job.result?.error || 'No se confirmó la programación. Revisa la estación y la tarjeta.'), job.state !== 'verified');
         }
         timer = setTimeout(poll, 1000);
@@ -244,7 +254,7 @@ window.TQTSTM32 = function (host, ctx) {
         const filas = K === 'R1'
             ? [['Nombre R1', d.nombre], ['R2 vinculada', current.r2], ['ID R2', d.id_r], ['MAC R2', d.mac_r], ['HW', d.hw], ['Firmware', d.fw], ['CRC32', current.crc32]]
             : [['Nombre R3', d.nombre], ['HW', d.hw], ['Firmware', d.fw], ['Imagen', (current.bytes / 1024).toFixed(1) + ' KB']];
-        setLuz((fresca.ok && fresca.data ? fresca.data : pcb).firmware ? 'ok' : 'bad');
+        setLuz((fresca.ok && fresca.data ? fresca.data : pcb).firmware ? 'ok' : 'bad', { fase: 'Lista para programar' });
         panel.replaceChildren(h('div', { class: 'prog-split' }, h('div', { class: 'prog-datos' }, h('div', { class: 'prog-cab' }, T.tipoChip(K), h('span', { class: 'prog-nm' }, current.nombre || current.r1),
             h('span', { class: 'dim' }, K === 'R1' ? 'R2 ' + current.r2 : (pcb.id_tarjeta_num ? 'Tarjeta #' + String(pcb.id_tarjeta_num).padStart(4, '0') : 'Suelta'))),
             h('dl', { class: 'prog-dl' }, ...filas.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
@@ -290,7 +300,7 @@ window.TQTSTM32 = function (host, ctx) {
         busy = true; enable();
         progress({ state: 'queued' });
         const r = await api('/api/stm32/jobs', { method: 'POST', body: { pcb_id: current.pcb_id, station_id: station.value, hex_sha256: current.hex_sha256, firmware_id: current.firmware_id, physical_confirmed: true } });
-        if (!r.ok) { busy = false; enable(); setLuz('err'); message(r.error, true); return; }
+        if (!r.ok) { busy = false; enable(); setLuz('err', { fase: 'No se pudo iniciar', error: r.error }); message(r.error, true); return; }
         watchJob(r.data);
     }
     function refresh() {

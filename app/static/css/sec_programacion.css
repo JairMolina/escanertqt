@@ -89,3 +89,8 @@
 .prog-mon-campo { flex: 1 1 200px; }
 .prog-mon-campo .input { width: 100%; }
 .prog-mon-chk { display: block; margin-top: 10px; font-size: 13px; }
+/* v1.4.0: plantilla compartida de estado (R1/R2/R3) */
+.prog-est-dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0;font-size:.85rem;text-align:left;width:100%}
+.prog-est-dl dt{color:var(--dim,#94a3b8)}
+.prog-est-dl dd{margin:0;overflow-wrap:anywhere}
+.prog-estado[data-s="err"] .prog-est-dl dd:last-of-type{font-weight:600}
