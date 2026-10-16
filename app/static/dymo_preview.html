@@ -42,11 +42,11 @@
         .cable-num.doble { font-size: 10pt; }   /* v1.3.93: pegado al borde izquierdo, no centrado */
         /* v1.3.91: línea punteada vertical al centro, se imprime (referencia para pegar); elemento propio, por encima de todo */
         .cable-linea { position: absolute; left: 50%; top: 1.5mm; bottom: 1.5mm; width: 0; margin-left: -0.25mm; border-left: 0.5mm dashed #000; z-index: 2; pointer-events: none; }
-        #cableBox > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
-        #cableBox > summary::-webkit-details-marker { display: none; }
-        #cableBox > summary::before { content: "▸"; color: var(--ink-3, #8a93a6); transition: transform .15s ease; }
-        #cableBox[open] > summary::before { transform: rotate(90deg); }
-        @media (prefers-reduced-motion: reduce) { #cableBox > summary::before { transition: none; } }
+        /* v1.3.94: la hoja se divide en zonas; solo se ve la zona elegida con los botones de arriba */
+        .zonas-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+        .zonas-bar .seg { flex: 1 1 340px; }
+        .zonas-bar .seg button { padding: 0 8px; }
+        .zonas-bar .cuenta { min-width: 20px; padding: 1px 6px; border-radius: 10px; background: var(--accent); color: var(--bg, #0A1020); font: 700 11px/16px var(--font-mono, monospace); }
         .r3m-vacia { color: #8a93a6; font: 600 7pt/1.2 system-ui, sans-serif; text-align: center; }
         #btnEscVinc[data-on="1"] { border-color: var(--ok); color: var(--ok); }
         .zoomhost { transform-origin: top left; }
@@ -84,34 +84,46 @@
             <div id="ayuda" class="stack" style="gap:10px"></div>
         </section>
 
-        <div class="tools-row">
-            <div class="field" style="width:150px"><label for="inFiltro">Buscar pareja</label><input class="input mono" id="inFiltro" inputmode="numeric" maxlength="4" placeholder="ej. 21" autocomplete="off" aria-describedby="filtroInfo"><small id="filtroInfo" class="faint" aria-live="polite"></small></div>
-            <div class="field" style="min-width:260px"><label for="selTarjeta">Tarjeta</label><select class="input" id="selTarjeta"></select></div>
-            <div class="field" style="width:110px"><label for="inCopias">Copias</label><input class="input mono" id="inCopias" inputmode="numeric" maxlength="2" value="1"></div>
-            <div class="field"><label for="selLoteModo">Marcar al imprimir lote</label>
-                <select class="input" id="selLoteModo"><option value="final">Solo etiquetas finales</option><option value="todas">Todas con R1 y R2</option></select></div>
+        <div id="aviso" class="stack" aria-live="polite"></div>
+
+        <div class="zonas-bar">
+            <div class="seg" role="group" aria-label="Tipo de etiqueta" id="zonas">
+                <button type="button" data-zona="tarj" aria-controls="tarjBox" aria-pressed="true">Tarjetas</button>
+                <button type="button" data-zona="esc" aria-controls="escBox" aria-pressed="false">Escanear <span class="cuenta" id="escCuenta" hidden></span></button>
+                <button type="button" data-zona="r3" aria-controls="r3Box" aria-pressed="false">R3</button>
+                <button type="button" data-zona="cable" aria-controls="cableBox" aria-pressed="false">Cable</button>
+            </div>
             <div class="field"><label for="selZoom">Ampliación de la vista</label>
                 <select class="input" id="selZoom"><option value="1">Tamaño real (1×)</option><option value="2">2×</option><option value="3" selected>3×</option><option value="4">4×</option></select></div>
         </div>
 
-        <div id="aviso" class="stack" aria-live="polite"></div>
-
-        <div class="stage-preview" tabindex="0" role="region" aria-label="Vista previa de la etiqueta">
-            <div class="silk" style="width:100%">Vista previa · a escala real 57 × 32 mm</div>
-            <div id="unico"><div id="zoomHost" class="zoomhost"><div id="dymoLabelContainer"></div></div></div>
-            <div class="row wrap" style="gap:8px 18px;color:var(--muted);font-size:13px">
-                <span><b style="color:var(--bad)">- - -</b> zona segura de 1.5 mm (no se imprime)</span>
-                <span id="medidas" class="mono"></span>
+        <section class="panel pad stack" aria-labelledby="hTarj" id="tarjBox" data-zona="tarj">
+            <h2 class="silk" id="hTarj">Etiquetas de tarjeta (R1 + R2)</h2>
+            <div class="tools-row">
+                <div class="field" style="width:150px"><label for="inFiltro">Buscar pareja</label><input class="input mono" id="inFiltro" inputmode="numeric" maxlength="4" placeholder="ej. 21" autocomplete="off" aria-describedby="filtroInfo"><small id="filtroInfo" class="faint" aria-live="polite"></small></div>
+                <div class="field" style="min-width:260px"><label for="selTarjeta">Tarjeta</label><select class="input" id="selTarjeta"></select></div>
+                <div class="field" style="width:110px"><label for="inCopias">Copias</label><input class="input mono" id="inCopias" inputmode="numeric" maxlength="2" value="1"></div>
+                <div class="field"><label for="selLoteModo">Marcar al imprimir lote</label>
+                    <select class="input" id="selLoteModo"><option value="final">Solo etiquetas finales</option><option value="todas">Todas con R1 y R2</option></select></div>
             </div>
-        </div>
 
-        <div class="row wrap" style="gap:10px">
-            <button class="btn btn-primary" type="button" id="btnPrint"><span class="svg-slot" data-i="printer"></span> Imprimir en DYMO</button>
-            <button class="btn" type="button" id="btnOpen"><span class="svg-slot" data-i="download"></span> Abrir en DYMO</button>
-            <button class="btn" type="button" id="btnPrintAll"><span class="svg-slot" data-i="layers"></span> Imprimir lote en DYMO…</button>
-            <button class="btn" type="button" id="btnDownAll"><span class="svg-slot" data-i="download"></span> Descargar lote</button>
-        </div>
-        <section class="panel pad stack" aria-labelledby="hEsc" id="escBox">
+            <div class="stage-preview" tabindex="0" role="region" aria-label="Vista previa de la etiqueta">
+                <div class="silk" style="width:100%">Vista previa · a escala real 57 × 32 mm</div>
+                <div id="unico"><div id="zoomHost" class="zoomhost"><div id="dymoLabelContainer"></div></div></div>
+                <div class="row wrap" style="gap:8px 18px;color:var(--muted);font-size:13px">
+                    <span><b style="color:var(--bad)">- - -</b> zona segura de 1.5 mm (no se imprime)</span>
+                    <span id="medidas" class="mono"></span>
+                </div>
+            </div>
+
+            <div class="row wrap" style="gap:10px">
+                <button class="btn btn-primary" type="button" id="btnPrint"><span class="svg-slot" data-i="printer"></span> Imprimir en DYMO</button>
+                <button class="btn" type="button" id="btnOpen"><span class="svg-slot" data-i="download"></span> Abrir en DYMO</button>
+                <button class="btn" type="button" id="btnPrintAll"><span class="svg-slot" data-i="layers"></span> Imprimir lote en DYMO…</button>
+                <button class="btn" type="button" id="btnDownAll"><span class="svg-slot" data-i="download"></span> Descargar lote</button>
+            </div>
+        </section>
+        <section class="panel pad stack" aria-labelledby="hEsc" id="escBox" data-zona="esc" hidden>
             <div class="row wrap" style="justify-content:space-between;gap:8px">
                 <h2 class="silk grow" id="hEsc" style="min-width:200px">Escanear para imprimir</h2>
                 <button class="btn" type="button" id="btnEscVinc"><span class="svg-slot" data-i="qr"></span> <span id="escVincTxt">Botón de escaneo (celular)</span></button>
@@ -127,7 +139,7 @@
                 <span class="hint" id="escResumen"></span>
             </div>
         </section>
-        <section class="panel pad stack" aria-labelledby="hR3" id="r3Box">
+        <section class="panel pad stack" aria-labelledby="hR3" id="r3Box" data-zona="r3" hidden>
             <div class="row wrap" style="justify-content:space-between;gap:8px">
                 <h2 class="silk grow" id="hR3" style="min-width:200px">Etiquetas R3</h2>
                 <span class="hint">Dos R3 por etiqueta (se corta a lo largo en dos tiras); cada tira lleva el QR y el nombre: <b class="mono" id="r3Ejemplo">TQT-R3-V30-0000</b></span>
@@ -150,10 +162,12 @@
                 <button class="btn" type="button" id="btnR3Open"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
             </div>
         </section>
-        <details class="panel pad stack" id="cableBox">
-            <summary><h2 class="silk" id="hCable" style="margin:0">Etiquetas cable</h2>
-                <span class="hint">La etiqueta se divide a la mitad: el número va solo en la izquierda y la derecha se enrolla en el cable.</span></summary>
-            <div class="row wrap" style="gap:10px;align-items:flex-end;margin-top:12px">
+        <section class="panel pad stack" aria-labelledby="hCable" id="cableBox" data-zona="cable" hidden>
+            <div class="row wrap" style="justify-content:space-between;gap:8px">
+                <h2 class="silk grow" id="hCable" style="min-width:200px">Etiquetas cable</h2>
+                <span class="hint">La etiqueta se divide a la mitad: el número va solo en la izquierda y la derecha se enrolla en el cable.</span>
+            </div>
+            <div class="row wrap" style="gap:10px;align-items:flex-end">
                 <div class="field" style="width:130px"><label for="cableDesde" id="cableDesdeLbl">Número desde</label><input class="input mono" id="cableDesde" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
                 <button class="btn" type="button" id="cableBarra" aria-pressed="false" title="Dos números: R1 y R2 con número diferente (TQT 0000/0000)" style="min-width:44px;font-weight:700">/</button>
                 <div class="field" style="width:130px" id="cableR2Box" hidden><label for="cableR2">Número R2</label><input class="input mono" id="cableR2" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
@@ -168,7 +182,7 @@
                 <button class="btn btn-primary" type="button" id="btnCablePrint"><span class="svg-slot" data-i="printer"></span> Imprimir cable en DYMO</button>
                 <button class="btn" type="button" id="btnCableOpen"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
             </div>
-        </details>
+        </section>
         <div id="prog" class="stack" hidden><div class="progress" aria-hidden="true"><i id="progBar"></i></div><div class="hint" id="progTxt" role="status" aria-live="polite"></div></div>
     </main>
 </div>
@@ -178,6 +192,6 @@
 <script src="/static/js/qrcode-generator.js?v=1316"></script>
 <script src="/static/js/vendor/dymo.connect.framework.js?v=1316"></script>
 <script src="/static/js/dymo_connect.js?v=1389"></script>
-<script src="/static/js/dymo.js?v=1392"></script>
+<script src="/static/js/dymo.js?v=1394"></script>
 </body>
 </html>

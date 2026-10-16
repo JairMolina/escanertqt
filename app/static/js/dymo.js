@@ -634,7 +634,6 @@ html, body { margin: 0; padding: 0; background: #fff; }
         $('cableR2Box').hidden = !on; $('cableHastaBox').hidden = on; $('cableDesdeLbl').textContent = on ? 'Número R1' : 'Número desde';
         cableVista(); if (on) $('cableR2').focus();
     });
-    $('cableBox').addEventListener('toggle', cableVista);
     $('selZoom').addEventListener('change', cableVista);
     cableVista();
 
@@ -727,6 +726,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         });
         const nR3 = pares(ESC.r3).length;
         $('escLista').replaceChildren(...(filas.length ? filas : [h('p', { class: 'muted', style: 'margin:0' }, 'Todavía no has escaneado nada.')]));
+        $('escCuenta').hidden = !filas.length; $('escCuenta').textContent = String(tj.length + nR3);
         $('escResumen').textContent = filas.length ? `${tj.length} tarjeta${tj.length === 1 ? '' : 's'} (R1 + R2) · ${ESC.r3.length} placa${ESC.r3.length === 1 ? '' : 's'} individual${ESC.r3.length === 1 ? '' : 'es'} en ${nR3} etiqueta${nR3 === 1 ? '' : 's'} → ${tj.length + nR3} etiqueta${tj.length + nR3 === 1 ? '' : 's'} en total` : '';
         refrescarBotones();
     }
@@ -757,6 +757,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
             let res; try { res = await escAgregar(d.codigo); } catch (e) { res = null; }
             res = res || { ok: false, texto: 'No se pudo procesar el código.' };
             toast(res.texto, { kind: res.ok ? 'ok' : 'warn' });
+            if (res.ok && zonaActual() !== 'esc') mostrarZona('esc', false);   // lo escaneado con el celular se ve en su lista
             if (ESC.token) api(`/api/escaner/${ESC.token}/resultado`, { method: 'POST', body: { n: d.n || 0, ok: res.ok, texto: String(res.texto).slice(0, 300) } });
     }
     setInterval(async () => {   // respaldo por HTTP si el WebSocket se cayó
@@ -767,6 +768,24 @@ html, body { margin: 0; padding: 0; background: #fff; }
         for (const c of r.data.items || []) await escRemoto({ id: ESC.id, n: c.n, codigo: c.codigo });
     }, 2500);
     escPintar(); escRestaurar();
+
+    // ------------------------------------------------------------------ v1.3.94: zonas con botones (la hoja era muy larga)
+    // Solo se ve la zona elegida: tarjetas, escanear, R3 o cable. Se recuerda la última en este navegador.
+    const ZONA_KEY = 'tqt.dymo.zona';
+    const zonaActual = () => { const b = document.querySelector('#zonas [aria-pressed="true"]'); return b ? b.dataset.zona : 'tarj'; };
+    function mostrarZona(z, enfocar) {
+        const btns = [...document.querySelectorAll('#zonas [data-zona]')];
+        if (!btns.some((b) => b.dataset.zona === z)) z = 'tarj';
+        btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.zona === z)));
+        document.querySelectorAll('main [data-zona]:not(button)').forEach((el) => { el.hidden = el.dataset.zona !== z; });
+        try { localStorage.setItem(ZONA_KEY, z); } catch (e) { /* nada */ }
+        // Las vistas previas miden la etiqueta y oculta mide 0: se recalculan al mostrarse
+        aplicarZoom(); r3Vista(); cableVista();
+        if (enfocar && z === 'esc') $('escIn').focus();   // listo para el lector USB
+    }
+    document.querySelectorAll('#zonas [data-zona]').forEach((b) => b.addEventListener('click', () => mostrarZona(b.dataset.zona, true)));
+    let zonaIni = 'tarj'; try { zonaIni = localStorage.getItem(ZONA_KEY) || 'tarj'; } catch (e) { /* nada */ }
+    mostrarZona(zonaIni, false);
 
     load().then(() => { state.listo = true; }); conectar(false);
 });

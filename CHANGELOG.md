@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.94 — 2026-10-16
+- **Etiquetas DYMO:** la hoja ya no muestra todo desplegado. Debajo de la conexión hay cuatro botones (Tarjetas · Escanear · R3 · Cable) y solo se ve la zona elegida; se recuerda la última en ese navegador. «Escanear» muestra cuántas etiquetas hay en la lista y, si llega un escaneo del celular, la página cambia sola a esa zona. Los avisos de impresión y la ampliación de la vista quedan fuera de las zonas (sirven para todas). Caché `dymo.js` a `?v=1394`.
+
 ## v1.3.93 — 2026-10-15
 - **Etiquetas cable:** «TQT 0000» ya no va centrado en su mitad: queda en una franja de 13 mm pegada al borde izquierdo (lejos de la línea punteada), así al doblar no se recorre hacia el doblez. Vista previa igual.
 
