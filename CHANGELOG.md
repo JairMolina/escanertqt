@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.1 — 2026-10-16
+- **Pruebas TQT (web):** salir de la sección con una prueba en curso ahora libera el puerto COM cuando la prueba termina (antes quedaba abierto y Programación no podía usarlo hasta recargar).
+- **Pruebas TQT (web):** una prueba web abandonada (sin latido por más de 2 min) de otro operador ya no bloquea la tarjeta: al iniciar se marca interrumpida / no verificada. Caché `sec_validacion.js` a `?v=1410`.
+
 ## v1.4.0 — 2026-10-16
 Pruebas TQT (`#/validacion`) pasan a correr en el navegador; el agente de Windows queda como respaldo. Pendiente de aceptación en el banco físico.
 - **1. Banco fijo:** sin selector de banco ni confirmación repetida; pulsar «Iniciar» es la intención del operador. Contexto fijo «banco de pruebas · modo seguro» (en la ruta web lo fija el servidor; en la del agente el campo `banco` se envía pero el backend lo ignora).

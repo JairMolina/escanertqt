@@ -457,9 +457,10 @@ def web_create(tid, operator):
         sid = web_station(c, operator)
         now = time.time()
         # Una pestaña cerrada sin informe queda interrumpida, nunca se reanuda.
+        # v1.4.1: también la de otro operador sobre esta tarjeta (si no, la bloquea hasta que alguien la abra).
         c.execute(
-            "UPDATE tqt_test_runs SET state='interrupted',result='no_verificado',updated=? WHERE station=? AND state IN ('queued','running') AND updated<?",
-            (now, sid, now - 120),
+            "UPDATE tqt_test_runs SET state='interrupted',result='no_verificado',updated=? WHERE (station=? OR (requested_card=? AND origin='web')) AND state IN ('queued','running') AND updated<?",
+            (now, sid, tid, now - 120),
         )
         if c.execute(
             "SELECT 1 FROM tqt_test_runs WHERE (station=? OR requested_card=?) AND state IN ('queued','running')",

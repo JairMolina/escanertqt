@@ -1001,6 +1001,8 @@
       }
       webAbort = null;
       document.removeEventListener("visibilitychange", alOcultar);
+      // v1.4.1: si se salió de la vista durante la prueba, desmontar() no pudo cerrar el COM; se libera ahora que terminó.
+      if (!alive) Promise.resolve(window.TQTValWeb?.desconectar?.()).catch(() => {});
       let r = null;
       if (jid) {
         try {
