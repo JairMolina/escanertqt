@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-15 23:38 UTC
-Commit de referencia: `da1f573359f7` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-16 00:30 UTC
+Commit de referencia: `5a5e89b16bb3` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Especificacion de implementacion Android guardada en docs/APP_TQT_ANDROID.md; nombre aprobado TQT, mismo proyecto. Incluye OTA R2 online/offline, sincronizacion automatica, identidad compartida, contratos actuales y criterios de aceptacion. Base4.0 fija/BIN cerrada; FW4.2 evolucionara4.3. Incorporado por fast-forward da1f573 web1.3.89/DYMO desde GitHub sin modificar su codigo. No se implemento app, firmware ni API offline y no hubo despliegue o grabacion.
+Preparado encargo detallado para compañero en docs/ENCARGO_VALIDACION_SERIAL_OTA.md:13 requisitos Validacion, motor14etapas directo WebSerial/WebBluetooth, indicadores/sensores/historial/FW, identidad0042 a0044 con confirmacion y continuidad, dos etiquetas Aprobada+cable, estado comun R1/R3 y ajusteOTA por eventos. Skytec queda pendiente sin integrar. BaseGit actualizada ff-only a5a5e89b web1.3.92 preservando ultimos cambiosDYMO. Solo documentacion, no implementacion/despliegue/hardware.
 
 ## Siguiente paso
-Retomar docs/APP_TQT_ANDROID.md: auditar contrato y proponer arquitectura Android/autorizacion offline, matriz compatibilidad4.0/4.2/4.3 y etapas antes de implementar. No exportar firmante global; base4.0 fija necesita alta online salvo solucion segura acordada. No eFuses. Ultimo despliegue comprobado1.3.88; Git incorpora1.3.89, despliegue de esa version no verificado en este avance.
+Compañero debe retomar ENCARGO_VALIDACION_SERIAL_OTA.md, inspeccionar contratos y portar motor sin perder evidencia. Mantener base4.0 fija, no eFuses. Limites explicitos: JLinkSWD no reemplazable porWebSerial, MAC no expuesta directamente porWebBluetooth, permisos nativos, DYMO directo requiere runtime fabricante. AppAndroid TQT conserva especificacion aparte APP_TQT_ANDROID.md. Autorizar banco y despliegue antes de ejecutar.
 
 ## Evidencia
-Especificacion documental con rutas reales, API/UUID revisados previamente y requisitos completos. Git remoto tenia1commit adicional da1f573; integrado ff-only conservando DYMO. Revisión documental y diff, sin pruebas de ejecucion por no cambiar codigo. Adjuntos pendientes0.
+Revision fuentes sec_validacion, contrato14etapas, engine/protocol/ble Python, APIvalidacion, transporteR2 y DYMOvigente1.3.92. ON/OFF BLE ya presentes en codigo: investigar visibilidad/habilitacion sin duplicar. ContratoONsensorcierre/OFFsensorapertura documentado. RequisitoOTA deriva confirmacion fisica usuario visible~2min vs pestañaoculta. Revision documental/diff; no pruebas runtime nuevas. Adjuntos pendientes0.
