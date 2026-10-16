@@ -666,17 +666,22 @@
 
         // ------------------------------------------------------------ panel de detalle
         const cabecera = h('div', { class: 'prog-cab' });
-        const r2Estado=h('div',{class:'prog-estado',role:'status','aria-live':'polite'});
+        const r2Estado=window.TQTProgEstado.crear();
         function pintarR2Estado() {
             if(!r2Estado) return;
             r2Estado.hidden=S.tipoEsp!=='R2' || !S.tarjeta;
             if(!r2Estado.hidden) {
+                // v1.4.0: misma plantilla (TQTProgEstado) que usan TQT R1 y R3
                 const state=r2States.get(S.tarjeta.id), evidence=state?.evidence;
                 const method={serial:'USB serial',ble_ota:'Bluetooth OTA',verify:'Verificación Bluetooth'}[evidence?.method] || '';
                 const when=evidence?.programmed_at ? new Date(evidence.programmed_at*1000).toLocaleString() : '';
-                r2Estado.replaceChildren(r2Badge(S.tarjeta),h('span',{class:'hint'},
-                    `Instalado: ${state?.installed_fw || 'sin verificar'} · Vigente: ${state?.latest_fw || '—'}`),
-                    ...(evidence ? [h('span',{class:'hint'},method+(when ? ' · '+when : ''))] : []));
+                const k=state?.state || 'unprogrammed';
+                window.TQTProgEstado.pintar(r2Estado,{
+                    estado:{updated:'ok',outdated:'warn',busy:'warn',unprogrammed:'bad',error:'err'}[k] || 'bad',
+                    etiqueta:stateNames[k], fase:S.busy ? 'Programando o verificando…' : '',
+                    conexion:S.puertoSel ? 'Puerto serial elegido · Bluetooth' : 'Sin puerto serial elegido · Bluetooth',
+                    fw:state?.installed_fw||'', hw:S.tarjeta.version||'', instalado:state?.installed_fw||'', vigente:state?.latest_fw||'',
+                    metodo:method+(when ? ' · '+when : ''), error:k==='error' ? (state?.error||'') : ''});
             }
         }
         async function continuarR1() {
