@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.92 — 2026-10-15
+- **Etiquetas cable:** el texto queda «TQT» arriba y el número abajo (en vertical). Botón «/» para R1/R2 con número diferente: pide «Número R1» y «Número R2» y la etiqueta sale «TQT 0021/0034». La API acepta `numero=0021/0034`. Caché `dymo.js` a `?v=1392`.
+
 ## v1.3.91 — 2026-10-15
 - **Etiquetas DYMO:** se quita el texto largo de ayuda; queda una línea de estado y el botón «Instalar DYMO en esta PC», que descarga `Instalar_DYMO_TQT.cmd` (instala DYMO Connect con winget, driver incluido, y abre la prueba del servicio; si no hay winget abre la página oficial). Sin DYMO Connect, «Imprimir» sigue usando el cuadro de impresión de Chrome.
 - **Etiquetas cable:** la línea punteada central es un elemento propio de 0.5 mm (vista previa e impresión con Chrome) y en el XML de DYMO una imagen más ancha con trazo de 0.5 mm. Caché `dymo.js` a `?v=1391`.

@@ -349,7 +349,7 @@ def get_dymo_r3_archivo(
 
 
 # ---------------------------------------------------------------- etiqueta de cable (v1.3.83): solo el número, mitad izquierda
-NUMERO_CABLE = r"^[0-9]{1,6}$"
+NUMERO_CABLE = r"^[0-9]{1,6}(/[0-9]{1,6})?$"   # v1.3.92: «0021/0034» para R1/R2 con número diferente
 
 
 @router.get("/dymo/cable/xml", summary="XML de la etiqueta de cable (número en la mitad izquierda) para DYMO")

@@ -695,7 +695,7 @@ class DymoService:
     def generate_cable_label_xml(cls, numero: str, label_format: Optional[str] = None) -> str:
         """`.label` (DYMO Label v8) con el número solo en la mitad izquierda."""
         f = obtener_formato(label_format)
-        objeto = _v8_texto("NUMERO", numero, CABLE_FUENTE_PT, caja_cable(f), "Center", "Rotation90")   # v1.3.84: número vertical
+        objeto = _v8_texto("NUMERO", f"TQT\n{numero}", CABLE_FUENTE_PT, caja_cable(f), "Center", "Rotation90")   # v1.3.84 vertical; v1.3.92 «TQT» arriba
         linea = caja_linea_cable(f)
         objeto += _v8_imagen("LINEA", png_linea_punteada(linea), linea)   # v1.3.90: línea punteada al centro
         return f"""<?xml version="1.0" encoding="utf-8"?>
@@ -753,6 +753,7 @@ class DymoService:
             <HorizontalAlignment>Center</HorizontalAlignment>
             <VerticalAlignment>Middle</VerticalAlignment>
             <IsVertical>False</IsVertical>
+            <LineTextSpan><TextSpan><Text>TQT</Text>{fuente}</TextSpan></LineTextSpan>
             <LineTextSpan><TextSpan><Text>{xml_escape(numero)}</Text>{fuente}</TextSpan></LineTextSpan>
           </FormattedText>
           <ObjectLayout><DYMOPoint><X>{_pulg(c.x)}</X><Y>{_pulg(c.y)}</Y></DYMOPoint><Size><Width>{_pulg(c.w)}</Width><Height>{_pulg(c.h)}</Height></Size></ObjectLayout>
@@ -784,8 +785,8 @@ class DymoService:
     @classmethod
     def archivo_cable(cls, numero: str, label_format: Optional[str] = None, tipo: str = "dymo") -> Tuple[bytes, str]:
         if tipo == "label":
-            return cls.generate_cable_label_xml(numero, label_format).encode("utf-8"), f"TQT_cable_{numero}.label"
-        return b"\xef\xbb\xbf" + cls.generate_cable_dcd_xml(numero, label_format).encode("utf-8"), f"TQT_cable_{numero}.dymo"
+            return cls.generate_cable_label_xml(numero, label_format).encode("utf-8"), f"TQT_cable_{numero.replace('/', '-')}.label"
+        return b"\xef\xbb\xbf" + cls.generate_cable_dcd_xml(numero, label_format).encode("utf-8"), f"TQT_cable_{numero.replace('/', '-')}.dymo"
 
     # ------------------------------------------------------------------ paquete de datos
     @classmethod

@@ -567,9 +567,15 @@ html, body { margin: 0; padding: 0; background: #fff; }
 
     // ------------------------------------------------------------------ etiquetas de cable (v1.3.83): una por número
     // La etiqueta se divide a la mitad en vertical; solo la izquierda lleva el número porque la derecha se enrolla en el cable.
+    const cableDoble = () => $('cableBarra').getAttribute('aria-pressed') === 'true';   // v1.3.92: «0000/0000» (R1/R2)
     function cableNumeros() {
         const d = $('cableDesde').value.trim(), hs = $('cableHasta').value.trim() || d;
         if (!d) return { lista: [], error: '' };
+        if (cableDoble()) {
+            const r2 = $('cableR2').value.trim();
+            if (!/^\d{1,4}$/.test(d) || !/^\d{1,4}$/.test(r2)) return { lista: [], error: r2 ? 'Escribe números de 1 a 4 dígitos.' : 'Escribe también el número de la R2.' };
+            return { lista: [`${d.padStart(4, '0')}/${r2.padStart(4, '0')}`], error: '' };
+        }
         if (!/^\d{1,4}$/.test(d) || !/^\d{1,4}$/.test(hs)) return { lista: [], error: 'Escribe números de 1 a 4 dígitos.' };
         const a = +d, b = +hs;
         if (b < a) return { lista: [], error: '«Hasta» debe ser mayor o igual que «Desde».' };
@@ -578,9 +584,9 @@ html, body { margin: 0; padding: 0; background: #fff; }
         return { lista, error: '' };
     }
     const nodoCable = (num) => h('div', { class: 'dymo-label cable', role: 'img', 'aria-label': `Etiqueta de cable: ${num}` },
-        h('div', { class: 'cable-num' }, num), h('div', { class: 'cable-vacia', 'aria-hidden': 'true' }), h('i', { class: 'cable-linea', 'aria-hidden': 'true' }));
+        h('div', { class: num.includes('/') ? 'cable-num doble' : 'cable-num' }, h('span', { class: 'cable-tqt' }, 'TQT'), h('span', null, num)), h('div', { class: 'cable-vacia', 'aria-hidden': 'true' }), h('i', { class: 'cable-linea', 'aria-hidden': 'true' }));
     function cableVista() {
-        const { lista, error } = cableNumeros(); const num = lista[0] || '0000';
+        const { lista, error } = cableNumeros(); const num = lista[0] || (cableDoble() ? '0000/0000' : '0000');
         $('cableLabel').replaceChildren(nodoCable(num));
         $('cableZoomHost').style.transform = `scale(${state.zoom})`;
         const lbl = $('cableLabel').firstChild; $('cableZoomHost').style.width = `${lbl.offsetWidth * state.zoom}px`; $('cableZoomHost').style.height = `${lbl.offsetHeight * state.zoom}px`;
@@ -589,7 +595,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
     }
     async function xmlCable(num, tipo) {
         let res;
-        try { res = await fetch(`/api/dymo/cable/xml?numero=${num}&tipo=${tipo}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        try { res = await fetch(`/api/dymo/cable/xml?numero=${encodeURIComponent(num)}&tipo=${tipo}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
         if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`);
         const txt = await res.text();
         if (!D.esXmlEtiqueta(txt)) throw new Error('El servidor no devolvió un XML de etiqueta válido.');
@@ -620,9 +626,14 @@ html, body { margin: 0; padding: 0; background: #fff; }
     });
     $('btnCableOpen').addEventListener('click', () => {
         const { lista } = cableNumeros();
-        lista.slice(0, 20).forEach((num, i) => setTimeout(() => bajar(`/api/dymo/cable/archivo?numero=${num}&tipo=label`, `TQT_cable_${num}.label`), i * 250));
+        lista.slice(0, 20).forEach((num, i) => setTimeout(() => bajar(`/api/dymo/cable/archivo?numero=${encodeURIComponent(num)}&tipo=label`, `TQT_cable_${num.replace('/', '-')}.label`), i * 250));
     });
-    ['cableDesde', 'cableHasta'].forEach((id) => $(id).addEventListener('input', cableVista));
+    ['cableDesde', 'cableHasta', 'cableR2'].forEach((id) => $(id).addEventListener('input', cableVista));
+    $('cableBarra').addEventListener('click', () => {
+        const on = !cableDoble(); $('cableBarra').setAttribute('aria-pressed', String(on)); $('cableBarra').classList.toggle('btn-primary', on);
+        $('cableR2Box').hidden = !on; $('cableHastaBox').hidden = on; $('cableDesdeLbl').textContent = on ? 'Número R1' : 'Número desde';
+        cableVista(); if (on) $('cableR2').focus();
+    });
     $('cableBox').addEventListener('toggle', cableVista);
     $('selZoom').addEventListener('change', cableVista);
     cableVista();
