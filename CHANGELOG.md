@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.3.93 — 2026-10-15
+- **Etiquetas cable:** «TQT 0000» ya no va centrado en su mitad: queda en una franja de 13 mm pegada al borde izquierdo (lejos de la línea punteada), así al doblar no se recorre hacia el doblez. Vista previa igual.
+
 ## v1.3.92 — 2026-10-15
 - **Etiquetas cable:** el texto queda «TQT» arriba y el número abajo (en vertical). Botón «/» para R1/R2 con número diferente: pide «Número R1» y «Número R2» y la etiqueta sale «TQT 0021/0034». La API acepta `numero=0021/0034`. Caché `dymo.js` a `?v=1392`.
 

@@ -35,6 +35,7 @@ class TestDymoCable(unittest.TestCase):
         f = obtener_formato("30334")
         c = caja_cable(f)
         self.assertLessEqual(c.x + c.w, f.ancho_mm / 2)
+        self.assertLessEqual(c.x + c.w, f.ancho_mm / 4 + 1)   # v1.3.93: pegado a la izquierda, lejos del doblez
         self.assertIn('Center', DymoService.generate_cable_label_xml("0007"))
         for xml in (DymoService.generate_cable_label_xml("0007"), DymoService.generate_cable_dcd_xml("0007")):
             self.assertIn('<Rotation>Rotation90</Rotation>', xml)   # v1.3.84: número vertical

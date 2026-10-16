@@ -212,9 +212,12 @@ def calcular_diseno_r3(formato: FormatoEtiqueta, nombres: List[str]) -> List[Mit
 CABLE_FUENTE_PT = 36.0
 
 
+CABLE_TEXTO_ANCHO_MM = 13.0   # v1.3.93: franja pegada al borde izquierdo (al doblar, el texto no se recorre hacia la línea)
+
+
 def caja_cable(formato: "FormatoEtiqueta") -> "Caja":
     m = MARGEN_SEGURO_MM
-    return Caja(m, m, formato.ancho_mm / 2 - 2 * m, formato.alto_mm - 2 * m)
+    return Caja(m, m, min(CABLE_TEXTO_ANCHO_MM, formato.ancho_mm / 2 - 2 * m), formato.alto_mm - 2 * m)
 
 
 # v1.3.90: línea punteada vertical al centro (referencia para doblar/pegar la etiqueta sobre el cable).
