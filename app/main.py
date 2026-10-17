@@ -20,7 +20,7 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station, esp32
+from app.routers import test_station, esp32, android
 from app.ssl_cert import ensure_ssl_certificates
 
 # Configurar logging
@@ -86,6 +86,7 @@ app = FastAPI(
 )
 app.include_router(esp32.router)
 app.include_router(esp32.agent_router)
+app.include_router(android.router)
 
 # Sin CORS: la interfaz se sirve desde este mismo origen (https://IP:8443). Sin middleware CORS el
 # navegador bloquea que OTROS sitios abiertos en el celular/PC escriban en la API con JSON.
@@ -125,7 +126,7 @@ RUTAS_PUBLICAS = {"/login", "/invitacion", "/api/auth/invitacion", "/api/auth/in
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js")
 
 
-PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health"}
+PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/android", "/favicon.ico", "/api/health"}
 ROL_NOMBRE = {"general": "General", "consultor": "Consultor"}
 # Páginas (y sus copias bajo /static) → zona que se nombra en el aviso "sin acceso" (v1.3.42)
 ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "emparejar", "/static/emparejar.html": "emparejar",
@@ -331,6 +332,11 @@ async def serve_login(request: Request):
 def health():
     """Pulso para Docker: no revela nada del sistema."""
     return {"ok": True}
+
+
+@app.get("/android", include_in_schema=False)
+def android_application():
+    return _serve_file(settings.STATIC_DIR / "android.html")
 
 
 @app.get("/dymo", include_in_schema=False)

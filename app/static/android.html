@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="dark light"><meta name="theme-color" content="#0A1020">
+    <title>Aplicación Android · TQT</title>
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <link rel="stylesheet" href="/static/css/app.css">
+    <link rel="stylesheet" href="/static/css/android_app.css">
+    <script src="/static/js/common.js" defer></script><script src="/static/js/android_app.js" defer></script>
+</head>
+<body>
+<main class="apk-shell">
+    <header class="apk-header"><a href="/monitor" class="apk-brand" aria-label="Volver a Inventario TQT">TQT<span>INVENTARIO</span></a><a href="/monitor">Volver a la consola ↗</a></header>
+    <div class="apk-layout">
+        <section class="apk-intro" aria-labelledby="apk-title">
+            <p class="apk-eyebrow">APLICACIÓN ANDROID · ACCESO PRIVADO</p>
+            <h1 id="apk-title">Tu inventario.<br>Más cerca.</h1>
+            <p class="apk-lead">Actualiza las tarjetas R2 por Bluetooth con el firmware autorizado y conserva la trazabilidad en Inventario TQT.</p>
+            <div class="apk-features"><p><b>01</b><span>Identifica la tarjeta física antes de autorizar.</span></p><p><b>02</b><span>Consulta el progreso confirmado por la R2.</span></p><p><b>03</b><span>Verifica el nuevo arranque y sincroniza el resultado.</span></p></div>
+            <p class="apk-note">La base inicial se instala por USB. Los equipos antiguos deben comprobar su compatibilidad antes de actualizar.</p>
+        </section>
+        <section class="apk-card" aria-labelledby="apk-release-title">
+            <div class="apk-card-top"><span class="apk-platform">ANDROID</span><span id="apk-status" role="status">Consultando versión…</span></div>
+            <h2 id="apk-release-title">TQT para tu teléfono</h2><p>Distribución directa para usuarios autorizados.</p>
+            <dl id="apk-metadata" hidden><div><dt>Versión</dt><dd id="apk-version"></dd></div><div><dt>Android mínimo</dt><dd id="apk-sdk"></dd></div><div><dt>Tamaño</dt><dd id="apk-size"></dd></div></dl>
+            <p id="apk-message" role="status" aria-live="polite">Comprobando si hay una versión aprobada para descargar.</p>
+            <a id="apk-download" class="apk-download" href="/api/android/apk/download" hidden>Descargar APK aprobada ↓</a>
+            <div id="apk-integrity" hidden><label for="apk-sha">SHA-256 del archivo</label><textarea id="apk-sha" rows="3" readonly spellcheck="false"></textarea><button id="apk-copy" type="button">Copiar huella</button></div>
+            <ol class="apk-steps"><li>Descarga la versión aprobada desde esta página.</li><li>Autoriza la instalación para el navegador si Android lo solicita.</li><li>Abre TQT e inicia sesión con tu cuenta habitual.</li></ol>
+        </section>
+    </div>
+    <footer class="apk-footer"><span>El envío completo no equivale a una actualización verificada.</span><span>Inventario y permisos centrales · BLE</span></footer>
+</main>
+</body></html>

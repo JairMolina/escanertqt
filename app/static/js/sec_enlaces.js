@@ -7,5 +7,6 @@
     const E = window.TQTEscritorio;
     E.registrar({ id: 'movimientos', titulo: 'Movimientos', icono: 'list', grupo: 'gestion', orden: 70, href: '/admin#movimientos' });
     E.registrar({ id: 'etiquetas', titulo: 'Etiquetas DYMO', icono: 'printer', grupo: 'gestion', orden: 80, href: '/dymo' });
+    E.registrar({ id: 'android', titulo: 'Aplicación TQT', icono: 'download', grupo: 'gestion', orden: 90, href: '/android' });
     E.registrar({ id: 'admin', titulo: 'Administración', icono: 'shield', grupo: 'gestion', orden: 100, href: '/admin' });
 })();

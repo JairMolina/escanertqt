@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "name": "TQT offline OTA P256 v1",
+  "minimum_firmware": "4.3",
+  "scope": "R2 / HW3.0 / ESP32-WROOM-32E-N4 only",
+  "legacy_profile_schema": 2,
+  "legacy_profile_capabilities": 1,
+  "control_begin": 5,
+  "manifest_state": 7,
+  "manifest_state_name": "offline_manifest",
+  "grant_body_bytes": 344,
+  "grant_bytes": 408,
+  "session_manifest_bytes": 472,
+  "info_transport": {
+    "legacy_info": "Existing INFO JSON, at most512bytes; no offline fields appended over GATT.",
+    "offline_info_uuid": "d45a0006-6a76-4e41-9f38-a7043f0ec069",
+    "offline_info_bytes": 190,
+    "fields": {
+      "protocol": [0, 1], "device_public_key": [1, 65],
+      "counter_le32": [66, 4], "anchor_key_id": [70, 8],
+      "identity_proof": [78, 32], "device_signature_raw_rs": [110, 64],
+      "last_grant_uuid": [174, 16]
+    },
+    "snapshot": "The legacy INFO and binary offline INFO must describe one stable signed snapshot. Reject a mismatching pair; bounded rereads only. Reassemble offline_* JSON fields for local and HTTP verification."
+  },
+  "magic_ascii_hex": "5451542d4f46464c494e452d76310000",
+  "fields": {
+    "magic": [0, 16],
+    "grant_uuid": [16, 16],
+    "device_public_key": [32, 65],
+    "phone_public_key": [97, 65],
+    "image_iv": [162, 16],
+    "source_counter_le32": [178, 4],
+    "source_app_digest": [182, 32],
+    "transfer_sha256": [214, 32],
+    "target_app_digest": [246, 32],
+    "image_bytes_le32": [278, 4],
+    "name_ascii_nul": [282, 24],
+    "hardware_ascii_nul": [306, 8],
+    "firmware_ascii_nul": [314, 16],
+    "mac": [330, 6],
+    "anchor_key_id": [336, 8],
+    "server_signature_raw_rs": [344, 64],
+    "phone_session_signature_raw_rs": [408, 64]
+  },
+  "labels": {
+    "identity": "TQT-OFFLINE-IDENTITY-v1",
+    "info": "TQT-OFFLINE-INFO-v1",
+    "session": "TQT-OFFLINE-SESSION-v1",
+    "image_key": "TQT-OFFLINE-DATA-v1"
+  },
+  "cryptography": {
+    "curve": "secp256r1",
+    "signatures": "ECDSA-SHA256; raw unsigned r||s, each32 bytes, big-endian",
+    "image": "AES-256-CTR; key=HMAC-SHA256(unit_key,image_key_label||grant_uuid); iv=grant.image_iv",
+    "server_signature": "signature over grant bytes0..343",
+    "phone_session_signature": "signature over session_label||grant_uuid16||fresh_INFO_nonce16||SHA256(grant408)",
+    "identity_hmac": "HMAC-SHA256(unit_key,identity_label||legacy_INFO_proof32||device_public_key65||counter_le32||anchor_key_id8)",
+    "device_info_signature": "signature over info_label||nonce16||app_digest32||counter_le32||partition_le32||boot_valid_byte||name24||hw8||fw16||mac6||last_grant_uuid16"
+  },
+  "rules": [
+    "Never change the fixed generic4.0 source or binary.",
+    "Preserve online protocol1, profile layout/capabilities and the per-unit key so4.2 can install4.3 online.",
+    "The device generates a persistent P256 private key in NVS; server enrollment verifies its binding with the existing unit-key HMAC.",
+    "The phone private key stays in Android Keystore; the phone never receives the device unit key or global enrollment signer.",
+    "Use the existing public enrollment trust anchor and refuse a mismatching server key; do not generate or replace a production signing key.",
+    "A grant authorizes exactly one device public key, phone key, source counter/digest and approved target image/name/HW/FW/MAC.",
+    "Consume the source counter durably before ANY OTA COMMIT, including online; preserve counter and last-grant receipt across reboot.",
+    "Before-COMMIT interruptions can restart with the same grant and a fresh phone signature; never resume partial data across connections.",
+    "After-COMMIT recover by authenticated INFO only, never retransmit firmware merely to verify.",
+    "Device receipt must match grant UUID, target digest and counter+1; require a valid new boot before success.",
+    "No reliable device wall clock exists: firmware enforces one-use scope/counter, not an invented UTC expiry or immediate offline revocation.",
+    "Application/server enforce package validity and account policy; late or causally stale evidence is historical/conflicted and must not overwrite newer inventory.",
+    "No physical programming or production deployment is authorized by this contract."
+  ]
+}

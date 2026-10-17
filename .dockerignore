@@ -15,3 +15,7 @@ data
 *.db.bak
 .env
 *.md
+android
+privado
+.android-build.log
+.android-release-build.log

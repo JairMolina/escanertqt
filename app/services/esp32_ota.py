@@ -11,6 +11,7 @@ import re
 import secrets
 import struct
 import time
+from contextlib import nullcontext
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from app.database import db, inventario as inv
 from app.services import esp32_firmware as fw
@@ -90,8 +91,8 @@ def capability(pcb_id):
                 reason='legacy' if known_old else 'enrollment' if not key else 'probe',needs_enrollment=not bool(key))
 
 
-def prepare(pcb_id,firmware_id,info,operator):
-    with db.transaction() as c:
+def prepare(pcb_id,firmware_id,info,operator,conn=None):
+    with (nullcontext(conn) if conn is not None else db.transaction()) as c:
         ensure(c)
         pcb=inv.get_pcb(pcb_id,conn=c)
         keyrow=c.execute('SELECT secret FROM esp32_unit_keys WHERE pcb=?',(pcb_id,)).fetchone()
@@ -100,6 +101,18 @@ def prepare(pcb_id,firmware_id,info,operator):
                 raise ValueError('La R2 está programándose o verificándose en la estación.')
         if not pcb or pcb['tipo']!='R2' or not keyrow:
             raise ValueError('Primero instala R2 V4.1 por serial desde esta web.')
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='android_offline_grants'").fetchone():
+            if c.execute("SELECT 1 FROM android_offline_grants WHERE target_pcb=? AND state IN ('authorized','pending_verification') AND expires_at>?",
+                         (pcb_id,time.time())).fetchone():
+                raise ValueError('La R2 tiene un paquete offline pendiente; ciérralo o verifica su resultado primero.')
+        if c.execute("SELECT 1 FROM esp32_ota_jobs WHERE pcb=? AND state='prepared' AND created>?",
+                     (pcb_id,time.time()-LIFETIME)).fetchone():
+            raise ValueError('La R2 tiene una OTA pendiente; verifícala o cancélala primero.')
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='r2_enrollments'").fetchone():
+            from app.services.r2_enrollment import TTL as enrollment_lifetime
+            if c.execute("SELECT 1 FROM r2_enrollments WHERE pcb=? AND state='prepared' AND created>?",
+                         (pcb_id,time.time()-enrollment_lifetime)).fetchone():
+                raise ValueError('La R2 tiene un alta pendiente; confirma la identidad antes de iniciar OTA.')
         key=bytes(keyrow['secret']);verify_info(info,key,pcb,allow_missing_mac=True)
         if c.execute('SELECT 1 FROM pcb_inventario WHERE UPPER(mac)=? AND id!=?',(info['mac'].upper(),pcb_id)).fetchone():
             raise ValueError('La MAC Bluetooth ya pertenece a otra PCB; no se inició la actualización.')
@@ -139,40 +152,56 @@ def prepare(pcb_id,firmware_id,info,operator):
                     encrypted_image=base64.b64encode(encrypted).decode('ascii'))
 
 
-def finish(identifier,info,operator):
-    with db.transaction() as c:
+def validate_result(c,row,info,pcb_snapshot=None):
+    """Validate reboot evidence without changing inventory or extending authorization.
+
+    Android may retain authentic late/conflicting evidence as history. Only finish
+    below may apply it, while the original authorization remains valid.
+    """
+    payload=json.loads(row['payload'])
+    pcb=pcb_snapshot or inv.get_pcb(row['pcb'],conn=c)
+    key=c.execute('SELECT secret FROM esp32_unit_keys WHERE pcb=?',(row['pcb'],)).fetchone()
+    if not pcb or not key: raise ValueError('Identidad OTA ya no disponible.')
+    verify_info(info,bytes(key['secret']),pcb,allow_missing_mac=True)
+    if mac(info['mac'])!=mac(payload['mac']): raise ValueError('La MAC cambió entre la autorización y el nuevo arranque.')
+    if (info['nombre'],info['hw'],info['fw'],info['app_sha256'])!=(payload['nombre'],payload['hw'],payload['fw'],payload['app_sha256']):
+        raise ValueError('La placa no arrancó con la imagen y versión elegidas; no se guarda el resultado.')
+    if info['partition']==payload['source_partition'] or info['nonce']==payload['nonce']:
+        raise ValueError('La R2 no confirmó el arranque en la partición nueva.')
+    return payload,pcb
+
+
+def finish(identifier,info,operator,conn=None):
+    with (nullcontext(conn) if conn is not None else db.transaction()) as c:
         ensure(c)
         row=c.execute('SELECT * FROM esp32_ota_jobs WHERE id=?',(identifier,)).fetchone()
         if not row or row['operator']!=operator: raise ValueError('Trabajo OTA no encontrado para este operador.')
         if row['state']=='verified': return json.loads(row['result'])
         if row['state']!='prepared' or time.time()-row['created']>LIFETIME: raise ValueError('Trabajo OTA cancelado o vencido.')
-        payload=json.loads(row['payload'])
-        pcb=inv.get_pcb(row['pcb'],conn=c)
-        key=c.execute('SELECT secret FROM esp32_unit_keys WHERE pcb=?',(row['pcb'],)).fetchone()
-        if not pcb or not key: raise ValueError('Identidad OTA ya no disponible.')
-        verify_info(info,bytes(key['secret']),pcb,allow_missing_mac=True)
-        if mac(info['mac'])!=mac(payload['mac']): raise ValueError('La MAC cambió entre la autorización y el nuevo arranque.')
-        if (info['nombre'],info['hw'],info['fw'],info['app_sha256'])!=(payload['nombre'],payload['hw'],payload['fw'],payload['app_sha256']):
-            raise ValueError('La placa no arrancó con la imagen y versión elegidas; no se guarda el resultado.')
-        if info['partition']==payload['source_partition'] or info['nonce']==payload['nonce']:
-            raise ValueError('La R2 no confirmó el arranque en la partición nueva.')
+        payload,pcb=validate_result(c,row,info)
         if payload.get('migration_required'):
             result=dict(verified=False,migration_required=True,fw=payload['fw'])
             c.execute("UPDATE esp32_ota_jobs SET state='verified',result=? WHERE id=?",(json.dumps(result),identifier))
             return result
-        updated=inv.guardar_programacion(pcb['id'],payload['mac'],payload['fw'],operator,conn=c)
-        from app.services import r2_programming as r2
-        r2.record(c,updated,'ble_ota',info)
-        if c.execute("SELECT 1 FROM sqlite_master WHERE name='r2_enrollments'").fetchone():
-            c.execute("UPDATE r2_enrollments SET state='verified' WHERE pcb=? AND state IN ('prepared','assigned')",(pcb['id'],))
-        result=dict(verified=True,pcb=updated,fw=payload['fw'],nombre_ble=info['nombre'],app_sha256=payload['app_sha256'])
+        result=record_verified(c,pcb,payload,info,operator,identifier)
         c.execute("UPDATE esp32_ota_jobs SET state='verified',result=? WHERE id=?",(json.dumps(result),identifier))
-        db.log_evento('ESP32_OTA_VERIFICADA',None,None,f'{payload["nombre"]}; FW {payload["fw"]}; job={identifier}; sha={payload["app_sha256"]}',operator,conn=c)
         return result
 
 
-def cancel(identifier,operator,error=''):
-    with db.transaction() as c:
+def record_verified(c,pcb,payload,info,operator,identifier,method='ble_ota',event='ESP32_OTA_VERIFICADA'):
+    """Common inventory/history effects, only after the caller verifies its protocol and CAS."""
+    updated=inv.guardar_programacion(pcb['id'],payload['mac'],payload['fw'],operator,conn=c)
+    from app.services import r2_programming as r2
+    r2.record(c,updated,method,info)
+    if c.execute("SELECT 1 FROM sqlite_master WHERE name='r2_enrollments'").fetchone():
+        c.execute("UPDATE r2_enrollments SET state='verified' WHERE pcb=? AND state IN ('prepared','assigned')",(pcb['id'],))
+    result=dict(verified=True,pcb=updated,fw=payload['fw'],nombre_ble=info['nombre'],app_sha256=payload['app_sha256'])
+    db.log_evento(event,None,None,f'{payload["nombre"]}; FW {payload["fw"]}; job={identifier}; sha={payload["app_sha256"]}',operator,conn=c)
+    return result
+
+
+def cancel(identifier,operator,error='',conn=None):
+    with (nullcontext(conn) if conn is not None else db.transaction()) as c:
         ensure(c)
         row=c.execute('SELECT * FROM esp32_ota_jobs WHERE id=? AND operator=?',(identifier,operator)).fetchone()
         if not row: raise ValueError('Trabajo OTA no encontrado.')

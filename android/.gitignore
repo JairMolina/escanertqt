@@ -1,0 +1,10 @@
+.gradle/
+.kotlin/
+local.properties
+**/build/
+*.jks
+*.keystore
+signing.properties
+# The repository ignores runtime data/ directories; these are Kotlin source packages.
+!app/src/**/data/
+!app/src/**/data/**

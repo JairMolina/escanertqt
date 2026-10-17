@@ -2,6 +2,37 @@
 
 Aplicación Inventario TQT (JairMolina/escanertqt): FastAPI, SQLite, WebSockets y HTML/JS. Mantener separada de TQT-OrangePi, que contiene infraestructura del servidor.
 
+## Android y firmware offline — 2026-10-17
+
+Rama de ensayo `codex/tqt-android-ota-20261017` basada en2b91f0b; producción conocida
+sigue web1.4.3/11cc0585. Se prepararon Android0.1.0 (`com.tqt.ota`, Kotlin/Compose,
+API26–36), API autenticada `/api/android`, outbox cifrado por operador/origen,
+paquetes offline por tarjeta/imagen/teléfono y FW4.3. Reutiliza SQLite, catálogo,
+credenciales por unidad, alta genérica4.0 fija y OTA4.2; no son dos inventarios.
+
+FW4.2 y el alta de base4.0 requieren autorización online. Tras instalar4.3 online
+y vincular INFO auténtico, un grant firmado408B permite sesión BLE nueva offline
+con firma Keystore del teléfono. CONTROL5/state7/manifiesto472B; INFOlegacy≤512B
++ extensión READ190B UUID0006. Contrato `protocols/offline-v1.json`; guías
+`docs/ANDROID_IMPLEMENTACION.md` y `android/README.md`. El contador durable se
+consume antes del COMMIT y el éxito exige recibo/hash/arranque válidos; no hay
+revocación UTC inmediata sin red. El firmante existente debe coincidir con la
+base fija; nunca generarlo automáticamente para habilitar offline.
+
+Pruebas reales:105backend,32JVM,7instrumentadas Android en emuladorAPI36 (login
+HTTPS/catálogo/navegación/Keystore/almacenamiento), Playwright escritorio/móvil,
+apksigner/aapt sobre APK debug y rechazo de release sin firma, compilación4.3
+core3.3.11/app1,159,888B y harness crypto nativo+4contrato. No hubo programación
+física ni despliegue. Faltan teléfono/R2, cortes/rollback/BLE reales, custodia de
+firma Android y publicación aprobada. El APK debug es solo de ensayo.
+
+CM resolvió una discrepancia importante: main/MEMORIA histórica no describían la
+última rama web1.4.3. Reutilizar las versiones contrastadas, no deducir producción
+de main. Comparación de recuperación delimitada:2071vs4355bytes,52.45%menos
+contexto,1cachehit; no demuestra ahorro global de tokens.9MCP de CM,0Gemini nuevo,
+5auxiliares reutilizados. Original del prompt en adjuntos internos fue rechazado
+por `cm files add`; se conservó sin eludir esa política.
+
 ## Estado confirmado 2026-10-13
 
 Versión 1.3.72 publicada en GitHub main y desplegada, por autorización expresa del usuario, en https://inventariotqt.site. Commit de aplicación cdad30fa90f61b5a471cff394ff42f7c1bacb047. Integra Test Station 0.6.3 en validacion y catálogo HEX, selección de firmware y cancelación STM32 en programacion. Se conserva Docker local de esta laptop, puerto loopback 18080 y volumen independiente con copia íntegra del inventario: 100 tarjetas y 300 PCB. Agente Windows saliente para COM/BLE; cinco módulos originales idénticos en SHA256, tiempos y 14 etapas conservados.

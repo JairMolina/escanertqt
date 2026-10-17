@@ -2,7 +2,7 @@
 
 Fecha de la solicitud: 2026-10-15. Nombre de la aplicación: **TQT**.
 
-Estado: requisitos documentados; aplicación, API offline y FW 4.3 todavía no implementados. Este documento pertenece al mismo proyecto de la web y es el punto de partida para su implementación. No implica autorización para desplegar, grabar hardware o modificar producción.
+Actualización2026-10-17: aplicación0.1.0, API offline y FW4.3 preparados en rama de ensayo. Ver `ANDROID_IMPLEMENTACION.md` para estado comprobado y pendientes. Las referencias siguientes son la especificación histórica; no describen por sí solas producción. Sin autorización de despliegue ni grabación física.
 
 ## Instrucción de trabajo
 

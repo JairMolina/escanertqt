@@ -1,17 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-16 19:45 UTC
-Commit de referencia: `11cc0585dc43` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-17 15:47 UTC
+Commit de referencia: `2b91f0b2c3b4` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Desplegada1.4.3 autorizada porusuario enOrangePi /home/orangepi/escanertqt commit11cc0585dc430208d1c1f2e83f3dd423e8badacf. Fastforward desde76d71a1 y recreate solo servicio tqt con servidor/compose.yml. Datos/volumenes/tunel conservados. Loginpublico confirma1.4.3 y apihealthOK.
+Android0.1.0 y FW4.3 preparados en rama codex/tqt-android-ota-20261017; API online/offline, identidad P256, permisos por unidad/teléfono, outbox cifrado y página privada. Reutiliza inventario/catálogo/alta/OTA existentes. Producción conocida web1.4.3/11cc0585 intacta; base genérica4.0 y FW4.2 sin cambios.
 
 ## Siguiente paso
-Revisar operacion de puente BLE Windows por usuario en produccion; pruebas fisicas previas locales14/14 no repetidas. UART28/99 lineas corruptas pendiente diagnostico. Previewlocal no reiniciado. Android/Skytec pendientes.
+Pruebas físicas teléfono/R2 al final según usuario: BLE, OTA4.2 a4.3, sesión4.3 sin Internet, cortes y rollback. Definir custodia/firma APK estable y publicación privada con fecha/historial real. Despliegue productivo requiere autorización y respaldo/restauración verificables; no se realizó. Original interno excluido por cm files add conservado en adjunto.
 
 ## Evidencia
-Sin trabajos activos antes de despliegue; respaldo SQLite predeploy_1.4.3_20261016_134402.db en /backups servidor. ContenedorAPP_VERSION1.4.3 y arranqueOK; httpsinventariotqt.site/login muestra1.4.3, apihealthok. 502 transitorio durante arranque resuelto; recursosstatic protegidos requieren sesion. Pruebas previas24Python14JSUIpass.
-
-## Nota operativa R2 (2026-10-16)
-
-Documentado en R2_ALTA_GENERICA_42.md el inicio de programar_base.ps1 con ExecutionPolicy Bypass limitado al proceso. El usuario reporto bloqueo de PowerShell; no confirmo nueva grabacion. Se mantiene BIN generico4.0 fijo seguido de alta y OTA web con datos/credencial por unidad; evidencia previa0067 FW4.2. Sin cambios de codigo ni nueva prueba fisica.
+105/105 backend;32/32 JVM;7/7 instrumentadas reales API36(loginHTTPS/catálogo/navegación/Keystore/almacenamiento);Playwright1440/390;SDK apksigner/aapt verifica debug y rechaza unsigned;FW4.3 compila core3.3.11 app1159888B RAM43164B;nativecryptoPASS+4contrato. CM9MCP/0Gemini/5auxiliares;52.45%menos bytes en comparación delimitada, sin ahorro global demostrado.

@@ -71,6 +71,9 @@ def start(pcb_id,firmware_id,station,operator,method='serial'):
         ensure(c)
         p=inv.get_pcb(pcb_id,conn=c)
         if not p or p['tipo']!='R2': raise ValueError('Elige una R2.')
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='android_offline_grants'").fetchone():
+            if c.execute("SELECT 1 FROM android_offline_grants WHERE target_pcb=? AND state IN ('authorized','pending_verification') AND expires_at>?",(pcb_id,time.time())).fetchone():
+                raise ValueError('La R2 tiene un paquete offline pendiente; ciérralo o verifica su resultado primero.')
         if method=='verify' and not p.get('mac'): raise ValueError('Primero instala por serial y lee la MAC.')
         if c.execute("SELECT 1 FROM sqlite_master WHERE name='esp32_ota_jobs'").fetchone():
             if c.execute("SELECT 1 FROM esp32_ota_jobs WHERE pcb=? AND state='prepared' AND created>?",(pcb_id,time.time()-3600)).fetchone():

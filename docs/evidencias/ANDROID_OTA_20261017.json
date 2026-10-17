@@ -1,0 +1,132 @@
+{
+  "date": "2026-10-17",
+  "branch": "codex/tqt-android-ota-20261017",
+  "base_commit": "2b91f0b2c3b4f0bc8df194e2e80afddc834aa9cb",
+  "production_modified": false,
+  "physical_ota_tested": false,
+  "android_version": "0.1.0",
+  "minimum_api": 26,
+  "emulator_api": 36,
+  "checks": {
+    "backend": "105/105",
+    "jvm": "32/32",
+    "instrumentation": "7/7",
+    "web_playwright": "desktop1440/mobile390 PASS; approved UI response fixture distinguished",
+    "sdk_apk": "debug signature/package verified; unsigned release rejected",
+    "firmware": {
+      "core": "3.3.11",
+      "fqbn": "esp32:esp32:esp32doit-devkit-v1",
+      "app_bytes": 1159888,
+      "app_sha256": "ae70b73a67e36d53a605ec32ea84bdc99dd4d9d941ccdec7781e6b49d5b50be7",
+      "offline_marker": true,
+      "compiled_source_match": {
+        "tqt_ota.cpp": true,
+        "tqt_offline.cpp": true,
+        "tqt_profile.cpp": true
+      },
+      "trust_anchor_sha256": "59f160e4ba7ceb337d2cacc0abc25788ca7c2c534d1458d5314124486afc4576",
+      "native": "PASS",
+      "contract": "4/4 PASS",
+      "physical_tests": false
+    }
+  },
+  "debug_apk": {
+    "sha256": "3608e488db1c7d9401ee1e48794181c405bc0db2b4794dcf2350b7db6e3b3141",
+    "distribution_approved": false
+  },
+  "memory_retrieval": {
+    "scope": "Actual desktop MCP calls, targeted retrieval comparison only; not billed Codex tokens",
+    "audit_searches": 3,
+    "comparison_search_calls": 4,
+    "usage_measurement_calls": 2,
+    "mcp_calls_so_far": 9,
+    "gemini_requests_delta": 0,
+    "subagents_unique": 5,
+    "query": "Android actualización offline",
+    "project": "Laptop-TQT-Web",
+    "auto_bytes": 2071,
+    "full_bytes": 4355,
+    "auto_estimated_tokens": 691,
+    "full_estimated_tokens": 1452,
+    "estimate_method": "UTF-8 bytes / 3 rounded up; not provider tokenizer",
+    "retrieval_bytes_reduction_percent": 52.45,
+    "same_repeat": true,
+    "delta": {
+      "requests": 3,
+      "cache_hits": 1,
+      "rank_computations": 1,
+      "embedding_attempts": 1,
+      "section_expansions": 1
+    },
+    "sources": [
+      {
+        "project": "Laptop-TQT-Web",
+        "file": "docs/CODEX_ESTADO.md",
+        "heading": "Siguiente paso",
+        "lines": [
+          10,
+          11
+        ],
+        "ref": "22:c8f476753c47a646e1cf",
+        "level": "standard"
+      },
+      {
+        "project": "Laptop-TQT-Web",
+        "file": "MEMORIA.md",
+        "heading": "Accesos y límites",
+        "lines": [
+          12,
+          18
+        ],
+        "ref": "22:e00d88eabfec02e00e45",
+        "level": "standard"
+      },
+      {
+        "project": "Laptop-TQT-Web",
+        "file": "docs/CODEX_ESTADO.md",
+        "heading": "Avance reportado",
+        "lines": [
+          7,
+          8
+        ],
+        "ref": "22:4ffcd7823091810cd001",
+        "level": "standard"
+      }
+    ],
+    "expanded_ref": "22:c8f476753c47a646e1cf",
+    "full_comparator": "full contract compatible with hybrid 1.0, same live index/query/scope; not an old production deployment",
+    "quality": {
+      "current_deployment_143": true,
+      "android_pending": true,
+      "full_current_deployment_143": false,
+      "hardware_ota_not_implied": true
+    },
+    "limits": [
+      "No global savings claim.",
+      "Initial first two audit payload byte lengths were not recorded.",
+      "Baseline and final usage snapshots cover the explicit retrieval comparison, not the full development."
+    ]
+  },
+  "sources_sha256": {
+    "protocols/offline-v1.json": "f37636baace4d95521272522cf16b22dba1d5ed7f61271182e2ffa36ddd4743f",
+    "app/routers/android.py": "2d71b775c9fb68e82b2b9418dbe8d638d628da87feac48cca5e084564dd43bf8",
+    "app/services/android_ota.py": "96eea00a149cea99a13a75425c20a5fd19a82a306e0e225aedda22df92d9cb01",
+    "app/services/android_offline.py": "66188012fd799524ed3740b44f040bc4c8c384ae2053fc03fb3c6fb866996213",
+    "app/services/esp32_ota.py": "5665f310730039db4ee541a1fe3da21d0ebdbce4b7a0e8122689e5f33fadb1aa",
+    "app/services/r2_programming.py": "195cd9d53f2519ba230b9d28d9f77e72a2e0817f288bc9c30ed3ecc0316505d5",
+    "android/app/src/main/java/com/tqt/ota/UpdateManager.kt": "9e314aef5f9ae8a534a45594007ce566b0891b9a9b4980cc430b424649f809db",
+    "android/app/src/main/java/com/tqt/ota/ble/BleOtaTransport.kt": "709548bad53bee84eac47aa227e3a056baa5635c8aa89c05872d0ca777ead446",
+    "android/app/src/main/java/com/tqt/ota/offline/OfflineCrypto.kt": "677c2d3a7ea7b463a84d8d9d6d8554314d0515cb8626bfb816a0df0498f9b17f",
+    "android/app/src/main/java/com/tqt/ota/offline/OfflineKeys.kt": "09d50a97aa8f32a45c4e4f32c294e01a6bcd82bf0f99f528d041d749ba155c03",
+    "android/app/src/main/java/com/tqt/ota/data/PrivateStore.kt": "2856160dc57ea150b89117c0cf386ba6b02b598daba3b310642ac480a21c4a69",
+    "android/app/src/main/java/com/tqt/ota/data/TqtApi.kt": "18f0c441676ce74a56805e927585e508c9582f5f66094fbf0fe0f673b632057f",
+    "firmware/esp32_r2/TQT_R2_V4_3/tqt_ota.cpp": "deff07f5c05da03bb3e0c35e28b192eb1916e6623bb190677cfc29ed9cecc5f3",
+    "firmware/esp32_r2/TQT_R2_V4_3/tqt_offline.cpp": "0b6a2e6d7476a5b8fb44af7df2e51adf00d6774c21c51c8a160e5b5f45ab4552"
+  },
+  "pending": [
+    "Physical phone/R2 BLE/OTA/powerloss/rollback tests deferred by user",
+    "Stable Android signing identity/custody and production publication",
+    "Explicit deployment authorization plus verified production backup/restore",
+    "Original request excluded from CM attachment ingestion by internal-path policy"
+  ]
+}
