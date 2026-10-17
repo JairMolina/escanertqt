@@ -45,3 +45,16 @@ La transición se completó físicamente desde la web 1.3.86: el usuario obtuvo 
 Esa lectura fresca se validó con la credencial guardada mediante el verificador HMAC normal y se contrastó con el trabajo autorizado, la imagen personalizada del catálogo y el estado de programación. Los tres coinciden. Hay un único registro de la R2 0067, método `ble_ota`, FW/HW/MAC guardados y ningún trabajo OTA pendiente. La conexión de lectura quedó cerrada. No se necesitó otra grabación serial para completar la transición.
 
 La prueba queda cerrada en el entorno local aislado. Producción no se desplegó. Antes de desplegar hay que conservar la clave privada del emisor y las credenciales de las unidades fuera de Git; la base pública debe corresponder al emisor persistente del servidor. La ruta directa de una unidad nueva con la última base que ya asigna guiones está cubierta por compilación y pruebas de protocolo; la prueba física documentada de la 0067 recorrió la base genérica inicial y la transición posterior.
+
+
+## Operación local: bloqueo de PowerShell (2026-10-16)
+
+Si `programar_base.ps1` muestra `PSSecurityException` o «ejecución de scripts deshabilitada», el script todavía no arrancó. Desde su carpeta puede invocarse en un proceso con política temporal, sin cambiar la política permanente de Windows:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\programar_base.ps1" -Puerto COM4
+```
+
+Confirmar el puerto real y colocar la tarjeta en BOOT + RESET antes de iniciar. Esta incidencia solo acredita el bloqueo; no se ha recibido confirmación de que esa nueva grabación haya terminado.
+
+El uso acordado sigue siendo grabar el BIN fijo genérico 4.0 sin editarlo por unidad. Después, con BOOT libre y alimentación normal, seleccionar la R2 correcta en la web y actualizar por Bluetooth: alta de nombre exacto y credencial, instalación del firmware compatible y verificación antes de registrar el resultado. La base y el servidor deben conservar la confianza criptográfica correspondiente. La evidencia física previa es la R2 0067 con FW 4.2; no implica que una nueva unidad ya esté verificada.
