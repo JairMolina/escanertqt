@@ -13,19 +13,26 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tqt.ota.ble.NearbyDevice
+import com.tqt.ota.data.InventoryClient
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import org.json.JSONObject
 
 private val Gold = Color(0xFFD9A441)
@@ -53,11 +60,11 @@ class MainActivity : ComponentActivity() {
 @Composable private fun TqtScreen(app: TqtApplication) {
     val manager = app.updates
     val state by manager.state.collectAsStateWithLifecycle()
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     var server by remember { mutableStateOf(app.store.baseUrl) }
     var email by remember { mutableStateOf(app.store.email) }
     var password by remember { mutableStateOf("") }
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     var firmware by remember { mutableStateOf<JSONObject?>(null) }
     var radio by remember { mutableStateOf<NearbyDevice?>(null) }
     var confirm by remember { mutableStateOf(false) }
@@ -70,6 +77,16 @@ class MainActivity : ComponentActivity() {
         else permissionError = true
     }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    var qrError by remember { mutableStateOf<String?>(null) }
+    val qrScanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        result.contents?.let { code ->
+            try {
+                val normalized = InventoryClient.query(code, scanned = true)
+                query = normalized.text; tab = 0
+                manager.refresh(normalized.text, normalized.type, scanned = true)
+            } catch (error: IllegalArgumentException) { qrError = error.message }
+        }
+    }
     fun scan() {
         if (required.all { activity.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) manager.scan()
         else permissions.launch(required)
@@ -77,7 +94,8 @@ class MainActivity : ComponentActivity() {
     LaunchedEffect(state.email) { if (state.email.isNotEmpty()) password = "" }
     LaunchedEffect(state.selected?.optInt("pcb_id")) { radio = null; firmware = null }
     LaunchedEffect(state.firmwares) { firmware = state.firmwares.firstOrNull() }
-    Scaffold(containerColor = Navy, topBar = {
+    LaunchedEffect(state.inventoryQuery) { query = state.inventoryQuery }
+    Scaffold(modifier = Modifier.navigationBarsPadding().imePadding(), containerColor = Navy, topBar = {
         TopAppBar(title = { Row(verticalAlignment = Alignment.CenterVertically) {
             Text("TQT", color = Gold, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
             Spacer(Modifier.width(12.dp)); Text("Actualización de tarjetas", fontSize = 15.sp)
@@ -86,8 +104,8 @@ class MainActivity : ComponentActivity() {
         }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Navy))
     }, bottomBar = {
         if (state.email.isNotEmpty()) NavigationBar(containerColor = Panel) {
-            listOf("Tarjetas", "Bluetooth", "Historial").forEachIndexed { index, label ->
-                NavigationBarItem(selected = tab == index, onClick = { tab = index }, icon = { Text(listOf("R2", "BLE", "LOG")[index], fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) }, label = { Text(label) })
+            listOf("Tarjetas", "Detalle", "Historial").forEachIndexed { index, label ->
+                NavigationBarItem(selected = tab == index, onClick = { tab = index }, icon = { Text(listOf("PCB", "INFO", "LOG")[index], fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) }, label = { Text(label) })
             }
         }
     }) { padding ->
@@ -108,7 +126,7 @@ class MainActivity : ComponentActivity() {
                 } }
             } else {
                 item {
-                    Text(when (tab) { 0 -> "Firmware, al día."; 1 -> "Una conexión segura."; else -> "Cada cambio cuenta." }, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                    Text(when (tab) { 0 -> "Tu inventario TQT."; 1 -> "Detalle de tarjeta."; else -> "Cada cambio cuenta." }, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                     Text(state.email, color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
                 if ((state.release?.optInt("version_code") ?: 0) > BuildConfig.VERSION_CODE) item { Section("NUEVA VERSIÓN DE LA APLICACIÓN") {
@@ -132,27 +150,69 @@ class MainActivity : ComponentActivity() {
                             Text("${pkg.optString("nombre")} · FW ${pkg.optString("fw")}")
                         } }
                     } }
-                    item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(query, { query = it }, label = { Text("Buscar tarjeta, serie o MAC") }, singleLine = true, modifier = Modifier.weight(1f))
-                        Button(onClick = { manager.refresh(query) }, enabled = !state.busy && !state.updating) { Text("Buscar") }
+                    item { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(query, { query = it }, label = { Text("Número, nombre o MAC") }, singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { manager.refresh(query) }),
+                            enabled = !state.busy && !state.updating, modifier = Modifier.fillMaxWidth().testTag("inventoryQuery"))
+                        Text("Ejemplo: 11 encuentra la serie 0011. También puedes escanear su QR.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { manager.refresh(query) }, enabled = !state.busy && !state.updating, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Buscar") }
+                            OutlinedButton(onClick = { qrScanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                .setPrompt("Escanea el QR de una tarjeta TQT").setBeepEnabled(false).setOrientationLocked(false).setCaptureActivity(QrCaptureActivity::class.java)) },
+                                enabled = !state.busy && !state.updating, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Escanear QR") }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("", "R1", "R2", "R3").forEach { type -> FilterChip(selected = state.inventoryType == type,
+                                onClick = { manager.refresh(query, type) }, enabled = !state.busy && !state.updating,
+                                label = { Text(type.ifEmpty { "Todas" }) }) }
+                        }
                     } }
-                    if (state.devices.isEmpty() && !state.busy) item { Text("No hay R2 para mostrar. Consulta el servidor o ajusta tu búsqueda.", color = Muted) }
+                    if (state.inventoryError != null) item { Section("NO SE PUDO COMPLETAR LA CONSULTA") {
+                        Text(state.inventoryError!!)
+                        if (state.inventoryLoaded) Text("Los datos anteriores permanecen visibles; actualiza la consulta antes de usarlos.", color = Muted)
+                        OutlinedButton(onClick = { manager.refresh(query) }, enabled = !state.busy) { Text("Reintentar consulta") }
+                    } }
+                    if (state.inventoryLoaded) item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${state.devices.size} de ${state.inventoryTotal} tarjetas", color = Muted)
+                        TextButton(onClick = { query = ""; manager.refresh("", "") }, enabled = !state.busy && !state.updating) { Text("Ver todas") }
+                    } }
+                    if (state.devices.isEmpty() && state.inventoryLoaded && !state.busy && state.inventoryError == null) item {
+                        Text("No se encontraron tarjetas. Revisa el número, cambia el tipo o pulsa Ver todas.", color = Muted)
+                    }
                     items(state.devices, key = { it.getInt("pcb_id") }) { device ->
                         OutlinedCard(onClick = { manager.select(device); tab = 1 }, enabled = !state.updating, modifier = Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("R2 · HW ${device.optString("hw")}", color = Color(0xFFB08CFF), style = MaterialTheme.typography.labelLarge)
+                                Text("${device.optString("tipo")} · HW ${device.optString("hw")}", color = Color(0xFFB08CFF), style = MaterialTheme.typography.labelLarge)
                                 Text(device.optString("nombre"), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                                Text("Firmware ${device.optString("firmware").ifEmpty { "sin confirmar" }}  ·  ${device.optString("mac").ifEmpty { "Identidad por verificar" }}", color = Muted)
-                                Text("Seleccionar tarjeta", color = Gold)
+                                Text(InventoryClient.status(device), color = if (device.optJSONObject("programming")?.optBoolean("verified") == true) Good else Gold)
+                                Text("FW ${InventoryClient.text(device, "firmware").ifEmpty { "sin registrar" }} · ${device.optString("estado_ciclo")}", color = Muted)
+                                Text("Ver detalle", color = Gold)
                             }
                         }
                     }
+                    if (state.inventoryOffset < state.inventoryTotal) item { OutlinedButton(onClick = { manager.loadMore() }, enabled = !state.busy && !state.updating, modifier = Modifier.fillMaxWidth()) { Text("Cargar más tarjetas") } }
                 }
                 if (tab == 1) {
                     item { Section("TARJETA SELECCIONADA") {
-                        Text(state.selected?.optString("nombre") ?: "Selecciona una R2 en Tarjetas", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                        Text("El nombre del anuncio solo ayuda a localizarla. El servidor comprueba identidad y compatibilidad antes de autorizar.", color = Muted)
+                        Text(state.selected?.optString("nombre") ?: "Selecciona una tarjeta en Tarjetas", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                         if (state.selected != null) {
+                            val pcb = state.selected!!
+                            Text(InventoryClient.status(pcb), color = if (pcb.optJSONObject("programming")?.optBoolean("verified") == true) Good else Gold, fontWeight = FontWeight.Bold)
+                            Text("Firmware registrado: ${InventoryClient.text(pcb, "firmware").ifEmpty { "sin registrar" }}")
+                            Text("Hardware: ${pcb.optString("hw")} · Estado: ${pcb.optString("estado_ciclo")}", color = Muted)
+                            Text("MAC: ${InventoryClient.text(pcb, "mac").ifEmpty { "sin registrar" }}", fontFamily = FontFamily.Monospace, color = Muted)
+                            Text("Tarjeta asociada: ${InventoryClient.text(pcb, "id_tarjeta_num").ifEmpty { "sin asignar" }}", color = Muted)
+                            val programming = pcb.optJSONObject("programming")
+                            if (programming != null) {
+                                Text(if (programming.optBoolean("verified")) "Programación verificada en la web." else "La web no registra una programación verificada para los datos actuales.", color = Muted)
+                                InventoryClient.text(programming, "latest_fw").takeIf { it.isNotEmpty() }?.let { Text("Último firmware compatible: $it", color = Muted) }
+                                InventoryClient.text(programming, "error").takeIf { it.isNotEmpty() }?.let { Text(it, color = Muted) }
+                            }
+                            if (!state.androidProgramming) Text("Puedes consultar el inventario. La programación Android aún no está habilitada en este servidor.", color = Muted)
+                            if (state.catalogueError != null) Text(state.catalogueError!!, color = Gold)
+                        }
+                        if (state.selected?.optString("tipo") == "R2" || state.offlineSelected != null) {
                             Text("Firmware de destino", style = MaterialTheme.typography.labelLarge)
                             state.firmwares.forEach { image -> Row(verticalAlignment = Alignment.CenterVertically) {
                                 RadioButton(selected = firmware?.optString("id") == image.optString("id"), onClick = { firmware = image }, enabled = !state.updating)
@@ -160,7 +220,7 @@ class MainActivity : ComponentActivity() {
                             } }
                             if (state.firmwares.isEmpty()) Text("No hay una imagen OTA compatible disponible.", color = Muted)
                         }
-                        Button(onClick = { scan() }, enabled = state.selected != null && !state.busy && !state.updating, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(if (state.busy) "Buscando…" else "Buscar por Bluetooth") }
+                        Button(onClick = { scan() }, enabled = (state.selected?.optString("tipo") == "R2" || state.offlineSelected != null) && !state.busy && !state.updating, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(if (state.busy) "Buscando…" else "Buscar por Bluetooth") }
                         Text(if (state.offlineSelected != null) "Paquete offline seleccionado: se verifican firma, teléfono, tarjeta y contador antes del envío." else "4.2 y el alta genérica 4.0 requieren Internet. En 4.3 puedes autorizar previamente un paquete para usarlo sin conexión.", color = Muted, style = MaterialTheme.typography.bodySmall)
                     } }
                     items(state.nearby, key = { it.address }) { candidate ->
@@ -171,8 +231,8 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                    item { Button(onClick = { confirm = true }, enabled = state.selected != null && firmware != null && radio != null && !state.updating && !state.busy && state.role != "consultor", modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Revisar y actualizar") } }
-                    if (state.offlineSelected == null) item { OutlinedButton(onClick = { manager.prepareOffline(state.selected!!, firmware!!, radio!!) }, enabled = state.selected != null && firmware != null && radio != null && !state.updating && !state.busy && state.role != "consultor", modifier = Modifier.fillMaxWidth()) { Text("Autorizar y guardar paquete offline") } }
+                    item { Button(onClick = { confirm = true }, enabled = (state.androidProgramming || state.offlineSelected != null) && state.selected != null && firmware != null && radio != null && !state.updating && !state.busy && state.role != "consultor", modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Revisar y actualizar") } }
+                    if (state.offlineSelected == null) item { OutlinedButton(onClick = { manager.prepareOffline(state.selected!!, firmware!!, radio!!) }, enabled = state.androidProgramming && state.selected?.optString("tipo") == "R2" && firmware != null && radio != null && !state.updating && !state.busy && state.role != "consultor", modifier = Modifier.fillMaxWidth()) { Text("Autorizar y guardar paquete offline") } }
                 }
                 if (tab == 2) {
                     item { OutlinedButton(onClick = { manager.synchronizeNow() }, enabled = !state.updating) { Text("Sincronizar resultados pendientes") } }
@@ -187,7 +247,7 @@ class MainActivity : ComponentActivity() {
                     } }
                 }
                 if (state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-                item { Text("TQT 0.1.0 · Distribución privada\nR2 ESP32 · Inventario y permisos centrales", color = Muted, style = MaterialTheme.typography.bodySmall) }
+                item { Text("TQT ${BuildConfig.VERSION_NAME} · Distribución privada\nInventario conectado · Programación R2 ESP32", color = Muted, style = MaterialTheme.typography.bodySmall) }
             }
         }
     }
@@ -201,6 +261,7 @@ class MainActivity : ComponentActivity() {
     }) { Text("Autorizar actualización") } }, dismissButton = { TextButton(onClick = { confirm = false }) { Text("Volver") } })
     val error = state.error ?: if (permissionError) "Permite Bluetooth cercano (o ubicación en Android 8–11) en Ajustes para buscar tarjetas." else null
     if (error != null) AlertDialog(onDismissRequest = { manager.dismissError(); permissionError = false }, title = { Text("Revisar operación") }, text = { Text(error) }, confirmButton = { TextButton(onClick = { manager.dismissError(); permissionError = false }) { Text("Entendido") } })
+    if (qrError != null) AlertDialog(onDismissRequest = { qrError = null }, title = { Text("Revisar código QR") }, text = { Text(qrError!!) }, confirmButton = { TextButton(onClick = { qrError = null }) { Text("Entendido") } })
 }
 
 @Composable private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {

@@ -8,6 +8,8 @@ import com.tqt.ota.data.ApiFailure
 import com.tqt.ota.data.PrivateStore
 import com.tqt.ota.data.TqtApi
 import com.tqt.ota.data.SessionContext
+import com.tqt.ota.data.InventoryClient
+import com.tqt.ota.data.InventoryQuery
 import com.tqt.ota.offline.OfflineCrypto
 import com.tqt.ota.offline.OfflineKeys
 import kotlinx.coroutines.*
@@ -25,7 +27,10 @@ data class ScreenState(
     val firmwares: List<JSONObject> = emptyList(), val selected: JSONObject? = null,
     val packages: List<JSONObject> = emptyList(), val offlineSelected: String? = null,
     val busy: Boolean = false, val updating: Boolean = false, val stage: String = "Listo",
-    val confirmed: Long = 0, val total: Long = 0, val error: String? = null, val release: JSONObject? = null
+    val confirmed: Long = 0, val total: Long = 0, val error: String? = null, val release: JSONObject? = null,
+    val inventoryTotal: Int = 0, val inventoryOffset: Int = 0, val inventoryQuery: String = "",
+    val inventoryType: String = "", val inventoryLoaded: Boolean = false, val inventoryError: String? = null,
+    val androidProgramming: Boolean = false, val catalogueError: String? = null
 )
 
 class UpdateManager(private val app: TqtApplication, private val store: PrivateStore, private val api: TqtApi) {
@@ -35,6 +40,7 @@ class UpdateManager(private val app: TqtApplication, private val store: PrivateS
     private val operation = Mutex()
     private val synchronization = Mutex()
     private var transferJob: Job? = null
+    private var inventoryJob: Job? = null
     fun dismissError() { mutable.update { it.copy(error = null) } }
     private fun report(error: Exception) { mutable.update { it.copy(error = error.message?.take(320) ?: "No se pudo completar la operación", busy = false) } }
     private fun objects(value: JSONObject, key: String): List<JSONObject> = value.optJSONArray(key)?.let { array -> (0 until array.length()).map { array.getJSONObject(it) } } ?: emptyList()
@@ -74,27 +80,62 @@ class UpdateManager(private val app: TqtApplication, private val store: PrivateS
             store.logout(); mutable.value = ScreenState()
         }
     }
-    fun refresh(query: String = "") { scope.launch { try { refreshNow(query) } catch (error: Exception) { report(error) } } }
-    private suspend fun refreshNow(query: String = "") {
+    fun refresh(query: String = "", type: String = state.value.inventoryType, scanned: Boolean = false) {
+        if (state.value.updating) return
+        val normalized = try { InventoryClient.query(query, type, scanned) }
+        catch (error: IllegalArgumentException) { mutable.update { it.copy(inventoryError = error.message) }; return }
+        inventoryJob?.cancel()
+        inventoryJob = scope.launch { refreshNow(normalized) }
+    }
+    fun loadMore() {
+        if (state.value.busy || state.value.updating || state.value.inventoryOffset >= state.value.inventoryTotal) return
+        inventoryJob = scope.launch { refreshNow(InventoryQuery(state.value.inventoryQuery, state.value.inventoryType), append = true) }
+    }
+    private suspend fun refreshNow(query: InventoryQuery = InventoryQuery(""), append: Boolean = false) {
         val account = store.session()
-        mutable.update { it.copy(busy = true) }
-        val response = api.request("/api/android/devices?limit=100&q=" + java.net.URLEncoder.encode(query, "UTF-8"), session = account)
-        if (!store.matches(account)) return
-        mutable.update { it.copy(devices = objects(response, "items"), busy = false) }
-        refreshHistory()
-        runCatching { api.request("/api/android/apk/manifest", session = account) }.getOrNull()?.let { release -> if (store.matches(account)) mutable.update { it.copy(release = release) } }
+        val inventory = InventoryClient { api.request(it, session = account) }
+        mutable.update { it.copy(busy = true, inventoryError = null) }
+        try {
+            val response = inventory.page(query, if (append) state.value.inventoryOffset else 0)
+            currentCoroutineContext().ensureActive()
+            if (!store.matches(account)) return
+            mutable.update { it.copy(devices = if (append) (it.devices + response.items).distinctBy { p -> p.getInt("pcb_id") } else response.items,
+                inventoryTotal = response.total, inventoryOffset = response.nextOffset, inventoryLoaded = true,
+                inventoryQuery = query.text, inventoryType = query.type) }
+            refreshHistory()
+            if (!append) {
+                val available = inventory.androidProgrammingAvailable()
+                if (store.matches(account)) mutable.update { it.copy(androidProgramming = available) }
+                if (available) runCatching { api.request("/api/android/apk/manifest", session = account) }.getOrNull()?.let { release ->
+                    if (store.matches(account)) mutable.update { it.copy(release = release) }
+                }
+            }
+        } catch (error: CancellationException) { throw error }
+        catch (error: Exception) {
+            if (store.matches(account)) mutable.update { it.copy(inventoryError = when {
+                error is ApiFailure && error.status == 401 -> "La sesión venció. Vuelve a iniciar sesión para consultar el inventario."
+                error is ApiFailure && error.status == 403 -> "Tu cuenta no tiene permiso para consultar el inventario."
+                else -> "No se pudo consultar el inventario. Comprueba Internet y pulsa Buscar para reintentar."
+            }) }
+        } finally { if (store.matches(account) && currentCoroutineContext().isActive) mutable.update { it.copy(busy = false) } }
     }
     fun select(device: JSONObject) {
         if (state.value.updating || state.value.busy) return
-        mutable.update { it.copy(selected = device, nearby = emptyList(), firmwares = emptyList(), offlineSelected = null, error = null) }
+        mutable.update { it.copy(selected = device, nearby = emptyList(), firmwares = emptyList(), offlineSelected = null, error = null, catalogueError = null, busy = true) }
         scope.launch {
             val account = store.session()
             try {
-                val catalogue = api.request("/api/android/firmwares?hw=" + java.net.URLEncoder.encode(device.getString("hw"), "UTF-8"), session = account)
+                val inventory = InventoryClient { api.request(it, session = account) }
+                val detail = inventory.detail(device.getInt("pcb_id"))
+                if (!store.matches(account)) return@launch
+                mutable.update { it.copy(selected = detail) }
+                if (detail.optString("tipo") != "R2") return@launch
+                val catalogue = inventory.firmwares(detail.getString("hw"))
                 // The generic 4.0 bootstrap is not a functional OTA target.
-                val images = objects(catalogue, "items").filter { !it.optString("id").contains("generic") && it.optInt("ota_protocol") == 1 }
+                val images = catalogue.filter { !it.optString("id").contains("generic") && it.optInt("ota_protocol") == 1 }
                 if (store.matches(account) && state.value.selected?.optInt("pcb_id") == device.optInt("pcb_id")) mutable.update { it.copy(firmwares = images) }
-            } catch (error: Exception) { report(error) }
+            } catch (error: Exception) { if (store.matches(account)) mutable.update { it.copy(catalogueError = "No se pudo actualizar el detalle o el catálogo de firmware. Vuelve a seleccionar la tarjeta para reintentar.") } }
+            finally { if (store.matches(account)) mutable.update { it.copy(busy = false) } }
         }
     }
     fun scan() {
@@ -109,6 +150,9 @@ class UpdateManager(private val app: TqtApplication, private val store: PrivateS
     }
     fun start(pcb: JSONObject, firmware: JSONObject, nearby: NearbyDevice) {
         if (state.value.updating || state.value.busy) return
+        if (!state.value.androidProgramming || InventoryClient.text(pcb, "tipo").let { it.isNotEmpty() && it != "R2" }) {
+            report(IllegalStateException("El servicio de programación Android no está habilitado en este servidor. Puedes consultar las tarjetas y su firmware.")); return
+        }
         val account = store.session()
         val identifier = UUID.randomUUID().toString()
         val record = JSONObject().put("id", identifier).put("state", "preparing").put("pcb_id", pcb.getInt("pcb_id"))
@@ -122,6 +166,7 @@ class UpdateManager(private val app: TqtApplication, private val store: PrivateS
     /** Prepare online, then preserve the opaque image and signed permission in private encrypted storage. */
     fun prepareOffline(pcb: JSONObject, firmware: JSONObject, nearby: NearbyDevice) {
         if (state.value.updating || state.value.busy) return
+        if (!state.value.androidProgramming) { report(IllegalStateException("El servidor necesita habilitar la programación Android para autorizar paquetes offline.")); return }
         val account = store.session()
         val id = UUID.randomUUID().toString()
         val record = JSONObject().put("id", id).put("state", "preparing").put("offline", true).put("kind", "offline")

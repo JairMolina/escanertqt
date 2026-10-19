@@ -55,13 +55,13 @@ class ApplicationInstrumentedTest {
                 compose.onNodeWithText("Correo de Inventario TQT").performTextInput("android.qa@example.invalid")
                 compose.onNode(hasSetTextAction() and hasText("Contraseña")).performTextInput("Prueba-OTA-2026!")
                 compose.onNodeWithText("Iniciar sesión").performScrollTo().performClick()
-                compose.waitUntil(30000) { compose.onAllNodesWithText("Firmware, al día.").fetchSemanticsNodes().isNotEmpty() }
+                compose.waitUntil(30000) { compose.onAllNodesWithText("Tu inventario TQT.").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithText("android.qa@example.invalid").assertIsDisplayed()
-                compose.waitUntil(30000) { compose.onAllNodesWithText("Seleccionar tarjeta").fetchSemanticsNodes().isNotEmpty() }
+                compose.waitUntil(30000) { compose.onAllNodesWithText("Ver detalle").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithText("Historial").performClick()
                 compose.onNodeWithText("Sincronizar resultados pendientes").assertIsDisplayed().performClick()
-                compose.onNodeWithText("Bluetooth", useUnmergedTree = true).performClick()
-                compose.onNodeWithText("Selecciona una R2 en Tarjetas").assertIsDisplayed()
+                compose.onNodeWithText("Detalle", useUnmergedTree = true).performClick()
+                compose.onNodeWithText("Selecciona una tarjeta en Tarjetas").assertIsDisplayed()
                 compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Revisar y actualizar"))
                 compose.onNodeWithText("Revisar y actualizar").assertIsNotEnabled()
                 java.io.File(app.cacheDir, "tqt-ui.png").outputStream().use { output ->

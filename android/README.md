@@ -1,9 +1,33 @@
-# TQT Android 0.1.0
+# TQT Android 0.2.0
 
 Aplicación nativa privada `com.tqt.ota`: Kotlin, Compose/Material3, Android8/API26
 mínimo, target/compile36. No usa Google Play Services. Pertenece a este repositorio;
 SQLite del servidor sigue siendo el inventario único. La base local solo conserva
 permisos y evidencias cifrados, separados por origen HTTPS y operador.
+
+## Inventario y búsqueda
+
+La consulta utiliza los mismos GET autenticados que la web: `/api/pcb`,
+`/api/pcb/{id}`, `/api/esp32/r2/status` y `/api/esp32/firmwares`. Funciona con el
+servidor actual aunque todavía no publique `/api/android`. No necesita una
+copia ni una migración de la base de producción.
+
+Tarjetas muestra el inventario paginado, con filtros Todas/R1/R2/R3. Escribir
+`11` busca la serie `0011`; `R2 11` limita además el tipo. Acepta el nombre
+completo, MAC y el QR de una PCB. Una etiqueta DYMO de una pareja selecciona su
+R2. El escáner usa [ZXing Android Embedded](https://github.com/journeyapps/zxing-android-embedded)
+4.3.0 (Apache 2.0), sin subir imágenes y sin depender de Google Play Services.
+Al cancelar vuelve a la búsqueda; un QR ajeno muestra una explicación.
+
+La ficha distingue firmware registrado de programación verificada. Para R2,
+la evidencia y el estado proceden del mismo servicio que utiliza la web. Sin
+esa evidencia no se afirma que la tarjeta esté físicamente programada.
+
+Si el servidor no tiene el servicio `/api/android`, la consulta y el catálogo
+siguen disponibles; las nuevas operaciones Android y autorizaciones offline
+quedan deshabilitadas con explicación. Habilitarlas requiere el despliegue
+separado y autorizado del backend preparado. No se sustituyen sus contratos
+ni se mandan resultados a un endpoint diferente.
 
 ## Construir y probar
 
@@ -26,7 +50,9 @@ Un debug APK no se convierte en publicación aprobada por compilar correctamente
 
 ## Operación
 
-1. Iniciar sesión con servidor HTTPS y cuenta habitual; seleccionar R2/firmware.
+1. Iniciar sesión con servidor HTTPS y cuenta habitual; buscar por número/QR,
+   consultar el listado y abrir la ficha. Para programar, seleccionar una R2 y
+   firmware con el servicio Android habilitado.
 2. Permitir Bluetooth cercano (Android12+) o ubicación (Android8–11), buscar y
    seleccionar la unidad física. Revisar el diálogo antes de iniciar.
 3. FW4.2 reutiliza la autorización online existente. La base genérica4.0 mantiene
