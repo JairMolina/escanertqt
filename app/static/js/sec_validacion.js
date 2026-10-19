@@ -366,7 +366,7 @@
         "button",
         { class: "tqt-cardbtn", type: "button", "aria-pressed": String(tarjeta?.id === t.id), "data-id": t.id, onclick: () => selectCard(t) },
         h("div", { class: "tqt-cardbtn-head" }, h("span", { class: "badge" }, "R1"), h("b", { class: "mono" }, t.r1?.nombre || "R1 sin registrar")),
-        h("div", { class: "tqt-cardbtn-meta" }, h("span", null, t.r1?.firmware ? "Programada · FW " + t.r1.firmware : "Sin programar"), h("span", null, "#" + cardNum(t))),
+        h("div", { class: "tqt-cardbtn-meta" }, h("span", null, window.TQT?.programada?.(window.TQT.conFw(t, "r1")) ? "Programada · FW " + window.TQT.conFw(t, "r1").firmware : "Sin programar"), h("span", null, "#" + cardNum(t))),
       );
       return h("li", null, b);
     }

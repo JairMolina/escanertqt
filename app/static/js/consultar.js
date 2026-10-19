@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 h('div', { class: 'fh-meta' }, T.tarjetaBadge(t), h('div', { class: 'hint' }, ORIGEN[d.origen] || ''),
                     h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: nueva }, icon('refresh'), 'Nueva consulta'))));
             cuerpo.append(T.estatusTarjeta(t, { onGuardado: () => { if (state.q) buscar(state.q, false, true); } }));
-            cuerpo.append(h('div', { class: 'fichagrid' }, SLOTS.map((s) => tarjetaPcb(s, t[s], t[s] && leidos.has(t[s].nombre)))));
+            cuerpo.append(h('div', { class: 'fichagrid' }, SLOTS.map((s) => tarjetaPcb(s, T.conFw(t, s), t[s] && leidos.has(t[s].nombre)))));
             cuerpo.append(h('div', { class: 'fichaacts' },
                 h('a', { class: 'btn btn-primary act-main', href: `/dymo?tarjeta_id=${t.id}` }, icon('printer'), 'Etiqueta DYMO'),
                 h('button', { class: 'btn', type: 'button', onclick: () => copiar(resumenTexto(t), 'Datos copiados') }, icon('paste'), 'Copiar datos'),

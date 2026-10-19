@@ -13,7 +13,7 @@
             const { T, api, h, icon, toast, sheet, util } = ctx;
             const P = ctx.params();
             const st = { tars: null, error: '', estado: ['completa', 'incompleta', 'sin_mac', 'r1r2', 'programada', 'validada'].includes(P.get('estado')) ? P.get('estado') : '', q: P.get('q') || '', sort: { id: 'num', dir: 'asc' }, sug: null, limit: 200, abierta: P.get('id') ? +P.get('id') : null, sel: new Set() };
-            const conFw = (t, s) => { const p = t[s]; return p ? Object.assign({}, p, { firmware: p.firmware || t['firmware_' + s] || null }) : null; };
+            const conFw = T.conFw;   // v1.4.8: helper común
 
             const q = h('input', { class: 'input', type: 'search', id: 'tarQ', placeholder: 'Número, serie o MAC', 'aria-label': 'Buscar tarjeta por número, nombre de placa o MAC', 'data-buscar': '1', value: st.q, autocomplete: 'off' });
             const opts = [['', 'Todas'], ...T.TARJETA_ESTADOS.map((g) => [g.key, g.label])];

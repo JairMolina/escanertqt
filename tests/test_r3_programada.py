@@ -82,7 +82,7 @@ class TestR3Programada(unittest.TestCase):
 
     def test_05_frontend(self):
         com = (JS / "common.js").read_text(encoding="utf-8")
-        self.assertIn("(p.tipo === 'R3' || !!p.mac)", com)                     # R3 programada = con firmware
+        self.assertIn("(p.tipo === 'R3' || lleno(p.mac))", com)                     # R3 programada = con firmware
         for f in ("consultar.js", "escritorio.js", "programar.js", "sec_macs.js", "sec_inventario.js", "sec_resumen.js"):
             self.assertNotIn("no lleva MAC ni firmware", (JS / f).read_text(encoding="utf-8"), f)
         macs = (JS / "sec_macs.js").read_text(encoding="utf-8")

@@ -148,8 +148,8 @@
     /** v1.3.52: tarjeta PROGRAMADA = R1, R2 y R3 presentes y las tres programadas (misma regla por placa que `programada`: R1/R2 con MAC y firmware, R3 con firmware).
      *  Es un avance dentro de «completa» (nunca hay programada sin MAC ni sin las 3 placas). Orden: Falta placa → Sin MAC → Programada → Completa. */
     /** v1.3.79: avance de programación sin esperar la R3 (R2 ESP32 → STM32 R1 → ESP32 R1): R1 y R2 con MAC y firmware. */
-    function r1r2Programadas(t) { const x = t || {}; return !!(x.r1 && x.r2) && ['r1', 'r2'].every((r) => programada(Object.assign({}, x[r], { firmware: x[r].firmware || x['firmware_' + r] || null }))); }
-    function tarjetaProgramada(t) { const x = t || {}; return !!(x.r1 && x.r2 && x.r3) && ['r1', 'r2', 'r3'].every((r) => programada(Object.assign({}, x[r], { firmware: x[r].firmware || x['firmware_' + r] || null }))); }
+    function r1r2Programadas(t) { const x = t || {}; return !!(x.r1 && x.r2) && ['r1', 'r2'].every((r) => programada(conFw(x, r))); }
+    function tarjetaProgramada(t) { const x = t || {}; return !!(x.r1 && x.r2 && x.r3) && ['r1', 'r2', 'r3'].every((r) => programada(conFw(x, r))); }
     /** Filtro por estado: 'programada' es derivado; el resto usa estadoTarjeta().key. */
     // 'validada' = t.validada del backend (v1.3.65: confirmada en Pruebas y validación › Placas validadas)
     const cumpleEstado = (t, key) => !key || (key === 'programada' ? tarjetaProgramada(t) : key === 'r1r2' ? r1r2Programadas(t) : key === 'validada' ? !!(t && t.validada) : estadoTarjeta(t).key === key);
@@ -265,7 +265,11 @@
     }
     const tarjetaBadge = (t) => { const e = estadoTarjeta(t); return badge(e.label, e.kind, e.icon); };
     /** R1/R2 con MAC y firmware guardados = programada (v1.3.40). La R3 no lleva MAC: programada = tiene firmware (v1.3.44). */
-    const programada = (p) => !!p && !!p.firmware && (p.tipo === 'R3' || !!p.mac);
+    // v1.4.8: mismo criterio que el servidor (_R1R2_PROGRAMADAS): valores con solo espacios no cuentan.
+    const lleno = (v) => v != null && String(v).trim() !== '';
+    const programada = (p) => !!p && lleno(p.firmware) && (p.tipo === 'R3' || lleno(p.mac));
+    /** v1.4.8: placa `s` ('r1'|'r2'|'r3') de la tarjeta con el firmware heredado de la tarjeta (firmware_rN) si la placa no lo trae. */
+    const conFw = (t, s) => { const p = t && t[s]; return p ? Object.assign({}, p, { firmware: lleno(p.firmware) ? p.firmware : (t['firmware_' + s] || null) }) : null; };
     const cicloBadge = (c, p) => {
         if (programada(p) && (c === 'RECIBIDA' || c === 'DISPONIBLE')) return badge('Programada', 'ok');
         if (programada(p) && c === 'ASIGNADA') return badge('Asignada · programada', 'ok');
@@ -767,7 +771,7 @@
     // ---------------------------------------------------------------- estatus de la tarjeta (v1.3.43, Consultar móvil y escritorio)
     const ymdHoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
     const fechaCorta = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? `${+m[3]} ${MESES[+m[2] - 1].slice(0, 3).toLowerCase()} ${m[1]}` : ''; };
-    /** Estatus de la tarjeta en el ciclo: emparejada → programada (MAC) → completa → entregada. */
+    /** Estatus de la tarjeta en el ciclo: emparejada → programada (MAC + firmware) → completa → entregada. */
     function estatusCiclo(t) {
         const e = estadoTarjeta(t);
         const prog = tarjetaProgramada(t);
@@ -830,7 +834,7 @@
         hydrateIcons, MESES, esc, h, store, api, parseNombre, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
         loteNombre, ordenarLotes, debounce, hora,
-        icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, banner, empty,
+        icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,
         toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, openLotes,
     };
 })();

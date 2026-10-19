@@ -1,5 +1,21 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.8 — 2026-10-19
+- **Auditoría de «programada»: un solo criterio en toda la app** (R1/R2 con MAC y firmware; R3 con firmware; valores con solo espacios no cuentan; el firmware puede venir heredado de la tarjeta `firmware_rN`, igual que la API).
+  - Servidor: `_R1R2_PROGRAMADAS` vive en `db.py` y lo usan el consumo de materiales y el reporte por fecha. El reporte por fecha ya no cuenta como «programada» una tarjeta con solo MAC, solo firmware o solo la R3: exige R1+R2 programadas y que su MAC o firmware se haya guardado en el rango.
+  - Frontend: `T.programada` con trim y nuevo `T.conFw` (firmware heredado), usado por `r1r2Programadas`, `tarjetaProgramada`, Tarjetas, Consultar (móvil) y la ficha rápida de la consola (antes estas dos no veían el firmware heredado). Pruebas TQT mostraba «Programada» con solo el firmware de la R1; ahora usa la regla común.
+  - Programación STM32 y programación por lote ahora avisan a la tarjeta (WS `TARJETA_ACTUALIZADA`) como el resto de la programación.
+- Caché de `common.js`, `sec_tarjetas.js`, `consultar.js`, `escritorio.js`, `sec_validacion.js` y `sec_resumen.js` a `?v=1480`. Pruebas `tests/test_programada_criterio.py`.
+
+## v1.4.7 — 2026-10-19
+- **Inventario TQTR: consumo de materiales por evento** (antes todo se descontaba al quedar la tarjeta «completa»):
+  - Materiales de R1/R2: cuando la R1 y la R2 de la tarjeta quedan **programadas** (MAC + firmware, misma regla que la app).
+  - Materiales de R3: cuando la **R3 se asigna** a su TQT.
+  - Caja Quintalock/Translock, actuador y armado final: cuando se **coloca el gabinete** (ya no exige tarjeta completa).
+  - Si el evento se quita (firmware borrado, R3 retirada, gabinete quitado, desemparejar/borrar), vuelven la caja y el actuador; lo demás queda como consumido. Al volver el evento se reactivan las mismas filas (sin duplicar). Lo marcado «no incluido» en Costos ya no se descuenta.
+- El descuento ocurre al momento (`consumir_por_evento` tras cada aviso de tarjeta, programación STM32, programación por lote y disolver), además de la conciliación al abrir el inventario.
+- Solo desde hoy: la migración `migr_consumo_146` deja en línea base (`inv_tqtr_consumo_base`) lo que ya cumplía un evento sin consumo registrado; lo ya descontado se conserva. Textos de Inventario › Consumo actualizados. Caché `sec_inventario_tqtr.js` a `?v=1470`.
+
 ## v1.4.6 — 2026-10-19
 - **«Cable R3» automático:** al asignar una R3 a una TQT (emparejar, armar o cambiar placa), el servidor encola solo la etiqueta «TQT: 0000 / R3: 0000» en la DYMO compartida (Raspberry); funciona aunque se empareje desde el celular y sin páginas abiertas. Interruptor en Administración › Resumen (ajuste `dymo_cable_r3_auto`, apagado por defecto).
 - Cada pareja TQT + R3 se imprime una vez (tabla `dymo_cable_r3_hechas`); al encender el interruptor, las tarjetas que ya tenían R3 se marcan como hechas. Si la R3 cambia, sale la etiqueta nueva. Sin DYMO compartida en línea no se encola: queda pendiente y se reintenta en la siguiente actualización de esa tarjeta (bitácora `CABLE_R3_AUTO` / `CABLE_R3_SIN_DYMO`). La consola avisa con el evento WS `CABLE_R3_AUTO`.

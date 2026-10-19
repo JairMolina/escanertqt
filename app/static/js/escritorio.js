@@ -355,7 +355,7 @@
         if (t) {
             titulo = `Tarjeta ${t.id_tarjeta_num}`;
             body.append(T.estatusTarjeta(t, { onGuardado: () => { invalidar(); if (RS.ficha) RS.ficha.close(); } }),
-                h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => placaCard(s.toUpperCase(), t[s], false))));
+                h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => placaCard(s.toUpperCase(), window.TQT.conFw(t, s), false))));
             acts.unshift({ label: 'Abrir en Tarjetas', icon: 'card', onClick: () => { ir('tarjetas', { id: t.id }); return true; } });
         } else if (d.serie) {
             titulo = `Número ${d.serie.numero} (sin tarjeta)`;

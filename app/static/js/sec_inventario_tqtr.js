@@ -7,7 +7,7 @@
     'use strict';
     const E = window.TQTEscritorio;
     const B = '/api/inventario-tqtr';
-    const ESTADOS_TARJETA = { activa: ['Completa', 'ok', 'check'], disuelta: ['Disuelta', 'warn', 'unlink'], borrada: ['Borrada', 'bad', 'trash'], pendiente: ['Sin completar', '', 'clock'], anterior: ['Antes del inicio', '', 'clock'] };
+    const ESTADOS_TARJETA = { activa: ['Con consumo', 'ok', 'check'], disuelta: ['Disuelta', 'warn', 'unlink'], borrada: ['Borrada', 'bad', 'trash'], pendiente: ['Sin consumo aún', '', 'clock'], anterior: ['Antes del inicio', '', 'clock'] };
     const ESTADOS_MAT = { activo: ['Consumido', 'ok'], disuelta: ['Consumo de tarjeta disuelta', 'warn'], devuelto: ['Devuelto', ''] };
     const mxnF = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }));
     const numF = (v) => (v === null || v === undefined || v === '' ? '—' : Number(v).toLocaleString('es-MX', { maximumFractionDigits: 3 }));
@@ -26,7 +26,7 @@
             const cab = h('div', { class: 'esc-h' }, h('h2', null, 'Materiales'), T.badge(et[0], et[1], et[2]));
             if (!f.items.length) {
                 cont.replaceChildren(cab, h('p', { class: 'muted' }, f.tarjeta.estado === 'anterior'
-                    ? `Se completó antes del ${f.consumo_desde}, fecha desde la que se descuenta material.` : 'Los materiales de R1 + R2 + R3 se descuentan del inventario cuando la tarjeta queda completa; la caja y el actuador, al asignarle gabinete.'));
+                    ? `Se completó antes del ${f.consumo_desde}, fecha desde la que se descuenta material.` : 'Los materiales se descuentan por evento: los de R1/R2 cuando ambas quedan programadas (MAC + firmware), los de R3 al asignarla a la TQT y la caja, el actuador y el armado final al colocar el gabinete.'));
                 return;
             }
             const inputs = new Map();
@@ -37,7 +37,7 @@
                 if (inp) inputs.set(i.id, inp);
                 return h('tr', { dataset: { estado: i.estado } },
                     h('td', null, h('div', { class: 'itq-mat' }, i.descripcion), i.nota ? h('span', { class: 'muted' }, i.nota) : null),
-                    h('td', { class: 'c-3' }, i.origen === 'placas' ? 'Placas' : 'Gabinete'),
+                    h('td', { class: 'c-3' }, ({ placas: 'R1/R2 programadas', r3: 'R3 asignada', gabinete: 'Gabinete' })[i.origen] || i.origen),
                     h('td', { class: 'num mono' }, numF(i.cantidad_estandar), ' ', h('span', { class: 'muted' }, i.unidad || '')),
                     h('td', { class: 'num' }, inp || h('span', { class: 'mono' }, numF(i.cantidad_real))),
                     h('td', { class: 'num mono', dataset: { k: i.merma > 0 ? 'bad' : i.merma < 0 ? 'ok' : '' } }, i.merma ? (i.merma > 0 ? '+' : '') + numF(i.merma) : '—'),
@@ -183,7 +183,7 @@
                         kpi('Producido', mxn(cs.producido.costo), '', `${cs.producido.tarjetas} tarjeta${cs.producido.tarjetas === 1 ? '' : 's'} completa${cs.producido.tarjetas === 1 ? '' : 's'}`))));
                 }
                 if (d.consumo) {
-                    out.push(bloque(`Consumo de tarjetas completas (desde ${d.consumo.consumo_desde})`, h('div', { class: 'esc-kpis', dataset: { n: 4 } },
+                    out.push(bloque(`Consumo de materiales por tarjeta (desde ${d.consumo.consumo_desde})`, h('div', { class: 'esc-kpis', dataset: { n: 4 } },
                         kpi('Tarjetas con consumo', d.consumo.tarjetas, 'info', d.consumo.disueltas ? `${d.consumo.disueltas} disueltas` : 'ninguna disuelta'),
                         kpi('Costo estándar', mxn(d.consumo.costo_estandar), ''), kpi('Costo real', mxn(d.consumo.costo_real), ''),
                         kpi('Merma', mxn(d.consumo.merma_costo), d.consumo.merma_costo > 0 ? 'warn' : 'ok'))));
@@ -658,17 +658,17 @@
                 if (!valor) { toast('Elige una fecha.', { kind: 'bad' }); return; }
                 const r = await api(`${B}/consumos/parametros`, { method: 'PATCH', body: { consumo_desde: valor } });
                 if (!r.ok) { toast(r.error, { kind: 'bad' }); return; }
-                toast(`Se descuenta material de tarjetas completadas desde el ${valor}`, { kind: 'ok' }); st.cons = r.data; st.dash = null; st.conf = null; cargar();
+                toast(`Se descuenta material de los eventos desde el ${valor}`, { kind: 'ok' }); st.cons = r.data; st.dash = null; st.conf = null; cargar();
             }
             function vistaConsumo() {
                 const cs = st.cons; const t = cs.totales;
                 const desde = h('input', { class: 'input', type: 'date', id: 'itqDesdeC', value: cs.consumo_desde || '' });
                 const out = [h('div', { class: 'esc-bar' },
-                    h('p', { class: 'muted grow' }, 'Al quedar completa una tarjeta (R1 + R2 + R3 y MAC) se descuentan sus materiales; con gabinete asignado, también la caja y el actuador. Si se desempareja o se borra, solo vuelven la caja y el actuador.'),
+                    h('p', { class: 'muted grow' }, 'Los materiales se descuentan por evento: R1/R2 al quedar programadas (MAC + firmware), R3 al asignarla a su TQT y la caja (Quintalock/Translock), el actuador y el armado final al colocar el gabinete. Si se quita el evento, se desempareja o se borra, solo vuelven la caja y el actuador.'),
                     h('label', { class: 'itq-fecha', for: 'itqDesdeC' }, h('span', { class: 'muted' }, 'Contar desde'), desde),
                     h('button', { class: 'btn', type: 'button', onclick: () => guardarDesde(desde.value) }, 'Aplicar'))];
                 out.push(h('div', { class: 'esc-kpis', dataset: { n: 4 } },
-                    kpi('Tarjetas completas', t.tarjetas, 'info', t.disueltas ? `${t.disueltas} disueltas o borradas` : 'ninguna disuelta'),
+                    kpi('Tarjetas con consumo', t.tarjetas, 'info', t.disueltas ? `${t.disueltas} disueltas o borradas` : 'ninguna disuelta'),
                     kpi('Costo estándar', mxn(t.costo_estandar), ''), kpi('Costo real', mxn(t.costo_real), ''),
                     kpi('Merma', mxn(t.merma_costo), t.merma_costo > 0 ? 'warn' : 'ok', 'real − estándar')));
                 const COLS = [
@@ -685,7 +685,7 @@
                 st.usort = st.usort || { id: 'fecha_finalizado', dir: 'desc' };
                 const pintarT = () => util.pintarTabla(tw, { cols: COLS, rows: cs.items, key: (x) => x.tarjeta_id, sort: st.usort, onSort: (id) => { st.usort = util.alternarOrden(st.usort, id); pintarT(); },
                     onOpen: abrirFicha, label: (x) => `Tarjeta ${x.tarjeta_num}`, caption: 'Consumo de material por tarjeta',
-                    vacio: { icono: 'list', titulo: 'Todavía no hay consumos', texto: `Aparecen cuando una tarjeta queda completa a partir del ${cs.consumo_desde}.` } });
+                    vacio: { icono: 'list', titulo: 'Todavía no hay consumos', texto: `Aparecen cuando se programan R1/R2, se asigna una R3 o se coloca un gabinete a partir del ${cs.consumo_desde}.` } });
                 pintarT();
                 out.push(tw);
                 return out;
@@ -744,7 +744,7 @@
                     h('ul', { class: 'itq-lista itq-compacta' }, st.conf.modelos.map((m) => h('li', null, m))));
                 const dIn = h('input', { class: 'input', type: 'date', id: 'cfgDesde', value: st.conf.consumo_desde || '', 'aria-label': 'Fecha desde la que se descuenta material' });
                 const consumo = h('section', { class: 'esc-card' }, h('div', { class: 'esc-h' }, h('h2', null, 'Consumo por tarjeta')),
-                    h('p', { class: 'muted' }, 'Solo las tarjetas completadas desde esta fecha descuentan material del inventario.'),
+                    h('p', { class: 'muted' }, 'Las tarjetas completadas antes de esta fecha no descuentan material del inventario.'),
                     h('div', { class: 'row' }, dIn, h('button', { class: 'btn', type: 'button', onclick: () => guardarDesde(dIn.value) }, 'Aplicar')));
                 const cv = st.conf.conversiones || {};
                 const cvIn = (id, k) => h('input', { class: 'input mono', type: 'number', id, min: '0', step: 'any', value: cv[k] ?? '' });

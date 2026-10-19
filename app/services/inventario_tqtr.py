@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.database import db
-from app.database.db import _TARJETA_COMPLETA, ConflictoError, NoEncontradoError
+from app.database.db import _R1R2_PROGRAMADAS, _TARJETA_COMPLETA, ConflictoError, NoEncontradoError
 
 SEMILLA = Path(__file__).resolve().parent.parent / "data_seed" / "inventario_tqtr.json"
 SEMILLA_COSTOS = Path(__file__).resolve().parent.parent / "data_seed" / "inventario_tqtr_costos.json"
@@ -983,16 +983,33 @@ NOTA_DISUELTA = "Consumo de tarjeta disuelta"
 NOTA_DEVUELTO = "Devuelto al inventario"
 
 
+# v1.4.6: cada material se descuenta en su evento (`origen`):
+#   placas   = materiales de R1/R2: cuando la R1 y la R2 de la tarjeta quedan programadas (MAC + firmware);
+#   r3       = materiales de R3: cuando la R3 se asigna a su TQT;
+#   gabinete = caja (Quintalock/Translock), actuador y lo demás del armado final: cuando se coloca el gabinete.
+ORIGENES = ("placas", "r3", "gabinete")
+
+
+def _origen(grupo: str, origen_consumo: Optional[str]) -> str:
+    if origen_consumo == "gabinete":
+        return "gabinete"
+    if grupo in ("R1", "R2"):
+        return "placas"
+    if grupo == "R3":
+        return "r3"
+    return origen_consumo if origen_consumo in ORIGENES else "gabinete"
+
+
 def _estandar(c) -> List[Dict[str, Any]]:
-    """Materiales estándar por armado: filas de costos ligadas a un componente con cantidad > 0."""
+    """Materiales estándar por armado: filas de costos «incluidas» ligadas a un componente con cantidad > 0."""
     out = []
     for r in c.execute("SELECT k.*, comp.descripcion AS comp_desc FROM inv_tqtr_costos k JOIN inv_tqtr_componentes comp ON comp.id = k.componente_id "
                        "ORDER BY k.orden, k.id"):
         q = r["cantidad_consumo"] if r["cantidad_consumo"] is not None else r["cantidad_armado"]
-        if not q or q <= 0:
+        if not q or q <= 0 or not r["incluido"]:   # v1.4.6: lo marcado «no incluido» en Costos no se descuenta
             continue
         out.append({"componente_id": r["componente_id"], "costo_id": r["id"], "descripcion": r["comp_desc"], "cantidad": q,
-                    "origen": r["origen_consumo"] or ("placas" if r["grupo"] in ("R1", "R2", "R3") else "gabinete"), "variante": r["variante"] or "",
+                    "origen": _origen(r["grupo"], r["origen_consumo"]), "variante": r["variante"] or "",
                     "devolvible": 1 if (r["variante"] or r["comp_desc"] == ACTUADOR) else 0})
     return out
 
@@ -1013,14 +1030,42 @@ def _tarjetas(c) -> Dict[int, Dict[str, Any]]:
     if not _tabla_existe(c, "tarjetas_produccion"):
         return {}
     return {r["id"]: dict(r) for r in c.execute(
-        f"SELECT id, id_tarjeta_num, lote_id, gabinete, fecha_finalizado, CASE WHEN {_TARJETA_COMPLETA} THEN 1 ELSE 0 END AS completa "
+        f"SELECT id, id_tarjeta_num, lote_id, gabinete, fecha_finalizado, CASE WHEN {_TARJETA_COMPLETA} THEN 1 ELSE 0 END AS completa, "
+        f"CASE WHEN {_R1R2_PROGRAMADAS} THEN 1 ELSE 0 END AS programada, CASE WHEN pcb_r3_id IS NOT NULL THEN 1 ELSE 0 END AS con_r3 "
         "FROM tarjetas_produccion")}
+
+
+
+
+def _condiciones(t: Dict[str, Any]) -> Dict[str, bool]:
+    return {"placas": bool(t["programada"]), "r3": bool(t["con_r3"]), "gabinete": t["gabinete"] in VARIANTES}
+
+
+def _migrar_146(c, tarjetas: Dict[int, Dict[str, Any]]) -> None:
+    """v1.4.6: paso del consumo «por tarjeta completa» al consumo por evento, solo desde hoy. Lo que a la fecha ya cumple un evento
+    y no tiene consumo registrado queda en la línea base (no se descuenta); lo ya descontado se conserva."""
+    c.execute("CREATE TABLE IF NOT EXISTS inv_tqtr_consumo_base (tarjeta_id INTEGER NOT NULL, origen TEXT NOT NULL, valor TEXT NOT NULL DEFAULT '', "
+              "creado_en TEXT NOT NULL DEFAULT (datetime('now','localtime')), PRIMARY KEY (tarjeta_id, origen))")
+    if c.execute("SELECT 1 FROM inv_tqtr_meta WHERE clave='migr_consumo_146'").fetchone() or not _tabla_existe(c, "tarjetas_produccion"):
+        return   # sin tabla de tarjetas todavía no se marca: la línea base se toma cuando exista
+    c.execute("UPDATE inv_tqtr_consumos SET origen='r3' WHERE origen='placas' AND costo_id IN "
+              "(SELECT id FROM inv_tqtr_costos WHERE grupo='R3' AND COALESCE(origen_consumo,'') <> 'gabinete')")
+    hay = {(r["tarjeta_id"], r["origen"]) for r in c.execute("SELECT DISTINCT tarjeta_id, origen FROM inv_tqtr_consumos WHERE estado IN ('activo','disuelta')")}
+    for t in tarjetas.values():
+        for origen, ok in _condiciones(t).items():
+            # ya cumplía el evento o ya tenía consumo del modelo anterior (p. ej. completa con MAC pero sin firmware): no se toca
+            if ok or (t["id"], origen) in hay:
+                c.execute("INSERT OR IGNORE INTO inv_tqtr_consumo_base (tarjeta_id, origen, valor) VALUES (?,?,?)",
+                          (t["id"], origen, t["gabinete"] if origen == "gabinete" else ""))
+    c.execute("INSERT OR REPLACE INTO inv_tqtr_meta (clave, valor) VALUES ('migr_consumo_146', datetime('now','localtime'))")
 
 
 def _sincronizar(c) -> Dict[str, int]:
     _asegurar_trigger(c)  # por si la BD de producción se creó después de preparar el inventario
     desde = _consumo_desde(c)
     tarjetas = _tarjetas(c)
+    _migrar_146(c, tarjetas)
+    base = {(r["tarjeta_id"], r["origen"]): r["valor"] for r in c.execute("SELECT * FROM inv_tqtr_consumo_base")}
     est = _estandar(c)
     filas: Dict[int, List[Dict[str, Any]]] = {}
     for r in c.execute("SELECT * FROM inv_tqtr_consumos"):
@@ -1047,13 +1092,14 @@ def _sincronizar(c) -> Dict[str, int]:
                 else:
                     poner(f, "disuelta", f["nota"] or NOTA_DISUELTA); cambios["disueltos"] += 1
 
-    # Tarjetas completadas y borradas sin conciliar (las anota el trigger): sus placas ya se usaron
+    # Tarjetas completadas y borradas sin conciliar (las anota el trigger): sus placas (R1/R2 y R3) ya se usaron
     for b in [dict(r) for r in c.execute("SELECT * FROM inv_tqtr_tarjetas_borradas")]:
         tid = b["tarjeta_id"]
-        if tid not in tarjetas and not filas.get(tid) and b["fecha_finalizado"] and b["fecha_finalizado"] >= desde:
+        if tid not in tarjetas and not filas.get(tid) and b["fecha_finalizado"] and b["fecha_finalizado"] >= desde \
+                and (tid, "placas") not in base:
             tb = {"id": tid, "id_tarjeta_num": b["id_tarjeta_num"], "lote_id": b["lote_id"]}
             for e in est:
-                if e["origen"] == "placas":
+                if e["origen"] in ("placas", "r3"):
                     crear(tb, e)
             filas[tid] = [dict(r) for r in c.execute("SELECT * FROM inv_tqtr_consumos WHERE tarjeta_id=?", (tid,))]
         c.execute("DELETE FROM inv_tqtr_tarjetas_borradas WHERE tarjeta_id=?", (tid,))
@@ -1066,38 +1112,62 @@ def _sincronizar(c) -> Dict[str, int]:
             if lista:
                 c.execute("DELETE FROM inv_tqtr_consumos WHERE tarjeta_id=?", (tid,)); cambios["excluidos"] += len(lista)
             continue
-        if not (t["completa"] and t["fecha_finalizado"]):
-            if not lista and t["fecha_finalizado"]:
-                # Se completó (fecha sellada) y se desarmó entre dos sincronizaciones: sus materiales de placas ya se usaron.
-                for e in est:
-                    if e["origen"] == "placas":
-                        crear(t, e)
-                lista = [dict(r) for r in c.execute("SELECT * FROM inv_tqtr_consumos WHERE tarjeta_id=?", (tid,))]
-            disolver(lista)
-            continue
+        cond = _condiciones(t)
+        gab = t["gabinete"] if cond["gabinete"] else None
         por_comp = {f["componente_id"]: f for f in lista}
-        gab = t["gabinete"] if t["gabinete"] in VARIANTES else None
-        deseados = [e for e in est if e["origen"] == "placas" or (gab and e["variante"] in ("", gab))]
-        ids_deseados = {e["componente_id"] for e in deseados}
-        for e in deseados:
-            f = por_comp.get(e["componente_id"])
-            if f is None:
-                crear(t, e)
-            elif f["estado"] != "activo":
-                poner(f, "activo", ""); cambios["reactivados"] += 1
-        for f in lista:  # cambio o retiro de gabinete: vuelven la caja anterior y (sin gabinete) el actuador
-            if f["origen"] == "gabinete" and f["estado"] == "activo" and f["componente_id"] not in ids_deseados and f["devolvible"]:
-                poner(f, "devuelto", NOTA_DEVUELTO); cambios["devueltos"] += 1
+        for origen in ORIGENES:
+            propias = [f for f in lista if f["origen"] == origen]
+            if (tid, origen) in base:   # ya cumplía este evento antes de v1.4.6: no se descuenta (nunca se disuelve lo ya descontado)
+                if origen != "gabinete":
+                    continue
+                if not gab:   # se quitó el gabinete: vuelven la caja y el actuador que sí se descontaron
+                    disolver(propias)
+                    continue
+                if gab == base[(tid, origen)]:   # regresó al gabinete de la línea base: vuelve la caja de otro gabinete
+                    for f in propias:
+                        if f["estado"] == "activo" and f["devolvible"] and f["variante"] not in ("", gab):
+                            poner(f, "devuelto", NOTA_DEVUELTO); cambios["devueltos"] += 1
+                    continue
+                deseados = [e for e in est if e["origen"] == "gabinete" and e["variante"] == gab]   # cambió de gabinete: solo la caja nueva
+            elif cond[origen]:
+                deseados = [e for e in est if e["origen"] == origen and (origen != "gabinete" or e["variante"] in ("", gab))]
+            else:
+                disolver(propias)   # se quitó el evento (desprogramar, quitar R3 o gabinete): vuelve lo devolvible
+                continue
+            ids_deseados = {e["componente_id"] for e in deseados}
+            for e in deseados:
+                f = por_comp.get(e["componente_id"])
+                if f is None:
+                    crear(t, e)
+                elif f["estado"] != "activo":
+                    poner(f, "activo", ""); cambios["reactivados"] += 1
+            for f in propias:  # cambio de gabinete: vuelve la caja anterior
+                if origen == "gabinete" and f["estado"] == "activo" and f["componente_id"] not in ids_deseados and f["devolvible"]:
+                    poner(f, "devuelto", NOTA_DEVUELTO); cambios["devueltos"] += 1
     return cambios
 
 
 def sincronizar_consumos(db_path: Optional[Path] = None) -> Dict[str, int]:
-    """Concilia tarjetas completas / gabinetes con los consumos (idempotente). Se llama antes de cada lectura del inventario."""
+    """Concilia los eventos de las tarjetas (R1+R2 programadas, R3 asignada, gabinete) con los consumos (idempotente).
+    Se llama antes de cada lectura del inventario y, desde v1.4.6, después de cada cambio de placas, programación o gabinete."""
     asegurar(db_path)
     with db.transaction(db_path) as c:
         cambios = _sincronizar(c)
     revisar_alertas(db_path)  # las tarjetas completas mueven existencias: aviso de stock mínimo una vez por cruce
     return cambios
+
+
+_LOCK_EVENTO = threading.Lock()
+
+
+def consumir_por_evento(db_path: Optional[Path] = None) -> None:
+    """v1.4.6: descuento inmediato tras programar, asignar R3/placas, poner gabinete o disolver. Nunca rompe la operación que lo llama.
+    Serializado: dos avisos simultáneos no compiten por escribir la BD (la conciliación es idempotente)."""
+    try:
+        with _LOCK_EVENTO:
+            sincronizar_consumos(db_path)
+    except Exception:
+        logging.getLogger("escaner_tqt.inventario_tqtr").exception("No se pudo conciliar el consumo de materiales")
 
 
 def _filas_costeadas(c, where: str = "", args: tuple = ()) -> List[Dict[str, Any]]:
@@ -1125,7 +1195,7 @@ def _estado_tarjeta(t: Optional[Dict[str, Any]], filas: List[Dict[str, Any]], de
         return "borrada"
     if t["fecha_finalizado"] and t["fecha_finalizado"] < desde:
         return "anterior"
-    if t["completa"] and t["fecha_finalizado"]:
+    if any(isinstance(f, dict) and f.get("estado") == "activo" for f in filas):   # v1.4.6: con algún material descontado
         return "activa"
     return "disuelta" if filas else "pendiente"
 
@@ -1182,8 +1252,9 @@ def editar_materiales_tarjeta(tarjeta_id: int, items: List[Dict[str, Any]], db_p
     sincronizar_consumos(db_path)
     with db.transaction(db_path) as c:
         t = _tarjetas(c).get(tarjeta_id)
-        if not t or _estado_tarjeta(t, [1], _param(c, "consumo_desde", "")) != "activa":
-            raise ValueError("Solo se editan los materiales de una tarjeta completa.")
+        activas = [dict(r) for r in c.execute("SELECT estado FROM inv_tqtr_consumos WHERE tarjeta_id=?", (tarjeta_id,))]
+        if not t or _estado_tarjeta(t, activas, _param(c, "consumo_desde", "")) != "activa":
+            raise ValueError("Solo se editan los materiales ya descontados de una tarjeta.")
         for it in items or []:
             f = c.execute("SELECT * FROM inv_tqtr_consumos WHERE tarjeta_id=? AND (id=? OR componente_id=?)",
                           (tarjeta_id, it.get("id") or -1, it.get("componente_id") or -1)).fetchone()

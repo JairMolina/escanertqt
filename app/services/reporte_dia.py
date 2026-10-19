@@ -66,10 +66,13 @@ def tarjetas_del_dia(fecha: str, db_path: Optional[Path] = None) -> Dict[str, An
     return tarjetas_del_rango(fecha, fecha, db_path)
 
 
-# v1.3.79: tarjetas con programación en el rango (MAC o firmware guardado en R1/R2/R3). escaneos.creado_en está en UTC: se compara en hora local.
-_PROGRAMADAS = ("SELECT DISTINCT t2.id FROM escaneos e JOIN pcb_inventario p ON p.nombre = e.valor "
-                "JOIN tarjetas_produccion t2 ON p.id IN (t2.pcb_r1_id, t2.pcb_r2_id, t2.pcb_r3_id) "
-                "WHERE e.evento IN ('MAC_GUARDADA', 'FIRMWARE_GUARDADO') AND date(e.creado_en, 'localtime') BETWEEN ? AND ?")
+# v1.3.79: tarjetas con programación en el rango. escaneos.creado_en está en UTC: se compara en hora local.
+# v1.4.8: solo cuentan si hoy tienen R1 y R2 programadas (MAC + firmware, mismo criterio que la app) y la MAC o el firmware
+# de su R1 o R2 se guardó en el rango (antes contaba cualquier MAC o firmware suelto, incluso de la R3).
+_PROGRAMADAS = ("SELECT DISTINCT tarjetas_produccion.id FROM escaneos e JOIN pcb_inventario p ON p.nombre = e.valor "
+                "JOIN tarjetas_produccion ON p.id IN (tarjetas_produccion.pcb_r1_id, tarjetas_produccion.pcb_r2_id) "
+                "WHERE e.evento IN ('MAC_GUARDADA', 'FIRMWARE_GUARDADO') AND date(e.creado_en, 'localtime') BETWEEN ? AND ? "
+                f"AND {db._R1R2_PROGRAMADAS}")
 
 
 def tarjetas_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optional[Path] = None) -> Dict[str, Any]:

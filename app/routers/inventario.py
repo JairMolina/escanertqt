@@ -33,7 +33,7 @@ from app.database.models import (
     VersionMasiva,
 )
 from app.routers.ws import manager
-from app.services import cable_r3_auto, firmware_build, esp32_firmware, usuarios
+from app.services import cable_r3_auto, inventario_tqtr, firmware_build, esp32_firmware, usuarios
 from app.services.admin_dep import admin_si_habilitado
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,8 @@ def _conteos() -> Dict[str, int]:
         return inv.conteos_recepcion(c)
 
 
-async def _notificar_tarjeta(tarjeta: Optional[Dict[str, Any]], evento: str = "TARJETA_ACTUALIZADA", mensaje: Optional[str] = None) -> None:
+async def _notificar_tarjeta(tarjeta: Optional[Dict[str, Any]], evento: str = "TARJETA_ACTUALIZADA", mensaje: Optional[str] = None,
+                             consumir: bool = True) -> None:
     if not tarjeta:
         return
     stats = await run_in_threadpool(db.get_stats, tarjeta["lote_id"])
@@ -72,6 +73,8 @@ async def _notificar_tarjeta(tarjeta: Optional[Dict[str, Any]], evento: str = "T
     if mensaje:
         datos["mensaje"] = mensaje
     await manager.broadcast(evento, datos)
+    if consumir:
+        await run_in_threadpool(inventario_tqtr.consumir_por_evento)   # v1.4.6: materiales por evento (programada, R3, gabinete)
     cable = await run_in_threadpool(cable_r3_auto.al_notificar, tarjeta)   # v1.4.6: «Cable R3» automático
     if cable:
         await manager.broadcast("CABLE_R3_AUTO", {"tarjeta_id": tarjeta["id"], **cable})
@@ -237,6 +240,9 @@ async def post_programacion_lote(payload: ProgramacionLote):
     res = await _run(inv.programar_lote, [i.model_dump() for i in payload.items], payload.simular, payload.operador)
     if res["guardadas"] and not payload.simular:
         await manager.broadcast("PCB_ACTUALIZADA", {"pcbs": [f["pcb"] for f in res["resultados"] if f["ok"]], "conteos": await run_in_threadpool(_conteos)})
+        await run_in_threadpool(inventario_tqtr.consumir_por_evento)   # v1.4.6: una conciliación para todo el lote
+        for tid in {f["pcb"].get("tarjeta_id") for f in res["resultados"] if f["ok"] and f.get("pcb")} - {None}:   # v1.4.8: avisa cada tarjeta
+            await _notificar_tarjeta(await run_in_threadpool(db.get_tarjeta_by_id, tid), consumir=False)
     for f in res["resultados"]:
         f.pop("pcb", None)     # la respuesta lleva solo lo necesario por fila
     return res
@@ -319,6 +325,7 @@ async def asignar_pcb(tarjeta_id: int, payload: AsignarPCB):
 @router.post("/tarjetas/disolver", summary="Desemparejar varias tarjetas (elegidas o todas las del lote)")
 async def disolver_tarjetas(payload: DisolverMasivo):
     r = await _run(inv.disolver_masivo, payload.ids, payload.todas, payload.lote_id, payload.forzar, payload.operador)
+    await run_in_threadpool(inventario_tqtr.consumir_por_evento)   # v1.4.6: vuelve lo devolvible
     lotes = {d["lote_id"] for d in r["disueltas"]}
     for lid in lotes:
         stats = await run_in_threadpool(db.get_stats, lid)
@@ -329,6 +336,7 @@ async def disolver_tarjetas(payload: DisolverMasivo):
 @router.delete("/tarjetas/{tarjeta_id}", summary="Disolver una tarjeta y liberar sus PCB")
 async def disolver_tarjeta(tarjeta_id: int, forzar: bool = Query(False)):
     resultado = await _run(inv.disolver_tarjeta, tarjeta_id, forzar)
+    await run_in_threadpool(inventario_tqtr.consumir_por_evento)   # v1.4.6: vuelve lo devolvible
     stats = await run_in_threadpool(db.get_stats, resultado["lote_id"])
     await manager.broadcast("TARJETA_ACTUALIZADA", {"eliminada": True, **resultado, "stats": stats})
     return resultado

@@ -225,22 +225,46 @@ class TestConsumoTarjetas(unittest.TestCase):
     def disp(self, desc):
         return next(f for f in svc.dashboard(db_path=self.path)["componentes"] if f["descripcion"] == desc)["disponible"]
 
-    def tarjeta(self):
+    def tarjeta(self, r3=True, firmware=True):
+        """Tarjeta NUEVA con MAC; `firmware=True` programa R1 y R2 (evento «placas»). Antes se asegura la migración v1.4.6
+        (primer sync) para que la tarjeta no caiga en la línea base."""
         from _aislamiento import crear_par
-        return crear_par(r3=True, path=self.path)
+        from app.database import inventario as inv
+        svc.sincronizar_consumos(self.path)
+        t = crear_par(r3=r3, path=self.path)
+        if firmware:
+            self.programar(t)
+        return t
 
-    def test_01_completar_descuenta_placas(self):
-        base = {d: self.disp(d) for d in ("PCB TQT-R1 V2.0 | PRINCIPAL", "Cable calibre 22 | R3 | Rojo", "Relevador automotriz 12 VCD | R2", ACT)}
-        t = self.tarjeta()
+    def programar(self, t, fw="1.0"):
+        from app.database import inventario as inv
+        for k in ("pcb_r1_id", "pcb_r2_id"):
+            inv.set_firmware(t[k], fw, db_path=self.path)
+
+    def estados(self, tid):
+        return {i["descripcion"]: i["estado"] for i in svc.materiales_tarjeta(tid, db_path=self.path)["items"]}
+
+    def test_01_programar_descuenta_placas_y_r3(self):
+        """v1.4.6: R1+R2 con MAC y firmware descuentan placas; la R3 asignada, sus materiales."""
+        from app.database import inventario as inv
+        D = ("PCB TQT-R1 V2.0 | PRINCIPAL", "Cable calibre 22 | R3 | Rojo", "Relevador automotriz 12 VCD | R2", ACT)
+        base = {d: self.disp(d) for d in D}
+        t = self.tarjeta(firmware=False)  # MAC sin firmware: solo la R3 asignada consume
+        self.assertEqual(self.disp("PCB TQT-R1 V2.0 | PRINCIPAL"), base["PCB TQT-R1 V2.0 | PRINCIPAL"])
+        self.assertEqual(self.disp("Relevador automotriz 12 VCD | R2"), base["Relevador automotriz 12 VCD | R2"])
+        self.assertAlmostEqual(self.disp("Cable calibre 22 | R3 | Rojo"), base["Cable calibre 22 | R3 | Rojo"] - 0.55)
+        inv.set_firmware(t["pcb_r1_id"], "1.0", db_path=self.path)  # solo R1 programada: aún no
+        self.assertEqual(self.disp("PCB TQT-R1 V2.0 | PRINCIPAL"), base["PCB TQT-R1 V2.0 | PRINCIPAL"])
+        inv.set_firmware(t["pcb_r2_id"], "1.0", db_path=self.path)
         self.assertEqual(self.disp("PCB TQT-R1 V2.0 | PRINCIPAL"), base["PCB TQT-R1 V2.0 | PRINCIPAL"] - 1)
-        self.assertAlmostEqual(self.disp("Cable calibre 22 | R3 | Rojo"), base["Cable calibre 22 | R3 | Rojo"] - 0.55)  # estándar de Costos
         self.assertEqual(self.disp("Relevador automotriz 12 VCD | R2"), base["Relevador automotriz 12 VCD | R2"] - 4)
         self.assertEqual(self.disp(ACT), base[ACT])  # sin gabinete no se toca el actuador
         f = svc.materiales_tarjeta(t["id"], db_path=self.path)
         self.assertTrue(f["editable"])
-        self.assertEqual({i["origen"] for i in f["items"]}, {"placas"})
+        self.assertEqual({i["origen"] for i in f["items"]}, {"placas", "r3"})
         svc.sincronizar_consumos(self.path); svc.sincronizar_consumos(self.path)  # idempotente
         self.assertEqual(self.disp("PCB TQT-R1 V2.0 | PRINCIPAL"), base["PCB TQT-R1 V2.0 | PRINCIPAL"] - 1)
+        self.assertAlmostEqual(self.disp("Cable calibre 22 | R3 | Rojo"), base["Cable calibre 22 | R3 | Rojo"] - 0.55)
 
     def test_02_gabinete_y_cambio(self):
         from app.database import inventario as inv
@@ -267,17 +291,24 @@ class TestConsumoTarjetas(unittest.TestCase):
 
     def test_04_desemparejar_y_borrar_devuelven_solo_actuador_y_gabinete(self):
         from app.database import inventario as inv
-        base = {d: self.disp(d) for d in (ACT, CT, "PCB TQT-R3 V2.0 | TIMER", "Sensor magnético CS1-U")}
+        base = {d: self.disp(d) for d in (ACT, CT, "PCB TQT-R3 V2.0 | TIMER", "PCB TQT-R1 V2.0 | PRINCIPAL")}
         t = self.tarjeta()
         inv.actualizar_datos_tarjeta(t["id"], {"gabinete": "Translock"}, db_path=self.path)
         self.assertEqual(self.disp(ACT), base[ACT] - 1)  # sincronizado con gabinete
-        inv.asignar_pcb(t["id"], "R3", None, db_path=self.path)  # deja de estar completa
+        inv.asignar_pcb(t["id"], "R3", None, db_path=self.path)  # sin R3: sus materiales quedan consumidos; el gabinete sigue puesto
+        self.assertEqual((self.disp(ACT), self.disp(CT)), (base[ACT] - 1, base[CT] - 1))
+        self.assertEqual(self.disp("PCB TQT-R3 V2.0 | TIMER"), base["PCB TQT-R3 V2.0 | TIMER"] - 1)  # queda consumida (disuelta)
+        self.assertTrue(any(i["estado"] == "disuelta" and i["nota"] == svc.NOTA_DISUELTA and i["origen"] == "r3"
+                            for i in svc.materiales_tarjeta(t["id"], db_path=self.path)["items"]))
+        inv.actualizar_datos_tarjeta(t["id"], {"gabinete": ""}, db_path=self.path)  # sin gabinete vuelve solo lo devolvible
         self.assertEqual((self.disp(ACT), self.disp(CT)), (base[ACT], base[CT]))
-        self.assertEqual(self.disp("PCB TQT-R3 V2.0 | TIMER"), base["PCB TQT-R3 V2.0 | TIMER"] - 1)  # queda consumida
-        self.assertEqual(self.disp("Sensor magnético CS1-U"), base["Sensor magnético CS1-U"] - 3)
+        f = svc.materiales_tarjeta(t["id"], db_path=self.path)
+        self.assertEqual(f["tarjeta"]["estado"], "activa")  # las placas siguen descontadas
+        # desemparejar R1: todo queda disuelto
+        inv.asignar_pcb(t["id"], "R1", None, db_path=self.path)
         f = svc.materiales_tarjeta(t["id"], db_path=self.path)
         self.assertEqual(f["tarjeta"]["estado"], "disuelta"); self.assertFalse(f["editable"])
-        self.assertTrue(any(i["estado"] == "disuelta" and i["nota"] == svc.NOTA_DISUELTA for i in f["items"]))
+        self.assertEqual(self.disp("PCB TQT-R1 V2.0 | PRINCIPAL"), base["PCB TQT-R1 V2.0 | PRINCIPAL"] - 1)
         # tarjeta borrada (disuelta desde Tarjetas)
         t2 = self.tarjeta()
         inv.actualizar_datos_tarjeta(t2["id"], {"gabinete": "Translock"}, db_path=self.path)
@@ -300,13 +331,19 @@ class TestConsumoTarjetas(unittest.TestCase):
         with self.assertRaises(ValueError):
             svc.editar_consumo_desde("31/12/2019", db_path=self.path)
 
-    def test_06_completada_y_desarmada_entre_sincronizaciones(self):
+    def test_06_programada_y_desarmada_entre_sincronizaciones(self):
+        """Por evento: lo que se programa y se deshace sin que nadie sincronice entre medio nunca llegó a descontarse
+        (en la app cada cambio sincroniza); si se sincroniza mientras está programada, queda 'disuelta' al desarmar."""
         from app.database import inventario as inv
         base = self.disp("PCB TQT-R2 V2.0 | RESPALDO")
-        t = self.tarjeta()
-        inv.asignar_pcb(t["id"], "R1", None, db_path=self.path)  # nadie abrió el inventario mientras estuvo completa
+        t = self.tarjeta(r3=False, firmware=False)
+        self.programar(t, "2.0"); inv.asignar_pcb(t["id"], "R1", None, db_path=self.path)
+        self.assertEqual(self.disp("PCB TQT-R2 V2.0 | RESPALDO"), base)
+        t2 = self.tarjeta(r3=False)
         self.assertEqual(self.disp("PCB TQT-R2 V2.0 | RESPALDO"), base - 1)
-        self.assertEqual(svc.materiales_tarjeta(t["id"], db_path=self.path)["tarjeta"]["estado"], "disuelta")
+        inv.asignar_pcb(t2["id"], "R1", None, db_path=self.path)
+        self.assertEqual(self.disp("PCB TQT-R2 V2.0 | RESPALDO"), base - 1)
+        self.assertEqual(svc.materiales_tarjeta(t2["id"], db_path=self.path)["tarjeta"]["estado"], "disuelta")
 
     def test_08_borrada_sin_abrir_la_consola(self):
         from app.database import db, inventario as inv
@@ -323,6 +360,71 @@ class TestConsumoTarjetas(unittest.TestCase):
         self.assertEqual((self.disp(ACT), self.disp(CT)), (base[ACT], base[CT]))  # caja y actuador devueltos
         estados = {i["tarjeta_id"]: i["estado"] for i in svc.consumos(db_path=self.path)["items"]}
         self.assertEqual((estados[t["id"]], estados[t2["id"]]), ("borrada", "borrada"))
+
+    # ------------------------------------------------------------------ v1.4.6: consumo por evento
+    def test_10_r3_sin_placas_programadas(self):
+        base = {d: self.disp(d) for d in ("PCB TQT-R3 V2.0 | TIMER", "Silicón P-53 | R3", "PCB TQT-R1 V2.0 | PRINCIPAL")}
+        t = self.tarjeta(firmware=False)
+        self.assertEqual(self.disp("PCB TQT-R3 V2.0 | TIMER"), base["PCB TQT-R3 V2.0 | TIMER"] - 1)
+        self.assertEqual(self.disp("Silicón P-53 | R3"), base["Silicón P-53 | R3"] - 100)
+        self.assertEqual(self.disp("PCB TQT-R1 V2.0 | PRINCIPAL"), base["PCB TQT-R1 V2.0 | PRINCIPAL"])
+        self.assertEqual({i["origen"] for i in svc.materiales_tarjeta(t["id"], db_path=self.path)["items"]}, {"r3"})
+        t2 = self.tarjeta(r3=False)  # sin R3 no se descuenta nada de R3
+        self.assertEqual(self.disp("PCB TQT-R3 V2.0 | TIMER"), base["PCB TQT-R3 V2.0 | TIMER"] - 1)
+        self.assertEqual(svc.materiales_tarjeta(t2["id"], db_path=self.path)["tarjeta"]["estado"], "activa")  # sus placas sí
+
+    def test_11_gabinete_sin_tarjeta_completa_y_cambio(self):
+        from app.database import inventario as inv
+        t = self.tarjeta(r3=False, firmware=False)  # ni programada ni con R3
+        a0, q0, t0 = self.disp(ACT), self.disp(CQ), self.disp(CT)
+        inv.actualizar_datos_tarjeta(t["id"], {"gabinete": "Quintalock"}, db_path=self.path)
+        self.assertEqual((self.disp(ACT), self.disp(CQ), self.disp(CT)), (a0 - 1, q0 - 1, t0))
+        self.assertEqual(self.estados(t["id"])[CQ], "activo")
+        inv.actualizar_datos_tarjeta(t["id"], {"gabinete": "Translock"}, db_path=self.path)  # vuelve la Quintalock, sale la Translock
+        self.assertEqual((self.disp(ACT), self.disp(CQ), self.disp(CT)), (a0 - 1, q0, t0 - 1))
+        est = self.estados(t["id"])
+        self.assertEqual((est[CQ], est[CT], est[ACT]), ("devuelto", "activo", "activo"))
+
+    def test_12_quitar_firmware_deja_disuelta_y_reactiva_sin_duplicar(self):
+        from app.database import inventario as inv
+        pcb = "PCB TQT-R1 V2.0 | PRINCIPAL"
+        t = self.tarjeta(r3=False, firmware=False)
+        d0 = self.disp(pcb)
+        self.programar(t)
+        self.assertEqual(self.disp(pcb), d0 - 1)
+        n = len(svc.materiales_tarjeta(t["id"], db_path=self.path)["items"])
+        inv.set_firmware(t["pcb_r1_id"], "", db_path=self.path)  # se borra el firmware de R1
+        self.assertEqual(self.disp(pcb), d0 - 1)  # nada devolvible: sigue descontado
+        f = svc.materiales_tarjeta(t["id"], db_path=self.path)
+        self.assertEqual({i["estado"] for i in f["items"]}, {"disuelta"})
+        self.assertEqual(f["tarjeta"]["estado"], "disuelta")
+        self.programar(t, "3.0")  # vuelve a programar: se reactivan las mismas filas
+        f = svc.materiales_tarjeta(t["id"], db_path=self.path)
+        self.assertEqual((len(f["items"]), {i["estado"] for i in f["items"]}), (n, {"activo"}))
+        self.assertEqual(self.disp(pcb), d0 - 1)  # no se descuenta dos veces
+
+    def test_13_linea_base_no_descuenta(self):
+        """Lo que ya cumplía un evento antes de la migración v1.4.6 no se descuenta; solo cambia la caja si cambia el gabinete."""
+        from app.database import db, inventario as inv
+        pcb = "PCB TQT-R1 V2.0 | PRINCIPAL"
+        t = self.tarjeta(firmware=False)
+        self.programar(t)
+        inv.actualizar_datos_tarjeta(t["id"], {"gabinete": "Translock"}, db_path=self.path)
+        svc.sincronizar_consumos(self.path)
+        with db.transaction(self.path) as c:  # simula una BD anterior a v1.4.6 con la tarjeta ya cumpliendo todo, sin consumos
+            c.execute("DELETE FROM inv_tqtr_consumos WHERE tarjeta_id=?", (t["id"],))
+            c.execute("DELETE FROM inv_tqtr_consumo_base")
+            c.execute("DELETE FROM inv_tqtr_meta WHERE clave='migr_consumo_146'")
+        d0 = {d: self.disp(d) for d in (pcb, "PCB TQT-R3 V2.0 | TIMER", ACT, CT, CQ)}
+        with db.transaction(self.path) as c:
+            svc._sincronizar(c)
+            bases = {(r["origen"], r["valor"]) for r in c.execute("SELECT * FROM inv_tqtr_consumo_base WHERE tarjeta_id=?", (t["id"],))}
+        self.assertEqual(bases, {("placas", ""), ("r3", ""), ("gabinete", "Translock")})
+        self.assertEqual({d: self.disp(d) for d in d0}, d0)  # nada se descuenta
+        self.assertEqual(svc.materiales_tarjeta(t["id"], db_path=self.path)["items"], [])
+        inv.actualizar_datos_tarjeta(t["id"], {"gabinete": "Quintalock"}, db_path=self.path)  # cambia: solo la caja nueva
+        self.assertEqual((self.disp(CT), self.disp(CQ), self.disp(ACT)), (d0[CT], d0[CQ] - 1, d0[ACT]))
+        self.assertEqual(self.disp(pcb), d0[pcb])
 
     def test_09_silicon_en_gabinete(self):
         from app.database import inventario as inv

@@ -366,6 +366,14 @@ _TARJETA_COMPLETA = ("pcb_r1_id IS NOT NULL AND pcb_r2_id IS NOT NULL AND pcb_r3
                      "AND (SELECT mac FROM pcb_inventario WHERE id = pcb_r2_id) IS NOT NULL")
 
 
+# v1.4.8: R1 y R2 de la tarjeta programadas = MAC y firmware no vacíos (TRIM); el firmware puede venir heredado de la tarjeta
+# (firmware_r1/firmware_r2), igual que lo muestra la API. Mismo criterio que T.programada / T.r1r2Programadas en common.js.
+_PROG_PLACA = ("(SELECT TRIM(COALESCE(mac,'')) <> '' AND TRIM(COALESCE(NULLIF(TRIM(firmware),''), tarjetas_produccion.firmware_{r},'')) <> '' "
+               "FROM pcb_inventario WHERE id = tarjetas_produccion.pcb_{r}_id)")
+_R1R2_PROGRAMADAS = ("tarjetas_produccion.pcb_r1_id IS NOT NULL AND tarjetas_produccion.pcb_r2_id IS NOT NULL AND "
+                     + _PROG_PLACA.format(r="r1") + " AND " + _PROG_PLACA.format(r="r2"))
+
+
 def _asegurar_fechas_entrega(conn: sqlite3.Connection) -> None:
     """Fechas de llegada / finalizado y gabinete de la tarjeta (la entrega es `fecha_real`). Se llenan solas con disparadores:
       * llegada    = fecha en que se confirmó la recepción de sus placas (la más antigua; hoy si no hay);

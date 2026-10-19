@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from app.services import stm32_programming as svc, usuarios
 from app.services import stm32_firmware as catalogue
 from app.routers.ws import manager
-from app.database import inventario as inv
+from app.database import db, inventario as inv
 
 router = APIRouter(prefix='/api/stm32', tags=['Programación R1 STM32'])
 
@@ -193,6 +193,9 @@ async def finish(jid: str, body: Result, st=Depends(station_token)):
         j = await run_in_threadpool(svc.job, jid)
         pcb = await run_in_threadpool(inv.get_pcb, j['pcb'])
         await manager.broadcast('PCB_ACTUALIZADA', {'pcb': pcb})
+        if pcb and pcb.get('tarjeta_id'):   # v1.4.8: aviso de tarjeta como el resto de la programación (consumo de materiales incluido)
+            from app.routers.inventario import _notificar_tarjeta
+            await _notificar_tarjeta(await run_in_threadpool(db.get_tarjeta_by_id, pcb['tarjeta_id']))
     return result
 
 
