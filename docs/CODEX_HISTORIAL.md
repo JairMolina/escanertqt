@@ -123,3 +123,12 @@ Evidencia: Prueba fisica autorizada 0039 COM7 run44d7b1fc0e23708d0817f0bf09613c8
 Avance: Integracion 1.4.3 sobre version REAL de produccion1.4.1 commit76d71a128a44778686027164181a468ff805e7f4; ese commit no estaba en GitHub y se recupero solo codigo por bundle. Conservadas liberacion COM al salir y recuperacion tarjeta bloqueada por pestaña abandonada de otro operador, junto con cambios141/142: distribucion, WebSerial y BLE Windows por MAC.
 Siguiente: Produccion comprobada sana en1.4.1; no desplegada1.4.3 ni reiniciada OrangePi. Preview backend aun requiere recarga/reinicio para version143. UART28/99 lineas corruptas pendiente diagnostico. Sin repetir prueba fisica; Android/Skytec pendientes.
 Evidencia: Origen76d71a1 contenedorOrangePi APP_VERSION1.4.1 y healthOK. Integracion24Python+14JS+UI PASS y diffsinmarcadores. Prueba fisica previa142 run44d7b1fc0e23708d0817f0bf09613c8c 14/14aprobada conadvertencias; no repetida. ECCverification aplicada pruebas/regresion y revisiondiff. Sin datos/credenciales publicados.
+
+## 2026-10-16 19:45 UTC | 11cc0585dc43
+Avance: Desplegada1.4.3 autorizada porusuario enOrangePi /home/orangepi/escanertqt commit11cc0585dc430208d1c1f2e83f3dd423e8badacf. Fastforward desde76d71a1 y recreate solo servicio tqt con servidor/compose.yml. Datos/volumenes/tunel conservados. Loginpublico confirma1.4.3 y apihealthOK.
+Siguiente: Revisar operacion de puente BLE Windows por usuario en produccion; pruebas fisicas previas locales14/14 no repetidas. UART28/99 lineas corruptas pendiente diagnostico. Previewlocal no reiniciado. Android/Skytec pendientes.
+Evidencia: Sin trabajos activos antes de despliegue; respaldo SQLite predeploy_1.4.3_20261016_134402.db en /backups servidor. ContenedorAPP_VERSION1.4.3 y arranqueOK; httpsinventariotqt.site/login muestra1.4.3, apihealthok. 502 transitorio durante arranque resuelto; recursosstatic protegidos requieren sesion. Pruebas previas24Python14JSUIpass.
+
+## 2026-10-16 — Aclaracion operativa base R2
+
+Anadida solucion temporal al bloqueo PowerShell y flujo BIN generico4.0 a alta/OTA en docs/R2_ALTA_GENERICA_42.md. No se ejecuto el programador, no se cambio politica Windows y no se verifico nueva grabacion. Produccion permanece1.4.3.
