@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.9 — 2026-10-19
+- **DYMO compartida: la cola ya no se atora.** «Aprobada» se valida solo al encolar; antes el agente la volvía a validar al descargar el SVG y, si el operador ya había iniciado otra prueba TQT de la misma tarjeta (aún sin resultado), recibía 403 y la etiqueta no salía. El reporte de error de la Raspberry se rechazaba con 422 y el agente lo reintentaba para siempre sin pedir más trabajo, así que nada más se imprimía.
+  - `Resultado` del agente es tolerante: acepta `null` en `detalle`/`cups_id`, recorta textos largos y toma un estado desconocido como «error» (queda en el log).
+  - Los vencimientos (10 min) también corren en cada latido, no solo cuando el agente pide trabajo.
+- Pruebas nuevas en `tests/test_dymo_remoto.py`.
+
 ## v1.4.8 — 2026-10-19
 - **Auditoría de «programada»: un solo criterio en toda la app** (R1/R2 con MAC y firmware; R3 con firmware; valores con solo espacios no cuentan; el firmware puede venir heredado de la tarjeta `firmware_rN`, igual que la API).
   - Servidor: `_R1R2_PROGRAMADAS` vive en `db.py` y lo usan el consumo de materiales y el reporte por fecha. El reporte por fecha ya no cuenta como «programada» una tarjeta con solo MAC, solo firmware o solo la R3: exige R1+R2 programadas y que su MAC o firmware se haya guardado en el rango.

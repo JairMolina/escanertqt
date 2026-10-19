@@ -108,6 +108,49 @@ class TestDymoRemoto(unittest.TestCase):
         self.assertEqual(p({"tipo": "aprobada", "tarjeta_id": t["id"]}), 403)   # sin prueba TQT aprobada
         self.assertEqual(p({"tipo": "r3", "nombres": ["TQT-R3-V30-0084", "TQT-R3-V30-0085"]}), 200)
 
+    def test_resultado_tolerante_no_atora_al_agente(self):
+        """v1.4.9: un resultado con null, texto largo o estado raro ya no da 422 (el agente lo reintentaba para siempre)."""
+        self.latido()
+        for body in ({"estado": "error", "detalle": None, "cups_id": None}, {"estado": "fallo", "detalle": "x" * 900}):
+            j = svc.encolar("cable", {"numero": "0031"}, 1, "Cable 0031", OP)
+            self.assertEqual(svc.tomar(self.ag["id"])["id"], j["id"])
+            r = self.pi.post(f"/api/dymo/remoto/agente/trabajos/{j['id']}/resultado", json=body, headers=self.H)
+            self.assertEqual(r.status_code, 200, body)
+            t = svc.trabajo(j["id"])
+            self.assertEqual(t["estado"], "error")
+            self.assertLessEqual(len(t["detalle"] or ""), 500)
+
+    def test_aprobada_sale_aunque_empiece_otra_prueba(self):
+        """v1.4.9: «Aprobada» se valida al encolar; una prueba nueva de la misma tarjeta (sin resultado) no bloquea el SVG."""
+        from app.services import test_station
+        self.latido()
+        t = iso.crear_par(iso.nuevo_lote()["id"])
+        test_station.init()
+        ahora = time.time()
+        with db.get_db() as c:
+            sid = test_station.web_station(c, OP)
+            c.execute("INSERT INTO tqt_test_runs(id,station,requested_card,tarjeta_id,operator,state,created,updated,inventory,result,origin)"
+                      " VALUES(?,?,?,?,?,'finished',?,?,'{}','aprobado','web')", ("apr-r", sid, t["id"], t["id"], OP, ahora, ahora))
+        j = self.op.post("/api/dymo/remoto/trabajos", json={"tipo": "aprobada", "tarjeta_id": t["id"]}).json()
+        with db.get_db() as c:
+            c.execute("INSERT INTO tqt_test_runs(id,station,requested_card,operator,state,created,updated,inventory,origin)"
+                      " VALUES(?,?,?,?,'running',?,?,'{}','web')", ("run-r", sid, t["id"], OP, ahora + 1, ahora + 1))
+        s = self.pi.get("/api/dymo/remoto/agente/siguiente?espera=0", headers=self.H).json()
+        self.assertEqual(s["id"], j["id"])
+        svg = self.pi.get(s["svg_url"], headers=self.H)
+        self.assertEqual(svg.status_code, 200)
+        self.assertIn("Aprobada", svg.text)
+
+    def test_latido_vence_aunque_no_pida_trabajo(self):
+        self.latido()
+        a = svc.encolar("cable", {"numero": "0001"}, 1, "Cable 0001", OP)
+        viejo = time.time() - svc.PENDIENTE_TTL - 5
+        with db.get_db() as c:
+            c.execute("UPDATE dymo_trabajos SET creado=?, actualizado=?", (viejo, viejo))
+        self.latido()
+        with db.get_db() as c:
+            self.assertEqual(c.execute("SELECT estado FROM dymo_trabajos WHERE id=?", (a["id"],)).fetchone()[0], "cancelada")
+
     def test_svg_r3(self):
         svg = DymoService.generate_r3_svg(["TQT-R3-V30-0084", "TQT-R3-V30-0085"])
         ET.fromstring(svg.encode())

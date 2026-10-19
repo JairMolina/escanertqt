@@ -60,6 +60,7 @@ def _vencer(c, now):
 
 def latido(aid, estado):
     with db.get_db() as c:
+        _vencer(c, time.time())   # v1.4.9: vencer también aquí; antes solo en tomar() y un agente atorado lo frenaba
         c.execute("UPDATE dymo_agentes SET last_seen=?,estado=? WHERE id=?", (time.time(), json.dumps(estado, ensure_ascii=False)[:2000], aid))
     return {"ok": True}
 

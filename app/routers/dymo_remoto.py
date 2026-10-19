@@ -1,12 +1,12 @@
 """v1.4.2: DYMO compartida (agente en Raspberry Pi). Operadores con sesión encolan; el agente usa su token Bearer."""
 
-import asyncio, re
+import asyncio, logging, re
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.routers.excel_dymo import NOMBRE_R3, _cable_ok, _exigir_aprobada, _tarjeta_o_404
 from app.routers.stm32 import operator, run
@@ -14,6 +14,7 @@ from app.services import dymo_remoto as svc
 from app.services.dymo_service import DymoService, obtener_formato
 
 router = APIRouter(prefix="/api/dymo/remoto", tags=["DYMO compartida"])
+log = logging.getLogger(__name__)
 FORMATO = "30334"
 
 
@@ -34,9 +35,24 @@ class Latido(BaseModel):
 
 
 class Resultado(BaseModel):
+    """v1.4.9: tolerante. Un 422 aquí dejaba al agente reintentando el mismo resultado para siempre (sin pedir más
+    trabajo): null y textos largos se aceptan recortados; un estado desconocido cuenta como «error»."""
     estado: Literal["impresa", "error", "desconocido"]
-    detalle: str = Field(default="", max_length=500)
-    cups_id: str = Field(default="", max_length=64)
+    detalle: str = ""
+    cups_id: str = ""
+
+    @field_validator("estado", mode="before")
+    @classmethod
+    def _estado(cls, v):
+        if v not in ("impresa", "error", "desconocido"):
+            log.warning("DYMO agente: estado de resultado %r tratado como «error».", v)
+            return "error"
+        return v
+
+    @field_validator("detalle", "cups_id", mode="before")
+    @classmethod
+    def _texto(cls, v, info):
+        return ("" if v is None else str(v))[:500 if info.field_name == "detalle" else 64]
 
 
 def _validar(p: Pedido):
@@ -62,8 +78,8 @@ def _validar(p: Pedido):
 def _svg(tipo, params):
     if tipo in ("tarjeta", "aprobada"):
         t = _tarjeta_o_404(params["tarjeta_id"])
-        if tipo == "aprobada":
-            _exigir_aprobada(params["tarjeta_id"])
+        # v1.4.9: «Aprobada» se valida al encolar, no al descargar: una prueba nueva recién iniciada sobre la misma
+        # tarjeta (aún sin resultado) daba 403 aquí y la etiqueta ya aceptada nunca salía.
         return DymoService.generate_svg_preview(t, FORMATO, guia=False, aprobada=tipo == "aprobada", borde=False)
     if tipo == "cable":
         return DymoService.generate_cable_svg(params["numero"], FORMATO, params.get("r3", ""))
