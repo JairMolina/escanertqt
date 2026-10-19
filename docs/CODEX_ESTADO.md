@@ -1,7 +1,13 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-19 (Claude Code)
-Commit de referencia: `945554f` (v1.4.6; producción sigue en 1.4.3 hasta que se despliegue)
+Commit de referencia: `dcd0ae8` (v1.4.8; producción en 1.4.6 hasta que se despliegue)
+
+## v1.4.7–v1.4.8 (2026-10-19, Claude Code)
+- v1.4.7: consumo de materiales por evento (R1/R2 programadas, R3 asignada, gabinete colocado); migración `migr_consumo_146` + tabla `inv_tqtr_consumo_base` (solo desde hoy); `consumir_por_evento` serializado.
+- v1.4.8: criterio único de «programada» (`db._R1R2_PROGRAMADAS`, `T.programada`/`T.conFw`); reporte por fecha corregido; STM32 y programación por lote notifican la tarjeta.
+- Evidencia: suites de inventario, programación, emparejado, DYMO, admin y API OK (test_correo_excel solo falla en conjunto, preexistente; pasa aislado). Docker local 1.4.8 healthy con la BD de producción 1.4.6 del 2026-10-19 (migración: base placas 34, r3 26, gabinete 19). Sin prueba física.
+- Pendiente de decisión: «Pendientes» de MAC y firmware solo miran MAC; OTA migration_required queda verified sin guardar firmware; vista de estado R2 por versión.
 
 ## v1.4.5–v1.4.6 (2026-10-19, Claude Code)
 - v1.4.5: zona «Cable R3» en Etiquetas DYMO (TQT: 0000 / R3: 0000), parámetro `r3` en `/api/dymo/cable/*` y DYMO compartida.
