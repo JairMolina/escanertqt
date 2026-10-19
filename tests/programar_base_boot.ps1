@@ -31,3 +31,28 @@ $all=Get-Content -LiteralPath $source -Raw
 if ($all.IndexOf('if ($Comprobar)') -gt $all.IndexOf('while ($true) {', $all.IndexOf('if ($Comprobar)'))) {throw 'Comprobar no protege la entrada al bucle.'}
 if ($all -notmatch '\[ValidateSet\("Manual","Automatico"\)\]\[string\]\$Modo="Manual"') {throw 'Se debe conservar Manual predeterminado.'}
 Write-Host 'PASS: sintaxis PowerShell, 8 casos BOOT, flujo fragmentado y modo manual predeterminado; sin hardware.'
+
+# Ejecutar solo el bucle principal con esptool y BOOT simulados: fallo -> nueva espera -> exito.
+$loop=$ast.EndBlock.Statements | Where-Object {$_ -is [System.Management.Automation.Language.WhileStatementAst]} | Select-Object -Last 1
+$script:bootCalls=0; $script:flashCalls=0; $script:flow=@()
+function Wait-BaseDownloadBoot {
+    param([string]$NombrePuerto)
+    $script:bootCalls++; $script:flow+='BOOT'
+    if ($script:bootCalls -eq 3) {throw 'FIN_SIMULACION'}
+}
+function Invoke-FakeBaseTool {
+    $script:flashCalls++; $script:flow+='FLASH'
+    $global:LASTEXITCODE=0
+    if ($script:flashCalls -eq 1) {$global:LASTEXITCODE=2}
+}
+$Modo='Automatico'; $Puerto='COM-FAKE'; $baseTool='Invoke-FakeBaseTool'; $Baudios=460800; $baseImage='NO-IMAGE'
+try {
+    Invoke-Expression $loop.Extent.Text
+    throw 'El bucle termino antes de completar la simulacion.'
+} catch {
+    if ($_.Exception.Message -ne 'FIN_SIMULACION') {throw}
+}
+if ($script:flashCalls -ne 2 -or ($script:flow -join ',') -ne 'BOOT,FLASH,BOOT,FLASH,BOOT') {
+    throw 'Tras fallo debe esperar otro BOOT antes de volver a escribir.'
+}
+Write-Host 'PASS: fallo simulado no cierra sesion; exige nuevo BOOT, graba siguiente y vuelve a esperar. Sin hardware.'

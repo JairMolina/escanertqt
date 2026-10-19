@@ -19,3 +19,7 @@ Documentado en R2_ALTA_GENERICA_42.md el inicio de programar_base.ps1 con Execut
 ## 2026-10-19 — Grabacion base R2 por BOOT
 
 programar_base.ps1 conserva Manual/Enter predeterminado y agrega -Modo Automatico: escucha ROM 115200 hasta boot:0x3 + waiting for download completos, libera COM antes de esptool y espera nuevo BOOT tras cada escritura. Error de escritura automatica detiene sin reintento. BIN fijo y hash sin cambios. Copia actualizada en la carpeta offline real FW_GENERAL_4_0/TQT_R2_BASE_V4_0_GENERIC. Pruebas PowerShell5.1: sintaxis,8casosROM y flujo acumulado PASS; -Comprobar Manual/Automatico reales PASS sin abrirCOM4. No grabacion fisica; pendiente usuario probar nuevoBOOT con monitorserial cerrado. Documentacion en README del firmware. Produccion sigue1.4.3 sin nuevos despliegues.
+
+## 2026-10-19 — Continuidad tras fallo de esptool
+
+Sustituida detencion automatica por mensaje y retorno a espera de un nuevo BOOT+RESET. Mantiene sesion abierta; no reintenta escritura sin nuevo evento. Prueba simulada fallo -> esperaBOOT -> exito -> esperaBOOT PASS, ademas8casosROM y -Comprobar real sin abrir COM4. Script actualizado en carpeta offline. No interrumpida ni ejecutada grabacion fisica; el proceso ya abierto requiere reiniciar script una vez al finalizar escritura para cargar el cambio. Reemplaza decision anterior de detener por fallo. BIN y web sin cambios.

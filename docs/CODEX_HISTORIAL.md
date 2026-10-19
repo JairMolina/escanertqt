@@ -136,3 +136,7 @@ Anadida solucion temporal al bloqueo PowerShell y flujo BIN generico4.0 a alta/O
 ## 2026-10-19 — Base generica R2, inicio automatico por BOOT
 
 Anadido parametro -Modo Manual|Automatico (Manual predeterminado) al script fijo. Espera mensajeROM fresco antes de cada escritura; SerialPort liberado en finally antes de esptool; sin reintento automatico al fallar. Copiado a carpeta offline solicitada. Tests deteccionROM y comprobacion local de ambosmodos PASS sin hardware. BIN/eFuses no modificados; modo automatico pendiente validacion fisica.
+
+## 2026-10-19 — Continuidad tras fallo de esptool
+
+Sustituida detencion automatica por mensaje y retorno a espera de un nuevo BOOT+RESET. Mantiene sesion abierta; no reintenta escritura sin nuevo evento. Prueba simulada fallo -> esperaBOOT -> exito -> esperaBOOT PASS, ademas8casosROM y -Comprobar real sin abrir COM4. Script actualizado en carpeta offline. No interrumpida ni ejecutada grabacion fisica; el proceso ya abierto requiere reiniciar script una vez al finalizar escritura para cargar el cambio. Reemplaza decision anterior de detener por fallo. BIN y web sin cambios.

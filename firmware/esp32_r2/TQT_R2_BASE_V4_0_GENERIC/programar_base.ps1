@@ -66,6 +66,9 @@ while ($true) {
         Write-Host 'Grabacion y hash verificados. Ya puedes liberar BOOT, reiniciar y cambiar a la siguiente tarjeta.'
     } else {
         Write-Host 'Fallo la grabacion: no se confirma esta tarjeta. Revisa contactos y modo BOOT antes de reintentar.'
-        if ($Modo -eq 'Automatico') { throw 'Modo automatico detenido por fallo de grabacion. No se reintenta solo.' }
+        if ($Modo -eq 'Automatico') {
+            Write-Host 'La sesion sigue abierta. Corrige los contactos y genera un NUEVO BOOT+RESET para volver a intentar o cambiar de tarjeta.'
+            continue
+        }
     }
 }
