@@ -2,6 +2,32 @@
 
 Aplicación Inventario TQT (JairMolina/escanertqt): FastAPI, SQLite, WebSockets y HTML/JS. Mantener separada de TQT-OrangePi, que contiene infraestructura del servidor.
 
+## Android: inventario y QR comprobados — 2026-10-19
+
+TQT0.2.0 instalada en teléfono real Android13, con sesión conservada. Rama
+`codex/android-inventario-qr-20261019`, sucesora de b81eeb2. Causa confirmada del
+Not Found: producción devuelve404 a `/api/android/devices`; los GET existentes
+`/api/pcb`, `/api/pcb/{id}`, `/api/esp32/r2/status` y `/api/esp32/firmwares` sí
+sirven el mismo inventario. La app ahora usa esos contratos para consultar sin
+desplegar cambios en producción. Búsqueda11→0011, QR local/cámara, filtros
+Todas/R1/R2/R3, paginación completa y ficha con firmware/estado/evidencia real.
+No confundir firmware registrado con programación físicamente verificada.
+
+40JVM correctas, lint0errores/15avisos, 10casos instrumentados distintos en el
+teléfono (9iniciales+4inventario finales con3repetidos), SDK firma/metadatos,
+cámara física abierta y navegación real. Se recorrieron300PCB sin duplicados;
+11 y QR simulado encontraron la misma R20011 y ficha/catálogo sin error.
+USB/instalación/control verificados sin intervención y ADB sin caducidad a
+petición del usuario. Logs/capturas/identificadores privados fuera de Git.
+
+Sin despliegue ni escritura de inventario. El servicio Android de programación
+no está desplegado: nuevas operaciones quedan deshabilitadas con explicación;
+no sustituir sus contratos por endpoints web distintos. Falta R2 física para
+BLE/OTA/cortes; firma y publicación definitivas siguen pendientes. Guía:
+`docs/ANDROID_INVENTARIO_020.md`. CM mediante configuración local de alcance
+ya existente `privado/cm-scope` apunta al checkout Android sin cambiar el
+registro global del proyecto. Conserva identidad y namespace Laptop-TQT-Web.
+
 ## Android y firmware offline — 2026-10-17
 
 Rama de ensayo `codex/tqt-android-ota-20261017` basada en2b91f0b; producción conocida
