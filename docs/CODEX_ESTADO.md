@@ -1,7 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-16 19:45 UTC
-Commit de referencia: `11cc0585dc43` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-19 (Claude Code)
+Commit de referencia: `945554f` (v1.4.6; producción sigue en 1.4.3 hasta que se despliegue)
+
+## v1.4.5–v1.4.6 (2026-10-19, Claude Code)
+- v1.4.5: zona «Cable R3» en Etiquetas DYMO (TQT: 0000 / R3: 0000), parámetro `r3` en `/api/dymo/cable/*` y DYMO compartida.
+- v1.4.6: impresión automática del cable R3 en la DYMO compartida al asignar una R3 (`app/services/cable_r3_auto.py`, gancho en `_notificar_tarjeta`), interruptor en Administración › Resumen (apagado por defecto). Crea la tabla `dymo_cable_r3_hechas` sola.
+- Evidencia: 89 pruebas Python OK (test_cable_r3_auto, test_dymo_cable, test_dymo_remoto, test_dymo, test_admin, test_api, test_qa_version_hoy); Docker local 1.4.6 healthy. Sin prueba física con la Raspberry ni revisión visual en navegador.
+- Pendiente: desplegar 1.4.4→1.4.6 en producción, activar el interruptor y probar una asignación real de R3.
 
 ## Avance reportado
 Desplegada1.4.3 autorizada porusuario enOrangePi /home/orangepi/escanertqt commit11cc0585dc430208d1c1f2e83f3dd423e8badacf. Fastforward desde76d71a1 y recreate solo servicio tqt con servidor/compose.yml. Datos/volumenes/tunel conservados. Loginpublico confirma1.4.3 y apihealthOK.
