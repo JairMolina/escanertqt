@@ -371,6 +371,13 @@ def get_dymo_r3_archivo(
 
 # ---------------------------------------------------------------- etiqueta de cable (v1.3.83): solo el número, mitad izquierda
 NUMERO_CABLE = r"^[0-9]{1,6}(/[0-9]{1,6})?$"   # v1.3.92: «0021/0034» para R1/R2 con número diferente
+NUMERO_R3 = r"^[0-9]{1,6}$"   # v1.4.5: «Cable R3» (TQT: 0000 / R3: 0000)
+R3_DOC = "v1.4.5: número de la R3 emparejada (etiqueta «Cable R3»); vacío = cable normal"
+
+
+def _cable_ok(numero: str, r3: str) -> None:
+    if not re.fullmatch(NUMERO_CABLE, numero) or (r3 and ("/" in numero or not re.fullmatch(NUMERO_R3, r3))):
+        raise HTTPException(422, f"Número inválido: {numero}" + (f" / R3 {r3}" if r3 else ""))
 
 
 @router.get("/dymo/cable/xml", summary="XML de la etiqueta de cable (número en la mitad izquierda) para DYMO")
@@ -378,19 +385,18 @@ def get_dymo_cable_xml(
     numero: str = Query(..., description="Número a imprimir, ej. 0021"),
     label_format: str = Query("30334", description=FORMATO_DOC),
     tipo: str = Query("dymo", pattern="^(dymo|label)$"),
+    r3: str = Query("", description=R3_DOC),
 ):
-    if not re.fullmatch(NUMERO_CABLE, numero):
-        raise HTTPException(422, f"Número inválido: {numero}")
+    _cable_ok(numero, r3)
     fmt = _formato_o_400(label_format)
-    xml = DymoService.generate_cable_dcd_xml(numero, fmt) if tipo == "dymo" else DymoService.generate_cable_label_xml(numero, fmt)
+    xml = DymoService.generate_cable_dcd_xml(numero, fmt, r3) if tipo == "dymo" else DymoService.generate_cable_label_xml(numero, fmt, r3)
     return Response(content=xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/dymo/cable/svg", summary="Etiqueta de cable como SVG a escala real (respaldo de impresión del navegador)")
-def get_dymo_cable_svg(numero: str = Query(...), label_format: str = Query("30334", description=FORMATO_DOC)):
-    if not re.fullmatch(NUMERO_CABLE, numero):
-        raise HTTPException(422, f"Número inválido: {numero}")
-    return Response(content=DymoService.generate_cable_svg(numero, _formato_o_400(label_format)), media_type="image/svg+xml")
+def get_dymo_cable_svg(numero: str = Query(...), label_format: str = Query("30334", description=FORMATO_DOC), r3: str = Query("", description=R3_DOC)):
+    _cable_ok(numero, r3)
+    return Response(content=DymoService.generate_cable_svg(numero, _formato_o_400(label_format), r3), media_type="image/svg+xml")
 
 
 @router.get("/dymo/cable/archivo", summary="Descarga la etiqueta de cable como archivo .dymo o .label")
@@ -398,10 +404,10 @@ def get_dymo_cable_archivo(
     numero: str = Query(...),
     label_format: str = Query("30334", description=FORMATO_DOC),
     tipo: str = Query("dymo", pattern="^(dymo|label)$"),
+    r3: str = Query("", description=R3_DOC),
 ):
-    if not re.fullmatch(NUMERO_CABLE, numero):
-        raise HTTPException(422, f"Número inválido: {numero}")
-    datos, archivo = DymoService.archivo_cable(numero, _formato_o_400(label_format), tipo)
+    _cable_ok(numero, r3)
+    datos, archivo = DymoService.archivo_cable(numero, _formato_o_400(label_format), tipo, r3)
     return _adjunto(datos, archivo)
 
 

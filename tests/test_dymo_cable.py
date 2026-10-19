@@ -55,6 +55,19 @@ class TestDymoCable(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("TQT_cable_0005.label", r.headers.get("content-disposition", ""))
 
+    def test_cable_r3(self):   # v1.4.5: «TQT: 0000» arriba y «R3: 0000» abajo
+        for tipo in ("label", "dymo"):
+            r = self.c.get(f"/api/dymo/cable/xml?numero=0011&r3=0073&tipo={tipo}")
+            self.assertEqual(r.status_code, 200, r.text)
+            ET.fromstring(r.text.encode("utf-8").lstrip(b"\xef\xbb\xbf"))
+            self.assertIn("TQT: 0011", r.text); self.assertIn("R3: 0073", r.text)
+        r = self.c.get("/api/dymo/cable/svg?numero=0011&r3=0073")
+        self.assertEqual(r.status_code, 200); self.assertIn("R3: 0073", r.text)
+        r = self.c.get("/api/dymo/cable/archivo?numero=0011&r3=0073&tipo=label")
+        self.assertIn("TQT_cable_0011_R3_0073.label", r.headers.get("content-disposition", ""))
+        self.assertEqual(self.c.get("/api/dymo/cable/xml?numero=0011&r3=7a").status_code, 422)
+        self.assertEqual(self.c.get("/api/dymo/cable/xml?numero=0011%2F0012&r3=0073").status_code, 422)
+
 
 if __name__ == "__main__":
     unittest.main()

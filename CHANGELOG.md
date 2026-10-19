@@ -1,5 +1,14 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.6 — 2026-10-19
+- **«Cable R3» automático:** al asignar una R3 a una TQT (emparejar, armar o cambiar placa), el servidor encola solo la etiqueta «TQT: 0000 / R3: 0000» en la DYMO compartida (Raspberry); funciona aunque se empareje desde el celular y sin páginas abiertas. Interruptor en Administración › Resumen (ajuste `dymo_cable_r3_auto`, apagado por defecto).
+- Cada pareja TQT + R3 se imprime una vez (tabla `dymo_cable_r3_hechas`); al encender el interruptor, las tarjetas que ya tenían R3 se marcan como hechas. Si la R3 cambia, sale la etiqueta nueva. Sin DYMO compartida en línea no se encola: queda pendiente y se reintenta en la siguiente actualización de esa tarjeta (bitácora `CABLE_R3_AUTO` / `CABLE_R3_SIN_DYMO`). La consola avisa con el evento WS `CABLE_R3_AUTO`.
+- Servicio `app/services/cable_r3_auto.py`, gancho en `_notificar_tarjeta` (inventario.py), `GET/PUT /api/admin/dymo/cable-r3-auto`. Caché `admin.js` y `escritorio.js` a `?v=1460`. Pruebas `tests/test_cable_r3_auto.py`.
+
+## v1.4.5 — 2026-10-19
+- **Etiquetas DYMO › «Cable R3»:** nueva zona junto a «Cable» con la etiqueta de cable de 57 × 32 mm que dice «TQT: 0000» arriba y «R3: 0000» abajo (misma franja izquierda y línea de doblez). Al emparejar una R3 con su R1/R2 (eventos WS `TARJETA_EMPAREJADA`/`TARJETA_ACTUALIZADA`), la tarjeta y su R3 se cargan solas; también hay lista de tarjetas con R3 del lote y, al escribir el número de tarjeta, la R3 se llena sola.
+- Servidor: parámetro opcional `r3` en `/api/dymo/cable/xml|svg|archivo` y en la DYMO compartida (`/api/dymo/remoto`, tipo `cable` con `r3`). Sin `r3` la etiqueta de cable no cambia. Caché `dymo.js` a `?v=1450`.
+
 ## v1.4.4 — 2026-10-16
 - **DYMO compartida (Raspberry Pi):** cualquier usuario imprime en la LabelWriter conectada a la Raspberry sin mover la etiquetadora. En Etiquetas DYMO aparece «DYMO compartida» en el selector de impresora (tarjeta, lote, escaneo, R3 y cable); en Pruebas TQT, «Imprimir etiquetas» la usa si se eligió o si la PC no tiene DYMO Connect. La web espera a que la Raspberry confirme «impresa».
 - Servidor: cola `/api/dymo/remoto` (sesión) y agente `/api/dymo/remoto/agente/*` (token Bearer propio, solo conexiones salientes desde la Raspberry). Cada etiqueta se entrega una vez; lo no tomado en 10 min se cancela (no sale tarde) y lo tomado sin confirmar queda «desconocido» (nunca se reimprime solo). «Aprobada» conserva la regla de la última prueba TQT aprobada. Sin agente en línea con impresora lista, no se encola. Alta del agente: `python -m app.services.dymo_remoto "Raspberry DYMO"` en el contenedor (muestra el token una vez).

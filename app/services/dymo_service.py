@@ -228,6 +228,11 @@ CABLE_LINEA_ANCHO_MM = 1.5   # v1.3.91: caja más ancha y trazo de 0.5 mm para q
 CABLE_GUION_MM, CABLE_HUECO_MM = 1.6, 1.2
 
 
+def lineas_cable(numero: str, r3: str = "") -> List[str]:
+    """v1.4.5: «Cable R3» = «TQT: 0000» arriba y «R3: 0000» abajo; el cable normal sigue con «TQT» y el número."""
+    return [f"TQT: {numero}", f"R3: {r3}"] if r3 else ["TQT", numero]
+
+
 def caja_linea_cable(formato: "FormatoEtiqueta") -> "Caja":
     m = MARGEN_SEGURO_MM
     return Caja(formato.ancho_mm / 2 - CABLE_LINEA_ANCHO_MM / 2, m, CABLE_LINEA_ANCHO_MM, formato.alto_mm - 2 * m)
@@ -706,10 +711,10 @@ class DymoService:
 
     # ------------------------------------------------------------------ cable (v1.3.83): número en la mitad izquierda
     @classmethod
-    def generate_cable_label_xml(cls, numero: str, label_format: Optional[str] = None) -> str:
+    def generate_cable_label_xml(cls, numero: str, label_format: Optional[str] = None, r3: str = "") -> str:
         """`.label` (DYMO Label v8) con el número solo en la mitad izquierda."""
         f = obtener_formato(label_format)
-        objeto = _v8_texto("NUMERO", f"TQT\n{numero}", CABLE_FUENTE_PT, caja_cable(f), "Center", "Rotation90")   # v1.3.84 vertical; v1.3.92 «TQT» arriba
+        objeto = _v8_texto("NUMERO", "\n".join(lineas_cable(numero, r3)), CABLE_FUENTE_PT, caja_cable(f), "Center", "Rotation90")   # v1.3.84 vertical; v1.3.92 «TQT» arriba
         linea = caja_linea_cable(f)
         objeto += _v8_imagen("LINEA", png_linea_punteada(linea), linea)   # v1.3.90: línea punteada al centro
         return f"""<?xml version="1.0" encoding="utf-8"?>
@@ -739,15 +744,16 @@ class DymoService:
                 f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/><g fill="#000" shape-rendering="crispEdges">{"".join(partes)}</g></svg>')
 
     @classmethod
-    def generate_cable_svg(cls, numero: str, label_format: Optional[str] = None) -> str:
+    def generate_cable_svg(cls, numero: str, label_format: Optional[str] = None, r3: str = "") -> str:
         """v1.4.0: SVG a escala real (1 unidad = 1 mm) de la etiqueta de cable, para el respaldo de impresión del navegador."""
         f = obtener_formato(label_format)
         c, ln = caja_cable(f), caja_linea_cable(f)
         # v1.4.2: dos líneas («TQT» y el número) deben caber en la franja de c.w mm; a 36 pt se salían del borde izquierdo.
-        pt = min(CABLE_FUENTE_PT * PT_A_MM, c.w / 2.1, c.h / (max(len(numero), 3) * 0.6))
+        arriba, abajo = lineas_cable(numero, r3)
+        pt = min(CABLE_FUENTE_PT * PT_A_MM, c.w / 2.1, c.h / (max(len(arriba), len(abajo), 3) * 0.6))
         cx, cy = c.x + c.w / 2, c.y + c.h / 2
         textos = "".join(f'<text transform="translate({cx + dx:.3f} {cy:.3f}) rotate(-90)" text-anchor="middle" dominant-baseline="central">{xml_escape(t)}</text>'
-                         for dx, t in ((-pt * 0.52, "TQT"), (pt * 0.52, numero)))
+                         for dx, t in ((-pt * 0.52, arriba), (pt * 0.52, abajo)))
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f.ancho_mm:g}mm" height="{f.alto_mm:g}mm" viewBox="0 0 {f.ancho_mm:g} {f.alto_mm:g}">'
                 f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/>'
                 f'<g fill="#000" font-family="{FUENTE_SVG}" font-weight="700" font-size="{pt:.4f}">{textos}</g>'
@@ -755,7 +761,7 @@ class DymoService:
                 f'stroke-dasharray="{CABLE_GUION_MM} {CABLE_HUECO_MM}"/></svg>')
 
     @classmethod
-    def generate_cable_dcd_xml(cls, numero: str, label_format: Optional[str] = None) -> str:
+    def generate_cable_dcd_xml(cls, numero: str, label_format: Optional[str] = None, r3: str = "") -> str:
         """`.dymo` (DYMO Connect) con el número solo en la mitad izquierda."""
         f = obtener_formato(label_format)
         m = MARGEN_SEGURO_MM
@@ -799,8 +805,7 @@ class DymoService:
             <HorizontalAlignment>Center</HorizontalAlignment>
             <VerticalAlignment>Middle</VerticalAlignment>
             <IsVertical>False</IsVertical>
-            <LineTextSpan><TextSpan><Text>TQT</Text>{fuente}</TextSpan></LineTextSpan>
-            <LineTextSpan><TextSpan><Text>{xml_escape(numero)}</Text>{fuente}</TextSpan></LineTextSpan>
+            {"".join(f"<LineTextSpan><TextSpan><Text>{xml_escape(t)}</Text>{fuente}</TextSpan></LineTextSpan>" for t in lineas_cable(numero, r3))}
           </FormattedText>
           <ObjectLayout><DYMOPoint><X>{_pulg(c.x)}</X><Y>{_pulg(c.y)}</Y></DYMOPoint><Size><Width>{_pulg(c.w)}</Width><Height>{_pulg(c.h)}</Height></Size></ObjectLayout>
         </TextObject>
@@ -829,10 +834,11 @@ class DymoService:
 </DesktopLabel>"""
 
     @classmethod
-    def archivo_cable(cls, numero: str, label_format: Optional[str] = None, tipo: str = "dymo") -> Tuple[bytes, str]:
+    def archivo_cable(cls, numero: str, label_format: Optional[str] = None, tipo: str = "dymo", r3: str = "") -> Tuple[bytes, str]:
+        base = f"TQT_cable_{numero.replace('/', '-')}" + (f"_R3_{r3}" if r3 else "")
         if tipo == "label":
-            return cls.generate_cable_label_xml(numero, label_format).encode("utf-8"), f"TQT_cable_{numero.replace('/', '-')}.label"
-        return b"\xef\xbb\xbf" + cls.generate_cable_dcd_xml(numero, label_format).encode("utf-8"), f"TQT_cable_{numero.replace('/', '-')}.dymo"
+            return cls.generate_cable_label_xml(numero, label_format, r3).encode("utf-8"), f"{base}.label"
+        return b"\xef\xbb\xbf" + cls.generate_cable_dcd_xml(numero, label_format, r3).encode("utf-8"), f"{base}.dymo"
 
     # ------------------------------------------------------------------ paquete de datos
     @classmethod

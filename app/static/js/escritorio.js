@@ -408,6 +408,7 @@
             if (RS.hoja) { const hj = RS.hoja; setTimeout(() => { if (RS.hoja === hj) hj.close(); }, 1600); }
         });
         ws.on('ESCANEO_REMOTO', (d) => { if (d && d.id === RS.id) recibirEscaneo(d); });
+        ws.on('CABLE_R3_AUTO', (d) => { if (d && d.mensaje) toast(d.mensaje, { kind: d.ok ? 'ok' : 'warn', ms: d.ok ? 4000 : 8000 }); });   // v1.4.6
         ws.on('ESCANER_CERRADO', (d) => { if (d && d.id === RS.id) { olvidarRS(); toast('Se cerró la vinculación con el celular', { kind: 'warn' }); } });
         // v1.3.46: respaldo por HTTP (si el WebSocket se cayó, los códigos del celular no se pierden)
         setInterval(async () => {

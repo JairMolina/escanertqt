@@ -393,6 +393,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         const r = await api(`/api/tarjetas?limit=500${lote ? `&lote_id=${encodeURIComponent(lote)}` : ''}`);
         if (!r.ok) { $('aviso').append(T.banner('bad', 'alert', 'No se pudieron cargar las tarjetas: ', r.error)); return; }
         state.tarjetas = (r.data && r.data.items) || [];
+        state.tarjetas.forEach((t) => cr3Recibir(t, false));
         state.tarjetas.sort((a, b) => (parseInt(a.id_tarjeta_num, 10) || 0) - (parseInt(b.id_tarjeta_num, 10) || 0));
         state.cur = state.tarjetas.find((t) => String(t.id) === p.get('tarjeta_id')) || state.tarjetas.find((t) => modo(t).k !== 'NO') || state.tarjetas[0] || null;
         llenarTarjetas();
@@ -628,20 +629,20 @@ html, body { margin: 0; padding: 0; background: #fff; }
         $('cableInfo').textContent = error || (lista.length ? `${lista.length} etiqueta${lista.length === 1 ? '' : 's'} (${lista[0]}${lista.length > 1 ? ' … ' + lista[lista.length - 1] : ''})` : 'Vista previa · 57 × 32 mm, número en la mitad izquierda');
         $('btnCablePrint').disabled = $('btnCableOpen').disabled = !lista.length || state.busy;
     }
-    async function xmlCable(num, tipo) {
+    async function xmlCable(num, tipo, r3) {
         let res;
-        try { res = await fetch(`/api/dymo/cable/xml?numero=${encodeURIComponent(num)}&tipo=${tipo}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        try { res = await fetch(`/api/dymo/cable/xml?numero=${encodeURIComponent(num)}&tipo=${tipo}${r3 ? `&r3=${encodeURIComponent(r3)}` : ''}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
         if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`);
         const txt = await res.text();
         if (!D.esXmlEtiqueta(txt)) throw new Error('El servidor no devolvió un XML de etiqueta válido.');
         return txt;
     }
-    async function imprimirCable(printer, num, c) {
-        if (printer === REMOTA) { await R.imprimir({ tipo: 'cable', numero: num, copias: c }); return; }
-        if (navegador()) { encolar(nodoCable(num), c); return; }
+    async function imprimirCable(printer, num, c, r3) {
+        if (printer === REMOTA) { await R.imprimir(r3 ? { tipo: 'cable', numero: num, r3, copias: c } : { tipo: 'cable', numero: num, copias: c }); return; }
+        if (navegador()) { encolar(r3 ? nodoCableR3(num, r3) : nodoCable(num), c); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
-            try { await D.print(printer, await xmlCable(num, tipo), c); return; }
+            try { await D.print(printer, await xmlCable(num, tipo, r3), c); return; }
             catch (e) { if (/no respondi|no encuentra|Elige|cargó|Sin conexión/i.test(e.message)) throw e; if (!primero) primero = e; }
         }
         throw primero;
@@ -672,6 +673,69 @@ html, body { margin: 0; padding: 0; background: #fff; }
     });
     $('selZoom').addEventListener('change', cableVista);
     cableVista();
+
+    // ------------------------------------------------------------------ v1.4.5: «Cable R3» (TQT: 0000 arriba, R3: 0000 abajo)
+    // Al emparejar una R3 con su R1/R2 (evento WS), la tarjeta y su R3 se cargan solas en esta zona.
+    const CR3 = new Map();   // id -> tarjeta con R3 (lote cargado + las que llegan por WebSocket)
+    const num4 = (v) => String(v || '').padStart(4, '0');
+    const r3De = (t) => { const m = String((t && ((t.r3 && t.r3.nombre) || t.nombre_r3)) || '').match(/(\d{4})$/); return m ? m[1] : ''; };
+    const nodoCableR3 = (tqt, r3) => h('div', { class: 'dymo-label cable', role: 'img', 'aria-label': `Etiqueta de cable R3: TQT ${tqt}, R3 ${r3}` },
+        h('div', { class: 'cable-num doble' }, h('span', null, `TQT: ${tqt}`), h('span', null, `R3: ${r3}`)), h('div', { class: 'cable-vacia', 'aria-hidden': 'true' }), h('i', { class: 'cable-linea', 'aria-hidden': 'true' }));
+    function cr3Datos() {
+        const a = $('cr3Tqt').value.trim(), b = $('cr3R3').value.trim();
+        if (!a && !b) return { ok: false, error: '' };
+        if (!/^\d{1,4}$/.test(a) || !/^\d{1,4}$/.test(b)) return { ok: false, error: !b ? 'Esa tarjeta no tiene R3 emparejada: escribe el número de la R3.' : 'Escribe números de 1 a 4 dígitos.' };
+        return { ok: true, tqt: num4(a), r3: num4(b) };
+    }
+    function cr3Vista() {
+        const d = cr3Datos();
+        $('cr3Label').replaceChildren(nodoCableR3(d.ok ? d.tqt : '0000', d.ok ? d.r3 : '0000'));
+        $('cr3ZoomHost').style.transform = `scale(${state.zoom})`;
+        const lbl = $('cr3Label').firstChild; $('cr3ZoomHost').style.width = `${lbl.offsetWidth * state.zoom}px`; $('cr3ZoomHost').style.height = `${lbl.offsetHeight * state.zoom}px`;
+        $('cr3Info').textContent = d.error || (d.ok ? `Etiqueta: TQT ${d.tqt} · R3 ${d.r3}` : 'Vista previa · 57 × 32 mm. Elige una tarjeta o empareja una R3.');
+        $('btnCr3Print').disabled = $('btnCr3Open').disabled = !d.ok || state.busy;
+    }
+    function cr3Lista() {
+        const sel = $('cr3Sel'), actual = sel.value;
+        const items = [...CR3.values()].sort((a, b) => (parseInt(b.id_tarjeta_num, 10) || 0) - (parseInt(a.id_tarjeta_num, 10) || 0));
+        sel.replaceChildren(h('option', { value: '' }, items.length ? `— ${items.length} tarjeta${items.length === 1 ? '' : 's'} con R3 —` : 'Ninguna tarjeta con R3 en el lote'),
+            ...items.map((t) => h('option', { value: String(t.id) }, `TQT ${num4(t.id_tarjeta_num)} · R3 ${r3De(t)}`)));
+        sel.value = CR3.has(+actual) ? actual : '';
+    }
+    function cr3Cargar(t) {
+        $('cr3Tqt').value = num4(t.id_tarjeta_num); $('cr3R3').value = r3De(t);
+        $('cr3Sel').value = CR3.has(t.id) ? String(t.id) : ''; cr3Vista();
+    }
+    function cr3Recibir(t, avisar) {
+        if (!t || !t.id) return;
+        const antes = CR3.get(t.id);
+        if (!r3De(t)) { if (antes) { CR3.delete(t.id); cr3Lista(); } return; }
+        CR3.set(t.id, t); cr3Lista();
+        if (avisar && (!antes || r3De(antes) !== r3De(t))) {   // R3 recién emparejada: se carga sola
+            cr3Cargar(t); toast(`Cable R3 listo: TQT ${num4(t.id_tarjeta_num)} · R3 ${r3De(t)}`, { kind: 'ok', ms: 4000 });
+        }
+    }
+    $('cr3Sel').addEventListener('change', () => { const t = CR3.get(+$('cr3Sel').value); if (t) cr3Cargar(t); else cr3Vista(); });
+    $('cr3Tqt').addEventListener('input', () => {   // al escribir la tarjeta, la R3 emparejada se llena sola
+        const n = parseInt($('cr3Tqt').value, 10); const t = [...CR3.values()].find((x) => parseInt(x.id_tarjeta_num, 10) === n);
+        if (t) { $('cr3R3').value = r3De(t); $('cr3Sel').value = String(t.id); } else $('cr3Sel').value = '';
+        cr3Vista();
+    });
+    $('cr3R3').addEventListener('input', cr3Vista);
+    $('selZoom').addEventListener('change', cr3Vista);
+    $('btnCr3Print').addEventListener('click', async () => {
+        const d = cr3Datos(); if (!d.ok) return;
+        const c = Math.max(1, Math.min(99, parseInt($('cr3Copias').value || '1', 10) || 1));
+        state.busy = true; refrescarBotones(); cr3Vista();
+        try { await imprimirCable($('selPrinter').value, d.tqt, c, d.r3); toast(`Etiqueta de cable R3 (TQT ${d.tqt} · R3 ${d.r3}) enviada a la DYMO.`, { kind: 'ok', ms: 4000 }); }
+        catch (e) { $('aviso').prepend(T.banner('bad', 'alert', h('b', null, 'Etiqueta de cable R3 sin imprimir. '), e.message || String(e))); }
+        state.busy = false; refrescarBotones(); cr3Vista();
+    });
+    $('btnCr3Open').addEventListener('click', () => {
+        const d = cr3Datos(); if (!d.ok) return;
+        bajar(`/api/dymo/cable/archivo?numero=${d.tqt}&r3=${d.r3}&tipo=label`, `TQT_cable_${d.tqt}_R3_${d.r3}.label`);
+    });
+    cr3Lista(); cr3Vista();
 
     // ------------------------------------------------------------------ v1.3.45: escanear un lote pequeño para imprimir
     // R1/R2 → la etiqueta de su tarjeta (R1 + R2); R3 → etiqueta R3 doble, de dos en dos (si queda una sola, la otra mitad va vacía).
@@ -786,6 +850,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         wsc.on('ESCANER_VINCULADO', (d) => { if (d && d.id === ESC.id) { ESC.moviles = d.moviles || ESC.moviles + 1; escBoton(); toast('Celular vinculado: ya puedes escanear', { kind: 'ok' }); } });
         wsc.on('ESCANER_CERRADO', (d) => { if (d && d.id === ESC.id) { escOlvidar(); toast('Se cerró la vinculación con el celular', { kind: 'warn' }); } });
         wsc.on('ESCANEO_REMOTO', (d) => escRemoto(d));
+        ['TARJETA_EMPAREJADA', 'TARJETA_ACTUALIZADA'].forEach((ev) => wsc.on(ev, (d) => cr3Recibir(d && d.tarjeta, true)));   // v1.4.5
     }
     async function escRemoto(d) {
             if (!d || d.id !== ESC.id || !d.codigo) return;
@@ -816,7 +881,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         document.querySelectorAll('main [data-zona]:not(button)').forEach((el) => { el.hidden = el.dataset.zona !== z; });
         try { localStorage.setItem(ZONA_KEY, z); } catch (e) { /* nada */ }
         // Las vistas previas miden la etiqueta y oculta mide 0: se recalculan al mostrarse
-        aplicarZoom(); r3Vista(); cableVista();
+        aplicarZoom(); r3Vista(); cableVista(); cr3Vista();
         if (enfocar && z === 'esc') $('escIn').focus();   // listo para el lector USB
     }
     document.querySelectorAll('#zonas [data-zona]').forEach((b) => b.addEventListener('click', () => mostrarZona(b.dataset.zona, true)));

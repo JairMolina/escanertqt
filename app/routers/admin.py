@@ -24,7 +24,7 @@ from app.database.db import NoEncontradoError
 from app.database.models import MESES_ES
 from app.routers.excel_dymo import excel_engine, ruta_permitida
 from app.routers.ws import manager
-from app.services import admin_auth, correo, usuarios
+from app.services import admin_auth, cable_r3_auto, correo, usuarios
 from app.services.admin_auth import (
     AdminDeshabilitadoError, BloqueadoError, TokenInvalidoError, MENSAJE_DESHABILITADO,
 )
@@ -314,6 +314,23 @@ async def cuenta_baja(email: str, request: Request, _: Dict = Depends(admin_requ
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     await run_in_threadpool(db.log_evento, "USUARIO_BAJA", None, usuarios.normalizar(email), "Cuenta eliminada", _quien(request))
     return {"ok": True}
+
+
+class CableR3AutoIn(BaseModel):
+    activo: bool
+
+
+@router.get("/dymo/cable-r3-auto", summary="v1.4.6: ¿se imprime solo el «Cable R3» al asignar una R3 a una TQT?")
+def get_cable_r3_auto(_: Dict = Depends(admin_requerido)):
+    return cable_r3_auto.estado()
+
+
+@router.put("/dymo/cable-r3-auto", summary="v1.4.6: activar o desactivar el «Cable R3» automático (DYMO compartida)")
+async def put_cable_r3_auto(payload: CableR3AutoIn, request: Request, _: Dict = Depends(admin_requerido)):
+    res = await run_in_threadpool(cable_r3_auto.set_activo, payload.activo)
+    await run_in_threadpool(db.log_evento, "CABLE_R3_AUTO_" + ("ON" if payload.activo else "OFF"), None,
+                            None, "Impresión automática del cable R3 " + ("activada" if payload.activo else "desactivada"), _quien(request))
+    return {**await run_in_threadpool(cable_r3_auto.estado), **res}
 
 
 @router.get("/resumen", summary="Conteos por lote, tipo y estado, y tamaño de la BD")

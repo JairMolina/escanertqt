@@ -33,7 +33,7 @@ from app.database.models import (
     VersionMasiva,
 )
 from app.routers.ws import manager
-from app.services import firmware_build, esp32_firmware, usuarios
+from app.services import cable_r3_auto, firmware_build, esp32_firmware, usuarios
 from app.services.admin_dep import admin_si_habilitado
 
 logger = logging.getLogger(__name__)
@@ -72,6 +72,9 @@ async def _notificar_tarjeta(tarjeta: Optional[Dict[str, Any]], evento: str = "T
     if mensaje:
         datos["mensaje"] = mensaje
     await manager.broadcast(evento, datos)
+    cable = await run_in_threadpool(cable_r3_auto.al_notificar, tarjeta)   # v1.4.6: «Cable R3» automático
+    if cable:
+        await manager.broadcast("CABLE_R3_AUTO", {"tarjeta_id": tarjeta["id"], **cable})
 
 
 # ============================================================================

@@ -8,7 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from app.routers.excel_dymo import NOMBRE_R3, NUMERO_CABLE, _exigir_aprobada, _tarjeta_o_404
+from app.routers.excel_dymo import NOMBRE_R3, _cable_ok, _exigir_aprobada, _tarjeta_o_404
 from app.routers.stm32 import operator, run
 from app.services import dymo_remoto as svc
 from app.services.dymo_service import DymoService, obtener_formato
@@ -21,6 +21,7 @@ class Pedido(BaseModel):
     tipo: Literal["tarjeta", "aprobada", "cable", "r3"]
     tarjeta_id: Optional[int] = Field(default=None, gt=0)
     numero: str = Field(default="", max_length=13)
+    r3: str = Field(default="", max_length=6)   # v1.4.5: «Cable R3»
     nombres: List[str] = Field(default_factory=list, max_length=2)
     copias: int = Field(default=1, ge=1, le=20)
 
@@ -49,8 +50,9 @@ def _validar(p: Pedido):
         num = str(t.get("id_tarjeta_num") or t["id"])
         return {"tarjeta_id": p.tarjeta_id}, ("Aprobada · " if p.tipo == "aprobada" else "Tarjeta ") + num
     if p.tipo == "cable":
-        if not re.fullmatch(NUMERO_CABLE, p.numero):
-            raise HTTPException(422, f"Número inválido: {p.numero}")
+        _cable_ok(p.numero, p.r3)
+        if p.r3:
+            return {"numero": p.numero, "r3": p.r3}, f"Cable TQT {p.numero} · R3 {p.r3}"
         return {"numero": p.numero}, "Cable " + p.numero
     if not 1 <= len(p.nombres) <= 2 or not all(re.fullmatch(NOMBRE_R3, n) for n in p.nombres):
         raise HTTPException(422, "Indica una o dos placas con nombre TQT-Rx-Vxx-0000.")
@@ -64,7 +66,7 @@ def _svg(tipo, params):
             _exigir_aprobada(params["tarjeta_id"])
         return DymoService.generate_svg_preview(t, FORMATO, guia=False, aprobada=tipo == "aprobada", borde=False)
     if tipo == "cable":
-        return DymoService.generate_cable_svg(params["numero"], FORMATO)
+        return DymoService.generate_cable_svg(params["numero"], FORMATO, params.get("r3", ""))
     return DymoService.generate_r3_svg(params["nombres"], FORMATO)
 
 

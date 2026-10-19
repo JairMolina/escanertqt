@@ -213,6 +213,25 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 2000);
             toast(`Descargado: ${nombre}. Contiene datos y cuentas reales: guárdalo en un lugar seguro.`, { kind: 'ok', ms: 6000 });
         } }, 'Descargar copia de la base (.db)');
+        // v1.4.6: «Cable R3» automático en la DYMO compartida al asignar una R3 a una TQT
+        const cr3 = await adm('/api/admin/dymo/cable-r3-auto', { timeout: 8000 });
+        if (cr3.ok && cr3.data) {
+            const chkCr3 = h('input', { type: 'checkbox', id: 'cableR3Auto', checked: cr3.data.activo ? '' : null, style: 'width:22px;height:22px;accent-color:var(--accent)' });
+            const estCr3 = h('p', { class: 'muted', 'aria-live': 'polite' });
+            const pintarCr3 = (d) => { estCr3.textContent = (d.activo ? 'Activada. ' : 'Desactivada. ') + (d.dymo_disponible ? 'DYMO compartida en línea.' : 'La DYMO compartida no está en línea: mientras siga así no se imprimirá (se reintenta en la siguiente actualización de la tarjeta).'); };
+            pintarCr3(cr3.data);
+            chkCr3.addEventListener('change', async () => {
+                chkCr3.disabled = true;
+                const r = await adm('/api/admin/dymo/cable-r3-auto', { method: 'PUT', body: { activo: chkCr3.checked }, timeout: 15000 });
+                chkCr3.disabled = false;
+                if (!r.ok) { chkCr3.checked = !chkCr3.checked; if (r.status !== 401) toast('No se pudo guardar: ' + (r.error || r.status), { kind: 'bad' }); return; }
+                pintarCr3(r.data);
+                toast(r.data.activo ? `Cable R3 automático activado${r.data.marcadas ? ` (${r.data.marcadas} tarjetas que ya tenían R3 no se imprimirán)` : ''}.` : 'Cable R3 automático desactivado.', { kind: 'ok', ms: 5000 });
+            });
+            box.append(h('div', null, tit('Etiqueta «Cable R3» automática'),
+                h('p', { class: 'muted' }, 'Al asignar una R3 a una TQT (emparejar, armar o cambiar placa), el servidor envía sola la etiqueta «TQT: 0000 / R3: 0000» a la DYMO compartida (Raspberry). Cada pareja TQT + R3 se imprime una sola vez; si se cambia la R3, sale la etiqueta nueva.'),
+                h('label', { for: 'cableR3Auto', style: 'display:flex;gap:10px;align-items:center;min-height:44px;cursor:pointer' }, chkCr3, 'Imprimir el cable R3 automáticamente'), estCr3));
+        }
         box.append(h('div', null, tit('Copia de la base de datos'), h('p', { class: 'muted' }, 'Copia completa y verificada de la base, hecha al momento (incluye usuarios y contraseñas cifradas). Úsala para restaurar en otro equipo.'), btnBd));
         box.append(h('div', null, tit('Últimos respaldos'), resp.length
             ? h('div', { class: 'tablewrap', tabindex: '0', role: 'region', 'aria-label': 'Tabla de respaldos' }, h('table', { class: 'grid' }, h('thead', null, h('tr', null, h('th', null, 'Archivo'), h('th', null, 'Tamaño'))),

@@ -92,6 +92,7 @@
                 <button type="button" data-zona="esc" aria-controls="escBox" aria-pressed="false">Escanear <span class="cuenta" id="escCuenta" hidden></span></button>
                 <button type="button" data-zona="r3" aria-controls="r3Box" aria-pressed="false">R3</button>
                 <button type="button" data-zona="cable" aria-controls="cableBox" aria-pressed="false">Cable</button>
+                <button type="button" data-zona="cr3" aria-controls="cr3Box" aria-pressed="false">Cable R3</button>
             </div>
             <div class="field"><label for="selZoom">Ampliación de la vista</label>
                 <select class="input" id="selZoom"><option value="1">Tamaño real (1×)</option><option value="2">2×</option><option value="3" selected>3×</option><option value="4">4×</option></select></div>
@@ -183,6 +184,27 @@
                 <button class="btn" type="button" id="btnCableOpen"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
             </div>
         </section>
+        <!-- v1.4.5: «Cable R3» = TQT: 0000 arriba y R3: 0000 abajo; se llena solo al emparejar una R3 con su R1/R2 -->
+        <section class="panel pad stack" aria-labelledby="hCr3" id="cr3Box" data-zona="cr3" hidden>
+            <div class="row wrap" style="gap:8px;align-items:baseline">
+                <h2 class="silk grow" id="hCr3" style="min-width:200px">Etiquetas cable R3</h2>
+                <span class="hint">«TQT: 0000» arriba y «R3: 0000» abajo. Al emparejar una R3 con su R1/R2, la tarjeta y la R3 se cargan solas.</span>
+            </div>
+            <div class="row wrap" style="gap:10px;align-items:flex-end">
+                <div class="field" style="min-width:220px;flex:1 1 220px"><label for="cr3Sel">Tarjetas con R3 emparejada</label><select class="input" id="cr3Sel"></select></div>
+                <div class="field" style="width:130px"><label for="cr3Tqt">Tarjeta TQT</label><input class="input mono" id="cr3Tqt" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
+                <div class="field" style="width:130px"><label for="cr3R3">R3</label><input class="input mono" id="cr3R3" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
+                <div class="field" style="width:110px"><label for="cr3Copias">Copias</label><input class="input mono" id="cr3Copias" inputmode="numeric" maxlength="2" value="1"></div>
+            </div>
+            <div class="stage-preview" role="region" aria-label="Vista previa de la etiqueta de cable R3">
+                <div class="silk" style="width:100%" id="cr3Info" aria-live="polite">Vista previa · 57 × 32 mm</div>
+                <div id="cr3ZoomHost" class="zoomhost"><div id="cr3Label"></div></div>
+            </div>
+            <div class="row wrap" style="gap:8px">
+                <button class="btn btn-primary" type="button" id="btnCr3Print"><span class="svg-slot" data-i="printer"></span> Imprimir cable R3 en DYMO</button>
+                <button class="btn" type="button" id="btnCr3Open"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
+            </div>
+        </section>
         <div id="prog" class="stack" hidden><div class="progress" aria-hidden="true"><i id="progBar"></i></div><div class="hint" id="progTxt" role="status" aria-live="polite"></div></div>
     </main>
 </div>
@@ -193,6 +215,6 @@
 <script src="/static/js/vendor/dymo.connect.framework.js?v=1316"></script>
 <script src="/static/js/dymo_connect.js?v=1389"></script>
 <script src="/static/js/dymo_remoto.js?v=1420"></script>
-<script src="/static/js/dymo.js?v=1420"></script>
+<script src="/static/js/dymo.js?v=1450"></script>
 </body>
 </html>
