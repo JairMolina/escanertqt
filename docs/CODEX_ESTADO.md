@@ -15,3 +15,7 @@ Sin trabajos activos antes de despliegue; respaldo SQLite predeploy_1.4.3_202610
 ## Nota operativa R2 (2026-10-16)
 
 Documentado en R2_ALTA_GENERICA_42.md el inicio de programar_base.ps1 con ExecutionPolicy Bypass limitado al proceso. El usuario reporto bloqueo de PowerShell; no confirmo nueva grabacion. Se mantiene BIN generico4.0 fijo seguido de alta y OTA web con datos/credencial por unidad; evidencia previa0067 FW4.2. Sin cambios de codigo ni nueva prueba fisica.
+
+## 2026-10-19 — Grabacion base R2 por BOOT
+
+programar_base.ps1 conserva Manual/Enter predeterminado y agrega -Modo Automatico: escucha ROM 115200 hasta boot:0x3 + waiting for download completos, libera COM antes de esptool y espera nuevo BOOT tras cada escritura. Error de escritura automatica detiene sin reintento. BIN fijo y hash sin cambios. Copia actualizada en la carpeta offline real FW_GENERAL_4_0/TQT_R2_BASE_V4_0_GENERIC. Pruebas PowerShell5.1: sintaxis,8casosROM y flujo acumulado PASS; -Comprobar Manual/Automatico reales PASS sin abrirCOM4. No grabacion fisica; pendiente usuario probar nuevoBOOT con monitorserial cerrado. Documentacion en README del firmware. Produccion sigue1.4.3 sin nuevos despliegues.

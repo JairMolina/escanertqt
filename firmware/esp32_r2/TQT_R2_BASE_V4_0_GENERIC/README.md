@@ -27,3 +27,24 @@ Para producción en masa usar directamente el BIN fijo ya registrado, sin recomp
 ```
 
 Cambiar COM4 por el puerto real. El comando comprueba el hash del BIN, usa 460800 baud y espera Enter para cada tarjeta en BOOT + RESET. Solo confirma la tarjeta si esptool termina y verifica la escritura. S permite salir. No hay operaciones de eFuses ni de borrado completo de flash.
+
+
+### Grabacion por Enter o deteccion automatica de BOOT
+
+El modo predeterminado conserva ENTER por tarjeta:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\programar_base.ps1" -Puerto COM4
+```
+
+Para iniciar cada grabacion al recibir un nuevo arranque DOWNLOAD_BOOT:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\programar_base.ps1" -Puerto COM4 -Modo Automatico
+```
+
+Cierra el monitor serial de Arduino u otra aplicacion que use COM4. Espera el aviso «Esperando NUEVO BOOT», conecta una sola R2 y genera BOOT+RESET. El script escucha el mensaje ROM a 115200, cierra ese lector y entrega el puerto a esptool para grabar a la velocidad elegida (460800 predeterminada). No cambia el BIN ni escribe eFuses.
+
+Espera «Grabacion y hash verificados» antes de retirar los contactos. Cambia la tarjeta y genera otro BOOT+RESET despues del nuevo aviso de espera. No identifica por si mismo si has colocado otra unidad: un nuevo reset en modo BOOT de la misma tarjeta tambien inicia otra grabacion. No basta una tarjeta que ya estaba en BOOT sin emitir un nuevo mensaje. Ctrl+C termina la espera; si falla la grabacion automatica, se detiene sin reintentar. No interrumpas una escritura en curso.
+
+Ambos modos admiten `-Comprobar`: valida BIN/herramienta sin abrir el puerto ni escribir. El nuevo modo automatico requiere validacion fisica; las pruebas de software no programan hardware.

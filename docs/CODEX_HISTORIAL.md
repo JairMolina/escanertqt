@@ -132,3 +132,7 @@ Evidencia: Sin trabajos activos antes de despliegue; respaldo SQLite predeploy_1
 ## 2026-10-16 — Aclaracion operativa base R2
 
 Anadida solucion temporal al bloqueo PowerShell y flujo BIN generico4.0 a alta/OTA en docs/R2_ALTA_GENERICA_42.md. No se ejecuto el programador, no se cambio politica Windows y no se verifico nueva grabacion. Produccion permanece1.4.3.
+
+## 2026-10-19 — Base generica R2, inicio automatico por BOOT
+
+Anadido parametro -Modo Manual|Automatico (Manual predeterminado) al script fijo. Espera mensajeROM fresco antes de cada escritura; SerialPort liberado en finally antes de esptool; sin reintento automatico al fallar. Copiado a carpeta offline solicitada. Tests deteccionROM y comprobacion local de ambosmodos PASS sin hardware. BIN/eFuses no modificados; modo automatico pendiente validacion fisica.
