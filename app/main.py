@@ -20,8 +20,9 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station, esp32, dymo_remoto
+from app.routers import test_station, esp32, dymo_remoto, plataforma
 from app.ssl_cert import ensure_ssl_certificates
+from app import modulos as modulos_cat
 
 # Configurar logging
 logging.basicConfig(
@@ -121,7 +122,7 @@ CABECERAS_SEGURIDAD = {
 
 # Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
-RUTAS_PUBLICAS = {"/inicio", "/api/modulos", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
+RUTAS_PUBLICAS = {"/inicio", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js")
 
 
@@ -180,6 +181,14 @@ def _permiso_rol(rol: Optional[str], ruta: str, metodo: str):
     return _sin_acceso(rol, ruta, metodo, "otra", "")
 
 
+def _sin_modulo(ruta: str, metodo: str):
+    """v1.4.11: la cuenta no tiene asignado Escáner TQT: vuelve al portal (página) o 403 (API, archivos y envíos)."""
+    if ruta.startswith(("/api/", "/ws", "/static/")) or metodo not in ("GET", "HEAD"):
+        return JSONResponse(status_code=403, content={"detail": "Tu cuenta no tiene acceso al módulo Escáner TQT. Pide a un administrador que te lo asigne.",
+                                                       "zona": "modulo"}, headers={"X-Acceso": "modulo"})
+    return RedirectResponse("/inicio?denegado=" + modulos_cat.ESCANER_TQT, status_code=302)
+
+
 async def _exigir_sesion(request: Request):
     """None si puede pasar; si no, la respuesta de rechazo (401 JSON para la API, redirección a /login para las páginas)."""
     ruta = request.url.path
@@ -189,6 +198,8 @@ async def _exigir_sesion(request: Request):
         return None
     try:
         u = await run_in_threadpool(usuarios.validar_sesion, request.cookies.get(usuarios.COOKIE))
+        if not modulos_cat.puede(u, modulos_cat.ESCANER_TQT) and not ruta.startswith("/api/auth/"):
+            return _sin_modulo(ruta, request.method)
         return _permiso_rol(u.get("rol"), ruta, request.method)
     except usuarios.SesionInvalidaError as e:
         if ruta.startswith(("/api/", "/static/", "/ws")) or request.method not in ("GET", "HEAD"):
@@ -248,6 +259,7 @@ app.include_router(validacion.agent_router)
 app.include_router(test_station.router)
 app.include_router(test_station.agent_router)
 app.include_router(dymo_remoto.router)   # v1.4.2: DYMO compartida (Raspberry)
+app.include_router(plataforma.router)   # v1.4.12: cuentas por módulo desde el portal
 
 
 def _serve_file(file_path: Path, fallback_path: Path = None) -> FileResponse:
@@ -330,31 +342,25 @@ async def serve_login(request: Request):
     return resp
 
 
-# v1.4.10: módulos de la plataforma. Agregar un módulo = agregar una entrada (el portal /inicio se arma solo).
-# estado: disponible | proximamente | mantenimiento. `url` solo se usa si está disponible.
-MODULOS = [
-    {"id": "escaner-tqt", "nombre": "Escáner TQT", "descripcion": "Recepción, emparejado, programación y entrega de tarjetas TQT.",
-     "icono": "chip", "url": "/", "estado": "disponible", "acento": "#D9A441", "sesion": True},
-    {"id": "almacen", "nombre": "Almacén", "descripcion": "Existencias, entradas y salidas de materiales.",
-     "icono": "caja", "url": "", "estado": "proximamente", "acento": "#4FB3BF", "sesion": True},
-    {"id": "calidad", "nombre": "Calidad", "descripcion": "Inspecciones, defectos y seguimiento de lotes.",
-     "icono": "escudo", "url": "", "estado": "proximamente", "acento": "#8FBF6A", "sesion": True},
-    {"id": "reportes", "nombre": "Reportes", "descripcion": "Indicadores de producción de todos los módulos.",
-     "icono": "grafica", "url": "", "estado": "proximamente", "acento": "#C98BD9", "sesion": True},
-]
-
-
 @app.get("/api/modulos", tags=["Config"])
-def modulos():
-    """Lista pública (solo lectura) de módulos para el portal."""
-    return {"version": settings.APP_VERSION, "modulos": MODULOS}
+async def modulos(request: Request):
+    """Lista pública (solo lectura) de módulos para el portal; con sesión dice a cuáles puede entrar la cuenta (v1.4.11)."""
+    try:
+        u = await run_in_threadpool(usuarios.validar_sesion, request.cookies.get(usuarios.COOKIE))
+    except usuarios.SesionInvalidaError:
+        u = None
+    yo = {"email": u["email"], "rol": u["rol"], "modulos": u["modulos"]} if u else None
+    return {"version": settings.APP_VERSION, "sesion": yo, "modulos": modulos_cat.para_portal(u)}
 
 
 @app.get("/inicio", include_in_schema=False)
-async def serve_inicio():
+async def serve_inicio(request: Request):
     """Portal de módulos (público): Escáner TQT es un módulo más de la plataforma."""
     html = (settings.STATIC_DIR / "inicio.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
-    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
+    resp = HTMLResponse(html, headers={"Cache-Control": "no-store"})
+    if not request.cookies.get("tqt_cid"):   # v1.4.13: el núcleo I+D tiene ingreso propio; misma marca anónima que /login para el límite de intentos
+        resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
+    return resp
 
 
 @app.get("/api/health", tags=["Config"])

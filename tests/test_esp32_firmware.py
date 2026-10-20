@@ -173,7 +173,7 @@ class Esp32FirmwareTests(unittest.TestCase):
     def test_api_upload_session_origin_and_exact_selected_download(self):
         body=dict(filename='R2.bin',contenido=base64.b64encode(self.raw).decode())
         self.assertEqual(iso.cliente_sin_sesion(app).post('/api/esp32/firmwares',json=body).status_code,401)
-        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general','modulos':['escaner-tqt']}):
             client=TestClient(app,base_url='https://testserver')
             self.assertEqual(client.post('/api/esp32/firmwares',json=body,headers={'Origin':'https://other.invalid'}).status_code,403)
             response=client.post('/api/esp32/firmwares',json=body)
@@ -192,7 +192,7 @@ class Esp32FirmwareTests(unittest.TestCase):
             with db.get_db() as c:
                 audit=c.execute("SELECT operador FROM escaneos WHERE evento='ESP32_PROGRAMADA' ORDER BY id DESC LIMIT 1").fetchone()
                 self.assertEqual(audit['operador'],self.operator)
-        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'consultor'}):
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'consultor','modulos':['escaner-tqt']}):
             self.assertEqual(client.post(f'/api/esp32/bin/{self.card["r2"]["id"]}').status_code,403)
 
     def test_programmed_r2_without_r3_shows_mac_and_firmware_everywhere(self):
@@ -201,9 +201,9 @@ class Esp32FirmwareTests(unittest.TestCase):
         with db.get_db() as c:   # dato heredado y obsoleto en la tarjeta: la PCB manda
             c.execute("UPDATE tarjetas_produccion SET firmware_r2='3.9' WHERE id=?",(tid,))
         client=TestClient(app,base_url='https://testserver')
-        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general','modulos':['escaner-tqt']}):
             self.assertEqual(client.put(f'/api/pcb/{r2}/programacion',json={'mac':mac,'firmware':'4.1'}).status_code,200)
-        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general','modulos':['escaner-tqt']}):
             detalle,lista_r,bymac,pcb_r=[client.get(u).json() for u in (f'/api/tarjetas/{tid}',f'/api/tarjetas?lote_id={self.card["lote_id"]}&limit=500',f'/api/tarjetas/by-mac/{mac}',f'/api/pcb/{r2}')]
         lista=[t for t in lista_r['items'] if t['id']==tid][0]
         for t in (detalle,lista,bymac):
@@ -219,7 +219,7 @@ class Esp32FirmwareTests(unittest.TestCase):
         r2=self.card['r2']['id']
         with patch('app.services.esp32_ota.finish',return_value={'verified':True,'pcb':inv.guardar_programacion(r2,iso.mac_unica(),'4.1',self.operator)}), \
              patch('app.routers.esp32.manager.broadcast',side_effect=capture), \
-             patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+             patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general','modulos':['escaner-tqt']}):
             body=dict(nombre='TQT_R2_V30_0001',hw='3.0',fw='4.1',mac=iso.mac_unica(),ota_protocol=1,key_id='a'*16,nonce='b'*32,
                       app_sha256='c'*64,proof='d'*64,boot_valid=True,partition=0)
             res=TestClient(app,base_url='https://testserver').post('/api/esp32/ota/result/x',json=body)
@@ -247,7 +247,7 @@ class Esp32FirmwareTests(unittest.TestCase):
         self.ready_r1('verified')
         self.assertTrue(f.gate(r1)['ok'])
         f.prepare(r1,saved['id'])
-        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general','modulos':['escaner-tqt']}):
             client=TestClient(app,base_url='https://testserver')
             self.assertEqual(client.post(f'/api/esp32/bin/{r1}?firmware_id={saved["id"]}').status_code,200)
             self.assertEqual(client.get(f'/api/esp32/r1-gate/{r1}').json()['ok'],True)
@@ -291,7 +291,7 @@ class Esp32FirmwareTests(unittest.TestCase):
     def test_r1_api_upload_bin_and_programacion(self):
         image=self.r1_image()
         body=dict(filename='R1.bin',contenido=base64.b64encode(image).decode(),tipo='R1',version='2.0')
-        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general','modulos':['escaner-tqt']}):
             client=TestClient(app,base_url='https://testserver')
             self.assertEqual(client.post('/api/esp32/firmwares',json=body).status_code,422)   # R1: firmware fijo, no se sube por la web
             identifier=f.save(image,'R1.bin',self.operator,'R1','2.0')['id']

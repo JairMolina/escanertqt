@@ -1,7 +1,14 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-20 (Claude Code)
-Commit de referencia: rama `feat/portal-modulos` (v1.4.10, sin merge a main; producción en 1.4.9)
+Commit de referencia: ver `git log` de main (v1.4.13; producción en 1.4.9 hasta que se despliegue)
+
+## v1.4.11–v1.4.13 (2026-10-20, Claude Code)
+- Plataforma «I+D»: portal `/inicio` con 7 módulos (catálogo `app/modulos.py`; Escáner TQT disponible, el resto «Próximamente»), órbitas con una sola elipse por anillo.
+- Acceso por módulo: columna `usuarios.modulos` (default `escaner-tqt`, la crea sola al arrancar); administradores entran a todo; sin Escáner TQT asignado, páginas → `/inicio?denegado=escaner-tqt` y API 403 `X-Acceso: modulo`.
+- Núcleo I+D: siempre botón; pide «Acceso de administrador» (`POST /api/plataforma/entrar`, solo abre sesión a administradores) y despliega «Cuentas y módulos» (`app/routers/plataforma.py`: GET/PATCH cuentas, POST `/modulos/{id}/todos`). También en Administración › Cuentas.
+- Evidencia: 125 pruebas de las suites pertinentes OK (test_plataforma_cuentas y test_portal_modulos nuevas). Docker local 1.4.13 healthy. Móvil revisado con emulación CDP a 360/390/412 px (sin desborde, objetivos ≥40 px) y panel de cuentas con servidor aislado. Sin prueba en celular físico ni con cuentas reales.
+- Pendiente: desplegar; los 6 módulos nuevos aún no tienen aplicación.
 
 ## v1.4.10 (2026-10-20, Claude Code)
 - Portal de módulos en `/inicio` (constelación: núcleo TQT y módulos como estrellas en órbita). Módulos en `MODULOS` de `app/main.py`, servidos en `GET /api/modulos` (público). Sin sesión, `/` → `/inicio`; las demás páginas siguen → `/login?next=`. Enlace «← Módulos» en login, consola y móvil. Archivos nuevos: `inicio.html`, `css/inicio.css`, `js/inicio.js`.

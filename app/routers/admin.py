@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
 
+from app import modulos as modulos_cat
 from app.config import settings
 from app.database import admin_ops, db
 from app.database.db import NoEncontradoError
@@ -223,6 +224,7 @@ class CuentaIn(BaseModel):
 class CuentaCambioIn(BaseModel):
     rol: Optional[str] = Field(None, max_length=20)
     activo: Optional[bool] = None
+    modulos: Optional[List[str]] = Field(None, max_length=30)   # v1.4.11: ids de app/modulos.py
 
 
 def _quien(request: Request) -> str:
@@ -262,7 +264,8 @@ def _enviar_invitacion(email: str, rol: str, enlace: str, por: str) -> Dict[str,
 
 @router.get("/usuarios", summary="Cuentas de usuario con su rol y estado")
 async def cuentas(_: Dict = Depends(admin_requerido)):
-    return {"items": await run_in_threadpool(usuarios.listar), "roles": list(usuarios.ROLES), "smtp": correo.configurado()}
+    return {"items": await run_in_threadpool(usuarios.listar), "roles": list(usuarios.ROLES),
+            "modulos": [{"id": m["id"], "nombre": m["nombre"], "estado": m["estado"]} for m in modulos_cat.MODULOS], "smtp": correo.configurado()}
 
 
 @router.post("/usuarios", summary="Dar de alta una cuenta y enviarle la invitación por correo")
@@ -294,7 +297,7 @@ async def cuenta_reenviar(email: str, request: Request, _: Dict = Depends(admin_
 @router.patch("/usuarios/{email}", summary="Cambiar rol o activar/desactivar una cuenta")
 async def cuenta_cambio(email: str, payload: CuentaCambioIn, request: Request, _: Dict = Depends(admin_requerido)):
     try:
-        await run_in_threadpool(usuarios.actualizar_cuenta, email, payload.rol, payload.activo)
+        await run_in_threadpool(usuarios.actualizar_cuenta, email, payload.rol, payload.activo, None, payload.modulos)
     except LookupError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:

@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from app.config import settings
 from app.database import db
+from app import modulos as modulos_cat
 from app.services import admin_auth as aa
 
 COOKIE = "tqt_sesion"
@@ -52,6 +53,8 @@ def _asegurar_tabla(c) -> None:
         c.execute("ALTER TABLE usuarios ADD COLUMN inv_hash TEXT")
         c.execute("ALTER TABLE usuarios ADD COLUMN inv_exp REAL")
         c.execute("ALTER TABLE usuarios ADD COLUMN invitado_por TEXT")
+    if "modulos" not in cols:   # v1.4.11: módulos de la plataforma; las cuentas que ya existían conservan Escáner TQT
+        c.execute("ALTER TABLE usuarios ADD COLUMN modulos TEXT NOT NULL DEFAULT 'escaner-tqt'")
 
 
 def sembrar(db_path: Optional[Path] = None, iteraciones: Optional[int] = None) -> int:
@@ -71,8 +74,11 @@ def sembrar(db_path: Optional[Path] = None, iteraciones: Optional[int] = None) -
 def listar(db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
     with db.get_db(db_path) as c:
         _asegurar_tabla(c)
-        return [dict(r) for r in c.execute("SELECT email, rol, activo, debe_cambiar, creado, ultimo_acceso, invitado_por, "
-                                                "inv_hash IS NOT NULL AS pendiente, inv_exp FROM usuarios ORDER BY email")]
+        filas = [dict(r) for r in c.execute("SELECT email, rol, modulos, activo, debe_cambiar, creado, ultimo_acceso, invitado_por, "
+                                                 "inv_hash IS NOT NULL AS pendiente, inv_exp FROM usuarios ORDER BY email")]
+    for f in filas:
+        f["modulos"] = _modulos_de(f["modulos"])
+    return filas
 
 
 # ---------------------------------------------------------------- sesión firmada
@@ -127,10 +133,10 @@ def validar_sesion(token: Optional[str], db_path: Optional[Path] = None, ahora: 
         raise SesionInvalidaError("Sesión inválida.")
     with db.get_db(db_path) as c:
         _asegurar_tabla(c)
-        r = c.execute("SELECT hash, activo, debe_cambiar, rol FROM usuarios WHERE email = ?", (email,)).fetchone()
+        r = c.execute("SELECT hash, activo, debe_cambiar, rol, modulos FROM usuarios WHERE email = ?", (email,)).fetchone()
     if not r or not r["activo"] or not hmac.compare_digest(_huella(r["hash"]).encode(), str(datos.get("v", "")).encode()):
         raise SesionInvalidaError("La sesión ya no es válida: inicia sesión de nuevo.")
-    return {"email": email, "debe_cambiar": bool(r["debe_cambiar"]), "rol": r["rol"]}
+    return {"email": email, "debe_cambiar": bool(r["debe_cambiar"]), "rol": r["rol"], "modulos": _modulos_de(r["modulos"])}
 
 
 # ---------------------------------------------------------------- inicio de sesión y cambio de clave
@@ -418,7 +424,13 @@ def _admins_activos(c) -> int:
     return c.execute("SELECT COUNT(*) FROM usuarios WHERE activo = 1 AND rol = 'administrador'").fetchone()[0]
 
 
-def actualizar_cuenta(email: str, rol: Optional[str] = None, activo: Optional[bool] = None, db_path: Optional[Path] = None) -> None:
+def _modulos_de(guardado: Optional[str]) -> List[str]:
+    """Lista de ids guardada como texto; un id que ya no existe en el catálogo se ignora (no tumba la sesión)."""
+    return [i for i in modulos_cat.IDS if i in (guardado or "").split(",")]
+
+
+def actualizar_cuenta(email: str, rol: Optional[str] = None, activo: Optional[bool] = None, db_path: Optional[Path] = None,
+                      modulos: Optional[List[str]] = None) -> None:
     """Cambia rol y/o activa/desactiva (desactivar cierra sus sesiones). Nunca deja la app sin un administrador activo."""
     email = normalizar(email)
     with aa._lock, db.transaction(db_path) as c:
@@ -434,6 +446,8 @@ def actualizar_cuenta(email: str, rol: Optional[str] = None, activo: Optional[bo
         if quita_admin and _admins_activos(c) <= 1:
             raise ValueError("Debe quedar al menos un administrador activo.")
         c.execute("UPDATE usuarios SET rol = ?, activo = ? WHERE email = ?", (nuevo_rol, nuevo_act, email))
+        if modulos is not None:   # v1.4.11: ValueError si algún id no existe
+            c.execute("UPDATE usuarios SET modulos = ? WHERE email = ?", (",".join(modulos_cat.normalizar_lista(modulos)), email))
 
 
 def eliminar_cuenta(email: str, db_path: Optional[Path] = None) -> None:

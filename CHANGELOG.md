@@ -1,5 +1,25 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.13 — 2026-10-20
+- **El núcleo I+D pide el acceso de administrador.** El núcleo es siempre un botón: sin sesión, o con una cuenta que no es administrador, despliega ahí mismo «Acceso de administrador» (correo y contraseña); al entrar, el mismo panel se convierte en «Cuentas y módulos».
+- Órbitas: una sola elipse fina por anillo (antes se dibujaban tres trazos sobre la misma trayectoria que vibraban al pasar el cursor); el hover ya no se activa sobre las órbitas.
+- Móvil revisado con emulación de dispositivo (360/390/412 px): sin desborde horizontal, tarjetas de módulo opacas (las marcas del fondo se veían a través en tema claro) y la fila «Dar o quitar a todos» del panel de cuentas en una sola línea deslizable con su etiqueta.
+- `POST /api/plataforma/entrar`: solo abre sesión si la cuenta es administrador (403 sin crear sesión para las demás; 409 si debe cambiar su contraseña primero; mismo límite de intentos que el login). `/inicio` marca el equipo (`tqt_cid`) igual que `/login`.
+
+## v1.4.12 — 2026-10-20
+- **Centro de control en el núcleo I+D.** Para los administradores, el núcleo del portal despliega ahí mismo el panel «Cuentas y módulos»: matriz de cuentas × módulos con casillas, rol por cuenta, «Todos» por cuenta y «Dar/Quitar a todos» por módulo, búsqueda y guardado inmediato. En móvil es una hoja inferior con tarjetas por cuenta.
+- API nueva `app/routers/plataforma.py` (sesión normal, solo administradores): `GET /api/plataforma/cuentas`, `PATCH /api/plataforma/cuentas/{email}` (rol y/o módulos), `POST /api/plataforma/modulos/{id}/todos`. Cada cambio queda en el log (`USUARIO_MODULOS`, `MODULO_TODOS`). Sigue la regla de que siempre quede un administrador activo.
+- Pruebas nuevas en `tests/test_plataforma_cuentas.py`.
+
+## v1.4.11 — 2026-10-20
+- **Plataforma I+D.** El portal y su cabecera ahora dicen «I+D» (TQT queda solo en el módulo Escáner TQT). Las conexiones de la constelación son arcos que siguen las órbitas (antes se veían cuadradas).
+- **7 módulos:** Escáner TQT (disponible) y SpeedLocker, Skudo AntiJammer, TPMS, Skudo Sigfox, Caiquen e Impresora («Próximamente»). El catálogo vive en `app/modulos.py`.
+- **Acceso por módulo.** Los administradores entran a todos; las cuentas general y consultor solo a los módulos asignados (columna nueva `usuarios.modulos`; las cuentas existentes conservan Escáner TQT). Sin Escáner TQT asignado, las páginas de la app vuelven al portal con aviso y la API responde 403 (`X-Acceso: modulo`). `/api/modulos` y `/api/auth/yo` informan los módulos de la sesión.
+  - Administración › Cuentas: chips de módulos por cuenta y hoja para asignarlos (`PATCH /api/admin/usuarios/{email}` con `modulos`).
+  - El portal muestra «Sin acceso» en los módulos no asignados, la cuenta con su rol y «Cerrar sesión».
+- Vista móvil del portal revisada (lista de módulos, cabecera compacta, safe-area).
+- Pruebas nuevas de acceso por módulo en `tests/test_portal_modulos.py`.
+
 ## v1.4.10 — 2026-10-20
 - **Portal de módulos (`/inicio`).** Escáner TQT pasa a ser un módulo de la plataforma. El portal es una constelación: el núcleo TQT al centro y los módulos como estrellas en órbita (Escáner TQT disponible; Almacén, Calidad y Reportes «Próximamente»). Funciona con teclado y lector de pantalla, respeta `prefers-reduced-motion`, tiene tema claro/oscuro y en móvil muestra una lista.
   - Los módulos se definen en un solo lugar (`MODULOS` en `app/main.py`, servido en `GET /api/modulos`, público y de solo lectura). Agregar un módulo = agregar una entrada.

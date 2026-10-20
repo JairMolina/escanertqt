@@ -1,8 +1,9 @@
 /* inicio.js - Portal de módulos (/inicio). Público: no usa common.js (que necesita sesión) ni otras dependencias.
-   Constelación: el núcleo "TQT" al centro y los módulos como estrellas en órbitas elípticas unidas por trazas.
-   - Datos: GET /api/modulos (público). Estado del servidor: GET /api/health cada 30 s.
-   - Órbitas con requestAnimationFrame; se pausan con la pestaña oculta y, por órbita, con hover/foco en una estrella.
-   - prefers-reduced-motion: sin órbitas ni parallax (posiciones fijas). ≤640 px o pantallas bajas: lista vertical, sin órbitas. */
+   Constelación: el núcleo "I+D" al centro y los módulos como estrellas en órbitas elípticas; cada una se une al núcleo con un
+   arco curvo; la órbita es una sola elipse y su tramo iluminado recorta esa misma elipse (sin trazos paralelos).
+   - Datos: GET /api/modulos (público; con sesión trae `sesion` y `permitido` por módulo). Estado del servidor: GET /api/health cada 30 s.
+   - Las órbitas giran juntas con requestAnimationFrame; se pausan con la pestaña oculta y con hover/foco en una estrella.
+   - prefers-reduced-motion: sin órbitas ni parallax. ≤640 px o pantallas bajas: lista vertical, sin órbitas y fondo estático (ahorra batería). */
 (function () {
     'use strict';
     var $ = function (id) { return document.getElementById(id); };
@@ -17,10 +18,17 @@
         caja: '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
         escudo: '<path d="M12 3 4.5 6v5.5c0 4.5 3 8 7.5 9.5 4.5-1.5 7.5-5 7.5-9.5V6z"/><path d="m8.8 12 2.4 2.4 4-4.4"/>',
         grafica: '<path d="M4 20V4M4 20h16"/><path d="m7.5 15 3.5-4 3 2.5 4.5-6"/>',
+        candado: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2.5"/>',
+        llanta: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.2"/><path d="M12 3v4.8M12 16.2V21M3 12h4.8M16.2 12H21"/>',
+        antena: '<circle cx="12" cy="10" r="1.6"/><path d="M12 11.6V21M9 21h6M8.2 6.2a5.4 5.4 0 0 0 0 7.6M15.8 6.2a5.4 5.4 0 0 1 0 7.6M5.4 3.6a9.4 9.4 0 0 0 0 12.8M18.6 3.6a9.4 9.4 0 0 1 0 12.8"/>',
+        ave: '<path d="M2.5 9.5c3-4.5 6.5-4.5 9.5 1 3-5.5 6.5-5.5 9.5-1"/><path d="M12 10.5v5.2M12 15.7l-2.6 4.3M12 15.7l2.6 4.3"/>',
+        impresora: '<path d="M7 9V4h10v5"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14h10v6H7z"/><path d="M16.5 12h.01"/>',
         sol: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
         luna: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>'
     };
     var ESTADOS = { disponible: 'Disponible', proximamente: 'Próximamente', mantenimiento: 'En mantenimiento' };
+    var ROLES = { administrador: 'Administrador', general: 'General', consultor: 'Consultor' };
+    var MSG_SIN = 'Tu cuenta no tiene acceso a este módulo. Pídelo a un administrador.';
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function r1(n) { return Math.round(n * 10) / 10; }
@@ -68,6 +76,34 @@
     }
     salud(); setInterval(salud, 30000);
 
+    /* ================= sesión (cabecera) y aviso de acceso denegado ================= */
+    var sesionInfo = null;
+    function pintarSesion() {
+        var box = $('ses');
+        pintarNucleo();
+        if (!sesionInfo) { box.hidden = true; return; }
+        var mail = String(sesionInfo.email || ''), corto = mail.length > 28 ? mail.slice(0, 27) + '…' : mail;
+        $('sesMail').textContent = corto; $('sesQuien').title = mail;
+        $('sesRol').textContent = ROLES[sesionInfo.rol] || sesionInfo.rol || '';
+        box.hidden = false;
+    }
+    $('salir').addEventListener('click', function () {
+        this.disabled = true;
+        var fin = function () { location.reload(); };
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).then(fin, fin);
+    });
+    /* ?denegado=escaner-tqt: el servidor te devuelve aquí si la cuenta no tiene el módulo. Se muestra el aviso y se limpia la URL. */
+    (function () {
+        var q = new URLSearchParams(location.search), d = q.get('denegado');
+        if (d === null) return;
+        q.delete('denegado');
+        try { history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : '') + location.hash); } catch (e) { /* sin history */ }
+        if (d !== 'escaner-tqt') return;
+        $('denTxt').textContent = 'Tu cuenta no tiene acceso a Escáner TQT. Pide a un administrador que te lo asigne.';
+        $('denegado').hidden = false;
+    })();
+    $('denX').addEventListener('click', function () { $('denegado').hidden = true; $('modulos').focus(); });
+
     /* ================= campo de estrellas (canvas de fondo, parallax leve) ================= */
     var cv = $('campo'), cx2 = cv.getContext('2d');
     var W = 0, H = 0, dpr = 1, fondo = [], par = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -86,18 +122,19 @@
         cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
         cx2.setTransform(dpr, 0, 0, dpr, 0, 0);
         var n = Math.max(60, Math.min(280, Math.round(W * H / 7500)));
+        if (lista) n = Math.min(n, 90);                     // móvil: menos puntos (se pinta una sola vez)
         while (fondo.length < n) fondo.push({ u: Math.random(), v: Math.random(), z: .15 + Math.random() * .85, r: .5 + Math.random() * 1.1, f: Math.random() * TAU, s: .5 + Math.random() * 1.1, k: Math.random() < .1 ? 1 : Math.random() < .12 ? 2 : 0 });
         fondo.length = n;
         if (!corriendo()) pintarCampo(0);
     }
     function pintarCampo(t) {
         cx2.clearRect(0, 0, W, H);
-        var ox = par.x * 14, oy = par.y * 14, claro = col.claro, i, s, x, y, a;
+        var ox = par.x * 14, oy = par.y * 14, claro = col.claro, fijo = quieto || lista, i, s, x, y, a;
         for (i = 0; i < fondo.length; i++) {
             s = fondo[i];
             x = s.u * (W + 48) - 24 + ox * s.z; y = s.v * (H + 48) - 24 + oy * s.z;
             a = claro ? .16 + .34 * s.z : .22 + .66 * s.z;
-            if (!quieto) a *= .8 + .2 * Math.sin(t * s.s + s.f);
+            if (!fijo) a *= .8 + .2 * Math.sin(t * s.s + s.f);
             cx2.globalAlpha = a; cx2.fillStyle = s.k === 1 ? col.a : s.k === 2 ? col.i : col.t;
             if (claro && s.z > .72) { cx2.fillRect(x - 4, y - .5, 8, 1); cx2.fillRect(x - .5, y - 4, 1, 8); }   // plano técnico: marcas "+"
             else { cx2.beginPath(); cx2.arc(x, y, claro ? s.r * .8 : s.r, 0, TAU); cx2.fill(); }
@@ -106,16 +143,18 @@
         cx2.globalAlpha = 1;
     }
     addEventListener('pointermove', function (e) {
-        if (quieto || e.pointerType === 'touch') return;
+        if (quieto || lista || e.pointerType === 'touch') return;
         par.tx = (e.clientX / innerWidth - .5) * 2; par.ty = (e.clientY / innerHeight - .5) * 2;
     }, { passive: true });
     document.documentElement.addEventListener('pointerleave', function () { par.tx = 0; par.ty = 0; });
 
     /* ================= constelación ================= */
-    var items = [], orbs = [], aristas = [], lay = { W: 0, H: 0, cx: 0, cy: 0 };
+    var items = [], orbs = [], lay = { W: 0, H: 0, cx: 0, cy: 0 };
     var act = null, fichaItem = null, fw = 0, fh = 0, entrando = false;
     var st = { hov: null, foc: null, tap: null, esc: false, t: 0, silencio: false };
-    var TILT = -0.2;
+    var TILT = -0.2, TILT_G = TILT * 180 / Math.PI;
+    var FASE0 = { 'in': 5.25, mid: 0.7, out: 1.4 };       // desfase de cada órbita (comprobado: las etiquetas no se encimen entre 1024 y 1920 px)
+    var fase = 0, vel = 1;                                  // las órbitas giran juntas (misma velocidad): las etiquetas nunca se alcanzan entre sí
 
     function estadoMsg(k, txt, boton) {
         var m = $('msg'); m.dataset.k = k || ''; $('msgTxt').textContent = txt || '';
@@ -129,52 +168,58 @@
         tAviso = setTimeout(function () { a.textContent = ''; }, 5000);
     }
 
+    /* Con sesión, un módulo con aplicación (disponible o en mantenimiento) que la cuenta no tiene asignado se marca "Sin acceso". "Próximamente" no cambia. */
+    function bloqueado(m) { return !!(sesionInfo && m.permitido === false && m.estado !== 'proximamente'); }
+    function estadoTxt(m) { return bloqueado(m) ? 'Sin acceso' : (ESTADOS[m.estado] || esc(m.estado)); }
+    var CANDADO = '<svg class="cand" viewBox="0 0 24 24" focusable="false"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>';
+
     function construir(mods) {
         // disponibles primero (estable): la estrella principal es la primera y el recorrido con flechas empieza ahí
         var base = mods.map(function (m, i) { return { m: m, i: i }; });
         base.sort(function (a, b) { return (a.m.estado === 'disponible' ? 0 : 1) - (b.m.estado === 'disponible' ? 0 : 1) || a.i - b.i; });
         listaEl.textContent = ''; $('orbitas').textContent = ''; $('lineas').textContent = '';
-        items = []; orbs = []; aristas = []; act = null; fichaItem = null;
+        items = []; orbs = []; act = null; fichaItem = null;
         st.hov = st.foc = st.tap = null; st.esc = false; ocultarFicha();
 
         base.forEach(function (b, n) {
-            var m = b.m, disp = m.estado === 'disponible', li = document.createElement('li');
-            var nombre = esc(m.nombre), estTxt = ESTADOS[m.estado] || esc(m.estado);
-            li.className = 'mod'; li.dataset.estado = m.estado;
+            var m = b.m, disp = m.estado === 'disponible', li = document.createElement('li'), sin = bloqueado(m), entra = disp && !sin;
+            li.className = 'mod'; li.dataset.estado = m.estado; if (sin) li.dataset.permiso = 'no';
             li.style.setProperty('--a', acentoOk(m.acento)); li.style.setProperty('--i', n);
-            li.innerHTML = '<button class="est" type="button" tabindex="-1" data-i="' + n + '"' + (disp ? '' : ' aria-disabled="true"') + ' aria-labelledby="mn' + n + ' mt' + n + '" aria-describedby="md' + n + '">' +
-                '<span class="astro" aria-hidden="true"><i class="halo"></i><i class="onda"></i><svg class="ico" viewBox="0 0 24 24" focusable="false">' + (ICONOS[m.icono] || ICONOS.chip) + '</svg></span>' +
-                '<span class="rot"><span class="nom" id="mn' + n + '">' + nombre + '</span><span class="tag" id="mt' + n + '"><i aria-hidden="true"></i>' + estTxt + '</span></span>' +
-                '<span class="desc" id="md' + n + '">' + esc(m.descripcion) + '</span>' +
-                (disp ? '<span class="go" aria-hidden="true">Entrar</span>' : '') + '</button>';
+            li.innerHTML = '<button class="est" type="button" tabindex="-1" data-i="' + n + '"' + (entra ? '' : ' aria-disabled="true"') + ' aria-labelledby="mn' + n + ' mt' + n + '" aria-describedby="md' + n + '">' +
+                '<span class="astro" aria-hidden="true"><i class="halo"></i><i class="onda"></i><svg class="ico" viewBox="0 0 24 24" focusable="false">' + (ICONOS[m.icono] || ICONOS.caja) + '</svg>' + (sin ? CANDADO : '') + '</span>' +
+                '<span class="rot"><span class="nom" id="mn' + n + '">' + esc(m.nombre) + '</span><span class="tag" id="mt' + n + '"><i aria-hidden="true"></i>' + estadoTxt(m) + '</span></span>' +
+                '<span class="desc" id="md' + n + '">' + esc(m.descripcion) + (sin ? ' ' + MSG_SIN : '') + '</span>' +
+                (entra ? '<span class="go" aria-hidden="true">Entrar</span>' : '') + '</button>';
             listaEl.appendChild(li);
-            items.push({ m: m, li: li, btn: li.firstChild, orb: null, off: 0, x: 0, y: 0, acento: acentoOk(m.acento) });
+            items.push({ m: m, li: li, btn: li.firstChild, orb: null, off: 0, x: 0, y: 0, acento: acentoOk(m.acento), sin: sin });
         });
 
-        // dos órbitas: los disponibles (hasta 3) en la interior; el resto en la exterior
+        // órbitas: interior (los disponibles, hasta 3), media y exterior (el resto repartido; la media solo si hay 3 o más)
         var dentro = items.filter(function (it) { return it.m.estado === 'disponible'; }).slice(0, 3);
-        var fuera = items.filter(function (it) { return dentro.indexOf(it) < 0; });
-        function orbita(arr, tam, dir, periodo, th0) {
+        var resto = items.filter(function (it) { return dentro.indexOf(it) < 0; });
+        var nm = resto.length >= 3 ? Math.floor(resto.length / 3) : 0;
+        function orbita(arr, tam) {
             if (!arr.length) return;
-            var el = document.createElementNS(NS, 'ellipse'); $('orbitas').appendChild(el);
-            var o = { tam: tam, dir: dir, w: TAU / periodo, v: 1, th: th0, parada: false, rx: 0, ry: 0, el: el };
-            arr.forEach(function (it, j) { it.orb = o; it.off = j * TAU / arr.length; });
+            // una sola trayectoria por órbita: la elipse base, el tramo iluminado (lz) y el cometa (gl) son la MISMA elipse (mismos atributos); lz y gl solo recortan con dasharray
+            var el = document.createElementNS(NS, 'ellipse'), lz = document.createElementNS(NS, 'ellipse'), gl = document.createElementNS(NS, 'ellipse');
+            el.setAttribute('class', 'orb'); lz.setAttribute('class', 'tray'); gl.setAttribute('class', 'glow'); lz.setAttribute('pathLength', '1'); gl.setAttribute('pathLength', '1'); gl.style.setProperty('--n', orbs.length);
+            $('orbitas').appendChild(el); $('orbitas').appendChild(lz); $('orbitas').appendChild(gl);
+            var o = { tam: tam, n: arr.length, rx: 0, ry: 0, el: el, lz: lz, gl: gl };
+            arr.forEach(function (it, j) { it.orb = o; it.off = FASE0[tam] + j * TAU / arr.length; });
             orbs.push(o);
         }
-        orbita(dentro, 'in', 1, 70, -0.55);
-        orbita(fuera, 'out', -1, 110, 2.5);
-        if (orbs.length === 1) orbs[0].tam = 'out';
+        orbita(dentro, 'in'); orbita(resto.slice(0, nm), 'mid'); orbita(resto.slice(nm), 'out');
 
-        // trazas tipo PCB: núcleo -> principal -> siguiente -> …
-        if (items.length) aristas.push({ a: null, b: items[0] });
-        for (var i = 0; i < items.length - 1; i++) aristas.push({ a: items[i], b: items[i + 1] });
-        aristas.forEach(function (e, k) {
-            var g = document.createElementNS(NS, 'g'), p1 = document.createElementNS(NS, 'path'), p2 = document.createElementNS(NS, 'path');
-            g.setAttribute('class', 'lin'); g.style.setProperty('--k', k);
-            p1.setAttribute('class', 'base'); p2.setAttribute('class', 'luz');
-            p1.setAttribute('pathLength', '1'); p2.setAttribute('pathLength', '1');
-            g.appendChild(p1); g.appendChild(p2); $('lineas').appendChild(g);
-            e.g = g; e.p1 = p1; e.p2 = p2;
+        // por estrella: solo el brazo curvo al núcleo (base + luz sobre exactamente el mismo trazo)
+        items.forEach(function (it, k) {
+            var g = document.createElementNS(NS, 'g');
+            g.setAttribute('class', 'lin brazo'); g.style.setProperty('--k', k);
+            var b1 = document.createElementNS(NS, 'path'), b2 = document.createElementNS(NS, 'path');
+            b1.setAttribute('class', 'base'); b2.setAttribute('class', 'luz');
+            b1.setAttribute('pathLength', '1'); b2.setAttribute('pathLength', '1');
+            g.appendChild(b1); g.appendChild(b2);
+            $('lineas').appendChild(g);
+            it.g = g; it.bb = b1; it.bl = b2;
         });
 
         roving(0);
@@ -183,61 +228,82 @@
 
     function roving(i) { items.forEach(function (it, k) { it.btn.tabIndex = k === i ? 0 : -1; }); }
 
-    /* Tamaño de las órbitas según el espacio disponible (sin desbordar entre 375 y 1920 px). */
+    /* Tamaño de las órbitas según el espacio disponible (sin desbordar entre 641 y 1920 px). En pantallas altas y angostas la elipse se redondea. */
     function calcular() {
         var w = escena.clientWidth, h = escena.clientHeight;
         if (!w || !h) return;
         lay.W = w; lay.H = h; lay.cx = w / 2; lay.cy = h / 2 - 12;
         escena.style.setProperty('--cy', r1(lay.cy) + 'px');
         if (lista || !orbs.length) return;
-        var ratio = .46, c = Math.cos(TILT), s = Math.sin(TILT);
+        var c = Math.cos(TILT), s = Math.sin(TILT), aw = w / 2 - 88, ah = Math.min(lay.cy - 46, h - lay.cy - 74);
+        var ratio = Math.max(.46, Math.min(.8, ah / aw * .8));
         var hw1 = Math.sqrt(c * c + ratio * ratio * s * s), hh1 = Math.sqrt(s * s + ratio * ratio * c * c);
-        var rx = Math.min((w / 2 - 88) / hw1, Math.min(lay.cy - 46, h - lay.cy - 74) / hh1, 640);
-        rx = Math.max(rx, 150);
-        var ry = rx * ratio, k = Math.max(.5, Math.min(.8, 104 / ry));
+        var rx = Math.max(Math.min(aw / hw1, ah / hh1, 640), 150), ry = rx * ratio;
+        var kin = Math.max(.5, Math.min(.66, 132 / ry)), kes = { 'in': kin, mid: (kin + 1) / 2, out: 1 };
         orbs.forEach(function (o) {
-            o.rx = o.tam === 'in' ? rx * k : rx; o.ry = o.tam === 'in' ? ry * k : ry;
-            o.el.setAttribute('cx', r1(lay.cx)); o.el.setAttribute('cy', r1(lay.cy));
-            o.el.setAttribute('rx', r1(o.rx)); o.el.setAttribute('ry', r1(o.ry));
-            o.el.setAttribute('transform', 'rotate(' + r1(TILT * 180 / Math.PI) + ' ' + r1(lay.cx) + ' ' + r1(lay.cy) + ')');
+            var k = kes[o.tam]; o.rx = rx * k; o.ry = ry * k;
+            [o.el, o.lz, o.gl].forEach(function (e) {
+                e.setAttribute('cx', r1(lay.cx)); e.setAttribute('cy', r1(lay.cy)); e.setAttribute('rx', r1(o.rx)); e.setAttribute('ry', r1(o.ry));
+                e.setAttribute('transform', 'rotate(' + r1(TILT_G) + ' ' + r1(lay.cx) + ' ' + r1(lay.cy) + ')');
+            });
         });
+        // longitud de arco acumulada de la elipse (misma forma para todas las órbitas): pasa del ángulo paramétrico a la fracción de trazo (pathLength 1)
+        var N = 240, q = ratio, tab = [0], i, a;
+        for (i = 0; i < N; i++) { a = (i + .5) / N * TAU; tab.push(tab[i] + Math.sqrt(Math.sin(a) * Math.sin(a) + q * q * Math.cos(a) * Math.cos(a))); }
+        lay.tab = tab;
         if (fichaItem) medirFicha();
+    }
+    function frac(a) {
+        var T = lay.tab, n = T.length - 1; a = ((a % TAU) + TAU) % TAU;
+        var f = a / TAU * n, i = Math.min(n - 1, Math.floor(f));
+        return (T[i] + (T[i + 1] - T[i]) * (f - i)) / T[n];
+    }
+    /* Tramo iluminado de la órbita de la estrella activa: recorta con dasharray/dashoffset la propia elipse (sin trazo paralelo). */
+    function luzOrbita(it) {
+        if (!lay.tab || !it || !it.orb) return;
+        var o = it.orb, a = fase + it.off, w = o.n > 1 ? Math.min(Math.PI / o.n, .5) : .5, f1 = frac(a - w), len = (((frac(a + w) - f1) % 1) + 1) % 1;
+        o.lz.style.strokeDasharray = len.toFixed(4) + ' ' + (1 - len).toFixed(4); o.lz.style.strokeDashoffset = (-f1).toFixed(4);
+    }
+
+    function pt(o, a) {
+        var ex = o.rx * Math.cos(a), ey = o.ry * Math.sin(a), c = Math.cos(TILT), s = Math.sin(TILT);
+        return [lay.cx + ex * c - ey * s, lay.cy + ex * s + ey * c];
+    }
+    /* Brazo del núcleo a la estrella: curva cuadrática que se arquea hacia atrás del sentido de giro (como el brazo de una espiral). */
+    function brazo(x, y) {
+        var dx = x - lay.cx, dy = y - lay.cy, qx = lay.cx + dx / 2 + dy * .24, qy = lay.cy + dy / 2 - dx * .24;
+        return 'M' + r1(lay.cx) + ' ' + r1(lay.cy) + 'Q' + r1(qx) + ' ' + r1(qy) + ' ' + r1(x) + ' ' + r1(y);
     }
 
     function colocar() {
         if (lista) { items.forEach(function (it) { it.li.style.transform = ''; }); return; }
-        var c = Math.cos(TILT), s = Math.sin(TILT);
         items.forEach(function (it) {
-            var o = it.orb, a = o.th + it.off, ex = o.rx * Math.cos(a), ey = o.ry * Math.sin(a);
-            it.x = lay.cx + ex * c - ey * s; it.y = lay.cy + ex * s + ey * c;
+            var o = it.orb, a = fase + it.off, p = pt(o, a);
+            it.x = p[0]; it.y = p[1];
             it.li.style.transform = 'translate3d(' + r1(it.x) + 'px,' + r1(it.y) + 'px,0)';
+            var d = brazo(it.x, it.y); it.bb.setAttribute('d', d); it.bl.setAttribute('d', d);
         });
-        aristas.forEach(function (e) {
-            var d = traza(e.a || { x: lay.cx, y: lay.cy }, e.b);
-            e.p1.setAttribute('d', d); e.p2.setAttribute('d', d);
-        });
+        if (act) luzOrbita(act);
         if (fichaItem && ficha.dataset.abierta === 'true') posFicha();
-    }
-
-    /* Traza ortogonal con quiebre a 45 grados, como una pista de PCB. */
-    function traza(a, b) {
-        var dx = b.x - a.x, dy = b.y - a.y, ax = Math.abs(dx), ay = Math.abs(dy), p = 'M' + r1(a.x) + ' ' + r1(a.y);
-        if (ax >= ay) return p + 'H' + r1(a.x + (dx < 0 ? -1 : 1) * (ax - ay)) + 'L' + r1(b.x) + ' ' + r1(b.y);
-        return p + 'V' + r1(a.y + (dy < 0 ? -1 : 1) * (ay - ax)) + 'L' + r1(b.x) + ' ' + r1(b.y);
     }
 
     /* ---- ficha de detalle ---- */
     function medirFicha() { fw = ficha.offsetWidth; fh = ficha.offsetHeight; }
     function posFicha() {
         var it = fichaItem, w = fw, h = fh, W2 = lay.W, H2 = lay.H, gx = 80, x, y;   // 80 px: deja libre la etiqueta de la estrella (hasta 148 px de ancho)
-        
         function cabeX(px) { return px >= 8 && px + w <= W2 - 8; }
         function cabeY(py) { return py >= 8 && py + h <= H2 - 8; }
         function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
         var vy = clamp(it.y - h / 2, 8, Math.max(8, H2 - h - 8)), hx = clamp(it.x - w / 2, 8, Math.max(8, W2 - w - 8));
         var R = it.x + gx, L = it.x - gx - w, B = it.y + 62, A = it.y - 46 - h;
         var lados = it.x >= lay.cx ? [['R', R], ['L', L]] : [['L', L], ['R', R]], elegido = null;
-        for (var i = 0; i < lados.length && !elegido; i++) if (cabeX(lados[i][1])) elegido = [lados[i][1], vy];
+        function libre(px, py) {      // que la ficha no tape a otra estrella ni su etiqueta
+            return items.every(function (o) { return o === it || o.x + 76 < px || o.x - 76 > px + w || o.y + 72 < py || o.y - 20 > py + h; });
+        }
+        for (var i = 0; i < lados.length && !elegido; i++) if (cabeX(lados[i][1]) && libre(lados[i][1], vy)) elegido = [lados[i][1], vy];
+        if (!elegido && cabeY(B) && libre(hx, B)) elegido = [hx, B];
+        if (!elegido && cabeY(A) && libre(hx, A)) elegido = [hx, A];
+        for (i = 0; i < lados.length && !elegido; i++) if (cabeX(lados[i][1])) elegido = [lados[i][1], vy];
         if (!elegido && cabeY(B)) elegido = [hx, B];
         if (!elegido && cabeY(A)) elegido = [hx, A];
         if (!elegido) elegido = [clamp(lados[0][1], 8, Math.max(8, W2 - w - 8)), vy];
@@ -247,11 +313,12 @@
     function mostrarFicha(it) {
         if (fichaItem !== it) {
             fichaItem = it; var m = it.m;
-            ficha.style.setProperty('--a', it.acento); ficha.dataset.e = m.estado;
-            $('fIco').innerHTML = ICONOS[m.icono] || ICONOS.chip;
-            $('fNom').textContent = m.nombre; $('fEst').textContent = ESTADOS[m.estado] || m.estado; $('fDesc').textContent = m.descripcion;
-            var av = $('fAviso'); av.hidden = m.estado !== 'mantenimiento'; av.textContent = m.estado === 'mantenimiento' ? 'Este módulo está en mantenimiento. Vuelve a intentarlo más tarde.' : '';
-            $('fEntrar').hidden = m.estado !== 'disponible';
+            ficha.style.setProperty('--a', it.acento); ficha.dataset.e = it.sin ? 'sin' : m.estado;
+            $('fIco').innerHTML = ICONOS[m.icono] || ICONOS.caja;
+            $('fNom').textContent = m.nombre; $('fEst').textContent = it.sin ? 'Sin acceso' : (ESTADOS[m.estado] || m.estado); $('fDesc').textContent = m.descripcion;
+            var av = $('fAviso'), txt = it.sin ? MSG_SIN : m.estado === 'mantenimiento' ? 'Este módulo está en mantenimiento. Vuelve a intentarlo más tarde.' : '';
+            av.hidden = !txt; av.textContent = txt;
+            $('fEntrar').hidden = m.estado !== 'disponible' || it.sin;
             medirFicha();
         }
         posFicha(); ficha.dataset.abierta = 'true'; $('fEntrar').tabIndex = 0;
@@ -264,13 +331,15 @@
         it = it || null;
         if (it === act) return;
         act = it;
-        items.forEach(function (x) { if (x === it) x.btn.setAttribute('data-on', ''); else x.btn.removeAttribute('data-on'); });
-        orbs.forEach(function (o) { o.parada = !!(it && it.orb === o); });
-        if (it) escena.setAttribute('data-act', ''); else escena.removeAttribute('data-act');
-        aristas.forEach(function (e) {
-            var on = !!(it && (e.a === it || e.b === it));
-            e.g.classList.toggle('on', on); if (on) e.g.style.setProperty('--a', it.acento);
+        items.forEach(function (x) {
+            var on = x === it;
+            if (on) x.btn.setAttribute('data-on', ''); else x.btn.removeAttribute('data-on');
+            x.g.classList.toggle('on', on);
+            if (on) x.g.style.setProperty('--a', it.acento);
         });
+        orbs.forEach(function (o) { var on = !!(it && it.orb === o); o.lz.classList.toggle('on', on); if (on) o.lz.style.setProperty('--a', it.acento); });
+        if (it) luzOrbita(it);
+        if (it) escena.setAttribute('data-act', ''); else escena.removeAttribute('data-act');
         if (it && !lista) mostrarFicha(it); else ocultarFicha();
     }
     function entrarHover(i) { clearTimeout(st.t); st.hov = i; st.esc = false; actualizar(); }
@@ -283,9 +352,10 @@
             avisar(m.estado === 'mantenimiento' ? m.nombre + ' está en mantenimiento. Vuelve a intentarlo más tarde.' : m.nombre + ' estará disponible próximamente.');
             return;
         }
+        if (it.sin) { avisar('Tu cuenta no tiene acceso a ' + m.nombre + '. Pídelo a un administrador.'); return; }
         var url = destino(m.url);
         if (!url) { avisar('No se pudo abrir ' + m.nombre + '.'); return; }
-        if (!m.sesion) { location.href = url; return; }
+        if (sesionInfo) { location.href = url; return; }       // con sesión y permiso: directo
         if (entrando) return;
         entrando = true; it.btn.setAttribute('data-cargando', ''); avisar('Comprobando tu sesión…');
         fetch('/api/auth/yo', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) {
@@ -308,7 +378,7 @@
     });
     listaEl.addEventListener('click', function (e) {
         var it = itemDe(e.target); if (!it) return;
-        if (e.pointerType === 'touch' && !lista && st.tap !== items.indexOf(it)) {    // en tableta el primer toque muestra la ficha; el segundo (o "Entrar") abre
+        if (e.pointerType === 'touch' && !lista && st.tap !== items.indexOf(it)) {    // en tableta el primer toque muestra la ficha; el segundo (o "Entrar") abre. En móvil (lista) un solo toque entra
             st.tap = items.indexOf(it); actualizar(); return;
         }
         abrir(it);
@@ -357,20 +427,25 @@
     $('msgBtn').addEventListener('click', cargar);
 
     function cargar() {
+        return cargarModulos();
+    }
+    function cargarModulos() {
         estadoMsg('carga', 'Cargando módulos…', null); escena.setAttribute('aria-busy', 'true');
-        fetch('/api/modulos', { cache: 'no-store' }).then(function (r) {
+        return fetch('/api/modulos', { cache: 'no-store', credentials: 'same-origin' }).then(function (r) {
             if (!r.ok) throw new Error('http ' + r.status);
             return r.json();
         }).then(function (d) {
+            sesionInfo = d && d.sesion && typeof d.sesion === 'object' ? d.sesion : null; pintarSesion();
             var ms = d && Array.isArray(d.modulos) ? d.modulos : [];
             if (!ms.length) { construir([]); estadoMsg('vacio', 'Todavía no hay módulos publicados.', 'Actualizar'); return; }
             construir(ms); estadoMsg('', '', null);
         }).catch(function () {
+            sesionInfo = null; pintarSesion();
             construir([]); estadoMsg('error', 'No se pudo cargar la lista de módulos. Revisa la conexión e inténtalo de nuevo.', 'Reintentar');
-        }).then(function () { escena.setAttribute('aria-busy', 'false'); arrancar(); });
+        }).then(function () { escena.setAttribute('aria-busy', 'false'); if (!cc.abierto) arrancar(); });
     }
 
-    /* ================= bucle de animación ================= */
+    /* ================= bucle de animación (solo escritorio con movimiento permitido) ================= */
     var raf = 0, ult = 0;
     function corriendo() { return raf !== 0; }
     function bucle(ts) {
@@ -378,21 +453,18 @@
         var dt = Math.min(.1, (ts - ult) / 1000 || 0); ult = ts;
         var k = 1 - Math.exp(-dt * 4);
         par.x += (par.tx - par.x) * k; par.y += (par.ty - par.y) * k;
-        if (!lista && orbs.length) {
-            var mov = false;
-            orbs.forEach(function (o) {
-                o.v += ((o.parada ? 0 : 1) - o.v) * (1 - Math.exp(-dt * 9));     // frena y arranca con suavidad
-                if (o.v < .002) o.v = 0; else if (o.v > .998) o.v = 1;
-                if (o.v > 0) { o.th += o.dir * o.w * o.v * dt; mov = true; }
-            });
-            if (mov) colocar();
+        if (orbs.length) {
+            vel += ((act ? 0 : 1) - vel) * (1 - Math.exp(-dt * (act ? 6 : 2.4)));     // frena y arranca con suavidad cuando hay una estrella activa
+            if (vel < .002) vel = 0; else if (vel > .998) vel = 1;
+            if (vel > 0) { fase += TAU / 110 * vel * dt; colocar(); }
         }
         pintarCampo(ts / 1000);
     }
     function detener() { if (raf) cancelAnimationFrame(raf); raf = 0; }
     function arrancar() {
         detener();
-        if (quieto || document.hidden) { par.x = par.y = par.tx = par.ty = 0; colocar(); pintarCampo(0); return; }
+        if (cc.abierto) return;                                   // centro de control abierto: la constelación queda en pausa
+        if (quieto || lista || document.hidden) { par.x = par.y = par.tx = par.ty = 0; colocar(); pintarCampo(0); return; }   // móvil / sin movimiento: nada corre (ahorra batería)
         ult = performance.now(); raf = requestAnimationFrame(bucle);
     }
     document.addEventListener('visibilitychange', function () { if (document.hidden) detener(); else { arrancar(); salud(); reloj(); } });
@@ -407,6 +479,319 @@
     }
     if (window.ResizeObserver) new ResizeObserver(refrescar).observe(escena);
     addEventListener('resize', refrescar);
+
+    /* ================= centro de control (solo administradores) =================
+       El núcleo "I+D" es siempre un botón. Administrador: despliega la matriz cuentas × módulos. Sin sesión (o sin ser administrador): despliega el
+       formulario «Acceso de administrador» desde el mismo núcleo y, tras entrar, ese mismo contenedor pasa a la matriz. POST /api/plataforma/entrar.
+       API (solo administradores): GET /api/plataforma/cuentas, PATCH /api/plataforma/cuentas/{email}, POST /api/plataforma/modulos/{id}/todos. */
+    var cc = { vista: 'acceso', entrando: false, mods: [], roles: [], cuentas: [], q: '', abierto: false, pend: 0, cola: Promise.resolve(), menu: null, conf: null };
+    var ccEl = $('cc'), ccPanel = $('ccPanel'), nucBtn = $('nucBtn'), portal = document.querySelector('.portal'), nucleo = document.querySelector('.nucleo');
+    var ccMenu = $('ccMenu'), ccConf = $('ccConf'), tCerrar = 0, tCcAviso = 0, menuBtn = null;
+
+    function esAdmin() { return !!(sesionInfo && sesionInfo.rol === 'administrador'); }
+    function pintarNucleo() {
+        var ad = esAdmin();
+        nucBtn.hidden = false;                                       // el núcleo siempre es un botón; sin sesión de administrador pide el acceso
+        if (ad) nucleo.setAttribute('data-admin', ''); else nucleo.removeAttribute('data-admin');
+        if (!ad && cc.abierto && cc.vista === 'cuentas' && !cc.entrando) ccCerrar(false);
+    }
+    function esYo(c) { return !!(sesionInfo && String(c.email).toLowerCase() === String(sesionInfo.email || '').toLowerCase()); }
+
+    function detalle(d, s) {
+        var x = d && d.detail;
+        if (typeof x === 'string' && x) return x;
+        if (Array.isArray(x)) { var t = x.map(function (i) { return i && i.msg ? i.msg : ''; }).filter(Boolean).join(' '); if (t) return t; }
+        if (s === 403) return 'Solo los administradores pueden gestionar cuentas.';
+        if (s === 401) return 'Tu sesión expiró. Vuelve a iniciar sesión.';
+        return 'No se pudo completar la operación (' + s + ').';
+    }
+    function api(met, url, cuerpo) {
+        var o = { method: met, credentials: 'same-origin', cache: 'no-store', headers: {} };
+        if (cuerpo !== undefined) { o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(cuerpo); }
+        return fetch(url, o).then(null, function () { throw new Error('Sin conexión con el servidor. Inténtalo de nuevo.'); }).then(function (r) {
+            return r.json().then(null, function () { return null; }).then(function (d) {
+                if (!r.ok) { var e = new Error(detalle(d, r.status)); e.status = r.status; throw e; }
+                return d;
+            });
+        });
+    }
+    function ccAvisar(txt, mal) {
+        var a = $('ccAviso'); clearTimeout(tCcAviso); a.textContent = ''; a.dataset.k = mal ? 'bad' : 'ok';
+        if (!txt) return;
+        setTimeout(function () { a.textContent = txt; }, 30);
+        tCcAviso = setTimeout(function () { a.textContent = ''; }, mal ? 8000 : 3000);
+    }
+    function ccEstado(e, txt, boton) {
+        $('ccCuerpo').dataset.e = e; $('ccCuerpo').setAttribute('aria-busy', e === 'carga' ? 'true' : 'false');
+        $('ccEstTxt').textContent = txt || ''; var b = $('ccEstBtn'); b.hidden = !boton; if (boton) b.textContent = boton;
+    }
+
+    /* ---- datos ---- */
+    function aplicar(d) {
+        if (!d || !Array.isArray(d.cuentas)) throw new Error('Respuesta inesperada del servidor.');
+        var nuevos = Array.isArray(d.modulos) ? d.modulos : [];
+        var mismos = nuevos.length === cc.mods.length && nuevos.every(function (m, i) { return cc.mods[i] && cc.mods[i].id === m.id; });
+        cc.mods = nuevos; cc.roles = Array.isArray(d.roles) && d.roles.length ? d.roles : ['administrador', 'general', 'consultor'];
+        cc.cuentas = d.cuentas.map(function (c) { c.modulos = Array.isArray(c.modulos) ? c.modulos : []; return c; });
+        if (!mismos) { menuCerrar(false); ccCabecera(); }
+        ccRender();
+    }
+    function ccCargar(silencioso) {
+        if (!silencioso) ccEstado('carga', 'Cargando cuentas…', null);
+        return api('GET', '/api/plataforma/cuentas').then(function (d) { aplicar(d); }).then(null, function (e) {
+            if (!silencioso) ccEstado('error', e.message, 'Reintentar');
+        });
+    }
+    /* Operaciones en serie (la matriz cambia rápido): cada una se envía cuando termina la anterior. Si falla, se revierte y se resincroniza. */
+    function encolar(fn, revertir, alTerminar) {
+        cc.pend++;
+        cc.cola = cc.cola.then(fn).then(function (d) {
+            cc.pend--;
+            if (cc.pend === 0) { try { aplicar(d); } catch (e) { /* forma distinta: se conserva lo optimista */ } }
+            ccAvisar('Guardado', false);
+            if (alTerminar) alTerminar();
+        }, function (e) {
+            cc.pend--;
+            if (revertir) revertir();
+            ccRender(); ccAvisar(e.message, true);
+            if (cc.pend === 0) ccCargar(true);
+        });
+    }
+
+    /* ---- vista ---- */
+    function ico(m) { return '<svg class="cc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (ICONOS[m.icono] || ICONOS.chip) + '</svg>'; }
+    function tiene(c, id) { return c.rol === 'administrador' || c.modulos.indexOf(id) >= 0; }
+    function ccCabecera() {
+        var h = '<tr><th scope="col" class="cc-h-cta">Cuenta</th><th scope="col" class="cc-h-rol">Rol</th><th scope="col" class="cc-h-c cc-h-t">Todos</th>', t = '';
+        cc.mods.forEach(function (m) {
+            var pron = m.estado === 'proximamente', nom = esc(m.nombre);
+            var b = '<button type="button" class="cc-mh" data-menu="' + esc(m.id) + '" style="--a:' + acentoOk(m.acento) + '" aria-haspopup="menu" aria-expanded="false"' + (pron ? ' data-pron="1"' : '') +
+                ' aria-label="' + nom + (pron ? ' (próximamente)' : '') + ': dar o quitar a todas las cuentas">' + ico(m) + '<span class="cc-mn">' + nom + '</span>' + (pron ? '<small>Pronto</small>' : '') + '</button>';
+            h += '<th scope="col" class="cc-h-c">' + b + '</th>'; t += b;
+        });
+        $('ccHead').innerHTML = h + '</tr>'; $('ccMods').innerHTML = t;
+    }
+    function chips(c) {
+        return (c.pendiente ? '<span class="cc-chip" data-k="info">Pendiente</span>' : '') + (c.activo === false ? '<span class="cc-chip" data-k="warn">Inactiva</span>' : '');
+    }
+    function ccRender() {
+        var ae = document.activeElement, clave = ae && ae.dataset && ae.dataset.f && ccPanel.contains(ae) ? ae.dataset.f : null;
+        var q = cc.q.trim().toLowerCase(), todas = cc.cuentas;
+        var ls = q ? todas.filter(function (c) { return String(c.email).toLowerCase().indexOf(q) >= 0; }) : todas;
+        $('ccCuenta').textContent = (ls.length === todas.length ? ls.length : ls.length + ' de ' + todas.length) + (todas.length === 1 ? ' cuenta' : ' cuentas');
+        var filas = '', tarj = '';
+        ls.forEach(function (c) {
+            var adm = c.rol === 'administrador', mail = esc(c.email);
+            var n = c.modulos.filter(function (id) { return cc.mods.some(function (m) { return m.id === id; }); }).length;
+            var todos = adm || (cc.mods.length > 0 && n === cc.mods.length), parcial = !todos && n > 0;
+            var nota = adm ? '<span class="cc-nota">Todos (administrador)</span>' : '';
+            var opts = cc.roles.map(function (r) { return '<option value="' + esc(r) + '"' + (r === c.rol ? ' selected' : '') + '>' + esc(ROLES[r] || r) + '</option>'; }).join('');
+            var sel = function (v) { return '<select class="input cc-rol" data-e="' + mail + '" data-f="r|' + mail + '|' + v + '" aria-label="Rol de ' + mail + '">' + opts + '</select>'; };
+            var tod = function (v) { return '<input type="checkbox" class="cc-todos" data-e="' + mail + '" data-f="t|' + mail + '|' + v + '" aria-label="Todos los módulos para ' + mail + '"' + (todos ? ' checked' : '') + (parcial ? ' data-ind="1"' : '') + (adm ? ' disabled' : '') + '>'; };
+            filas += '<tr><th scope="row" class="cc-cta"><span class="cc-mail" title="' + mail + '">' + mail + '</span>' + chips(c) + nota + '</th><td>' + sel('t') + '</td><td class="cc-c"><label class="cc-cl">' + tod('t') + '</label></td>';
+            tarj += '<li class="cc-card"><div class="cc-chead"><span class="cc-mail">' + mail + '</span>' + chips(c) + '</div>' + nota +
+                '<div class="cc-crow"><label class="cc-rl"><span>Rol</span>' + sel('m') + '</label><label class="cc-pill">' + tod('m') + '<span class="cc-pb"><b>Todos</b></span></label></div><div class="cc-pills">';
+            cc.mods.forEach(function (m) {
+                var at = 'class="cc-chk" data-e="' + mail + '" data-m="' + esc(m.id) + '" aria-label="' + esc(m.nombre) + ' para ' + mail + '"' + (tiene(c, m.id) ? ' checked' : '') + (adm ? ' disabled' : '');
+                filas += '<td class="cc-c"><label class="cc-cl"><input type="checkbox" ' + at + ' data-f="c|' + mail + '|' + esc(m.id) + '|t"></label></td>';
+                tarj += '<label class="cc-pill" style="--a:' + acentoOk(m.acento) + '"' + (m.estado === 'proximamente' ? ' data-pron="1"' : '') + '><input type="checkbox" ' + at + ' data-f="c|' + mail + '|' + esc(m.id) + '|m"><span class="cc-pb">' + ico(m) + '<b>' + esc(m.nombre) + '</b></span></label>';
+            });
+            filas += '</tr>'; tarj += '</div></li>';
+        });
+        var sc = $('ccScroll'), top = sc.scrollTop, izq = sc.scrollLeft;
+        $('ccFilas').innerHTML = filas; $('ccTarjetas').innerHTML = tarj;
+        sc.scrollTop = top; sc.scrollLeft = izq;
+        Array.prototype.forEach.call(ccPanel.querySelectorAll('[data-ind]'), function (i) { i.indeterminate = true; });
+        if (!todas.length) ccEstado('vacio', 'Todavía no hay cuentas registradas.', 'Actualizar');
+        else if (!ls.length) ccEstado('vacio', 'Ninguna cuenta coincide con «' + cc.q.trim() + '».', 'Limpiar búsqueda');
+        else ccEstado('ok', '', null);
+        if (clave) {
+            var cand = ccPanel.querySelectorAll('[data-f="' + clave.replace(/["\\]/g, '\\$&') + '"]'), k;
+            for (k = 0; k < cand.length; k++) if (cand[k].offsetParent !== null) { cand[k].focus(); break; }
+        }
+    }
+    function cuentaDe(mail) { var l = String(mail).toLowerCase(); return cc.cuentas.filter(function (c) { return String(c.email).toLowerCase() === l; })[0]; }
+
+    /* ---- cambios (optimistas, con reversión si fallan) ---- */
+    function ccCambioModulos(c, nuevos) {
+        var antes = c.modulos.slice(); c.modulos = nuevos; ccRender();
+        encolar(function () { return api('PATCH', '/api/plataforma/cuentas/' + encodeURIComponent(c.email), { modulos: nuevos }); }, function () { c.modulos = antes; });
+    }
+    function ccCambioRol(c, rol) {
+        var antes = c.rol, yo = esYo(c); c.rol = rol; ccRender();
+        encolar(function () { return api('PATCH', '/api/plataforma/cuentas/' + encodeURIComponent(c.email), { rol: rol }); }, function () { c.rol = antes; }, yo ? function () { cargar(); } : null);
+    }
+    ccPanel.addEventListener('change', function (e) {
+        var t = e.target, c = t.dataset && t.dataset.e ? cuentaDe(t.dataset.e) : null;
+        if (!c) return;
+        if (t.classList.contains('cc-rol')) { ccCambioRol(c, t.value); return; }
+        if (t.classList.contains('cc-chk')) {
+            var id = t.dataset.m, sin = c.modulos.filter(function (x) { return x !== id; });
+            ccCambioModulos(c, t.checked ? sin.concat(id) : sin);
+        } else if (t.classList.contains('cc-todos')) {
+            ccCambioModulos(c, t.checked ? cc.mods.map(function (m) { return m.id; }) : []);
+        }
+    });
+    $('ccBuscar').addEventListener('input', function () { cc.q = this.value; ccRender(); });
+
+    /* ---- menú por columna + confirmación en línea (sin alert/confirm del navegador) ---- */
+    function menuCerrar(devolver) {
+        if (ccMenu.hidden) return;
+        ccMenu.hidden = true;
+        if (menuBtn) { menuBtn.setAttribute('aria-expanded', 'false'); if (devolver) menuBtn.focus(); }
+    }
+    function menuAbrir(btn) {
+        if (menuBtn === btn && !ccMenu.hidden) { menuCerrar(true); return; }
+        menuCerrar(false); menuBtn = btn; cc.menu = btn.dataset.menu;
+        var m = cc.mods.filter(function (x) { return x.id === cc.menu; })[0]; if (!m) return;
+        ccMenu.setAttribute('aria-label', 'Acciones para ' + m.nombre);
+        ccMenu.hidden = false; btn.setAttribute('aria-expanded', 'true');
+        var r = btn.getBoundingClientRect(), w = ccMenu.offsetWidth, h = ccMenu.offsetHeight, abajo = r.bottom + 4;
+        ccMenu.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+        ccMenu.style.top = (abajo + h > innerHeight - 8 ? Math.max(8, r.top - h - 4) : abajo) + 'px';
+        ccMenu.firstElementChild.focus();
+    }
+    function confCerrar(devolver) {
+        if (ccConf.hidden) return;
+        ccConf.hidden = true; cc.conf = null;
+        if (devolver && menuBtn) menuBtn.focus();
+    }
+    function confAbrir(id, activo) {
+        var m = cc.mods.filter(function (x) { return x.id === id; })[0]; if (!m) return;
+        cc.conf = { id: id, activo: activo };
+        $('ccConfTxt').textContent = (activo ? '¿Dar «' : '¿Quitar «') + m.nombre + '» a todas las cuentas que no son administradoras?';
+        var ok = $('ccConfOk'); ok.textContent = activo ? 'Dar a todos' : 'Quitar a todos'; ok.className = 'btn btn-sm ' + (activo ? 'btn-primary' : 'btn-danger');
+        ccConf.hidden = false; $('ccConfNo').focus();
+    }
+    $('ccConfNo').addEventListener('click', function () { confCerrar(true); });
+    $('ccConfOk').addEventListener('click', function () {
+        var k = cc.conf; if (!k) return;
+        confCerrar(true); ccAvisar('Aplicando…', false);
+        encolar(function () { return api('POST', '/api/plataforma/modulos/' + encodeURIComponent(k.id) + '/todos', { activo: k.activo }); }, null);
+    });
+    ccMenu.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-ac]'); if (!b) return;
+        var id = cc.menu; menuCerrar(false); confAbrir(id, b.dataset.ac === 'dar');
+    });
+    ccMenu.addEventListener('keydown', function (e) {
+        var its = Array.prototype.slice.call(ccMenu.querySelectorAll('[role=menuitem]')), i = its.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown') { e.preventDefault(); its[(i + 1) % its.length].focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); its[(i - 1 + its.length) % its.length].focus(); }
+        else if (e.key === 'Home') { e.preventDefault(); its[0].focus(); }
+        else if (e.key === 'End') { e.preventDefault(); its[its.length - 1].focus(); }
+        else if (e.key === 'Tab') { e.preventDefault(); menuCerrar(true); }
+    });
+    ccPanel.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-menu]');
+        if (b) { confCerrar(false); menuAbrir(b); return; }
+        if (!ccMenu.hidden && !ccMenu.contains(e.target)) menuCerrar(false);
+    });
+    $('ccEstBtn').addEventListener('click', function () {
+        if (cc.cuentas.length && cc.q.trim()) { cc.q = ''; $('ccBuscar').value = ''; ccRender(); $('ccBuscar').focus(); } else ccCargar();
+    });
+    $('ccX').addEventListener('click', function () { ccCerrar(true); });
+
+    /* ---- abrir / cerrar: foco atrapado dentro y devuelto al núcleo ---- */
+    function ccAbrir() {
+        if (cc.abierto) return;
+        cc.abierto = true; clearTimeout(tCerrar);
+        ccVista(esAdmin() ? 'cuentas' : 'acceso');
+        nucBtn.setAttribute('aria-expanded', 'true');
+        var r = nucBtn.getBoundingClientRect();
+        ccEl.hidden = false;
+        ccPanel.style.setProperty('--ox', Math.round(r.left + r.width / 2 - ccPanel.offsetLeft) + 'px');
+        ccPanel.style.setProperty('--oy', Math.round(r.top + r.height / 2 - ccPanel.offsetTop) + 'px');
+        void ccPanel.offsetWidth;                                   // fija el estado inicial antes de animar
+        ccEl.dataset.abierto = 'true';
+        portal.inert = true; escena.setAttribute('data-cc', ''); detener();
+        if (cc.vista === 'acceso') accPreparar(); else { ccPanel.focus({ preventScroll: true }); ccCargar(); }
+    }
+    function ccVista(v) {
+        cc.vista = v; ccEl.dataset.vista = v;
+        $('ccTit').textContent = v === 'acceso' ? 'Acceso de administrador' : 'Cuentas y módulos';
+        $('ccSub').textContent = v === 'acceso' ? 'Entra para administrar cuentas y módulos.' : 'Los cambios se guardan al instante.';
+    }
+
+    /* ---- vista «acceso»: formulario de administrador ---- */
+    var accEmail = $('ccEmail'), accPass = $('ccPass'), accBtn = $('ccEntrar'), accErr = $('ccErr'), accEnv = false;
+    function accError(txt, enlace, campo) {
+        $('ccErrTxt').textContent = txt || ''; $('ccErrLink').hidden = !enlace; accErr.hidden = !txt;
+        accEmail.removeAttribute('aria-invalid'); accPass.removeAttribute('aria-invalid');
+        if (campo) campo.setAttribute('aria-invalid', 'true');
+    }
+    function accPreparar() {
+        accError('', false); accPass.value = ''; accVer(false);
+        var n = $('ccSesNota');
+        if (sesionInfo) { n.textContent = 'Tu sesión (' + (sesionInfo.email || '') + ' · ' + (ROLES[sesionInfo.rol] || sesionInfo.rol || '') + ') no es de administrador.'; n.hidden = false; } else n.hidden = true;
+        accEstado(false);
+        accEmail.focus({ preventScroll: true });
+    }
+    function accEstado(env) {
+        accEnv = env; accBtn.disabled = env; accBtn.textContent = env ? 'Entrando…' : 'Entrar';
+        $('ccAcc').setAttribute('aria-busy', env ? 'true' : 'false');
+    }
+    function accVer(ver) {
+        accPass.type = ver ? 'text' : 'password';
+        var b = $('ccVer'); b.textContent = ver ? 'Ocultar' : 'Ver'; b.setAttribute('aria-pressed', ver ? 'true' : 'false'); b.setAttribute('aria-label', ver ? 'Ocultar la contraseña' : 'Mostrar la contraseña');
+    }
+    $('ccVer').addEventListener('click', function () { accVer(accPass.type === 'password'); accPass.focus(); });
+    $('ccAcc').addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        if (accEnv) return;
+        var mail = accEmail.value.trim(), clave = accPass.value;
+        if (!mail) { accError('Escribe tu correo.', false, accEmail); accEmail.focus(); return; }
+        if (!clave) { accError('Escribe tu contraseña.', false, accPass); accPass.focus(); return; }
+        accError('', false); accEstado(true);
+        api('POST', '/api/plataforma/entrar', { email: mail, password: clave }).then(function (d) {
+            var rol = d && d.rol;
+            if (rol !== 'administrador') { var e = new Error('Esta cuenta no es de administrador.'); e.status = 403; throw e; }
+            var ses = { email: (d && d.email) || mail, rol: rol };
+            accPass.value = ''; accEstado(false);
+            if (!cc.abierto || cc.vista !== 'acceso') { cargarModulos(); return; }
+            cc.entrando = true; sesionInfo = ses; pintarSesion();      // sesión provisional; /api/modulos la confirma y trae permisos
+            ccVista('cuentas'); ccEstado('carga', 'Cargando cuentas…', null); ccAvisar('', false);
+            ccCargar();
+            ccPanel.focus({ preventScroll: true });
+            cargarModulos().then(function () {
+                cc.entrando = false;
+                if (!esAdmin()) { sesionInfo = ses; pintarSesion(); }
+            });
+        }).then(null, function (e) {
+            accEstado(false);
+            var st = e && e.status;
+            accError(e && e.message ? e.message : 'No se pudo entrar. Inténtalo de nuevo.', st === 409, st === 401 ? accPass : null);
+            if (st === 401) { accPass.select(); accPass.focus(); }
+        });
+    });
+    function ccCerrar(devolver) {
+        if (!cc.abierto) return;
+        cc.abierto = false; menuCerrar(false); confCerrar(false);
+        nucBtn.setAttribute('aria-expanded', 'false');
+        ccEl.dataset.abierto = 'false';
+        tCerrar = setTimeout(function () { ccEl.hidden = true; }, mqQuieto.matches ? 0 : 280);
+        portal.inert = false; escena.removeAttribute('data-cc'); arrancar();
+        if (devolver !== false && !nucBtn.hidden) nucBtn.focus();
+    }
+    nucBtn.addEventListener('click', function () { if (cc.abierto) ccCerrar(true); else ccAbrir(); });
+    var ccDown = false;
+    ccEl.addEventListener('pointerdown', function (e) { ccDown = e.target === ccEl; });
+    ccEl.addEventListener('click', function (e) { if (ccDown && e.target === ccEl) ccCerrar(true); ccDown = false; });
+    document.addEventListener('keydown', function (e) {
+        if (!cc.abierto) return;
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            if (!ccMenu.hidden) menuCerrar(true); else if (!ccConf.hidden) confCerrar(true); else ccCerrar(true);
+            return;
+        }
+        if (e.key !== 'Tab') return;
+        var f = Array.prototype.filter.call(ccPanel.querySelectorAll('button, input, select, a[href]'), function (x) { return !x.disabled && x.getClientRects().length > 0; });
+        if (!f.length) { e.preventDefault(); return; }
+        var a = document.activeElement, p = f[0], u = f[f.length - 1];
+        if (!ccPanel.contains(a) || a === ccPanel) { e.preventDefault(); (e.shiftKey ? u : p).focus(); }
+        else if (e.shiftKey && a === p) { e.preventDefault(); u.focus(); }
+        else if (!e.shiftKey && a === u) { e.preventDefault(); p.focus(); }
+    });
+    addEventListener('resize', function () { menuCerrar(false); });
 
     /* ================= arranque ================= */
     leerColores(); ajustarCampo(); pintarCampo(0);

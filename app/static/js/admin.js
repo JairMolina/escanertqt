@@ -551,6 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const r = await adm('/api/admin/usuarios');
         if (!r.ok) { $('uTabla').replaceChildren(h('p', { class: 'hint err' }, r.error)); return; }
         $('uSmtp').textContent = r.data.smtp ? 'Correo SMTP configurado.' : 'Correo SMTP sin configurar: al invitar se mostrará el enlace para compartirlo a mano.';
+        const catalogo = r.data.modulos || [];
         const filas = r.data.items.map((u) => {
             const estado = u.pendiente ? (u.inv_exp * 1000 < Date.now() ? 'Invitación caducada' : 'Invitación pendiente') : u.activo ? 'Activa' : 'Desactivada';
             const sel = h('select', { class: 'input', 'aria-label': 'Rol de ' + u.email, style: 'min-height:36px' }, ...['administrador', 'general', 'consultor'].map((x) => h('option', { value: x }, bonito(x))));
@@ -579,10 +580,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 const x = await adm(rutaCuenta(u.email), { method: 'DELETE' });
                 if (x.ok) { toast('Cuenta eliminada', { kind: 'ok' }); cargarCuentas(); } else toast(x.error, { kind: 'bad' });
             } }, 'Eliminar'));
-            return h('tr', {}, h('td', { class: 'mono' }, u.email), h('td', {}, sel), h('td', {}, estado), h('td', {}, u.ultimo_acceso || '—'),
-                h('td', {}, h('div', { class: 'row', style: 'gap:6px' }, ...acc)));
+            const esAdmin = u.rol === 'administrador';
+            const asignados = new Set(u.modulos || []);
+            const chips = esAdmin ? [h('span', { class: 'mchip', 'data-todos': '1' }, 'Todos los módulos')]
+                : catalogo.filter((m) => asignados.has(m.id)).map((m) => h('span', { class: 'mchip' }, m.nombre, m.estado === 'proximamente' ? h('small', {}, ' (próx.)') : null));
+            if (!esAdmin && !chips.length) chips.push(h('span', { class: 'mchip vacio' }, 'Sin módulos'));
+            const celdaMod = h('div', { class: 'mchips', role: 'list', 'aria-label': 'Módulos de ' + u.email }, ...chips.map((c) => { c.setAttribute('role', 'listitem'); return c; }));
+            if (!esAdmin) acc.unshift(h('button', { class: 'btn btn-sm', type: 'button', 'aria-label': 'Módulos de ' + u.email, onclick: () => editarModulos(u, catalogo) }, 'Módulos'));
+            return h('tr', {}, h('td', { class: 'mono' }, u.email), h('td', {}, sel), h('td', {}, celdaMod), h('td', {}, estado), h('td', {}, u.ultimo_acceso || '—'),
+                h('td', {}, h('div', { class: 'row wrap', style: 'gap:6px' }, ...acc)));
         });
-        $('uTabla').replaceChildren(h('table', { class: 'table' }, h('thead', {}, h('tr', {}, ...['Correo', 'Rol', 'Estado', 'Último acceso', 'Acciones'].map((t) => h('th', {}, t)))), h('tbody', {}, ...filas)));
+        $('uTabla').replaceChildren(h('div', { class: 'tablewrap' }, h('table', { class: 'table' }, h('thead', {}, h('tr', {}, ...['Correo', 'Rol', 'Módulos', 'Estado', 'Último acceso', 'Acciones'].map((t) => h('th', {}, t)))), h('tbody', {}, ...filas))));
+    }
+    /** Hoja con una casilla por módulo del catálogo; guarda con PATCH {modulos}. */
+    function editarModulos(u, catalogo) {
+        const sel = new Set(u.modulos || []);
+        const tuvoEscaner = sel.has('escaner-tqt');
+        const aviso = h('p', { class: 'hint warn', role: 'status', 'aria-live': 'polite', hidden: true }, 'Esta cuenta ya no podrá entrar a Escáner TQT');
+        const err = h('p', { class: 'hint err', role: 'alert', hidden: true });
+        const refrescaAviso = () => { aviso.hidden = !(tuvoEscaner && !sel.has('escaner-tqt')); };
+        const lista = catalogo.map((m) => {
+            const cb = h('input', { type: 'checkbox', value: m.id, checked: sel.has(m.id) });
+            cb.addEventListener('change', () => { if (cb.checked) sel.add(m.id); else sel.delete(m.id); refrescaAviso(); });
+            return h('label', { class: 'mod-opt' }, cb, h('span', {}, m.nombre, m.estado === 'proximamente' ? h('small', {}, ' (próx.)') : null));
+        });
+        const body = [h('p', { class: 'hint' }, u.email), h('div', { class: 'mod-lista', role: 'group', 'aria-label': 'Módulos asignados' }, ...lista), aviso, err];
+        sheet({ title: 'Módulos de la cuenta', body, actions: [
+            { label: 'Cancelar', kind: 'ghost', onClick: () => true },
+            { label: 'Guardar', kind: 'primary', onClick: async () => {
+                err.hidden = true;
+                const x = await adm(rutaCuenta(u.email), { method: 'PATCH', body: { modulos: catalogo.map((m) => m.id).filter((id) => sel.has(id)) } });
+                if (!x.ok) { err.textContent = x.error || 'No se pudo guardar.'; err.hidden = false; return false; }
+                toast('Módulos actualizados', { kind: 'ok' }); cargarCuentas(); return true;
+            } },
+        ] });
     }
     $('formAlta').addEventListener('submit', async (e) => {
         e.preventDefault();

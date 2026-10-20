@@ -226,10 +226,10 @@ class OtaTests(unittest.TestCase):
         body=dict(firmware_id='base-R2-v41',device=self.info)
         anon=iso.cliente_sin_sesion(app)
         self.assertEqual(anon.post(f'/api/esp32/ota/prepare/{self.pid}',json=body).status_code,401)
-        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'consultor'}):
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'consultor','modulos':['escaner-tqt']}):
             client=TestClient(app,base_url='https://testserver')
             self.assertEqual(client.post(f'/api/esp32/ota/prepare/{self.pid}',json=body).status_code,403)
-        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+        with patch('app.services.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general','modulos':['escaner-tqt']}):
             self.assertEqual(client.post(f'/api/esp32/ota/prepare/{self.pid}',json=body,headers={'Origin':'https://other.invalid'}).status_code,403)
             response=client.post(f'/api/esp32/ota/prepare/{self.pid}',json=body)
             self.assertEqual(response.status_code,200)

@@ -7,7 +7,7 @@
     <meta name="color-scheme" content="dark light">
     <meta name="robots" content="noindex">
     <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
-    <title>Inicio · Plataforma TQT</title>
+    <title>Inicio · Plataforma I+D</title>
     <script>
         /* Tema: el que el usuario eligió (mismo ajuste `tqt.tema` que el resto de la app); si nunca eligió, el del sistema. */
         (function () {
@@ -16,8 +16,8 @@
             document.documentElement.dataset.theme = t;
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/app.css?v=1410">
-    <link rel="stylesheet" href="/static/css/inicio.css?v=1410">
+    <link rel="stylesheet" href="/static/css/app.css?v=1411">
+    <link rel="stylesheet" href="/static/css/inicio.css?v=1417">
 </head>
 <body>
 <a class="salto" href="#modulos">Saltar a los módulos</a>
@@ -30,12 +30,18 @@
                 <rect x="8" y="8" width="32" height="32" rx="5"/><path d="M16 8v-4M24 8v-4M32 8v-4M16 44v-4M24 44v-4M32 44v-4M8 16H4M8 24H4M8 32H4M44 16h-4M44 24h-4M44 32h-4"/>
                 <path d="M17 24h5l3-6 3 12 3-6h2"/>
             </svg>
-            <b>TQT</b><span class="sub">Plataforma</span>
+            <b>I+D</b><span class="sub">Plataforma</span>
         </div>
 
         <div class="saludo">
             <p class="hola" id="hola">&nbsp;</p>
-            <p class="fecha" id="fecha">&nbsp;</p>
+            <div class="linea2">
+                <p class="fecha" id="fecha">&nbsp;</p>
+                <div class="ses" id="ses" hidden>
+                    <span class="quien" id="sesQuien"><span class="mail" id="sesMail"></span><span class="rol" id="sesRol"></span></span>
+                    <button class="salir" type="button" id="salir">Cerrar sesión</button>
+                </div>
+            </div>
         </div>
 
         <div class="sistema">
@@ -50,6 +56,11 @@
     </header>
 
     <main class="cielo" id="modulos" aria-labelledby="tit" tabindex="-1">
+        <div class="denegado" id="denegado" role="alert" hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>
+            <p id="denTxt"></p>
+            <button class="iconbtn" type="button" id="denX" aria-label="Descartar aviso"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </div>
         <div class="intro">
             <h1 id="tit">Módulos de la plataforma</h1>
             <p><span class="solo-pc">Pasa el cursor sobre una estrella o usa las flechas del teclado para ver el módulo. Enter entra.</span><span class="solo-movil">Elige un módulo para entrar.</span></p>
@@ -61,14 +72,16 @@
                 <g id="lineas"></g>
             </svg>
 
-            <div class="nucleo" aria-hidden="true">
-                <i class="anillo a"></i><i class="anillo b"></i>
-                <div class="disco">
+            <div class="nucleo">
+                <i class="anillo a" aria-hidden="true"></i><i class="anillo b" aria-hidden="true"></i>
+                <div class="disco" aria-hidden="true">
                     <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="7" y="7" width="34" height="34" rx="5"/><path d="M15 7V3M24 7V3M33 7V3M15 45v-4M24 45v-4M33 45v-4M7 15H3M7 24H3M7 33H3M45 15h-4M45 24h-4M45 33h-4"/>
-                        <text x="24" y="28.4" text-anchor="middle" stroke="none" fill="var(--text)">TQT</text>
+                        <text x="24" y="28.9" text-anchor="middle" stroke="none" fill="var(--text)">I+D</text>
                     </svg>
                 </div>
+                <!-- El núcleo es siempre el botón de administración: con sesión de administrador abre el panel; si no, pide el acceso (lo activa inicio.js). -->
+                <button class="nucbtn" type="button" id="nucBtn" hidden aria-expanded="false" aria-controls="ccPanel" aria-haspopup="dialog" aria-label="Administrar"><span class="adm" aria-hidden="true">Administrar</span></button>
             </div>
 
             <ul class="astros" id="lista" role="list" aria-label="Módulos de la plataforma"></ul>
@@ -99,6 +112,61 @@
         </div>
     </main>
 </div>
-<script src="/static/js/inicio.js?v=1410"></script>
+
+<!-- Centro de control: vista «acceso» (formulario de administrador) o «cuentas» (cuentas × módulos); el contenido lo pinta inicio.js -->
+<div class="cc" id="cc" hidden data-abierto="false" data-vista="acceso">
+    <section class="cc-panel" id="ccPanel" role="dialog" aria-modal="true" aria-labelledby="ccTit" tabindex="-1">
+        <header class="cc-cab">
+            <div class="cc-tit">
+                <h2 id="ccTit">Acceso de administrador</h2>
+                <p id="ccSub">Entra para administrar cuentas y módulos.</p>
+            </div>
+            <button class="iconbtn" type="button" id="ccX" aria-label="Cerrar el panel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </header>
+        <form class="cc-acc" id="ccAcc" novalidate>
+            <p class="cc-sesnota" id="ccSesNota" hidden></p>
+            <div class="field"><label for="ccEmail">Correo</label>
+                <input class="input" id="ccEmail" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" required></div>
+            <div class="field"><label for="ccPass">Contraseña</label>
+                <div class="cc-clave"><input class="input" id="ccPass" name="password" type="password" autocomplete="current-password" maxlength="200" required>
+                    <button class="btn" type="button" id="ccVer" aria-pressed="false" aria-label="Mostrar la contraseña">Ver</button></div></div>
+            <div class="cc-err" id="ccErr" role="alert" hidden><span id="ccErrTxt"></span> <a href="/login" id="ccErrLink" hidden>Ir a iniciar sesión</a></div>
+            <button class="btn btn-primary" type="submit" id="ccEntrar">Entrar</button>
+        </form>
+        <div class="cc-barra">
+            <label class="cc-busca"><span class="sr-only">Buscar por correo</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+                <input class="input" type="search" id="ccBuscar" placeholder="Buscar por correo" autocomplete="off" spellcheck="false" enterkeyhint="search"></label>
+            <p class="cc-cuenta" id="ccCuenta" aria-live="polite"></p>
+        </div>
+        <div class="cc-conf" id="ccConf" role="group" aria-labelledby="ccConfTxt" hidden>
+            <p id="ccConfTxt"></p>
+            <button class="btn btn-sm" type="button" id="ccConfOk">Confirmar</button>
+            <button class="btn btn-sm btn-ghost" type="button" id="ccConfNo">Cancelar</button>
+        </div>
+        <div class="cc-mods" id="ccMods" aria-label="Acciones por módulo"></div>
+        <div class="cc-cuerpo" id="ccCuerpo" data-e="carga" aria-busy="true">
+            <div class="cc-scroll" id="ccScroll">
+                <table class="cc-tabla">
+                    <caption class="sr-only">Módulos asignados a cada cuenta</caption>
+                    <thead id="ccHead"></thead>
+                    <tbody id="ccFilas"></tbody>
+                </table>
+                <ul class="cc-tarjetas" id="ccTarjetas" role="list" aria-label="Cuentas"></ul>
+            </div>
+            <div class="cc-estado" id="ccEstado">
+                <div class="cc-sk" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+                <p id="ccEstTxt">Cargando cuentas…</p>
+                <button class="btn" type="button" id="ccEstBtn" hidden>Reintentar</button>
+            </div>
+        </div>
+        <p class="cc-aviso" id="ccAviso" role="status" aria-live="polite"></p>
+        <div class="cc-menu" id="ccMenu" role="menu" hidden>
+            <button type="button" role="menuitem" data-ac="dar">Dar a todos</button>
+            <button type="button" role="menuitem" data-ac="quitar">Quitar a todos</button>
+        </div>
+    </section>
+</div>
+<script src="/static/js/inicio.js?v=1414"></script>
 </body>
 </html>
