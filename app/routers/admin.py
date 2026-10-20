@@ -243,8 +243,11 @@ def _enlace(request: Request, token: str) -> str:
     return f"{base}/invitacion#{token}"
 
 
-def _enviar_invitacion(email: str, rol: str, enlace: str, por: str) -> Dict[str, Any]:
-    """Envía el correo; si falla, el administrador recibe el enlace para dárselo por otro medio."""
+def _enviar_invitacion(email: str, rol: str, enlace: str, por: str, modulos: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Envía el correo; si falla, el administrador recibe el enlace para dárselo por otro medio.
+    v1.4.14: con `modulos` (nombres) la invitación es a la plataforma I+D y lista los módulos."""
+    if modulos is not None:
+        return _enviar_invitacion_plataforma(email, rol, enlace, por, modulos)
     texto = (f"Hola:\n\n{por} te dio de alta en Escáner TQT con el rol «{rol}».\n\n"
              f"Para activar tu cuenta y elegir tu contraseña abre este enlace (vale 48 horas y se usa una sola vez):\n{enlace}\n\n"
              "Si no esperabas este correo, ignóralo.\n\nInventario TQT")
@@ -254,6 +257,25 @@ def _enviar_invitacion(email: str, rol: str, enlace: str, por: str) -> Dict[str,
                             aviso=("gris", "El enlace vale 48 horas y se usa una sola vez. Si no esperabas este correo, ignóralo."))
     try:
         correo.enviar(email, "Activa tu cuenta de Escáner TQT", texto, html)
+        return {"enviado": True}
+    except correo.CorreoNoConfigurado as e:
+        return {"enviado": False, "error": str(e), "enlace": enlace}
+    except Exception as e:  # noqa: BLE001 - SMTP/red: se informa sin exponer credenciales
+        logger.warning("No se pudo enviar la invitación a %s: %s", email, e)
+        return {"enviado": False, "error": f"No se pudo enviar el correo ({type(e).__name__}).", "enlace": enlace}
+
+
+def _enviar_invitacion_plataforma(email: str, rol: str, enlace: str, por: str, modulos: List[str]) -> Dict[str, Any]:
+    lista = ", ".join(modulos) if modulos else "todos los módulos (administrador)" if rol == "administrador" else "ninguno por ahora"
+    texto = (f"Hola:\n\n{por} te invitó a la plataforma I+D con el rol «{rol}».\nMódulos: {lista}.\n\n"
+             f"Para activar tu cuenta y elegir tu contraseña abre este enlace (vale 48 horas y se usa una sola vez):\n{enlace}\n\n"
+             "Si no esperabas este correo, ignóralo.\n\nPlataforma I+D")
+    html = correo.plantilla("Activa tu cuenta", saludo="Hola:", preencabezado=f"{por} te invitó a la plataforma I+D",
+                            parrafos=[f"{por} te invitó a la plataforma I+D. Para activar tu cuenta y elegir tu contraseña, usa el botón:"],
+                            filas=[("Cuenta", email), ("Rol", rol.capitalize()), ("Módulos", lista)], boton=("Activar mi cuenta", enlace),
+                            aviso=("gris", "El enlace vale 48 horas y se usa una sola vez. Si no esperabas este correo, ignóralo."))
+    try:
+        correo.enviar(email, "Te invitaron a la plataforma I+D", texto, html)
         return {"enviado": True}
     except correo.CorreoNoConfigurado as e:
         return {"enviado": False, "error": str(e), "enlace": enlace}

@@ -214,6 +214,11 @@ def calcular_diseno_r3(formato: FormatoEtiqueta, nombres: List[str]) -> List[Mit
 # v1.3.84: el número va en vertical (girado 90°), a lo largo de la mitad izquierda.
 CABLE_FUENTE_PT = 36.0
 
+# --- Etiqueta de activo (v1.4.14/16): «ACT 0001» grande y centrado a la derecha del QR, sin más líneas ---
+ACTIVO_CODIGO_PT = 24.0        # tope del tamaño del código
+ACTIVO_MIN_CODIGO_PT = 18.0    # el QR crece mientras el código no baje de esto
+ACTIVO_MAX_PUNTOS = 8          # puntos por módulo del QR (0.68 mm a 300 dpi); la etiqueta de tarjeta usa 6
+
 
 CABLE_TEXTO_ANCHO_MM = 13.0   # v1.3.93: franja pegada al borde izquierdo (al doblar, el texto no se recorre hacia la línea)
 
@@ -839,6 +844,163 @@ class DymoService:
         if tipo == "label":
             return cls.generate_cable_label_xml(numero, label_format, r3).encode("utf-8"), f"{base}.label"
         return b"\xef\xbb\xbf" + cls.generate_cable_dcd_xml(numero, label_format, r3).encode("utf-8"), f"{base}.dymo"
+
+    # ------------------------------------------------------------------ activo (v1.4.14, simplificada en v1.4.16)
+    # Solo «ACT 0001» y el QR con la URL del activo. Mismo formato y reglas que la etiqueta de tarjeta (QR a la izquierda con
+    # módulos exactos a 300 dpi, todo dentro de la zona segura); sin nombre ni otras líneas, así que el QR y el código crecen
+    # hasta donde caben: el módulo más grande (hasta ACTIVO_MAX_PUNTOS) que aún deja al código en >= ACTIVO_MIN_CODIGO_PT.
+    @classmethod
+    def diseno_activo(cls, url: str, etiqueta: str, label_format: Optional[str] = None):
+        """(Diseno, caja del código centrada en vertical, pt del código) de la etiqueta de un activo."""
+        f = obtener_formato(label_format)
+        modulos = len(matriz_qr(url))
+        m = MARGEN_SEGURO_MM
+        seguro = Caja(m, m, f.ancho_mm - 2 * m, f.alto_mm - 2 * m)
+        avance = max(len(etiqueta), 1) * FUENTE_AVANCE_EM * PT_A_MM   # mm de ancho por cada pt de fuente
+
+        def medidas(ppm: int):
+            lado = (modulos + 2 * SILENCIO_MODULOS) * ppm / DOTS_PER_MM
+            ancho = seguro.derecha - (seguro.x + lado + SEPARACION_MM)
+            return lado, ancho, min(ACTIVO_CODIGO_PT, ancho / avance)
+
+        ppm = ACTIVO_MAX_PUNTOS
+        while ppm > 4 and (medidas(ppm)[0] > seguro.h + 1e-9 or medidas(ppm)[2] < ACTIVO_MIN_CODIGO_PT):
+            ppm -= 1
+        lado, ancho, pt = medidas(ppm)
+        if lado > seguro.h + 1e-9 or ancho <= 0:
+            raise ValueError(f"El QR ({lado:.1f} mm) no cabe en la zona segura de {f.codigo}.")
+        pt = max(MIN_FUENTE_PT, pt)
+        qr = Caja(seguro.x, seguro.y + (seguro.h - lado) / 2, lado, lado)
+        alto = pt * INTERLINEADO * PT_A_MM
+        texto = Caja(qr.derecha + SEPARACION_MM, seguro.y + (seguro.h - alto) / 2, ancho, alto)
+        return Diseno(f, seguro, qr, modulos, ppm, texto, pt, 1), texto, pt
+
+    @classmethod
+    def generate_activo_xml(cls, url: str, etiqueta: str, label_format: Optional[str] = None) -> str:
+        """`.label` (DYMO Label v8) del activo: objetos `QR` (imagen 1 bit) y `TEXTO` («ACT 0001»)."""
+        d, c_cod, pt = cls.diseno_activo(url, etiqueta, label_format)
+        f = d.formato
+        objetos = (_v8_imagen("QR", cls.generate_qr_base64(url, box_size=d.puntos_por_modulo), d.qr)
+                   + _v8_texto("TEXTO", etiqueta, round(pt, 1), c_cod))
+        return f"""<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+    <PaperOrientation>{f.v8_orientacion}</PaperOrientation>
+    <Id>{f.paper_id}</Id>
+    <PaperName>{f.paper_name}</PaperName>
+    <DrawCommands>
+        <RoundRectangle X="0" Y="0" Width="{f.v8_ancho or f.twips_alto}" Height="{f.v8_alto or f.twips_ancho}" Rx="270" Ry="270" />
+    </DrawCommands>
+{objetos}</DieCutLabel>"""
+
+    @classmethod
+    def generate_activo_dcd_xml(cls, url: str, etiqueta: str, label_format: Optional[str] = None) -> str:
+        """`.dymo` (DYMO Connect) del activo, para `dymo.label.framework.openLabelXml`: `QR` (BarcodeObject con la URL)
+        y `TEXTO` («ACT 0001», grande y centrado en vertical)."""
+        d, c_cod, pt = cls.diseno_activo(url, etiqueta, label_format)
+        f, seg = d.formato, d.zona_segura
+        negro = cls._color(1, 0, 0, 0)
+        margen = '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0" /></Margin>'
+
+        def layout(c: Caja) -> str:
+            return (f"<ObjectLayout><DYMOPoint><X>{_pulg(c.x)}</X><Y>{_pulg(c.y)}</Y></DYMOPoint>"
+                    f"<Size><Width>{_pulg(c.w)}</Width><Height>{_pulg(c.h)}</Height></Size></ObjectLayout>")
+
+        fuente = (f"<FontInfo><FontName>{FUENTE}</FontName><FontSize>{round(pt, 1):g}</FontSize><IsBold>True</IsBold>"
+                  f"<IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>")
+        return f"""<?xml version="1.0" encoding="utf-8"?>
+<DesktopLabel Version="1">
+  <DYMOLabel Version="3">
+    <Description>TQT activo {f.codigo} {f.ancho_mm:g}x{f.alto_mm:g} mm</Description>
+    <Orientation>Landscape</Orientation>
+    <LabelName>{f.nombre_dcd}</LabelName>
+    <InitialLength>0</InitialLength>
+    <BorderStyle>SolidLine</BorderStyle>
+    <DYMORect>
+      <DYMOPoint><X>{_pulg(seg.x)}</X><Y>{_pulg(seg.y)}</Y></DYMOPoint>
+      <Size><Width>{_pulg(seg.w)}</Width><Height>{_pulg(seg.h)}</Height></Size>
+    </DYMORect>
+    <BorderColor>{negro}</BorderColor>
+    <BorderThickness>1</BorderThickness>
+    <Show_Border>False</Show_Border>
+    <DynamicLayoutManager>
+      <RotationBehavior>ClearObjects</RotationBehavior>
+      <LabelObjects>
+        <BarcodeObject>
+          <Name>QR</Name>
+          {cls._brushes()}
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          {margen}
+          <BarcodeFormat>QRCode</BarcodeFormat>
+          <Data>
+            <MultiDataString>
+              <DataString>{xml_escape(url)}</DataString>
+            </MultiDataString>
+          </Data>
+          <HorizontalAlignment>Center</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <Size>Medium</Size>
+          <TextPosition>None</TextPosition>
+          <FontInfo><FontName>{FUENTE}</FontName><FontSize>8</FontSize><IsBold>False</IsBold><IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>
+          {layout(d.qr)}
+        </BarcodeObject>
+        <TextObject>
+          <Name>TEXTO</Name>
+          {cls._brushes()}
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          {margen}
+          <HorizontalAlignment>Left</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <FitMode>AlwaysFit</FitMode>
+          <IsVertical>False</IsVertical>
+          <FormattedText>
+            <FitMode>AlwaysFit</FitMode>
+            <HorizontalAlignment>Left</HorizontalAlignment>
+            <VerticalAlignment>Middle</VerticalAlignment>
+            <IsVertical>False</IsVertical>
+            <LineTextSpan><TextSpan><Text>{xml_escape(etiqueta)}</Text>{fuente}</TextSpan></LineTextSpan>
+          </FormattedText>
+          {layout(c_cod)}
+        </TextObject>
+      </LabelObjects>
+    </DynamicLayoutManager>
+  </DYMOLabel>
+  <LabelApplication>Blank</LabelApplication>
+  <DataTable>
+    <Columns></Columns>
+    <Rows></Rows>
+  </DataTable>
+</DesktopLabel>"""
+
+    @classmethod
+    def generate_activo_svg(cls, url: str, etiqueta: str, label_format: Optional[str] = None, borde: bool = False) -> str:
+        """SVG a escala real (1 unidad = 1 mm) de la etiqueta del activo: vista previa e impresión del navegador / DYMO compartida."""
+        d, c_cod, pt = cls.diseno_activo(url, etiqueta, label_format)
+        f = d.formato
+        mod = d.puntos_por_modulo / DOTS_PER_MM
+        x0, y0 = d.qr.x + SILENCIO_MODULOS * mod, d.qr.y + SILENCIO_MODULOS * mod
+        celdas = "".join(f'<rect x="{x0 + c * mod:.4f}" y="{y0 + r * mod:.4f}" width="{mod:.4f}" height="{mod:.4f}"/>'
+                         for r, fila in enumerate(matriz_qr(url)) for c, v in enumerate(fila) if v)
+        marco = (f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" rx="2.5" fill="#fff" stroke="#000" stroke-width="0.2"/>' if borde
+                 else f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/>')
+        texto = (f'<text x="{c_cod.x:.3f}" y="{c_cod.y + c_cod.h / 2:.3f}" dominant-baseline="central" '
+                 f'font-size="{pt * PT_A_MM:.4f}">{xml_escape(etiqueta)}</text>')
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f.ancho_mm:g}mm" height="{f.alto_mm:g}mm" viewBox="0 0 {f.ancho_mm:g} {f.alto_mm:g}">'
+                f'{marco}<g fill="#000" shape-rendering="crispEdges">{celdas}</g>'
+                f'<g fill="#000" font-family="{FUENTE_SVG}" font-weight="700">{texto}</g></svg>')
+
+    @classmethod
+    def archivo_activo(cls, url: str, etiqueta: str, label_format: Optional[str] = None, tipo: str = "dymo") -> Tuple[bytes, str]:
+        """(bytes, nombre) del archivo `.dymo`/`.label` del activo; el nombre es el código sin espacios («ACT-0001.dymo»)."""
+        base = etiqueta.replace(" ", "-")
+        if tipo == "label":
+            return cls.generate_activo_xml(url, etiqueta, label_format).encode("utf-8"), f"{base}.label"
+        return b"\xef\xbb\xbf" + cls.generate_activo_dcd_xml(url, etiqueta, label_format).encode("utf-8"), f"{base}.dymo"
 
     # ------------------------------------------------------------------ paquete de datos
     @classmethod

@@ -1,7 +1,14 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-20 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.13; producción en 1.4.9 hasta que se despliegue)
+Commit de referencia: ver `git log` de main (v1.4.17; producción en 1.4.13 hasta que se despliegue)
+
+## v1.4.14–v1.4.17 (2026-10-20, Claude Code)
+- Módulo Impresora disponible: activos ACT 0000 (`app/services/activos.py`, `app/routers/activos.py`, tablas `activos`/`activos_eventos` creadas solas), etiqueta DYMO 30334 solo con «ACT 0000» + QR (`/impresora?activo=ACT-0000`), impresión individual y por lote a la DYMO compartida (misma cola que TQT, tipo `activo`), estado `/api/activos/impresora/estado`, vincular celular, importación de Excel (`activos_import.py`, solo filas verdes) con departamento y características. Interfaz propia y acceso propio `/impresora/acceso`.
+- Permiso por módulo de cada ruta (`modulos.modulo_de_ruta`, rutas compartidas); invitaciones por correo a módulos desde el núcleo (`/api/plataforma/invitaciones`).
+- Evidencia: suites pertinentes OK (test_activos, test_activos_import, test_invitaciones_modulo y las de plataforma/auth/dymo). Docker local 1.4.17 con 372 activos importados del Excel de inventario (BD local; el Excel no está en el repo). Sin impresión física ni prueba con celular real.
+- Para producción: `TQT_PUBLIC_URL` debe estar definida (si no, el QR toma la URL con que la Raspberry pide la etiqueta); SMTP con `TQT_SMTP_*`; verificar que el agente de la Raspberry acepte trabajos de tipo `activo` (descarga el mismo SVG genérico). La carga inicial de activos se hace con el botón «Importar Excel».
+- Pendiente: activos ACT-0281 y ACT-0377 traen una contraseña en notas (decisión del usuario).
 
 ## v1.4.11–v1.4.13 (2026-10-20, Claude Code)
 - Plataforma «I+D»: portal `/inicio` con 7 módulos (catálogo `app/modulos.py`; Escáner TQT disponible, el resto «Próximamente»), órbitas con una sola elipse por anillo.

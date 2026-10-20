@@ -20,7 +20,7 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station, esp32, dymo_remoto, plataforma
+from app.routers import test_station, esp32, dymo_remoto, plataforma, activos
 from app.ssl_cert import ensure_ssl_certificates
 from app import modulos as modulos_cat
 
@@ -122,11 +122,11 @@ CABECERAS_SEGURIDAD = {
 
 # Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
-RUTAS_PUBLICAS = {"/inicio", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
+RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js")
 
 
-PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health"}
+PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora"}   # v1.4.14: Impresora en solo lectura
 ROL_NOMBRE = {"general": "General", "consultor": "Consultor"}
 # Páginas (y sus copias bajo /static) → zona que se nombra en el aviso "sin acceso" (v1.3.42)
 ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "emparejar", "/static/emparejar.html": "emparejar",
@@ -181,12 +181,14 @@ def _permiso_rol(rol: Optional[str], ruta: str, metodo: str):
     return _sin_acceso(rol, ruta, metodo, "otra", "")
 
 
-def _sin_modulo(ruta: str, metodo: str):
-    """v1.4.11: la cuenta no tiene asignado Escáner TQT: vuelve al portal (página) o 403 (API, archivos y envíos)."""
+def _sin_modulo(ruta: str, metodo: str, mod: Optional[str] = None):
+    """v1.4.11: la cuenta no tiene asignado el módulo de la ruta: vuelve al portal (página) o 403 (API, archivos y envíos)."""
+    mod = mod or modulos_cat.ESCANER_TQT
+    nombre = next((m["nombre"] for m in modulos_cat.MODULOS if m["id"] == mod), mod)
     if ruta.startswith(("/api/", "/ws", "/static/")) or metodo not in ("GET", "HEAD"):
-        return JSONResponse(status_code=403, content={"detail": "Tu cuenta no tiene acceso al módulo Escáner TQT. Pide a un administrador que te lo asigne.",
-                                                       "zona": "modulo"}, headers={"X-Acceso": "modulo"})
-    return RedirectResponse("/inicio?denegado=" + modulos_cat.ESCANER_TQT, status_code=302)
+        return JSONResponse(status_code=403, content={"detail": f"Tu cuenta no tiene acceso al módulo {nombre}. Pide a un administrador que te lo asigne.",
+                                                       "zona": "modulo", "modulo": mod}, headers={"X-Acceso": "modulo"})
+    return RedirectResponse("/inicio?denegado=" + mod, status_code=302)
 
 
 async def _exigir_sesion(request: Request):
@@ -198,8 +200,9 @@ async def _exigir_sesion(request: Request):
         return None
     try:
         u = await run_in_threadpool(usuarios.validar_sesion, request.cookies.get(usuarios.COOKIE))
-        if not modulos_cat.puede(u, modulos_cat.ESCANER_TQT) and not ruta.startswith("/api/auth/"):
-            return _sin_modulo(ruta, request.method)
+        mod = modulos_cat.modulo_de_ruta(ruta)   # v1.4.14: cada módulo con su permiso (antes todo era Escáner TQT)
+        if not (modulos_cat.puede(u, mod) if mod else modulos_cat.alguno(u)) and not ruta.startswith("/api/auth/"):
+            return _sin_modulo(ruta, request.method, mod)
         return _permiso_rol(u.get("rol"), ruta, request.method)
     except usuarios.SesionInvalidaError as e:
         if ruta.startswith(("/api/", "/static/", "/ws")) or request.method not in ("GET", "HEAD"):
@@ -207,6 +210,9 @@ async def _exigir_sesion(request: Request):
         if ruta == "/":   # v1.4.10: sin sesión, la portada es el portal de módulos (el resto sigue yendo al login)
             return RedirectResponse("/inicio", status_code=302)
         destino = ruta + (("?" + request.url.query) if request.url.query else "")
+        acceso = modulos_cat.login_de(modulos_cat.modulo_de_ruta(ruta))   # v1.4.17: cada módulo con su pantalla de acceso
+        if acceso != "/login":
+            return RedirectResponse(acceso + "?next=" + quote(destino, safe=""), status_code=302)
         return RedirectResponse("/login?next=" + quote(destino, safe=""), status_code=302)
 
 
@@ -260,6 +266,23 @@ app.include_router(test_station.router)
 app.include_router(test_station.agent_router)
 app.include_router(dymo_remoto.router)   # v1.4.2: DYMO compartida (Raspberry)
 app.include_router(plataforma.router)   # v1.4.12: cuentas por módulo desde el portal
+app.include_router(activos.router)      # v1.4.14: módulo Impresora (activos con etiqueta DYMO + QR)
+
+
+@app.get("/impresora/acceso", include_in_schema=False)
+async def serve_impresora_acceso(request: Request):
+    """v1.4.17: inicio de sesión propio del módulo Impresora (misma cuenta y API que /login, otra identidad)."""
+    html = (settings.STATIC_DIR / "impresora_acceso.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
+    resp = HTMLResponse(html, headers={"Cache-Control": "no-store"})
+    if not request.cookies.get("tqt_cid"):   # misma marca anónima que /login para el límite de intentos
+        resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
+    return resp
+
+
+@app.get("/impresora", include_in_schema=False)
+async def serve_impresora():
+    """Módulo Impresora: registro de activos, etiqueta DYMO «ACT 0000» con QR y consulta con el celular."""
+    return _serve_file(settings.STATIC_DIR / "impresora.html")
 
 
 def _serve_file(file_path: Path, fallback_path: Path = None) -> FileResponse:

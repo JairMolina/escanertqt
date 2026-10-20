@@ -1,5 +1,33 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.17 — 2026-10-20
+- **Inicio de sesión propio del módulo Impresora** (`/impresora/acceso`): al entrar a Impresora desde el portal sin sesión ya no se abre el login de Escáner TQT. Misma cuenta y misma lógica (`login.js`: cambio de contraseña y «¿Olvidaste tu contraseña?»), con la identidad de Impresora.
+  - El catálogo de módulos indica la pantalla de acceso de cada uno (`login`); el middleware y el portal la usan, y al terminar se vuelve al módulo.
+  - Si la sesión caduca o se cierra dentro de Impresora, se vuelve a su propio acceso (`accesoDelModulo` en `common.js`).
+
+## v1.4.16 — 2026-10-20
+- **Impresora con interfaz propia** («libro de activos»: papel y tinta / grafito, placas plateadas, sellos de estado, acento bermellón), distinta de la consola de Escáner TQT.
+- **Etiqueta solo con «ACT 0000» y el QR** (QR y texto más grandes en el mismo formato 30334). El QR abre la ficha del activo con el celular.
+- **Imprimir etiqueta** siempre visible en la ficha: va a la DYMO compartida (Raspberry) por la misma cola que Escáner TQT. Estado de la impresora en la cabecera (`GET /api/activos/impresora/estado`).
+- **Imprimir lote**: modal con filtros por fecha de alta (hoy, ayer, un día, rango), «solo sin imprimir», departamento y búsqueda; selección con casillas (máx. 500), envío a la Raspberry y avance por etiqueta (`GET /api/activos/lote/estado`) con reintento de las fallidas, o descarga `.zip`.
+- `GET /api/activos` acepta `desde`, `hasta`, `impresa` y `codigos`; `POST /api/activos/imprimir-lote` resuelve el lote por filtros en el servidor.
+
+## v1.4.15 — 2026-10-20
+- **Impresora: importar activos desde Excel.** Botón «Importar Excel» con vista previa por hoja (nuevos, a actualizar, omitidos con motivo) antes de aplicar; por defecto solo las filas marcadas en verde. Conserva el número de activo del Excel (ACT82 → ACT 0082), detecta el formato de cada hoja (incluida una con encabezados recorridos), repara acentos dañados y, si un activo aparece en varias hojas, toma la fila modificada más recientemente.
+  - Tras importar: imprimir todas las etiquetas en la DYMO compartida (`POST /api/activos/imprimir-lote`) o descargarlas en `.zip` (`/api/activos/etiquetas.zip`).
+  - Servicio `app/services/activos_import.py` y `POST /api/activos/importar` (vista previa / aplicar, solo `.xlsx`, máx. 10 MB). Script `scripts/importar_activos_excel.py` para cargas iniciales.
+- Activos con **departamento** y **características** (asignado a, colaborador, descripción, procesador, RAM, disco, pantalla, fecha de revisión, comentarios, datos de baja…), visibles y editables en la ficha; filtro y búsqueda por departamento. La etiqueta agrega una línea «Departamento · S/N».
+- Pruebas nuevas en `tests/test_activos_import.py`.
+
+## v1.4.14 — 2026-10-20
+- **Módulo Impresora (disponible): registro de activos con etiqueta DYMO y QR.** Pantalla `/impresora` con lista y ficha, alta/edición con número sugerido (ACT 0000) y catálogos, historial de eventos y filtros.
+  - Etiqueta en el mismo formato que Escáner TQT (30334, 57×32 mm): QR con el enlace `/impresora?activo=ACT-0001` y «ACT 0001» con el nombre del activo. Impresión por DYMO compartida (Raspberry, tipo `activo`), DYMO Connect del equipo, descarga `.dymo` o desde el navegador (SVG).
+  - Consulta con el celular: «Vincular celular» (mismo escáner remoto que TQT), lector USB y cámara del teléfono; el QR abierto con la cámara normal lleva directo a la ficha.
+  - Backend `app/services/activos.py` y `app/routers/activos.py` (`/api/activos`, tablas `activos` y `activos_eventos` que se crean solas). Consultor en solo lectura.
+- **Permiso por módulo de cada ruta** (`modulos.modulo_de_ruta`): las rutas de Impresora exigen ese módulo, las de la app TQT exigen Escáner TQT y las compartidas (celular escáner, WebSocket, sesión, scripts comunes) basta con tener algún módulo.
+- **Invitaciones por correo desde el núcleo I+D** a módulos concretos: `POST /api/plataforma/invitaciones` (correo, rol y módulos), reenviar y cancelar. Sin SMTP configurado devuelve el enlace para compartirlo a mano. El correo ahora habla de la plataforma I+D y lista los módulos; al activar la cuenta se entra al portal.
+- Pruebas nuevas: `tests/test_activos.py`, `tests/test_invitaciones_modulo.py`.
+
 ## v1.4.13 — 2026-10-20
 - **El núcleo I+D pide el acceso de administrador.** El núcleo es siempre un botón: sin sesión, o con una cuenta que no es administrador, despliega ahí mismo «Acceso de administrador» (correo y contraseña); al entrar, el mismo panel se convierte en «Cuentas y módulos».
 - Órbitas: una sola elipse fina por anillo (antes se dibujaban tres trazos sobre la misma trayectoria que vibraban al pasar el cursor); el hover ya no se activa sobre las órbitas.

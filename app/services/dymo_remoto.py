@@ -8,7 +8,7 @@ ENVIADA_TTL queda «desconocido» (nunca se reimprime solo)."""
 import hashlib, json, secrets, time
 from app.database import db
 
-TIPOS = ("tarjeta", "aprobada", "cable", "r3")
+TIPOS = ("tarjeta", "aprobada", "cable", "r3", "activo")   # v1.4.14: «activo» lo encola el módulo Impresora
 FINALES = ("impresa", "error", "desconocido", "cancelada")
 EN_LINEA_S = 45          # latido cada 15 s
 PENDIENTE_TTL = 600
@@ -103,6 +103,22 @@ def trabajo(jid):
     if not r:
         raise ValueError("Trabajo de impresión no encontrado.")
     return dict(r, delante=pos)
+
+
+def trabajos(ids):
+    """v1.4.16: estado de varios trabajos de una vez (para el avance de un lote). {id: {estado, detalle, delante}}; los ids
+    que no existen no aparecen."""
+    ids = list(dict.fromkeys(ids))[:500]
+    if not ids:
+        return {}
+    init()
+    with db.get_db() as c:
+        _vencer(c, time.time())
+        marcas = ",".join("?" * len(ids))
+        filas = c.execute(f"SELECT id,estado,detalle,creado FROM dymo_trabajos WHERE id IN ({marcas})", ids).fetchall()
+        pend = [r["creado"] for r in c.execute("SELECT creado FROM dymo_trabajos WHERE estado='pendiente'")]
+    return {r["id"]: {"estado": r["estado"], "detalle": r["detalle"] or "",
+                      "delante": sum(1 for x in pend if x < r["creado"]) if r["estado"] == "pendiente" else 0} for r in filas}
 
 
 def cancelar(jid):

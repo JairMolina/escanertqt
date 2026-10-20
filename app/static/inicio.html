@@ -17,7 +17,7 @@
         })();
     </script>
     <link rel="stylesheet" href="/static/css/app.css?v=1411">
-    <link rel="stylesheet" href="/static/css/inicio.css?v=1417">
+    <link rel="stylesheet" href="/static/css/inicio.css?v=1418">
 </head>
 <body>
 <a class="salto" href="#modulos">Saltar a los módulos</a>
@@ -137,7 +137,34 @@
             <label class="cc-busca"><span class="sr-only">Buscar por correo</span>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
                 <input class="input" type="search" id="ccBuscar" placeholder="Buscar por correo" autocomplete="off" spellcheck="false" enterkeyhint="search"></label>
+            <button class="btn btn-primary cc-invbtn" type="button" id="ccInv" aria-expanded="false" aria-controls="ccInvForm" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Invitar</button>
             <p class="cc-cuenta" id="ccCuenta" aria-live="polite"></p>
+        </div>
+        <form class="cc-inv" id="ccInvForm" aria-labelledby="ccInvTit" novalidate hidden>
+            <h3 id="ccInvTit">Invitar por correo</h3>
+            <div class="cc-inv-fila">
+                <div class="field"><label for="ccInvMail">Correo</label>
+                    <input class="input" id="ccInvMail" type="email" inputmode="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="200" required></div>
+                <div class="field"><label for="ccInvRol">Rol</label>
+                    <select class="input" id="ccInvRol"></select></div>
+            </div>
+            <fieldset class="cc-inv-mods"><legend>Módulos a los que tendrá acceso</legend><div id="ccInvMods" class="cc-inv-lista"></div></fieldset>
+            <p class="cc-inv-smtp" id="ccInvSmtp" hidden>El correo no está configurado en este servidor: se generará un enlace para compartir.</p>
+            <div class="cc-err" id="ccInvErr" role="alert" hidden></div>
+            <div class="cc-inv-acc">
+                <button class="btn btn-primary" type="submit" id="ccInvEnv">Enviar invitación</button>
+                <button class="btn btn-ghost" type="button" id="ccInvNo">Cancelar</button>
+            </div>
+        </form>
+        <div class="cc-enl" id="ccEnl" role="group" aria-labelledby="ccEnlTit" hidden>
+            <p class="cc-enl-t" id="ccEnlTit"></p>
+            <p class="cc-enl-m" id="ccEnlMot"></p>
+            <div class="cc-enl-fila">
+                <input class="input" id="ccEnlUrl" type="text" readonly spellcheck="false" aria-label="Enlace de invitación">
+                <button class="btn btn-primary" type="button" id="ccEnlCop">Copiar enlace</button>
+                <button class="btn btn-ghost" type="button" id="ccEnlX">Cerrar</button>
+            </div>
         </div>
         <div class="cc-conf" id="ccConf" role="group" aria-labelledby="ccConfTxt" hidden>
             <p id="ccConfTxt"></p>
@@ -164,9 +191,10 @@
         <div class="cc-menu" id="ccMenu" role="menu" hidden>
             <button type="button" role="menuitem" data-ac="dar">Dar a todos</button>
             <button type="button" role="menuitem" data-ac="quitar">Quitar a todos</button>
+            <button type="button" role="menuitem" data-ac="invitar">Invitar a este módulo</button>
         </div>
     </section>
 </div>
-<script src="/static/js/inicio.js?v=1414"></script>
+<script src="/static/js/inicio.js?v=1417"></script>
 </body>
 </html>

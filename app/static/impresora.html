@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A1020">
+    <meta name="color-scheme" content="dark light">
+    <meta name="robots" content="noindex">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <title>Impresora · Activos · Plataforma I+D</title>
+    <script>
+        /* Tema: el que eligió el usuario (mismo ajuste `tqt.tema` que el resto de la plataforma); si nunca eligió, el del sistema. */
+        (function () {
+            var t = 'dark';
+            try { var g = localStorage.getItem('tqt.tema'); t = g === 'light' || g === 'dark' ? g : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* sin almacenamiento */ }
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1411">
+    <link rel="stylesheet" href="/static/css/impresora.css?v=1416">
+</head>
+<body>
+<a class="salto" href="#lista">Saltar a la lista de activos</a>
+
+<div class="im" id="im">
+    <header class="cab">
+        <a class="ir-modulos" href="/inicio" aria-label="Volver al portal de módulos" title="Volver al portal de módulos"><i class="svg-slot" data-i="flechaIzq"></i><span>Módulos</span></a>
+        <div class="marca">
+            <span class="sello" aria-hidden="true">
+                <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h22l6 6v18H6z"/><path d="M13 16h4v4h-4zM21 16h4v4h-4zM13 24h4v4h-4zM21 24h2M25 24v4"/></svg>
+            </span>
+            <div class="tit"><span class="kick">I+D · Plataforma</span><b>Impresora</b></div>
+        </div>
+        <span class="espacio"></span>
+        <button class="est-imp" type="button" id="bEstImp" data-e="?" title="Estado de la impresora compartida. Toca para volver a comprobar.">
+            <i class="punto" aria-hidden="true"></i><span class="t1">Impresora</span><span class="t2" id="estImpT">comprobando…</span>
+        </button>
+        <button class="btn btn-sm btn-cel" type="button" id="bCel" aria-haspopup="dialog" data-estado="">
+            <i class="svg-slot" data-i="phone"></i><span class="t">Vincular celular</span><i class="punto" aria-hidden="true"></i>
+        </button>
+        <span class="usuario" id="usuario" hidden><span class="mail" id="uMail"></span><span class="rol" id="uRol"></span></span>
+        <button class="iconbtn" type="button" id="bTema" aria-label="Cambiar entre tema claro y oscuro" title="Tema claro / oscuro"></button>
+    </header>
+
+    <div class="barra" role="search">
+        <div class="busca">
+            <label class="sr-only" for="q">Buscar activos</label>
+            <i class="svg-slot" data-i="search"></i>
+            <input class="input" id="q" type="search" placeholder="Buscar código, nombre, serie…" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        </div>
+        <div class="filtros">
+            <div class="field"><label class="sr-only" for="fEst">Filtrar por estado</label>
+                <select class="input" id="fEst"><option value="">Todos los estados</option></select></div>
+            <div class="field"><label class="sr-only" for="fDep">Filtrar por departamento</label>
+                <select class="input" id="fDep"><option value="">Todos los deptos.</option></select></div>
+            <div class="field"><label class="sr-only" for="fCat">Filtrar por categoría</label>
+                <select class="input" id="fCat"><option value="">Todas las categ.</option></select></div>
+        </div>
+        <div class="escaneo" title="Lector USB o teclado: escanea la etiqueta con este campo enfocado">
+            <label class="sr-only" for="scan">Escanear etiqueta con lector USB</label>
+            <i class="svg-slot" data-i="qr"></i>
+            <input class="input mono" id="scan" type="text" placeholder="Escanear" autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go">
+        </div>
+        <button class="btn btn-sec btn-imp" type="button" id="bImportar" data-edita aria-haspopup="dialog"><i class="svg-slot" data-i="excel"></i><span>Importar Excel</span></button>
+        <button class="btn btn-sec btn-lote" type="button" id="bLote" data-edita aria-haspopup="dialog"><i class="svg-slot" data-i="printer"></i><span>Imprimir lote</span></button>
+        <button class="btn btn-primary btn-nuevo" type="button" id="bNuevo" data-edita><i class="svg-slot" data-i="plus"></i><span>Nuevo activo</span></button>
+    </div>
+
+    <div class="cuerpo">
+        <main class="lista-col" id="lista-col" aria-labelledby="tLista">
+            <div class="lista-cab">
+                <h1 id="tLista">Libro de activos</h1>
+                <p class="total mono" id="total" role="status" aria-live="polite"></p>
+                <p class="proximo" id="proximo" hidden>Siguiente número <b class="mono" id="proximoN"></b></p>
+            </div>
+            <div class="cols" aria-hidden="true">
+                <span>Código</span><span>Activo</span><span class="c-dep">Departamento</span><span class="c-cat">Categoría</span><span class="c-ubi">Ubicación</span><span class="c-res">Responsable</span><span>Estado</span><span class="c-imp">Impr.</span>
+            </div>
+            <ul class="lista" id="lista" role="list" aria-label="Activos registrados" tabindex="-1"></ul>
+            <p class="lote-filtro" id="loteFiltro" hidden><span id="loteTxt"></span><button class="btn btn-sm btn-ghost" type="button" id="loteQuitar">Quitar filtro</button></p>
+            <div class="estado" id="estado" hidden></div>
+        </main>
+
+        <aside class="ficha" id="ficha" aria-label="Ficha del activo" tabindex="-1">
+            <div class="f-vacia" id="fVacia">
+                <i class="svg-slot" data-i="tag"></i>
+                <h2>Ficha del activo</h2>
+                <p>Elige un activo de la lista o escanea su etiqueta: aquí aparecen sus datos, la etiqueta y el historial.</p>
+            </div>
+            <div class="f-error" id="fError" hidden role="alert">
+                <p id="fErrorT"></p>
+                <button class="btn btn-sm" type="button" id="fReintentar"><i class="svg-slot" data-i="refresh"></i>Reintentar</button>
+            </div>
+            <article class="f-cont" id="fCont" hidden aria-busy="false">
+                <div class="f-top">
+                    <button class="btn btn-sm btn-ghost f-volver" type="button" id="fVolver"><i class="svg-slot" data-i="flechaIzq"></i>Activos</button>
+                    <span class="silk-m">Ficha de activo</span>
+                </div>
+                <header class="f-cab">
+                    <div class="f-id"><div class="placa placa-xl" id="fPlaca"><span id="fCodigo"></span></div><span class="chip" id="fEstado"></span></div>
+                    <h2 id="fNombre" tabindex="-1"></h2>
+                    <p class="f-sub" id="fSub"></p>
+                </header>
+                <section class="f-etq" aria-labelledby="tEtq">
+                    <h3 class="silk-m" id="tEtq">Etiqueta · código ACT y QR</h3>
+                    <figure class="papel"><img id="fSvg" alt="" width="520" height="260" decoding="async"></figure>
+                    <p class="f-etq-meta mono" id="fEtqMeta"></p>
+                </section>
+                <div class="f-acc" id="fAcc" data-edita>
+                    <button class="btn-imprimir" type="button" id="bImp"><i class="svg-slot" data-i="printer"></i><span class="b-t">Imprimir etiqueta</span><span class="b-s" id="bImpSub">Impresora compartida</span></button>
+                    <button class="btn btn-sec" type="button" id="bMas" popovertarget="menuImp" aria-haspopup="menu"><i class="svg-slot" data-i="more"></i><span>Otras vías</span></button>
+                    <button class="btn btn-sec" type="button" id="bEditar"><i class="svg-slot" data-i="edit"></i><span>Editar</span></button>
+                </div>
+                <p class="f-msg" id="fMsg" role="status" aria-live="polite" hidden></p>
+                <dl class="f-datos" id="fDatos"></dl>
+                <section class="f-car" id="fCarSec" aria-labelledby="tCar" hidden>
+                    <h3 class="silk-m" id="tCar">Características</h3>
+                    <dl class="car" id="fCar"></dl>
+                </section>
+                <section class="f-hist" aria-labelledby="tHist">
+                    <h3 class="silk-m" id="tHist">Historial</h3>
+                    <ol id="fHist" class="hist"></ol>
+                </section>
+            </article>
+        </aside>
+    </div>
+
+    <button class="fab" type="button" id="bCam" aria-label="Escanear etiqueta con la cámara"><i class="svg-slot" data-i="camera"></i><span>Escanear</span></button>
+</div>
+
+<!-- menú de impresión (popover: queda sobre todo, se cierra con Esc o al tocar fuera) -->
+<div class="menu" id="menuImp" popover="auto" role="menu" aria-label="Cómo imprimir la etiqueta"></div>
+
+<!-- alta / edición -->
+<dialog class="hoja" id="hoja" aria-labelledby="hTit" data-paso="form">
+    <form id="form" novalidate autocomplete="off">
+        <header class="h-cab">
+            <div><p class="silk-m" id="hKicker">Nuevo activo</p><h2 id="hTit">Registrar activo</h2></div>
+            <button class="iconbtn" type="button" id="hX" aria-label="Cerrar"><i class="svg-slot" data-i="x"></i></button>
+        </header>
+        <div class="h-cuerpo">
+            <div class="h-err" id="hErr" role="alert" hidden></div>
+            <div class="h-num">
+                <div class="field">
+                    <label for="fNum">Número de activo</label>
+                    <input class="input mono" id="fNum" name="numero" type="text" inputmode="numeric" maxlength="6" aria-describedby="fNumAy fNumE">
+                    <p class="hint" id="fNumAy">Sugerido por el sistema. Cámbialo solo si ya tienes una etiqueta con otro número.</p>
+                    <p class="hint err" id="fNumE" hidden></p>
+                </div>
+                <div class="placa placa-lg" aria-live="polite"><span id="fNumVivo">ACT 0000</span></div>
+            </div>
+            <div class="field campo"><label for="fNom">Nombre <b aria-hidden="true">*</b></label>
+                <input class="input" id="fNom" name="nombre" type="text" maxlength="120" required aria-required="true" aria-describedby="fNomE" placeholder="Ej. Osciloscopio de banco">
+                <p class="hint err" id="fNomE" hidden></p></div>
+            <div class="rejilla">
+                <div class="field campo"><label for="fDepto">Departamento</label>
+                    <input class="input" id="fDepto" name="departamento" type="text" maxlength="80" list="dlDep"></div>
+                <div class="field campo"><label for="fCateg">Categoría</label>
+                    <input class="input" id="fCateg" name="categoria" type="text" maxlength="80" list="dlCat"></div>
+                <div class="field campo"><label for="fEstado2">Estado</label>
+                    <select class="input" id="fEstado2" name="estado"></select></div>
+                <div class="field campo"><label for="fMarca">Marca</label>
+                    <input class="input" id="fMarca" name="marca" type="text" maxlength="80"></div>
+                <div class="field campo"><label for="fModelo">Modelo</label>
+                    <input class="input" id="fModelo" name="modelo" type="text" maxlength="80"></div>
+                <div class="field campo"><label for="fSerie">Número de serie</label>
+                    <input class="input mono" id="fSerie" name="serie" type="text" maxlength="80" spellcheck="false"></div>
+                <div class="field campo"><label for="fUbic">Ubicación</label>
+                    <input class="input" id="fUbic" name="ubicacion" type="text" maxlength="80" list="dlUbi"></div>
+                <div class="field campo"><label for="fResp">Responsable</label>
+                    <input class="input" id="fResp" name="responsable" type="text" maxlength="80" list="dlRes"></div>
+                <div class="field campo"><label for="fFecha">Fecha de adquisición</label>
+                    <input class="input mono" id="fFecha" name="fecha_adquisicion" type="date"></div>
+                <div class="field campo"><label for="fValor">Valor (MXN)</label>
+                    <input class="input mono" id="fValor" name="valor" type="text" inputmode="decimal" aria-describedby="fValorE" placeholder="0.00">
+                    <p class="hint err" id="fValorE" hidden></p></div>
+            </div>
+            <div class="field campo"><label for="fNotas">Notas</label>
+                <textarea class="input" id="fNotas" name="notas" rows="3" maxlength="1000"></textarea></div>
+            <fieldset class="car-ed" id="carEd" aria-labelledby="carEdT">
+                <legend class="lbl" id="carEdT">Características</legend>
+                <p class="hint">Datos extra del equipo: procesador, memoria, disco, comentarios… Cada uno con su nombre y su valor.</p>
+                <div class="car-ed" id="carLista"></div>
+                <button class="btn btn-sm" type="button" id="carAdd"><i class="svg-slot" data-i="plus"></i>Agregar característica</button>
+            </fieldset>
+            <datalist id="dlCarEt"><option value="Asignado a"><option value="Colaborador"><option value="Descripción"><option value="Procesador"><option value="Memoria RAM"><option value="Disco Duro"><option value="Tamaño de pantalla"><option value="Fecha de revisión"><option value="Comentarios"><option value="Origen"></datalist>
+            <datalist id="dlDep"></datalist><datalist id="dlCat"></datalist><datalist id="dlUbi"></datalist><datalist id="dlRes"></datalist>
+        </div>
+        <footer class="h-pie">
+            <button class="btn btn-ghost" type="button" id="hCancel">Cancelar</button>
+            <button class="btn btn-primary" type="submit" id="hGuardar"><span>Guardar activo</span></button>
+        </footer>
+    </form>
+
+    <!-- paso 2 tras guardar: imprimir ahora -->
+    <div class="hecho" id="hecho">
+        <header class="h-cab">
+            <div><p class="silk-m">Registro guardado</p><h2 id="hhTit" tabindex="-1">Activo registrado</h2></div>
+            <button class="iconbtn" type="button" id="hhX" aria-label="Cerrar"><i class="svg-slot" data-i="x"></i></button>
+        </header>
+        <div class="h-cuerpo">
+            <div class="hecho-id"><div class="placa placa-xl"><span id="hhCodigo"></span></div><p id="hhNombre"></p></div>
+            <figure class="papel"><img id="hhSvg" alt="" width="520" height="260" decoding="async"></figure>
+            <p class="f-msg" id="hhMsg" role="status" aria-live="polite" hidden></p>
+            <div class="vias" id="hhVias" aria-label="Imprimir etiqueta ahora"></div>
+        </div>
+        <footer class="h-pie">
+            <button class="btn btn-ghost" type="button" id="hhOtro" data-edita><i class="svg-slot" data-i="plus"></i>Registrar otro</button>
+            <button class="btn btn-primary" type="button" id="hhListo">Listo, imprimiré después</button>
+        </footer>
+    </div>
+</dialog>
+
+<!-- vincular celular como escáner -->
+<dialog class="hoja hoja-cel" id="hojaCel" aria-labelledby="cTit">
+    <header class="h-cab">
+        <div><p class="silk-m">Escáner remoto</p><h2 id="cTit">Vincular celular</h2></div>
+        <button class="iconbtn" type="button" id="cX" aria-label="Cerrar"><i class="svg-slot" data-i="x"></i></button>
+    </header>
+    <div class="h-cuerpo cel">
+        <div class="cel-qr" id="celQr" role="img" aria-label="Código QR para vincular el celular"></div>
+        <div class="cel-txt">
+            <p class="cel-est" id="celEst" role="status" aria-live="polite" data-on=""></p>
+            <ol>
+                <li>Con la cámara del celular, escanea este QR.</li>
+                <li>Inicia sesión si te lo pide: el celular queda como escáner de este módulo.</li>
+                <li>Escanea la etiqueta de un activo: su ficha se abre aquí y el celular recibe el nombre.</li>
+            </ol>
+            <p class="cel-aviso" id="celLocal" hidden>Abriste la página como «localhost»: el celular no puede llegar a esa dirección. Entra con la IP de esta PC (por ejemplo https://192.168.x.x:8443/impresora) y genera el QR otra vez.</p>
+            <p class="cel-aviso" id="celErr" role="alert" hidden></p>
+            <details><summary>Enlace manual</summary><code class="mono" id="celUrl"></code></details>
+        </div>
+    </div>
+    <footer class="h-pie">
+        <button class="btn btn-ghost" type="button" id="cDesv"><i class="svg-slot" data-i="unlink"></i>Desvincular</button>
+        <button class="btn btn-primary" type="button" id="cListo">Listo</button>
+    </footer>
+</dialog>
+
+<!-- imprimir etiquetas por lote -->
+<dialog class="hoja hoja-lote" id="hojaLote" aria-labelledby="lTit" data-paso="elige">
+    <header class="h-cab">
+        <div><p class="silk-m" id="lKicker">Impresión por lote</p><h2 id="lTit" tabindex="-1">Elegir etiquetas</h2></div>
+        <button class="iconbtn" type="button" id="lX" aria-label="Cerrar"><i class="svg-slot" data-i="x"></i></button>
+    </header>
+
+    <section class="imp-paso" data-p="elige">
+        <div class="lote-grid">
+            <form class="lote-filtros" id="lFiltros" novalidate>
+                <fieldset class="seg-f">
+                    <legend class="lbl">Fecha de alta</legend>
+                    <div class="seg-op">
+                        <label><input type="radio" name="lFecha" value="todas" checked><span>Todas</span></label>
+                        <label><input type="radio" name="lFecha" value="hoy"><span>Hoy</span></label>
+                        <label><input type="radio" name="lFecha" value="ayer"><span>Ayer</span></label>
+                        <label><input type="radio" name="lFecha" value="dia"><span>Un día</span></label>
+                        <label><input type="radio" name="lFecha" value="rango"><span>Rango</span></label>
+                    </div>
+                </fieldset>
+                <div class="field" id="lDiaW" hidden><label for="lDia">Día</label><input class="input mono" id="lDia" type="date"></div>
+                <div class="rejilla2" id="lRangoW" hidden>
+                    <div class="field"><label for="lDesde">Desde</label><input class="input mono" id="lDesde" type="date"></div>
+                    <div class="field"><label for="lHasta">Hasta</label><input class="input mono" id="lHasta" type="date"></div>
+                </div>
+                <label class="chk"><input type="checkbox" id="lSinImp" checked><b>Solo sin imprimir</b><small>Oculta los activos cuya etiqueta ya salió de la impresora.</small></label>
+                <div class="field"><label for="lDep">Departamento</label><select class="input" id="lDep"><option value="">Todos</option></select></div>
+                <div class="field"><label for="lQ">Buscar</label><input class="input" id="lQ" type="search" placeholder="Código, nombre, serie…" autocomplete="off" spellcheck="false"></div>
+            </form>
+            <div class="lote-res">
+                <div class="lote-aviso" id="lAviso" role="status" hidden></div>
+                <div class="lote-cab">
+                    <label class="lote-todos"><input type="checkbox" id="lTodos"><b id="lCuenta">Cargando…</b></label>
+                </div>
+                <ul class="lote-lista" id="lLista" role="list" aria-label="Activos del lote" aria-busy="true"></ul>
+                <div class="estado" id="lEstado" hidden></div>
+            </div>
+        </div>
+        <footer class="h-pie">
+            <a class="btn btn-sec" id="lZip" href="#" download aria-disabled="true"><i class="svg-slot" data-i="download"></i><span>Descargar .zip</span></a>
+            <button class="btn btn-primary" type="button" id="lEnviar" disabled><i class="svg-slot" data-i="printer"></i><span>Enviar etiquetas a la impresora</span></button>
+        </footer>
+    </section>
+
+    <section class="imp-paso" data-p="progreso">
+        <div class="h-cuerpo">
+            <p class="res-t" id="lResT" tabindex="-1"></p>
+            <div class="bar-prog" role="progressbar" aria-label="Progreso de impresión" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="lBarraW"><i id="lBarra"></i></div>
+            <div class="totales" id="lTot"></div>
+            <p class="f-msg" id="lMsg" role="status" aria-live="polite" hidden style="margin:0"></p>
+            <ul class="lote-jobs" id="lJobs" role="list" aria-label="Etiquetas pendientes o con error"></ul>
+        </div>
+        <footer class="h-pie">
+            <button class="btn btn-ghost" type="button" id="lVolver">Elegir otras</button>
+            <button class="btn btn-sec" type="button" id="lReintentar" hidden><i class="svg-slot" data-i="refresh"></i><span>Reintentar fallidas</span></button>
+            <button class="btn btn-primary" type="button" id="lListo">Listo</button>
+        </footer>
+    </section>
+</dialog>
+
+<!-- importar activos desde Excel -->
+<dialog class="hoja hoja-imp" id="hojaImp" aria-labelledby="iTit" data-paso="elige">
+    <header class="h-cab">
+        <div><p class="silk-m" id="iKicker">Paso 1 de 3</p><h2 id="iTit" tabindex="-1">Importar desde Excel</h2></div>
+        <button class="iconbtn" type="button" id="iX" aria-label="Cerrar"><i class="svg-slot" data-i="x"></i></button>
+    </header>
+
+    <section class="imp-paso" data-p="elige">
+        <div class="h-cuerpo">
+            <div class="h-err" id="iErr" role="alert" hidden></div>
+            <label class="drop" id="drop" for="iArchivo">
+                <i class="svg-slot" data-i="excel"></i>
+                <b>Suelta aquí el archivo de Excel</b>
+                <small>o toca para elegirlo · .xlsx · hasta 10 MB</small>
+                <span class="arch" id="iNombre" hidden></span>
+                <input class="sr-only" id="iArchivo" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            </label>
+            <label class="chk"><input type="checkbox" id="iVerdes" checked><b>Solo filas marcadas en verde</b>
+                <small>Importa únicamente los equipos que ya están verificados (fila resaltada en verde). Desmárcalo para traer todas las filas de cada hoja.</small></label>
+        </div>
+        <footer class="h-pie">
+            <button class="btn btn-ghost" type="button" id="iCancel">Cancelar</button>
+            <button class="btn btn-primary" type="button" id="iRevisar" disabled><span>Revisar archivo</span></button>
+        </footer>
+    </section>
+
+    <section class="imp-paso" data-p="revisa">
+        <div class="h-cuerpo">
+            <div class="h-err" id="iErr2" role="alert" hidden></div>
+            <div class="bar-imp" id="iBarra" hidden role="progressbar" aria-label="Importando"><i></i></div>
+            <p class="hint" id="iArchResumen"></p>
+            <div class="totales" id="iTotales"></div>
+            <div class="imp-sec"><h3 class="silk-m">Por hoja</h3>
+                <div class="tabla-wrap"><table class="tabla"><caption class="sr-only">Resumen por hoja del archivo</caption>
+                    <thead><tr><th scope="col">Hoja</th><th scope="col" class="n">En verde</th><th scope="col" class="n">Nuevos</th><th scope="col" class="n">Actualizar</th><th scope="col" class="n">Omitidos</th></tr></thead>
+                    <tbody id="iHojas"></tbody></table></div>
+                <div id="iOmit" class="imp-sec"></div></div>
+            <div class="imp-sec"><h3 class="silk-m" id="iMuestraT">Muestra</h3>
+                <div class="tabla-wrap"><table class="tabla"><caption class="sr-only">Muestra de los activos que se importarían</caption>
+                    <thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Departamento</th><th scope="col">Responsable</th></tr></thead>
+                    <tbody id="iMuestra"></tbody></table></div></div>
+        </div>
+        <footer class="h-pie">
+            <button class="btn btn-ghost" type="button" id="iOtro">Cambiar archivo</button>
+            <button class="btn btn-primary" type="button" id="iAplicar"><span>Importar</span></button>
+        </footer>
+    </section>
+
+    <section class="imp-paso" data-p="listo">
+        <div class="h-cuerpo">
+            <p class="res-t" id="iResT" tabindex="-1"></p>
+            <p class="hint" id="iResS"></p>
+            <div class="res-acc" aria-label="Etiquetas de lo importado">
+                <button class="btn btn-primary" type="button" id="iImpLote"><i class="svg-slot" data-i="printer"></i><span>Imprimir todas en DYMO compartida</span></button>
+                <a class="btn" id="iZip" href="#" download><i class="svg-slot" data-i="download"></i><span>Descargar etiquetas (.zip)</span></a>
+                <button class="btn" type="button" id="iVer"><i class="svg-slot" data-i="list"></i><span>Ver activos importados</span></button>
+            </div>
+            <p class="f-msg" id="iMsg" role="status" aria-live="polite" hidden style="margin:0"></p>
+        </div>
+        <footer class="h-pie"><button class="btn btn-ghost" type="button" id="iCerrar">Cerrar</button></footer>
+    </section>
+</dialog>
+
+<!-- escaneo con la cámara del teléfono -->
+<dialog class="hoja hoja-cam" id="hojaCam" aria-labelledby="camTit">
+    <header class="h-cab">
+        <div><p class="silk-m">Cámara</p><h2 id="camTit">Escanear etiqueta</h2></div>
+        <button class="iconbtn" type="button" id="camX" aria-label="Cerrar la cámara"><i class="svg-slot" data-i="x"></i></button>
+    </header>
+    <div class="h-cuerpo">
+        <div id="camHost" class="cam-host"></div>
+        <p class="hint" id="camMsg" role="status" aria-live="polite">Apunta al QR de la etiqueta del activo.</p>
+        <form class="cam-man" id="camForm">
+            <div class="field"><label for="camCod">¿No lee? Teclea el código</label>
+                <input class="input mono" id="camCod" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ACT-0001" enterkeyhint="go"></div>
+            <button class="btn" type="submit">Buscar</button>
+        </form>
+    </div>
+</dialog>
+
+<div class="anuncio sr-only" id="anuncio" role="status" aria-live="polite"></div>
+
+<script src="/static/js/common.js?v=1417"></script>
+<script src="/static/js/ws_client.js?v=1321"></script>
+<script src="/static/js/impresora.js?v=1416"></script>
+</body>
+</html>

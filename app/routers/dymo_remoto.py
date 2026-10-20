@@ -81,6 +81,9 @@ def _svg(tipo, params):
         # v1.4.9: «Aprobada» se valida al encolar, no al descargar: una prueba nueva recién iniciada sobre la misma
         # tarjeta (aún sin resultado) daba 403 aquí y la etiqueta ya aceptada nunca salía.
         return DymoService.generate_svg_preview(t, FORMATO, guia=False, aprobada=tipo == "aprobada", borde=False)
+    if tipo == "activo":   # v1.4.14: módulo Impresora (params = {numero, base})
+        from app.services import activos
+        return activos.svg_etiqueta(params["numero"], params["base"], FORMATO)
     if tipo == "cable":
         return DymoService.generate_cable_svg(params["numero"], FORMATO, params.get("r3", ""))
     return DymoService.generate_r3_svg(params["nombres"], FORMATO)

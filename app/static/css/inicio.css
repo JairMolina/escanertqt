@@ -366,7 +366,7 @@ body::before {
 .cc[data-abierto="true"] .cc-panel { transform: none; opacity: 1; }
 /* vista «acceso»: el mismo contenedor, más compacto, con el formulario; la vista «cuentas» oculta el formulario y viceversa */
 .cc[data-vista="acceso"] .cc-panel { width: min(420px, 100%); }
-.cc[data-vista="acceso"] :is(.cc-barra, .cc-conf, .cc-mods, .cc-cuerpo, .cc-aviso, .cc-menu) { display: none; }
+.cc[data-vista="acceso"] :is(.cc-barra, .cc-conf, .cc-inv, .cc-enl, .cc-mods, .cc-cuerpo, .cc-aviso, .cc-menu) { display: none; }
 .cc[data-vista="cuentas"] .cc-acc { display: none; }
 .cc-acc { display: flex; flex-direction: column; gap: 14px; padding: 8px 20px 20px; border-top: 1px solid var(--line); padding-top: 16px; }
 .cc-acc .input { width: 100%; min-height: 48px; font-size: 16px; }
@@ -390,7 +390,43 @@ body::before {
 .cc-busca { position: relative; flex: 1; max-width: 360px; display: block; }
 .cc-busca svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .cc-busca .input { width: 100%; min-height: 44px; padding-left: 38px; }
-.cc-cuenta { color: var(--muted); font-size: 15px; font-weight: 600; white-space: nowrap; }
+.cc-cuenta { margin-left: auto; color: var(--muted); font-size: 15px; font-weight: 600; white-space: nowrap; }
+.cc-invbtn { display: inline-flex; align-items: center; gap: 7px; flex: none; min-height: 44px; padding: 0 16px 0 12px; font-weight: 700; }
+.cc-invbtn:disabled { opacity: .6; cursor: not-allowed; }
+
+/* invitar por correo: formulario compacto y tarjeta con el enlace, dentro del mismo panel */
+.cc-inv, .cc-enl { margin: 0 20px 12px; padding: 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface-2); }
+.cc-inv { flex: none; display: flex; flex-direction: column; gap: 12px; max-height: min(62vh, 480px); max-height: min(62dvh, 480px); overflow-y: auto; overscroll-behavior: contain; }
+.cc-inv[hidden], .cc-enl[hidden], .cc-inv [hidden] { display: none; }
+.cc-inv h3 { font-size: 16px; font-weight: 700; line-height: 1.2; }
+.cc-inv-fila { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 12px; }
+.cc-inv .input { width: 100%; min-height: 44px; font-size: 16px; }
+.cc-inv-mods { margin: 0; padding: 0; border: 0; min-width: 0; }
+.cc-inv-mods legend { padding: 0; margin-bottom: 6px; color: var(--muted); font-size: 14px; font-weight: 600; }
+.cc-inv-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.cc-im { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.1; cursor: pointer; }
+.cc-im input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--accent-text); cursor: inherit; }
+.cc-im .cc-ico { width: 20px; height: 20px; flex: none; color: color-mix(in srgb, var(--a, var(--accent)) 60%, var(--text)); }
+.cc-im:has(:checked) { border-color: color-mix(in srgb, var(--a, var(--accent)) 70%, var(--line-2)); background: color-mix(in srgb, var(--a, var(--accent)) 16%, var(--surface)); }
+.cc-im:has(:disabled) { opacity: .75; cursor: not-allowed; }
+.cc-im:has(:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.cc-im[data-pron] { border-style: dashed; }
+.cc-inv-smtp { padding: 9px 12px; border-radius: 8px; font-size: 14.5px; line-height: 1.35; background: color-mix(in srgb, var(--warn) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--line)); }
+.cc-inv-acc { display: flex; flex-wrap: wrap; gap: 10px; }
+.cc-inv-acc .btn { min-height: 44px; font-weight: 700; }
+.cc-inv-acc .btn:disabled { opacity: .7; cursor: progress; }
+.cc-enl { flex: none; display: flex; flex-direction: column; gap: 8px; border-color: color-mix(in srgb, var(--info) 55%, var(--line-2)); }
+.cc-enl p { margin: 0; line-height: 1.35; overflow-wrap: anywhere; }
+.cc-enl-t { font-size: 15px; font-weight: 700; }
+.cc-enl-m { font-size: 14.5px; color: var(--muted); }
+.cc-enl-fila { display: flex; flex-wrap: wrap; gap: 8px; }
+.cc-enl-fila .input { flex: 1 1 280px; min-width: 0; min-height: 44px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+.cc-enl-fila .btn { min-height: 44px; }
+.cc-pacc { display: flex; flex-wrap: wrap; gap: 0 12px; margin-top: 3px; }
+.cc-lnk { min-height: 28px; padding: 0 2px; border: 0; background: transparent; color: var(--accent-text); font: inherit; font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.cc-lnk-bad { color: var(--bad); }
+.cc-lnk:disabled { opacity: .6; cursor: progress; text-decoration: none; }
+.cc-lnk:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; border-radius: 3px; }
 .cc-conf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 20px 10px; padding: 8px 8px 8px 14px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 12%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--line)); }
 .cc-conf[hidden] { display: none; }
 .cc-conf p { flex: 1 1 260px; font-size: 15px; font-weight: 600; line-height: 1.3; }
@@ -463,6 +499,17 @@ body::before {
   .cc-barra { padding: 4px 16px 10px; flex-wrap: wrap; gap: 6px 12px; }
   .cc-busca { max-width: none; flex: 1 1 100%; }
   .cc-conf { margin: 0 12px 10px; }
+  .cc-invbtn { flex: 1 1 auto; justify-content: center; }
+  .cc-cuenta { flex: none; }
+  .cc-inv, .cc-enl { margin: 0 12px 10px; padding: 12px; max-height: 58dvh; }
+  .cc-enl { max-height: none; }
+  .cc-inv-fila { grid-template-columns: minmax(0, 1fr); }
+  .cc-im { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .cc-im span { min-width: 0; overflow-wrap: anywhere; }
+  .cc-inv-acc .btn, .cc-enl-fila .btn { flex: 1 1 140px; }
+  .cc-enl-fila .input { flex-basis: 100%; }
+  .cc-pacc { gap: 0 6px; margin: 4px 0 0 -8px; }
+  .cc-lnk { min-height: 44px; padding: 0 8px; font-size: 15px; }
   /* una sola fila deslizable con su etiqueta: antes ocupaba ~1/3 de la pantalla antes de la primera cuenta */
   .cc-mods { display: flex; flex-wrap: nowrap; gap: 6px; padding: 0 12px 10px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
   .cc-mods::-webkit-scrollbar { display: none; }

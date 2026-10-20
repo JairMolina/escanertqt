@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A1020">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <meta name="color-scheme" content="dark light">
+    <meta name="robots" content="noindex">
+    <title>Impresora · Plataforma I+D</title>
+    <script>
+        /* Tema: el que el usuario eligió (mismo ajuste que el resto de la plataforma); si nunca eligió, el del sistema. */
+        (function () {
+            var t = 'dark';
+            try { var g = localStorage.getItem('tqt.tema'); t = g === 'light' || g === 'dark' ? g : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* sin almacenamiento */ }
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1411">
+    <style>
+        /* Acceso al módulo IMPRESORA — "registro de patrimonio y etiquetadora" (misma identidad que /impresora):
+           papel cálido y tinta (claro) o grafito cálido (oscuro), placas plateadas #B8B8C8 y sello bermellón como único acento. */
+        :root[data-theme="light"], :root:not([data-theme]) {
+            --bg: #D8D4CA; --bg-2: #CDC8BC; --surface: #F8F5EE; --surface-2: #EFEBE0; --line: #D0CABD; --line-2: #8C877B;
+            --text: #1B1D26; --muted: #58564F; --faint: #6B685F; --accent: #C2381C; --accent-ink: #FFFFFF; --accent-text: #A62C13;
+            --ok: #1D6B45; --warn: #8A5200; --bad: #B42424; --mod-text: #4D5169;
+            --paper: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 2px 0 -1px var(--surface-2), 0 3px 0 -1px var(--line), 0 24px 34px -26px rgba(48, 36, 12, .6);
+            --campo: #FFFFFF; --maq-a: #E6E4DC; --maq-b: #B9B6AA; --maq-c: #2D2F38; color-scheme: light;
+        }
+        :root[data-theme="dark"] {
+            --bg: #131418; --bg-2: #0C0D10; --surface: #1C1E25; --surface-2: #262932; --line: #31343D; --line-2: #6D7180;
+            --text: #EEEBE4; --muted: #A8A69F; --faint: #918F88; --accent: #FF7456; --accent-ink: #220C06; --accent-text: #FF8B72;
+            --ok: #4CD08B; --warn: #F2B33D; --bad: #FF6B6B; --mod-text: #B8B8C8;
+            --paper: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 2px 0 -1px var(--surface-2), 0 3px 0 -1px var(--line), 0 26px 34px -24px rgba(0, 0, 0, .9);
+            --campo: #121318; --maq-a: #3A3D49; --maq-b: #23252E; --maq-c: #0E0F13; color-scheme: dark;
+        }
+        :root { --mod: #B8B8C8; --plata-1: #EDEEF4; --plata-3: #A1A3B7; --tinta-placa: #14172A; --ease: cubic-bezier(.23, 1, .32, 1); --rad: 3px; }
+        html { -webkit-font-smoothing: antialiased; }
+        html, body { height: 100%; }
+        body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); }
+        .tema { position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 5; }
+        .tema, .ir-modulos { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--rad); }
+        .ir-fijo { position: fixed; top: max(10px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); z-index: 5; min-height: 44px; min-width: 44px; padding: 0 12px 0 9px; }
+        .pantalla { min-height: 100dvh; display: flex; flex-direction: column; }
+        .btn { border-radius: var(--rad); }
+
+        /* ---------- mesa de la etiquetadora ---------- */
+        .mesa { position: relative; overflow: hidden; isolation: isolate; background: var(--bg-2); border-bottom: 3px double var(--line-2);
+                display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: max(64px, calc(env(safe-area-inset-top) + 56px)) max(18px, env(safe-area-inset-right)) 14px max(18px, env(safe-area-inset-left)); }
+        .mesa::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .7;
+                        background-image: radial-gradient(color-mix(in srgb, var(--line-2) 55%, transparent) 1px, transparent 1.4px); background-size: 22px 22px;
+                        -webkit-mask-image: radial-gradient(80% 100% at 60% 50%, #000 15%, transparent 85%); mask-image: radial-gradient(80% 100% at 60% 50%, #000 15%, transparent 85%); }
+        .marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .sello { width: 42px; height: 42px; flex: none; display: grid; place-items: center; border-radius: var(--rad); color: var(--tinta-placa);
+                 background: linear-gradient(180deg, var(--plata-1) 0%, #CDCEDB 46%, var(--mod) 54%, var(--plata-3) 100%);
+                 box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75), inset 0 -1px 0 rgba(20, 23, 42, .22), 0 1px 2px rgba(0, 0, 0, .35); }
+        .sello svg { width: 28px; height: 28px; }
+        .tit { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+        .kick { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); line-height: 1.1; }
+        .tit b { font-size: 26px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; line-height: .95; }
+        .titular { display: none; }
+
+        /* la máquina: todo en em, se escala con font-size */
+        .escena { flex: none; font-size: 5.4px; width: 22em; }
+        .maquina { position: relative; width: 22em; }
+        .cuerpo { position: relative; z-index: 2; height: 9em; border-radius: 1.1em; overflow: hidden;
+                  background: linear-gradient(180deg, var(--maq-a) 0 58%, var(--maq-c) 58% 100%); border: .25em solid var(--maq-b);
+                  box-shadow: 0 .3em 0 rgba(255, 255, 255, .25) inset, 0 2.2em 3em -1.6em rgba(0, 0, 0, .6); }
+        .cuerpo .rot { position: absolute; left: 1.6em; bottom: .9em; font: 600 1.05em/1 var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: #C9CBD6; }
+        .cuerpo .led { position: absolute; right: 1.8em; bottom: 1.15em; width: .9em; height: .9em; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 .35em color-mix(in srgb, var(--ok) 28%, transparent); }
+        .cuerpo .vent { position: absolute; left: 1.6em; top: 1.6em; width: 7em; height: 2.2em; background: repeating-linear-gradient(90deg, rgba(0, 0, 0, .28) 0 .22em, transparent .22em .7em); border-radius: .3em; }
+        .cuerpo .tapa { position: absolute; right: 1.6em; top: 1.5em; width: 5em; height: 2.6em; border-radius: .5em; border: .2em solid var(--maq-b); }
+        .ranura { position: relative; z-index: 3; width: 17em; height: .9em; margin: -.45em auto 0; border-radius: .45em; background: #07080a; box-shadow: 0 .15em 0 rgba(255, 255, 255, .12); }
+        .salida { position: relative; z-index: 1; width: 16em; margin: -.5em auto 0; height: 12.5em; overflow: hidden; }
+        .etiqueta { position: relative; width: 16em; aspect-ratio: 57 / 32; background: #FAFAF6; color: #14172A; border-radius: .5em; display: flex; align-items: center; gap: 1.1em; padding: 0 1.3em;
+                    box-shadow: 0 0 0 1px rgba(20, 23, 42, .12), 0 1.2em 2em -1em rgba(0, 0, 0, .55); }
+        .etiqueta::before, .etiqueta::after { content: ""; position: absolute; top: 50%; width: 1.1em; height: 1.1em; margin-top: -.55em; border-radius: 50%; background: var(--bg-2); box-shadow: inset 0 .1em .2em rgba(0, 0, 0, .35); }
+        .etiqueta::before { left: -.55em; } .etiqueta::after { right: -.55em; }
+        .etiqueta .qr { width: 5.6em; height: 5.6em; flex: none; }
+        .etiqueta .acta { display: flex; flex-direction: column; font-family: var(--font-mono); font-weight: 700; line-height: .95; letter-spacing: .03em; font-variant-numeric: slashed-zero; }
+        .etiqueta .acta span { font-size: 2.6em; } .etiqueta .acta b { font-size: 3.1em; }
+        .corte { position: absolute; left: 0; right: 0; bottom: .6em; border-top: .15em dashed color-mix(in srgb, var(--line-2) 80%, transparent); }
+        .leyenda { display: none; margin: 1.6em 0 0; text-align: center; font: 500 1.2em/1.3 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+        .placa { position: relative; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; font-family: var(--font-mono); font-weight: 600; letter-spacing: .07em; font-variant-numeric: tabular-nums slashed-zero;
+                 font-size: 22px; padding: 9px 32px; border-radius: 3px; color: var(--tinta-placa); margin-bottom: 18px;
+                 background: linear-gradient(180deg, var(--plata-1) 0%, #CDCEDB 46%, var(--mod) 54%, var(--plata-3) 100%);
+                 box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75), inset 0 -1px 0 rgba(20, 23, 42, .22), 0 1px 2px rgba(0, 0, 0, .35); }
+        .placa::before, .placa::after { content: ""; position: absolute; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #7D7F93); box-shadow: 0 0 0 .5px rgba(20, 23, 42, .5); }
+        .placa::before { left: 10px; } .placa::after { right: 10px; }
+        .placa span { text-shadow: 0 1px 0 rgba(255, 255, 255, .6); }
+
+        /* ---------- hoja de acceso ---------- */
+        .zona { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 26px max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+        .acceso { width: min(440px, 100%); display: flex; flex-direction: column; gap: 18px; padding: 24px 22px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--rad); box-shadow: var(--paper); }
+        .acceso .silk { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--mod-text); margin-bottom: 8px; }
+        .acceso h2 { margin: 0; font-size: 32px; line-height: 1.05; font-weight: 700; letter-spacing: .01em; }
+        .acceso .sub { color: var(--muted); margin: 8px 0 0; font-size: 16px; font-weight: 500; text-wrap: pretty; }
+        .acceso form { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 2px solid var(--text); }
+        .acceso form[hidden] { display: none; }
+        .acceso .field > label { color: var(--muted); }
+        .acceso .input { min-height: 52px; font-size: 16px; border-radius: var(--rad); background: var(--campo, var(--bg)); border-color: var(--line-2); }
+        .acceso .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); }
+        .acceso .clave { display: flex; gap: 8px; }
+        .acceso .clave .input { flex: 1; min-width: 0; }
+        .acceso .clave .btn { min-width: 72px; min-height: 52px; padding: 0 14px; font-size: 15px; }
+        .acceso .mayus { display: flex; align-items: center; gap: 6px; margin: 8px 2px 0; color: var(--warn); font-size: 14px; font-weight: 600; }
+        .acceso .mayus[hidden] { display: none; }
+        .acceso .btn { min-height: 52px; }
+        .acceso .btn-primary { font-size: 17px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 55%, #000); transition: transform .12s, filter .15s, box-shadow .12s; }
+        .acceso .btn-primary:hover:not([disabled]) { filter: brightness(1.06); }
+        .acceso .btn-primary:active:not([disabled]) { transform: translateY(2px) scale(.99); box-shadow: none; }
+        .acceso .btn-primary[disabled] { opacity: .75; cursor: progress; }
+        .acceso .btn-ghost { border: 1.5px solid var(--text); background: transparent; }
+        .msg { margin: 0; min-height: 0; font-weight: 600; font-size: 15px; color: var(--bad); }
+        .msg:empty { display: none; }
+        .msg.ok { color: var(--ok); }
+        .acceso .ayuda { margin: 0; color: var(--muted); font-size: 15px; }
+        .acceso .ayuda .btn { min-height: 44px; padding: 0 4px; border: 0; font-size: 15px; text-decoration: underline; text-underline-offset: 3px; color: var(--accent-text); }
+        .row { display: flex; align-items: center; gap: 10px; }
+        .estado { display: flex; align-items: center; gap: 8px; margin: 0; padding-top: 14px; border-top: 1px dashed var(--line-2); font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+        .estado .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+        .estado .punto[data-s="on"] { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+        .estado .punto[data-s="off"] { background: var(--bad); }
+        .estado .ver { margin-left: auto; color: var(--faint); }
+        .pie { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--faint); font-size: 13px; }
+
+        @media (max-width: 380px) { .tit b { font-size: 22px; letter-spacing: .1em; } .tit .kick { display: none; } .escena { font-size: 4.6px; } .acceso { padding: 20px 16px 16px; } .acceso h2 { font-size: 28px; } }
+
+        /* ---------- escritorio: mesa a la izquierda, hoja a la derecha ---------- */
+        @media (min-width: 900px) {
+            .pantalla { flex-direction: row; }
+            .mesa { flex: 1 1 56%; flex-direction: column; align-items: flex-start; justify-content: center; gap: 44px; min-height: 100dvh; padding: 96px clamp(40px, 5vw, 88px) 56px;
+                    border-bottom: 0; border-right: 3px double var(--line-2); }
+            .sello { width: 48px; height: 48px; } .tit b { font-size: 30px; }
+            .escena { font-size: 14.5px; align-self: center; }
+            .leyenda { display: block; }
+            .titular { display: block; max-width: 540px; }
+            .titular h1 { margin: 0 0 12px; font-size: clamp(34px, 3.4vw, 48px); line-height: 1.02; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; text-wrap: balance; }
+            .titular p { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.4; max-width: 42ch; text-wrap: pretty; }
+            .zona { flex: 1 1 44%; align-items: center; padding: 48px clamp(28px, 4vw, 72px); }
+            .acceso { padding: 30px 30px 24px; gap: 22px; } .acceso h2 { font-size: 36px; }
+        }
+
+        /* ---------- movimiento (solo si no se pidió reducirlo): la etiquetadora imprime una etiqueta nueva cada 9 s ---------- */
+        @media (prefers-reduced-motion: no-preference) {
+            .etiqueta { animation: sale 9s var(--ease) 0s infinite; }
+            .cuerpo .led { animation: late 2.4s ease-out infinite; }
+            .acceso > *, .acceso form > * { animation: sube-suave .5s var(--ease) both; }
+            .acceso > :nth-child(2) { animation-delay: .1s; } .acceso > :nth-child(3) { animation-delay: .2s; } .acceso > :nth-child(4) { animation-delay: .3s; }
+            @keyframes sale { 0% { transform: translateY(-104%); } 16% { transform: translateY(-6%); } 20%, 90% { transform: translateY(0); } 96%, 100% { transform: translateY(104%); } }
+            @keyframes late { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 70%, 100% { box-shadow: 0 0 0 .8em transparent; } }
+            @keyframes sube-suave { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        }
+    </style>
+</head>
+<body>
+<button class="iconbtn tema" type="button" id="tema" aria-label="Cambiar entre tema claro y oscuro" title="Tema claro / oscuro">
+    <svg id="icoTema" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+</button>
+<a class="ir-modulos ir-fijo" href="/inicio" aria-label="Volver al portal de módulos" title="Volver al portal de módulos">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Módulos</span>
+</a>
+<div class="pantalla">
+    <header class="mesa">
+        <div class="marca">
+            <span class="sello" aria-hidden="true">
+                <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h22l6 6v18H6z"/><path d="M13 16h4v4h-4zM21 16h4v4h-4zM13 24h4v4h-4zM21 24h2M25 24v4"/></svg>
+            </span>
+            <div class="tit"><span class="kick">I+D · Plataforma</span><b>Impresora</b></div>
+        </div>
+        <div class="escena" aria-hidden="true">
+            <div class="maquina">
+                <div class="cuerpo"><i class="vent"></i><i class="tapa"></i><span class="rot">ACT · QR</span><i class="led"></i></div>
+                <div class="ranura"></div>
+                <div class="salida">
+                    <div class="etiqueta">
+                        <svg class="qr" id="qr" viewBox="0 0 25 25" shape-rendering="crispEdges" fill="#14172A"></svg>
+                        <div class="acta"><span>ACT</span><b id="num">0042</b></div>
+                    </div>
+                </div>
+            </div>
+            <p class="leyenda">Una etiqueta por equipo</p>
+        </div>
+        <div class="titular">
+            <span class="placa" aria-hidden="true"><span id="placaNum">ACT 0042</span></span>
+            <h1>Acceso al registro de activos</h1>
+            <p>Da de alta cada equipo con su número ACT, imprime su etiqueta con QR y consulta su ficha al escanearla.</p>
+        </div>
+    </header>
+    <main class="zona">
+        <section class="acceso" aria-labelledby="tit">
+            <div>
+                <span class="silk">Acceso al registro de activos</span>
+                <h2 id="tit">Iniciar sesión</h2>
+                <p class="sub" id="sub">Entra con tu correo y tu contraseña.</p>
+            </div>
+
+            <form id="fLogin" autocomplete="on" novalidate>
+                <div class="field"><label for="email">Correo</label>
+                    <input class="input" id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" placeholder=" " required autofocus></div>
+                <div class="field"><label for="pass">Contraseña</label>
+                    <div class="clave"><input class="input" id="pass" name="password" type="password" autocomplete="current-password" maxlength="200" placeholder=" " required aria-describedby="mayus">
+                        <button class="btn" type="button" id="ver" aria-pressed="false" aria-label="Mostrar la contraseña">Ver</button></div>
+                    <p class="mayus" id="mayus" role="status" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 4 13h4v7h8v-7h4z"/></svg>Bloq Mayús está activado.</p></div>
+                <p class="msg" id="msg" role="alert" aria-live="assertive"></p>
+                <button class="btn btn-primary" type="submit" id="entrar">Entrar</button>
+            </form>
+
+            <p class="ayuda" id="olvidoBox"><button class="btn btn-ghost" type="button" id="olvido">¿Olvidaste tu contraseña?</button></p>
+
+            <form id="fOlvide" autocomplete="off" novalidate hidden>
+                <div id="olvP1">
+                    <p class="sub">Escribe tu correo. Otra persona con la sesión abierta deberá aprobar el cambio.</p>
+                    <div class="field"><label for="olvEmail">Correo</label><input class="input" id="olvEmail" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" placeholder=" "></div>
+                </div>
+                <div id="olvP2" hidden>
+                    <p class="sub" role="status" aria-live="polite">Solicitud enviada. Pide a otra persona con sesión abierta que la apruebe en la consola (candado, "Solicitudes de contraseña"). Esta pantalla avanza sola cuando lo haga.</p>
+                </div>
+                <div id="olvP3" hidden>
+                    <p class="sub">Aprobada. Pide a esa persona el código de 6 dígitos y elige tu contraseña nueva (mínimo 10 caracteres).</p>
+                    <div class="field"><label for="olvCodigo">Código de 6 dígitos</label><input class="input mono" id="olvCodigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder=" "></div>
+                    <div class="field"><label for="olvNueva">Contraseña nueva</label><input class="input" id="olvNueva" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                    <div class="field"><label for="olvRepite">Repite la nueva</label><input class="input" id="olvRepite" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                </div>
+                <p class="msg" id="msgOlv" role="alert" aria-live="assertive"></p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" type="submit" id="olvEnviar" style="flex:1">Pedir ayuda</button>
+                    <button class="btn btn-ghost" type="button" id="olvVolver">Volver</button>
+                </div>
+            </form>
+
+            <form id="fClave" autocomplete="off" novalidate hidden>
+                <p class="sub" id="avisoClave">Por seguridad, cambia tu contraseña (mínimo 10 caracteres).</p>
+                <div class="field"><label for="actual">Contraseña actual</label><input class="input" id="actual" type="password" autocomplete="current-password" maxlength="200" placeholder=" "></div>
+                <div class="field"><label for="nueva">Contraseña nueva</label><input class="input" id="nueva" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                <div class="field"><label for="repite">Repite la nueva</label><input class="input" id="repite" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                <p class="msg" id="msgClave" role="alert" aria-live="assertive"></p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" type="submit" id="guardar" style="flex:1">Guardar contraseña</button>
+                    <button class="btn btn-ghost" type="button" id="luego">Más tarde</button>
+                </div>
+            </form>
+            <p class="ayuda">¿Sin cuenta? Pide acceso a un supervisor.</p>
+            <p class="estado"><span class="punto" id="punto" data-s="?"></span><span id="estadoTxt">Comprobando servidor…</span><span class="ver mono">v__VERSION__</span></p>
+            <p class="pie"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Conexión cifrada. Solo cuentas autorizadas.</p>
+        </section>
+    </main>
+</div>
+<script>
+    /* Efectos de la pantalla de acceso (no tocan el flujo de login.js). */
+    (function () {
+        var $ = function (id) { return document.getElementById(id); };
+        var quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        /* QR decorativo (no codifica nada): tres marcas de posición y módulos con semilla. */
+        function qr(semilla) {
+            var n = 25, s = semilla, d = '', p = '', i, j;
+            function fijo(x, y) { return (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9); }
+            for (i = 0; i < n; i++) for (j = 0; j < n; j++) {
+                if (fijo(i, j)) continue;
+                s = (s * 1103515245 + 12345) & 0x7fffffff;
+                if ((s >> 16) % 100 < 47) d += 'M' + i + ' ' + j + 'h1v1h-1z';
+            }
+            [[0, 0], [n - 7, 0], [0, n - 7]].forEach(function (o) {
+                p += '<path fill-rule="evenodd" d="M' + o[0] + ' ' + o[1] + 'h7v7h-7zM' + (o[0] + 1) + ' ' + (o[1] + 1) + 'v5h5v-5z"/><rect x="' + (o[0] + 2) + '" y="' + (o[1] + 2) + '" width="3" height="3"/>';
+            });
+            $('qr').innerHTML = '<path d="' + d + '"/>' + p;
+        }
+        var n = 42; qr(n);
+        if (!quieto) setInterval(function () {   /* acompasado con la animación CSS de 9 s: el número cambia mientras la etiqueta está fuera de la ranura */
+            if (document.hidden) return;
+            n = n >= 9999 ? 1 : n + 1; var t = ('000' + n).slice(-4);
+            setTimeout(function () { $('num').textContent = t; $('placaNum').textContent = 'ACT ' + t; qr(n * 7); }, 8300);
+        }, 9000);
+        /* Aviso de Bloq Mayús en la contraseña. */
+        var pass = $('pass'), mayus = $('mayus');
+        function caps(e) { if (e.getModifierState) mayus.hidden = !e.getModifierState('CapsLock'); }
+        pass.addEventListener('keydown', caps); pass.addEventListener('keyup', caps); pass.addEventListener('blur', function () { mayus.hidden = true; });
+        /* Botón: "Entrando…" mientras login.js lo tiene deshabilitado. */
+        var entrar = $('entrar');
+        new MutationObserver(function () { entrar.textContent = entrar.disabled ? 'Entrando…' : 'Entrar'; }).observe(entrar, { attributes: true, attributeFilter: ['disabled'] });
+        /* Pulso del servidor (público): punto verde "En línea" / rojo "Sin conexión". */
+        var p = $('punto'), t = $('estadoTxt');
+        function ver() {
+            fetch('/api/health', { cache: 'no-store' }).then(function (r) { return r.ok; }, function () { return false; }).then(function (ok) {
+                p.dataset.s = ok ? 'on' : 'off'; t.textContent = ok ? 'Servidor en línea' : 'Sin conexión con el servidor';
+            });
+        }
+        ver(); setInterval(ver, 20000);
+    })();
+</script>
+<script src="/static/js/login.js?v=1333"></script>
+</body>
+</html>

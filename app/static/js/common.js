@@ -1,10 +1,13 @@
 (function () {
+    /** v1.4.17: cada módulo tiene su pantalla de inicio de sesión (Impresora: /impresora/acceso; el resto, /login). */
+    function accesoDelModulo() { return location.pathname.indexOf('/impresora') === 0 ? '/impresora/acceso' : '/login'; }
+    window.accesoDelModulo = accesoDelModulo;
     // Sesión de usuario caducada o cerrada en otro equipo: cualquier respuesta 401 marcada por el servidor lleva al login.
     const _fetch = window.fetch.bind(window);
     window.fetch = async function (...a) {
         const r = await _fetch(...a);
         if (r.status === 401 && r.headers.get('X-Auth') === 'login' && location.pathname !== '/login') {
-            location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search + location.hash);
+            location.href = accesoDelModulo() + '?next=' + encodeURIComponent(location.pathname + location.search + location.hash);
         }
         return r;
     };
@@ -340,7 +343,7 @@
         try { await fetch('/api/admin/logout', { method: 'POST' }); } catch (e) { /* sin red: igual se va al login */ }   // también cierra la sesión de supervisor
         try { sessionStorage.clear(); } catch (e) { /* nada */ }
         try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) { /* sin red: igual se va al login */ }
-        location.href = '/login';
+        location.href = accesoDelModulo();
     }
     function applyTheme(t) {
         document.documentElement.dataset.theme = t;

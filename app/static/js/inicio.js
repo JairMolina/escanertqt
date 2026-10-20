@@ -358,9 +358,10 @@
         if (sesionInfo) { location.href = url; return; }       // con sesión y permiso: directo
         if (entrando) return;
         entrando = true; it.btn.setAttribute('data-cargando', ''); avisar('Comprobando tu sesión…');
+        var acceso = (destino(m.login) || '/login') + '?next=' + encodeURIComponent(url);   // v1.4.17: cada módulo con su pantalla de acceso
         fetch('/api/auth/yo', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) {
-            location.href = r.ok ? url : '/login?next=' + encodeURIComponent(url);   // 401: a iniciar sesión; después vuelve a "/", que decide rol y dispositivo
-        }, function () { location.href = '/login?next=' + encodeURIComponent(url); });
+            location.href = r.ok ? url : acceso;   // 401: a iniciar sesión; después vuelve al módulo
+        }, function () { location.href = acceso; });
     }
     addEventListener('pageshow', function (e) {
         if (e.persisted) { entrando = false; items.forEach(function (it) { it.btn.removeAttribute('data-cargando'); }); avisar(''); }
@@ -484,7 +485,7 @@
        El núcleo "I+D" es siempre un botón. Administrador: despliega la matriz cuentas × módulos. Sin sesión (o sin ser administrador): despliega el
        formulario «Acceso de administrador» desde el mismo núcleo y, tras entrar, ese mismo contenedor pasa a la matriz. POST /api/plataforma/entrar.
        API (solo administradores): GET /api/plataforma/cuentas, PATCH /api/plataforma/cuentas/{email}, POST /api/plataforma/modulos/{id}/todos. */
-    var cc = { vista: 'acceso', entrando: false, mods: [], roles: [], cuentas: [], q: '', abierto: false, pend: 0, cola: Promise.resolve(), menu: null, conf: null };
+    var cc = { vista: 'acceso', entrando: false, mods: [], roles: [], cuentas: [], q: '', abierto: false, pend: 0, cola: Promise.resolve(), menu: null, conf: null, smtp: true, busy: {} };
     var ccEl = $('cc'), ccPanel = $('ccPanel'), nucBtn = $('nucBtn'), portal = document.querySelector('.portal'), nucleo = document.querySelector('.nucleo');
     var ccMenu = $('ccMenu'), ccConf = $('ccConf'), tCerrar = 0, tCcAviso = 0, menuBtn = null;
 
@@ -529,11 +530,14 @@
     /* ---- datos ---- */
     function aplicar(d) {
         if (!d || !Array.isArray(d.cuentas)) throw new Error('Respuesta inesperada del servidor.');
+        if (typeof d.smtp === 'boolean') cc.smtp = d.smtp;
         var nuevos = Array.isArray(d.modulos) ? d.modulos : [];
         var mismos = nuevos.length === cc.mods.length && nuevos.every(function (m, i) { return cc.mods[i] && cc.mods[i].id === m.id; });
         cc.mods = nuevos; cc.roles = Array.isArray(d.roles) && d.roles.length ? d.roles : ['administrador', 'general', 'consultor'];
         cc.cuentas = d.cuentas.map(function (c) { c.modulos = Array.isArray(c.modulos) ? c.modulos : []; return c; });
         if (!mismos) { menuCerrar(false); ccCabecera(); }
+        $('ccInv').disabled = !cc.mods.length;
+        if (!$('ccInvForm').hidden) invAviso();
         ccRender();
     }
     function ccCargar(silencioso) {
@@ -571,6 +575,12 @@
         });
         $('ccHead').innerHTML = h + '</tr>'; $('ccMods').innerHTML = t;
     }
+    function accionesPend(c, mail) {
+        if (!c.pendiente) return '';
+        var oc = !!cc.busy[String(c.email).toLowerCase()], d = oc ? ' disabled' : '';
+        return '<span class="cc-pacc"><button type="button" class="cc-lnk" data-f="i|' + mail + '|r" data-inv="reenviar" data-e="' + mail + '"' + d + '>' + (oc ? 'Reenviando…' : 'Reenviar') + '</button>' +
+            '<button type="button" class="cc-lnk cc-lnk-bad" data-f="i|' + mail + '|c" data-inv="cancelar" data-e="' + mail + '"' + d + ' aria-label="Cancelar invitación de ' + mail + '">Cancelar invitación</button></span>';
+    }
     function chips(c) {
         return (c.pendiente ? '<span class="cc-chip" data-k="info">Pendiente</span>' : '') + (c.activo === false ? '<span class="cc-chip" data-k="warn">Inactiva</span>' : '');
     }
@@ -588,8 +598,8 @@
             var opts = cc.roles.map(function (r) { return '<option value="' + esc(r) + '"' + (r === c.rol ? ' selected' : '') + '>' + esc(ROLES[r] || r) + '</option>'; }).join('');
             var sel = function (v) { return '<select class="input cc-rol" data-e="' + mail + '" data-f="r|' + mail + '|' + v + '" aria-label="Rol de ' + mail + '">' + opts + '</select>'; };
             var tod = function (v) { return '<input type="checkbox" class="cc-todos" data-e="' + mail + '" data-f="t|' + mail + '|' + v + '" aria-label="Todos los módulos para ' + mail + '"' + (todos ? ' checked' : '') + (parcial ? ' data-ind="1"' : '') + (adm ? ' disabled' : '') + '>'; };
-            filas += '<tr><th scope="row" class="cc-cta"><span class="cc-mail" title="' + mail + '">' + mail + '</span>' + chips(c) + nota + '</th><td>' + sel('t') + '</td><td class="cc-c"><label class="cc-cl">' + tod('t') + '</label></td>';
-            tarj += '<li class="cc-card"><div class="cc-chead"><span class="cc-mail">' + mail + '</span>' + chips(c) + '</div>' + nota +
+            filas += '<tr><th scope="row" class="cc-cta"><span class="cc-mail" title="' + mail + '">' + mail + '</span>' + chips(c) + accionesPend(c, mail) + nota + '</th><td>' + sel('t') + '</td><td class="cc-c"><label class="cc-cl">' + tod('t') + '</label></td>';
+            tarj += '<li class="cc-card"><div class="cc-chead"><span class="cc-mail">' + mail + '</span>' + chips(c) + '</div>' + accionesPend(c, mail) + nota +
                 '<div class="cc-crow"><label class="cc-rl"><span>Rol</span>' + sel('m') + '</label><label class="cc-pill">' + tod('m') + '<span class="cc-pb"><b>Todos</b></span></label></div><div class="cc-pills">';
             cc.mods.forEach(function (m) {
                 var at = 'class="cc-chk" data-e="' + mail + '" data-m="' + esc(m.id) + '" aria-label="' + esc(m.nombre) + ' para ' + mail + '"' + (tiene(c, m.id) ? ' checked' : '') + (adm ? ' disabled' : '');
@@ -653,25 +663,40 @@
     }
     function confCerrar(devolver) {
         if (ccConf.hidden) return;
-        ccConf.hidden = true; cc.conf = null;
-        if (devolver && menuBtn) menuBtn.focus();
+        var k = cc.conf; ccConf.hidden = true; cc.conf = null;
+        if (!devolver) return;
+        if (k && k.inv) enfocarF('i|' + k.inv + '|c', 'ccInv'); else if (menuBtn) menuBtn.focus();
+    }
+    function enfocarF(clave, alt) {
+        var c = ccPanel.querySelectorAll('[data-f="' + clave.replace(/["\\]/g, '\\$&') + '"]'), k;
+        for (k = 0; k < c.length; k++) if (c[k].offsetParent !== null && !c[k].disabled) { c[k].focus(); return; }
+        if (alt && !$(alt).disabled) $(alt).focus(); else ccPanel.focus({ preventScroll: true });
+    }
+    function confInv(mail) {
+        cc.conf = { inv: mail };
+        $('ccConfTxt').textContent = '¿Cancelar la invitación a ' + mail + '? El enlace enviado dejará de funcionar.';
+        var ok = $('ccConfOk'); ok.textContent = 'Cancelar invitación'; ok.className = 'btn btn-sm btn-danger';
+        $('ccConfNo').textContent = 'Conservar';
+        ccConf.hidden = false; $('ccConfNo').focus();
     }
     function confAbrir(id, activo) {
         var m = cc.mods.filter(function (x) { return x.id === id; })[0]; if (!m) return;
         cc.conf = { id: id, activo: activo };
         $('ccConfTxt').textContent = (activo ? '¿Dar «' : '¿Quitar «') + m.nombre + '» a todas las cuentas que no son administradoras?';
-        var ok = $('ccConfOk'); ok.textContent = activo ? 'Dar a todos' : 'Quitar a todos'; ok.className = 'btn btn-sm ' + (activo ? 'btn-primary' : 'btn-danger');
+        var ok = $('ccConfOk'); ok.textContent = activo ? 'Dar a todos' : 'Quitar a todos'; ok.className = 'btn btn-sm ' + (activo ? 'btn-primary' : 'btn-danger'); $('ccConfNo').textContent = 'Cancelar';
         ccConf.hidden = false; $('ccConfNo').focus();
     }
     $('ccConfNo').addEventListener('click', function () { confCerrar(true); });
     $('ccConfOk').addEventListener('click', function () {
         var k = cc.conf; if (!k) return;
+        if (k.inv) { confCerrar(false); invCancelar(k.inv); return; }
         confCerrar(true); ccAvisar('Aplicando…', false);
         encolar(function () { return api('POST', '/api/plataforma/modulos/' + encodeURIComponent(k.id) + '/todos', { activo: k.activo }); }, null);
     });
     ccMenu.addEventListener('click', function (e) {
         var b = e.target.closest && e.target.closest('[data-ac]'); if (!b) return;
-        var id = cc.menu; menuCerrar(false); confAbrir(id, b.dataset.ac === 'dar');
+        var id = cc.menu; menuCerrar(false);
+        if (b.dataset.ac === 'invitar') invAbrir(id); else confAbrir(id, b.dataset.ac === 'dar');
     });
     ccMenu.addEventListener('keydown', function (e) {
         var its = Array.prototype.slice.call(ccMenu.querySelectorAll('[role=menuitem]')), i = its.indexOf(document.activeElement);
@@ -681,7 +706,104 @@
         else if (e.key === 'End') { e.preventDefault(); its[its.length - 1].focus(); }
         else if (e.key === 'Tab') { e.preventDefault(); menuCerrar(true); }
     });
+    /* ---- invitaciones por correo: POST /api/plataforma/invitaciones, .../{email}/reenviar, DELETE .../{email} ---- */
+    var invForm = $('ccInvForm'), invMail = $('ccInvMail'), invRol = $('ccInvRol'), invEnv = false, invAdm = false, invPrev = [], enlEl = $('ccEnl');
+    function invAviso() { $('ccInvSmtp').hidden = cc.smtp !== false; }
+    function invError(txt, campo) {
+        var e = $('ccInvErr'); e.textContent = txt || ''; e.hidden = !txt;
+        invMail.removeAttribute('aria-invalid'); if (txt && campo) campo.setAttribute('aria-invalid', 'true');
+    }
+    function invEstado(env) { invEnv = env; $('ccInvEnv').disabled = env; $('ccInvEnv').textContent = env ? 'Enviando…' : 'Enviar invitación'; invForm.setAttribute('aria-busy', env ? 'true' : 'false'); }
+    function invRolCambio() {
+        var adm = invRol.value === 'administrador', its = Array.prototype.slice.call(invForm.querySelectorAll('.cc-inv-chk'));
+        if (adm && !invAdm) invPrev = its.filter(function (i) { return i.checked; }).map(function (i) { return i.value; });     // «todos»: se recuerda la elección previa
+        its.forEach(function (i) { if (adm) i.checked = true; else if (invAdm) i.checked = invPrev.indexOf(i.value) >= 0; i.disabled = adm; });
+        invAdm = adm;
+    }
+    function invAbrir(modId) {
+        if (!cc.mods.length) return;
+        menuCerrar(false); confCerrar(false); enlCerrar(false);
+        invRol.innerHTML = cc.roles.map(function (r) { return '<option value="' + esc(r) + '">' + esc(ROLES[r] || r) + '</option>'; }).join('');
+        invRol.value = cc.roles.indexOf('general') >= 0 ? 'general' : (cc.roles.filter(function (r) { return r !== 'administrador'; })[0] || cc.roles[0]);
+        var pre = modId && cc.mods.some(function (m) { return m.id === modId; }) ? modId : (cc.mods.filter(function (m) { return m.estado === 'disponible'; })[0] || cc.mods[0]).id;
+        $('ccInvMods').innerHTML = cc.mods.map(function (m) {
+            return '<label class="cc-im" style="--a:' + acentoOk(m.acento) + '"' + (m.estado === 'proximamente' ? ' data-pron="1"' : '') + '><input type="checkbox" class="cc-inv-chk" value="' + esc(m.id) + '"' + (m.id === pre ? ' checked' : '') + '>' + ico(m) + '<span>' + esc(m.nombre) + '</span></label>';
+        }).join('');
+        invMail.value = ''; invAdm = false; invError('', null); invEstado(false); invAviso(); invRolCambio();
+        invForm.hidden = false; $('ccInv').setAttribute('aria-expanded', 'true');
+        invMail.focus({ preventScroll: true }); invForm.scrollIntoView({ block: 'nearest' });
+    }
+    function invCerrar(devolver) {
+        if (invForm.hidden) return;
+        invForm.hidden = true; $('ccInv').setAttribute('aria-expanded', 'false');
+        if (devolver) $('ccInv').focus();
+    }
+    function enlCerrar(devolver) {
+        if (enlEl.hidden) return;
+        enlEl.hidden = true;
+        if (devolver) $('ccInv').focus();
+    }
+    /* Resultado de enviar / reenviar: enviado → aviso; si no, tarjeta con el enlace para compartir a mano y el motivo. */
+    function invResultado(d, mail, reenvio) {
+        if (cc.pend === 0) { try { aplicar(d); } catch (e) { ccCargar(true); } }
+        if (d && d.enviado) { enlCerrar(false); ccAvisar((reenvio ? 'Invitación reenviada a ' : 'Invitación enviada a ') + mail, false); return true; }
+        if (!d || !d.enlace) { ccAvisar((d && d.error) || 'No se pudo enviar la invitación.', true); return false; }
+        $('ccEnlTit').textContent = 'Invitación para ' + mail + ': comparte este enlace.';
+        $('ccEnlMot').textContent = 'No se envió el correo' + (d.error ? ': ' + d.error : '.');
+        $('ccEnlUrl').value = d.enlace; $('ccEnlCop').textContent = 'Copiar enlace';
+        enlEl.hidden = false; $('ccEnlCop').focus({ preventScroll: true }); enlEl.scrollIntoView({ block: 'nearest' });
+        ccAvisar('Invitación creada: falta compartir el enlace', false);
+        return true;
+    }
+    function invCopiar() {
+        var u = $('ccEnlUrl'), b = $('ccEnlCop');
+        var ok = function () { b.textContent = 'Copiado'; ccAvisar('Enlace copiado', false); };
+        var resp = function () {
+            u.focus(); u.select(); u.setSelectionRange(0, u.value.length);
+            var bien = false; try { bien = document.execCommand('copy'); } catch (e) { bien = false; }
+            if (bien) ok(); else ccAvisar('Selecciona el enlace y cópialo manualmente.', true);
+        };
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(u.value).then(ok, resp); else resp();
+    }
+    function invCancelar(mail) {
+        ccAvisar('Cancelando…', false);
+        api('DELETE', '/api/plataforma/invitaciones/' + encodeURIComponent(mail)).then(function (d) {
+            if (cc.pend === 0) { try { aplicar(d); } catch (e) { ccCargar(true); } }
+            ccAvisar('Invitación a ' + mail + ' cancelada', false); enfocarF('x', 'ccInv');
+        }).then(null, function (e) { ccAvisar(e.message, true); ccCargar(true); });
+    }
+    function invReenviar(mail) {
+        var k = mail.toLowerCase(); if (cc.busy[k]) return;
+        cc.busy[k] = true; ccRender(); ccAvisar('Reenviando…', false);
+        api('POST', '/api/plataforma/invitaciones/' + encodeURIComponent(mail) + '/reenviar').then(function (d) {
+            delete cc.busy[k]; var enl = invResultado(d, mail, true) && !enlEl.hidden; ccRender();
+            if (!enl) enfocarF('i|' + mail + '|r', 'ccInv');
+        }).then(null, function (e) { delete cc.busy[k]; ccRender(); ccAvisar(e.message, true); });
+    }
+    $('ccInv').addEventListener('click', function () { if (invForm.hidden) invAbrir(null); else invCerrar(true); });
+    $('ccInvNo').addEventListener('click', function () { invCerrar(true); });
+    invRol.addEventListener('change', invRolCambio);
+    $('ccEnlCop').addEventListener('click', invCopiar);
+    $('ccEnlX').addEventListener('click', function () { enlCerrar(true); });
+    $('ccEnlUrl').addEventListener('focus', function () { this.select(); });
+    invForm.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        if (invEnv) return;
+        var mail = invMail.value.trim(), adm = invRol.value === 'administrador';
+        var mods = Array.prototype.filter.call(invForm.querySelectorAll('.cc-inv-chk'), function (i) { return i.checked; }).map(function (i) { return i.value; });
+        if (!mail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) { invError(mail ? 'Escribe un correo válido.' : 'Escribe el correo de la persona.', invMail); invMail.focus(); return; }
+        if (!adm && !mods.length) { invError('Elige al menos un módulo.', null); return; }
+        invError('', null); invEstado(true);
+        api('POST', '/api/plataforma/invitaciones', { email: mail, rol: invRol.value, modulos: mods }).then(function (d) {
+            invEstado(false); invCerrar(false); invResultado(d, mail, false);
+            if (enlEl.hidden) $('ccInv').focus();
+        }).then(null, function (e) {
+            invEstado(false); invError(e.message, e.status === 422 ? invMail : null); invMail.focus();
+        });
+    });
     ccPanel.addEventListener('click', function (e) {
+        var bi = e.target.closest && e.target.closest('[data-inv]');
+        if (bi && !bi.disabled) { menuCerrar(false); if (bi.dataset.inv === 'reenviar') invReenviar(bi.dataset.e); else confInv(bi.dataset.e); return; }
         var b = e.target.closest && e.target.closest('[data-menu]');
         if (b) { confCerrar(false); menuAbrir(b); return; }
         if (!ccMenu.hidden && !ccMenu.contains(e.target)) menuCerrar(false);
@@ -765,7 +887,7 @@
     });
     function ccCerrar(devolver) {
         if (!cc.abierto) return;
-        cc.abierto = false; menuCerrar(false); confCerrar(false);
+        cc.abierto = false; menuCerrar(false); confCerrar(false); invCerrar(false); enlCerrar(false);
         nucBtn.setAttribute('aria-expanded', 'false');
         ccEl.dataset.abierto = 'false';
         tCerrar = setTimeout(function () { ccEl.hidden = true; }, mqQuieto.matches ? 0 : 280);
@@ -780,7 +902,7 @@
         if (!cc.abierto) return;
         if (e.key === 'Escape') {
             e.preventDefault();
-            if (!ccMenu.hidden) menuCerrar(true); else if (!ccConf.hidden) confCerrar(true); else ccCerrar(true);
+            if (!ccMenu.hidden) menuCerrar(true); else if (!ccConf.hidden) confCerrar(true); else if (!invForm.hidden) invCerrar(true); else if (!enlEl.hidden) enlCerrar(true); else ccCerrar(true);
             return;
         }
         if (e.key !== 'Tab') return;

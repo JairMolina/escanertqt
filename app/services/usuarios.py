@@ -361,7 +361,8 @@ def _nueva_invitacion(c, email: str, ahora: Optional[float]) -> str:
     return token
 
 
-def crear_invitacion(email: str, rol: str, por: str, db_path: Optional[Path] = None, ahora: Optional[float] = None) -> str:
+def crear_invitacion(email: str, rol: str, por: str, db_path: Optional[Path] = None, ahora: Optional[float] = None,
+                     modulos: Optional[List[str]] = None) -> str:
     """Crea la cuenta (desactivada, con su rol) y devuelve el token de invitación. ValueError si el correo ya existe."""
     email, rol = normalizar(email), _validar_rol(rol)
     if not _EMAIL.match(email):
@@ -372,6 +373,8 @@ def crear_invitacion(email: str, rol: str, por: str, db_path: Optional[Path] = N
             raise ValueError("Ya existe una cuenta con ese correo.")
         c.execute("INSERT INTO usuarios (email, hash, activo, debe_cambiar, rol, invitado_por) VALUES (?, ?, 0, 0, ?, ?)",
                   (email, "!" + secrets.token_hex(16), rol, normalizar(por)))   # "!": hash imposible, no se puede entrar
+        if modulos is not None:   # v1.4.14: invitación a módulos concretos (sin lista: Escáner TQT, como antes)
+            c.execute("UPDATE usuarios SET modulos = ? WHERE email = ?", (",".join(modulos_cat.normalizar_lista(modulos)), email))
         return _nueva_invitacion(c, email, ahora)
 
 

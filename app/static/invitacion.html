@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark light">
     <meta name="robots" content="noindex">
     <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
-    <title>Activar cuenta · Escáner TQT</title>
+    <title>Activar cuenta · Plataforma I+D</title>
     <script>
         (function () {
             var t = 'dark';
@@ -37,7 +37,7 @@
         <p class="msg" id="msg" role="alert"></p>
         <button class="btn btn-primary btn-block" type="submit" id="ok">Activar y entrar</button>
     </form>
-    <p class="ver">Escáner TQT v__VERSION__</p>
+    <p class="ver">Plataforma I+D v__VERSION__</p>
 </main>
 <script>
 (function () {
@@ -59,7 +59,7 @@
         if ($('p1').value !== $('p2').value) return err('Las contraseñas no coinciden.');
         $('ok').disabled = true;
         post('/api/auth/invitacion/aceptar', { token, nueva: $('p1').value })
-            .then((d) => { history.replaceState(null, '', '/invitacion'); location.replace(d.rol === 'consultor' ? '/consultar' : '/'); })
+            .then((d) => { history.replaceState(null, '', '/invitacion'); location.replace('/inicio'); })   /* v1.4.14: el portal muestra los módulos de la cuenta */
             .catch((e) => { err(e.message); $('ok').disabled = false; });
     });
 })();
