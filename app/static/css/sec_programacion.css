@@ -69,14 +69,21 @@
 }
 
 /* v1.3.73: detalle STM32 dividido en datos + semáforo de estado */
-.prog-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(130px,auto);gap:16px;align-items:start}
-.prog-estado{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border:1px solid var(--border,#334155);border-radius:8px;text-align:center}
-.prog-luz{width:28px;height:28px;border-radius:50%;background:var(--bad,#d64b4b);box-shadow:0 0 10px currentColor;color:var(--bad,#d64b4b)}
+/* v1.4.19: dos mitades iguales; datos en pares compactos (2 por fila) y estado en la segunda mitad */
+.prog-split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+.prog-split .prog-dl{grid-template-columns:max-content minmax(0,1fr) max-content minmax(0,1fr);gap:4px 10px;margin-bottom:8px;padding:8px 10px}
+.prog-split .prog-cab{margin-bottom:6px}
+.prog-split .hint{margin:4px 0 0}
+.prog-estado{display:grid;grid-template-columns:auto 1fr;align-items:center;align-content:start;gap:8px 10px;padding:10px 12px;border:1px solid var(--border,#334155);border-radius:8px}
+.prog-estado .prog-est-dl{grid-column:1/-1}
+.prog-acciones{margin:12px 0}
+.prog-luz{width:18px;height:18px;border-radius:50%;background:var(--bad,#d64b4b);box-shadow:0 0 10px currentColor;color:var(--bad,#d64b4b)}
 .prog-estado[data-s="ok"] .prog-luz{background:var(--ok,#22a35a);color:var(--ok,#22a35a)}
 .prog-estado[data-s="warn"] .prog-luz{background:var(--warn,#e0a526);color:var(--warn,#e0a526)}
 .prog-luz-txt{font-weight:600;font-size:.9rem}
 @media (prefers-reduced-motion:no-preference){.prog-estado[data-s="warn"] .prog-luz{animation:prog-pulso 1s ease-in-out infinite alternate}}
 @keyframes prog-pulso{to{opacity:.45}}
+@media (max-width:899px){.prog-split .prog-dl{grid-template-columns:max-content minmax(0,1fr)}}
 @media (max-width:599px){.prog-split{grid-template-columns:1fr}}
 
 .prog-sesion { align-items: center; gap: 8px; }

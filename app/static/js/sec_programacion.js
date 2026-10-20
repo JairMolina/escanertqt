@@ -53,8 +53,8 @@
             if(!r.ok) throw new Error(r.error);
             const available=r.data.filter(s=>s.local && s.online);
             let saved=''; try { saved=localStorage.getItem('tqt.station.stm32') || ''; } catch(_) {}
-            const station=available.find(s=>s.id===saved) || (available.length===1 ? available[0] : null);
-            if(!station) throw new Error('Selecciona la estación de esta laptop en TQT R1 y mantén su agente Windows actualizado.');
+            const station=available.find(s=>s.id===saved) || available[0];
+            if(!station) throw new Error('No hay una estación J-Link conectada en esta laptop. Abre su agente Windows y vuelve a intentar.');
             return station.id;
         }
         async function waitVerification(id) {

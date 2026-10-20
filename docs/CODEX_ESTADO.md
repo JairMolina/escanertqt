@@ -1,7 +1,12 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-20 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.18; producción en 1.4.13 hasta que se despliegue)
+Commit de referencia: ver `git log` de main (v1.4.19; producción en 1.4.13 hasta que se despliegue)
+
+## v1.4.19 (2026-10-20, Claude Code)
+- Programación R1/R3: estatus por tarjeta en la lista, detalle en dos mitades, botones y avance arriba, estación J-Link automática (sin menú). Pruebas TQT: tarjeta + inventario arriba, intro/serial/historial apilados, prueba automática a todo el ancho.
+- Evidencia: test_qa_version_hoy OK, `node --check` OK, Docker local 1.4.19. Sin revisión visual con sesión ni hardware.
+- Pendiente: el usuario reporta que ON/OFF BLE sale por serial; el código revisado envía por BLE (puente Windows y Web Bluetooth). Falta evidencia del registro.
 
 ## v1.4.18 (2026-10-20, Claude Code)
 - Impresora: etiqueta «ACT» arriba y número abajo junto al QR; exportar Excel (`/api/activos/exportar.xlsx`, filtros o selección); selección en lote y eliminación con contraseña del usuario (`/api/activos/eliminar-lote`, mismo limitador que el login, bitácora `ACTIVOS_ELIMINADOS`).

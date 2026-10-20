@@ -259,8 +259,9 @@
     const introPanel = h("section", { class: "prog-panel tqt-card tqt-intro" },
       h("h2", null, "Pruebas TQT"),
       h("p", { class: "hint tqt-bench" }, "Banco de pruebas · modo seguro"), modeHint, modeBtn);
+    webBox.firstElementChild.append(disconnectSerial);
     const serialPanel = h("section", { class: "prog-panel tqt-card tqt-serial-panel" },
-      h("h3", null, "Puerto serial"), connSerial.el, webBox, disconnectSerial, agentBox,
+      h("h3", null, "Puerto serial"), connSerial.el, webBox, agentBox,
       h("div", { class: "tqt-serial-manual" }, serialManual));
     const blePanel = h("section", { class: "prog-panel tqt-card tqt-ble-panel" },
       h("h3", null, "Bluetooth R1 / R2"), connBle.el, bleRole,
@@ -268,18 +269,18 @@
       h("div", { class: "row wrap" }, bleOn, bleOff), nativeInfo, nativeInstall, bleHint, manualOut);
     const historyPanel = h("section", { class: "prog-panel tqt-card tqt-history-panel" },
       h("h3", null, "Historial de la tarjeta seleccionada"), historyHost);
+    // v1.4.19: tarjeta arriba; intro + serial apilados en una columna; Bluetooth al lado
+    const cardPanel = h("section", { class: "prog-panel tqt-card tqt-pick-panel" },
+      h("h3", null, "Elige una tarjeta"),
+      h("label", { class: "sr-only", for: "tqt-search" }, "Buscar tarjeta"),
+      h("div", { class: "tqt-pick-row" }, search, button("Cargar QR / código", () => scan(search.value))),
+      cardList, moreBtn);
     host.append(
-      h("div", { class: "tqt-header" }, introPanel, serialPanel, blePanel),
+      h("div", { class: "tqt-header" }, cardPanel,
+        h("section", { class: "prog-panel tqt-card tqt-inventory-panel" }, h("h3", null, "R1 y R2 · datos del inventario"), cardHost),
+        h("div", { class: "tqt-stack" }, introPanel, serialPanel, historyPanel), blePanel),
       status, announcer,
-      h("div", { class: "tqt-layout" },
-        h("aside", { class: "tqt-col tqt-side" },
-          h("section", { class: "prog-panel tqt-card" },
-            h("h3", null, "Elige una tarjeta"),
-            h("label", { class: "sr-only", for: "tqt-search" }, "Buscar tarjeta"), search,
-            h("div", { class: "row wrap" }, button("Cargar QR / código", () => scan(search.value))),
-            cardList, moreBtn),
-          historyPanel,
-          h("section", { class: "prog-panel tqt-card tqt-inventory-panel" }, h("h3", null, "R1 y R2 · datos del inventario"), cardHost)),
+      h("div", { class: "tqt-layout tqt-layout-full" },
         h("div", { class: "tqt-col tqt-main" }, summary,
           h("section", { class: "prog-panel tqt-card" },
             h("h3", null, "Prueba automática"), h("div", { class: "row wrap" }, start, stop), progress,

@@ -1,5 +1,12 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.19 — 2026-10-20
+- **Programación R1/R3 — estatus en la lista:** cada tarjeta muestra «Sin programar», «Desactualizada» o «Actualizada» (FW guardado contra el más alto compatible con su HW), igual que en TQT R2.
+- **Detalle más compacto:** los datos de la tarjeta van en pares (dos por fila) en la primera mitad y el estado de programación en la segunda; los botones de programar, ESP32, subir HEX y cancelar suben justo debajo.
+- **Estación J-Link automática:** ya no hay menú de estaciones; se usa solo el dispositivo de esta PC que está conectado (el último usado si sigue en línea), con botón «Actualizar».
+- **Programación R1/R3:** el avance y resultado de la programación aparece justo debajo de los botones.
+- **Pruebas TQT más compacto:** «Elige una tarjeta» pasa arriba (buscador y botón en una línea, lista más densa); «Pruebas TQT» y «Puerto serial» van apilados en una columna sin espacio sobrante, con «Elegir puerto» y «Desconectar» en la misma fila; Bluetooth R1/R2 a la derecha. Los datos del inventario (R1, R2, R3) quedan junto a «Elige una tarjeta» y el historial bajo «Puerto serial»; la prueba automática usa todo el ancho.
+
 ## v1.4.18 — 2026-10-20
 - **Etiqueta de activo en dos líneas:** QR a la izquierda y «ACT» arriba con el número (0000) abajo, más grande.
 - **Exportar Excel** en Impresora (`GET /api/activos/exportar.xlsx`): exporta lo filtrado o la selección, con una columna por característica; disponible también para consultor.
