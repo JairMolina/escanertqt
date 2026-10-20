@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.18 — 2026-10-20
+- **Etiqueta de activo en dos líneas:** QR a la izquierda y «ACT» arriba con el número (0000) abajo, más grande.
+- **Exportar Excel** en Impresora (`GET /api/activos/exportar.xlsx`): exporta lo filtrado o la selección, con una columna por característica; disponible también para consultor.
+- **Selección y eliminación en lote:** casillas en el libro de activos con barra de acciones (exportar, imprimir, eliminar). Eliminar pide la **contraseña del usuario** (`POST /api/activos/eliminar-lote`, mismo límite de intentos que el login), borra los activos con su historial y queda en la bitácora (`ACTIVOS_ELIMINADOS`). También «Eliminar este activo» desde la ficha.
+
 ## v1.4.17 — 2026-10-20
 - **Inicio de sesión propio del módulo Impresora** (`/impresora/acceso`): al entrar a Impresora desde el portal sin sesión ya no se abre el login de Escáner TQT. Misma cuenta y misma lógica (`login.js`: cambio de contraseña y «¿Olvidaste tu contraseña?»), con la identidad de Impresora.
   - El catálogo de módulos indica la pantalla de acceso de cada uno (`login`); el middleware y el portal la usan, y al terminar se vuelve al módulo.

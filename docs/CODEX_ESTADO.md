@@ -1,7 +1,11 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-20 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.17; producción en 1.4.13 hasta que se despliegue)
+Commit de referencia: ver `git log` de main (v1.4.18; producción en 1.4.13 hasta que se despliegue)
+
+## v1.4.18 (2026-10-20, Claude Code)
+- Impresora: etiqueta «ACT» arriba y número abajo junto al QR; exportar Excel (`/api/activos/exportar.xlsx`, filtros o selección); selección en lote y eliminación con contraseña del usuario (`/api/activos/eliminar-lote`, mismo limitador que el login, bitácora `ACTIVOS_ELIMINADOS`).
+- Evidencia: 174 pruebas de las suites pertinentes OK; Docker local 1.4.18 con los 372 activos. Exportar/eliminar sin probar con datos reales.
 
 ## v1.4.14–v1.4.17 (2026-10-20, Claude Code)
 - Módulo Impresora disponible: activos ACT 0000 (`app/services/activos.py`, `app/routers/activos.py`, tablas `activos`/`activos_eventos` creadas solas), etiqueta DYMO 30334 solo con «ACT 0000» + QR (`/impresora?activo=ACT-0000`), impresión individual y por lote a la DYMO compartida (misma cola que TQT, tipo `activo`), estado `/api/activos/impresora/estado`, vincular celular, importación de Excel (`activos_import.py`, solo filas verdes) con departamento y características. Interfaz propia y acceso propio `/impresora/acceso`.

@@ -1,6 +1,7 @@
 """v1.4.15: importación de activos desde Excel (libro generado en memoria; sin datos reales)."""
 import _aislamiento  # noqa: F401  (debe ser lo primero)
 import io
+import re
 import sqlite3
 import tempfile
 import unittest
@@ -295,7 +296,7 @@ class TestAplicarYApi(unittest.TestCase):
         self.assertEqual(self.c.post("/api/activos", json={"nombre": "x", "caracteristicas": [{"etiqueta": "", "valor": "a"}]}).status_code, 422)
         # v1.4.16: la etiqueta ya no lleva departamento ni serie, solo «ACT 0530» y el QR
         svg = self.c.get("/api/activos/ACT-0530/etiqueta.svg").text
-        self.assertIn("ACT 0530", svg)
+        self.assertEqual(re.findall(r"<text[^>]*>([^<]*)</text>", svg), ["ACT", "0530"])
         self.assertNotIn("S/N", svg)
         self.assertNotIn("DETALLE", self.c.get("/api/activos/ACT-0530/etiqueta/xml").text)
 

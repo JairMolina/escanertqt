@@ -17,7 +17,7 @@
         })();
     </script>
     <link rel="stylesheet" href="/static/css/app.css?v=1411">
-    <link rel="stylesheet" href="/static/css/impresora.css?v=1416">
+    <link rel="stylesheet" href="/static/css/impresora.css?v=1418">
 </head>
 <body>
 <a class="salto" href="#lista">Saltar a la lista de activos</a>
@@ -50,18 +50,19 @@
         </div>
         <div class="filtros">
             <div class="field"><label class="sr-only" for="fEst">Filtrar por estado</label>
-                <select class="input" id="fEst"><option value="">Todos los estados</option></select></div>
+                <select class="input" id="fEst"><option value="">Estado: todos</option></select></div>
             <div class="field"><label class="sr-only" for="fDep">Filtrar por departamento</label>
-                <select class="input" id="fDep"><option value="">Todos los deptos.</option></select></div>
+                <select class="input" id="fDep"><option value="">Depto: todos</option></select></div>
             <div class="field"><label class="sr-only" for="fCat">Filtrar por categoría</label>
-                <select class="input" id="fCat"><option value="">Todas las categ.</option></select></div>
+                <select class="input" id="fCat"><option value="">Categ.: todas</option></select></div>
         </div>
         <div class="escaneo" title="Lector USB o teclado: escanea la etiqueta con este campo enfocado">
             <label class="sr-only" for="scan">Escanear etiqueta con lector USB</label>
             <i class="svg-slot" data-i="qr"></i>
             <input class="input mono" id="scan" type="text" placeholder="Escanear" autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go">
         </div>
-        <button class="btn btn-sec btn-imp" type="button" id="bImportar" data-edita aria-haspopup="dialog"><i class="svg-slot" data-i="excel"></i><span>Importar Excel</span></button>
+        <button class="btn btn-sec btn-exp" type="button" id="bExportar" title="Exportar a Excel" aria-label="Exportar a Excel"><i class="svg-slot" data-i="download"></i><span>Exportar</span></button>
+        <button class="btn btn-sec btn-imp" type="button" id="bImportar" data-edita aria-haspopup="dialog" aria-label="Importar desde Excel" title="Importar desde Excel"><i class="svg-slot" data-i="excel"></i><span>Importar</span></button>
         <button class="btn btn-sec btn-lote" type="button" id="bLote" data-edita aria-haspopup="dialog"><i class="svg-slot" data-i="printer"></i><span>Imprimir lote</span></button>
         <button class="btn btn-primary btn-nuevo" type="button" id="bNuevo" data-edita><i class="svg-slot" data-i="plus"></i><span>Nuevo activo</span></button>
     </div>
@@ -72,6 +73,16 @@
                 <h1 id="tLista">Libro de activos</h1>
                 <p class="total mono" id="total" role="status" aria-live="polite"></p>
                 <p class="proximo" id="proximo" hidden>Siguiente número <b class="mono" id="proximoN"></b></p>
+                <button class="btn btn-sm btn-sec btn-selmodo" type="button" id="bSel" aria-pressed="false"><i class="svg-slot" data-i="check"></i><span>Seleccionar</span></button>
+            </div>
+            <div class="selbar" id="selBar" role="region" aria-label="Acciones sobre la selección" hidden>
+                <label class="selbar-todos"><input type="checkbox" id="selTodos"><span><b>Todo lo filtrado</b> <span class="mono" id="selN"></span></span></label>
+                <div class="selbar-acc">
+                    <button class="btn btn-sm btn-sec" type="button" id="selExp" disabled><i class="svg-slot" data-i="download"></i><span class="t-l">Exportar selección</span><span class="t-c">Exportar</span></button>
+                    <button class="btn btn-sm btn-sec" type="button" id="selImp" data-edita disabled><i class="svg-slot" data-i="printer"></i><span class="t-l">Imprimir selección</span><span class="t-c">Imprimir</span></button>
+                    <button class="btn btn-sm btn-peligro" type="button" id="selDel" data-edita disabled><i class="svg-slot" data-i="trash"></i><span class="t-l">Eliminar…</span><span class="t-c">Eliminar</span></button>
+                    <button class="btn btn-sm btn-ghost" type="button" id="selFin" aria-label="Salir de la selección" title="Salir de la selección"><i class="svg-slot" data-i="x"></i><span class="t-l">Listo</span></button>
+                </div>
             </div>
             <div class="cols" aria-hidden="true">
                 <span>Código</span><span>Activo</span><span class="c-dep">Departamento</span><span class="c-cat">Categoría</span><span class="c-ubi">Ubicación</span><span class="c-res">Responsable</span><span>Estado</span><span class="c-imp">Impr.</span>
@@ -121,6 +132,7 @@
                     <h3 class="silk-m" id="tHist">Historial</h3>
                     <ol id="fHist" class="hist"></ol>
                 </section>
+                <div class="f-peligro" data-edita><button class="btn btn-peligro-ghost" type="button" id="bElim"><i class="svg-slot" data-i="trash"></i><span>Eliminar este activo…</span></button></div>
             </article>
         </aside>
     </div>
@@ -297,6 +309,32 @@
     </section>
 </dialog>
 
+<!-- eliminar activos (acción permanente, pide la contraseña) -->
+<dialog class="hoja hoja-del" id="hojaDel" aria-labelledby="dTit">
+    <form id="formDel" novalidate autocomplete="off">
+        <header class="h-cab h-cab-peligro">
+            <div><p class="silk-m">Acción permanente</p><h2 id="dTit" tabindex="-1">Eliminar activos</h2></div>
+            <button class="iconbtn" type="button" id="dX" aria-label="Cerrar"><i class="svg-slot" data-i="x"></i></button>
+        </header>
+        <div class="h-cuerpo">
+            <p class="del-aviso"><b id="dResumen"></b> Se borran para siempre, junto con todo su historial. Esta acción no se puede deshacer.</p>
+            <div class="del-cods" id="dCods" aria-label="Activos que se eliminarán"></div>
+            <details class="omit" id="dTodos" hidden><summary id="dTodosT">Ver todos los códigos</summary><ul id="dLista"></ul></details>
+            <div class="field">
+                <label for="dPass">Tu contraseña</label>
+                <div class="clave-d"><input class="input" id="dPass" type="password" autocomplete="current-password" maxlength="200" aria-describedby="dAyuda dMsg">
+                    <button class="btn btn-sec" type="button" id="dVer" aria-pressed="false" aria-label="Mostrar la contraseña">Ver</button></div>
+                <p class="hint" id="dAyuda">Escríbela para confirmar que eres tú quien elimina.</p>
+            </div>
+            <p class="h-err" id="dMsg" role="alert" hidden></p>
+        </div>
+        <footer class="h-pie">
+            <button class="btn btn-ghost" type="button" id="dCancel">Cancelar</button>
+            <button class="btn btn-peligro" type="submit" id="dEliminar" disabled><i class="svg-slot" data-i="trash"></i><span>Eliminar</span></button>
+        </footer>
+    </form>
+</dialog>
+
 <!-- importar activos desde Excel -->
 <dialog class="hoja hoja-imp" id="hojaImp" aria-labelledby="iTit" data-paso="elige">
     <header class="h-cab">
@@ -381,6 +419,6 @@
 
 <script src="/static/js/common.js?v=1417"></script>
 <script src="/static/js/ws_client.js?v=1321"></script>
-<script src="/static/js/impresora.js?v=1416"></script>
+<script src="/static/js/impresora.js?v=1418"></script>
 </body>
 </html>

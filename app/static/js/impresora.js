@@ -1,5 +1,5 @@
 /**
- * impresora.js (v1.4.16) - Módulo IMPRESORA (/impresora): activos, número ACT 0000, etiqueta DYMO con QR.
+ * impresora.js (v1.4.18) - Módulo IMPRESORA (/impresora): activos, número ACT 0000, etiqueta DYMO con QR.
  * Lista + ficha, alta/edición, impresión por 4 vías, escaneo (lector USB, celular vinculado, cámara del teléfono).
  * Depende de common.js (TQT.h/api/icon/toast) y ws_client.js. Carga bajo demanda: qrcode-generator, DYMO Connect y el visor de cámara.
  */
@@ -48,7 +48,7 @@
 
     // ------------------------------------------------------------------ estado
     const S = { ro: false, yo: null, items: [], total: 0, siguiente: null, cat: { categorias: [], departamentos: [], ubicaciones: [], responsables: [], estados: ESTADOS_FB },
-        q: '', estado: '', categoria: '', departamento: '', soloCodigos: null, cargando: true, error: '', seq: 0, sel: null, act: null, selSeq: 0, edit: null, imprimiendo: false };
+        q: '', estado: '', categoria: '', departamento: '', soloCodigos: null, modoSel: false, selSet: new Set(), cargando: true, error: '', seq: 0, sel: null, act: null, selSeq: 0, edit: null, imprimiendo: false };
     const nombreEstado = (id) => ((S.cat.estados || ESTADOS_FB).find((e) => e.id === id) || ESTADOS_FB.find((e) => e.id === id) || { nombre: id || '—' }).nombre;
     const nm = (x) => (typeof x === 'string' ? x : (x && (x.nombre || x.id)) || '');
     const chip = (estado) => { const c = h('span', { class: 'chip', dataset: { e: estado || '' } }, nombreEstado(estado)); return c; };
@@ -79,9 +79,9 @@
         pintaCatalogos();
     }
     function pintaCatalogos() {
-        llenaSelect($('fEst'), 'Todos los estados', S.cat.estados, (e) => [e.id, e.nombre]);
-        llenaSelect($('fDep'), 'Todos los deptos.', S.cat.departamentos || [], (c) => [nm(c), nm(c)]);
-        llenaSelect($('fCat'), 'Todas las categ.', S.cat.categorias || [], (c) => [nm(c), nm(c)]);
+        llenaSelect($('fEst'), 'Estado: todos', S.cat.estados, (e) => [e.id, e.nombre]);
+        llenaSelect($('fDep'), 'Depto: todos', S.cat.departamentos || [], (c) => [nm(c), nm(c)]);
+        llenaSelect($('fCat'), 'Categ.: todas', S.cat.categorias || [], (c) => [nm(c), nm(c)]);
         const dl = (id, arr) => $(id).replaceChildren(...(arr || []).map((v) => h('option', { value: nm(v) })));
         dl('dlDep', S.cat.departamentos); dl('dlCat', S.cat.categorias); dl('dlUbi', S.cat.ubicaciones); dl('dlRes', S.cat.responsables);
         const es = $('fEstado2'); es.replaceChildren(...S.cat.estados.map((e) => h('option', { value: e.id }, e.nombre)));
@@ -103,12 +103,12 @@
         pintaLista(!opts.silencio);
     }
 
-    function filaDe(a, i) {
+    function filaBase(a, i) {
         const sub = [a.marca, a.modelo].filter(lleno).join(' · ');
         const meta = (v) => h('span', { 'data-vacio': lleno(v) ? null : '1' }, lleno(v) ? v : '—');
         return h('li', null, h('button', {
             class: 'fila', type: 'button', dataset: { codigo: a.codigo }, style: `--i:${Math.min(i, 14)}`, 'aria-current': S.sel === a.codigo ? 'true' : null,
-            onclick: () => abre(a.codigo, { push: !desk.matches }),
+            onclick: () => (S.modoSel ? alternaSel(a.codigo) : abre(a.codigo, { push: !desk.matches })),
         },
         h('span', { class: 'c-cod' }, placa(a.etiqueta || etq(a.codigo))),
         h('span', { class: 'c-nom' }, h('b', null, a.nombre), sub ? h('small', null, sub) : null),
@@ -117,7 +117,17 @@
         h('span', { class: 'c-imp mono', title: 'Veces impresa' }, String(a.impresiones || 0))));
     }
 
+    function filaDe(a, i) {
+        const li = filaBase(a, i); if (!S.modoSel) return li;
+        const cb = h('input', { type: 'checkbox', 'aria-label': `Seleccionar ${a.etiqueta || etq(a.codigo)}`, dataset: { c: a.codigo } }); cb.checked = S.selSet.has(a.codigo);
+        li.classList.add('con-sel'); li.prepend(h('span', { class: 'fsel' }, cb)); if (S.selSet.has(a.codigo)) li.querySelector('.fila').dataset.sel = '1';
+        return li;
+    }
     function pintaLista(anim) {
+        if (!S.cargando && !S.error) { const ok = new Set(S.items.map((x) => x.codigo)); S.selSet.forEach((cd) => { if (!ok.has(cd)) S.selSet.delete(cd); }); }
+        pintaListaBase(anim); actualizaSelBar();
+    }
+    function pintaListaBase(anim) {
         const ul = $('lista'), est = $('estado');
         ul.dataset.anim = anim ? '1' : '';
         est.hidden = true; est.replaceChildren(); delete est.dataset.k;
@@ -664,6 +674,7 @@
         actualizaLote();
     }
     async function cargaLote() {
+        if (LT.fijo) { pintaLote(); return; }
         const mi = ++LT.seq; LT.cargando = true; LT.error = ''; pintaLote();
         const r = await api('/api/activos?' + paramsLote(), { timeout: 15000 });
         if (mi !== LT.seq) return;
@@ -672,11 +683,14 @@
         pintaLote();
     }
     const cargaLoteDeb = T.debounce(cargaLote, 280);
-    function abreLote() {
+    function abreLote(o) {
+        const fijo = o && Array.isArray(o.codigos) ? o.codigos : null; LT.fijo = !!fijo;
+        $('lFiltros').hidden = !!fijo; dLote.querySelector('.lote-grid').dataset.fijo = fijo ? '1' : '';
         LT.items = []; LT.sel = new Set(); LT.error = ''; $('lFiltros').reset(); $('lDiaW').hidden = true; $('lRangoW').hidden = true;
         llenaSelect($('lDep'), 'Todos', S.cat.departamentos || [], (c) => [nm(c), nm(c)]);
         paraSondeo(); pasoLote('elige'); avisoLote(); if (!dLote.open) dLote.showModal();
-        estadoImpresora().then(() => { avisoLote(); actualizaLote(); }); cargaLote();
+        estadoImpresora().then(() => { avisoLote(); actualizaLote(); });
+        if (fijo) { const ss = new Set(fijo); LT.items = S.items.filter((a) => ss.has(a.codigo)); LT.sel = new Set(LT.items.map((a) => a.codigo)); LT.cargando = false; pintaLote(); $('lTit').textContent = 'Imprimir selección'; } else cargaLote();
     }
     $('bLote').addEventListener('click', abreLote);
     ['lX', 'lListo'].forEach((id) => $(id).addEventListener('click', () => dLote.close()));
@@ -754,6 +768,91 @@
         if (fall.length) enviaLote(fall, true);
     });
     $('lVolver').addEventListener('click', () => { paraSondeo(); pasoLote('elige'); avisoLote(); cargaLote(); $('lTit').focus(); });
+
+    // ------------------------------------------------------------------ exportar a Excel · modo selección · eliminar
+    const nExport = () => (S.modoSel && S.selSet.size ? S.selSet.size : (S.soloCodigos ? S.items.length : S.total));
+    function actualizaSelBar() {
+        const n = S.selSet.size, tot = S.items.length;
+        $('selBar').hidden = !S.modoSel; if (S.modoSel) document.body.dataset.sel = '1'; else delete document.body.dataset.sel;
+        const sb = $('bSel'); sb.setAttribute('aria-pressed', String(S.modoSel)); sb.querySelector('span').textContent = S.modoSel ? 'Salir de selección' : 'Seleccionar';
+        $('selN').textContent = `· ${n} de ${tot} seleccionados`;
+        const t = $('selTodos'); t.checked = !!tot && n === tot; t.indeterminate = n > 0 && n < tot; t.disabled = !tot;
+        ['selExp', 'selImp', 'selDel'].forEach((id) => { $(id).disabled = !n; });
+        const ne = nExport(), be = $('bExportar');
+        be.title = be.ariaLabel = `Exportar a Excel ${nTxt(ne, 'activo', 'activos')}${S.modoSel && n ? ' seleccionados' : ' (con los filtros actuales)'}`;
+        be.setAttribute('aria-label', be.title);
+    }
+    function setModoSel(v) { S.modoSel = !!v; if (!v) S.selSet.clear(); pintaLista(); actualizaSelBar(); }
+    function marcaSel(c) {
+        const cb = $('lista').querySelector(`input[data-c="${CSS.escape(c)}"]`), f = $('lista').querySelector(`.fila[data-codigo="${CSS.escape(c)}"]`);
+        if (cb) cb.checked = S.selSet.has(c); if (f) { if (S.selSet.has(c)) f.dataset.sel = '1'; else delete f.dataset.sel; }
+    }
+    function alternaSel(c) { if (S.selSet.has(c)) S.selSet.delete(c); else S.selSet.add(c); marcaSel(c); actualizaSelBar(); }
+    $('bSel').addEventListener('click', () => setModoSel(!S.modoSel));
+    $('selFin').addEventListener('click', () => { setModoSel(false); $('bSel').focus(); });
+    $('lista').addEventListener('change', (e) => { const c = e.target.dataset && e.target.dataset.c; if (c) { if (e.target.checked) S.selSet.add(c); else S.selSet.delete(c); marcaSel(c); actualizaSelBar(); } });
+    $('selTodos').addEventListener('change', (e) => { S.selSet = e.target.checked ? new Set(S.items.map((a) => a.codigo)) : new Set(); S.items.forEach((a) => marcaSel(a.codigo)); actualizaSelBar(); });
+    $('selImp').addEventListener('click', () => { if (S.selSet.size) abreLote({ codigos: [...S.selSet] }); });
+
+    // exportar: con selección, solo esos códigos; si no, lo que se ve con los filtros activos
+    function urlExportar() {
+        const qs = new URLSearchParams();
+        if (S.modoSel && S.selSet.size) return '/api/activos/exportar.xlsx?codigos=' + [...S.selSet].map(enc).join(',');
+        if (S.soloCodigos) return '/api/activos/exportar.xlsx?codigos=' + [...S.soloCodigos].map(enc).join(',');
+        if (S.q) qs.set('q', S.q); if (S.estado) qs.set('estado', S.estado); if (S.categoria) qs.set('categoria', S.categoria); if (S.departamento) qs.set('departamento', S.departamento);
+        return '/api/activos/exportar.xlsx' + (qs.toString() ? '?' + qs : '');
+    }
+    async function exporta() {
+        const n = nExport(), btns = [$('bExportar'), $('selExp')];
+        if (!n) { toast('No hay activos que exportar', { kind: 'warn' }); return; }
+        btns.forEach((b) => { b.disabled = true; }); toast(`Preparando el Excel con ${nTxt(n, 'activo', 'activos')}…`);
+        let res; try { res = await fetch(urlExportar(), { cache: 'no-store' }); } catch (e) { btns.forEach((b) => { b.disabled = false; }); actualizaSelBar(); toast('Sin conexión con el servidor', { kind: 'bad' }); return; }
+        if (!res.ok) { let d = ''; try { d = detalleDe((await res.json()).detail); } catch (e) { /* nada */ } btns.forEach((b) => { b.disabled = false; }); actualizaSelBar(); toast(d || `No se pudo exportar (${res.status})`, { kind: 'bad' }); return; }
+        const blob = await res.blob(), m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(res.headers.get('Content-Disposition') || '');
+        const nombre = m ? decodeURIComponent(m[1]) : `activos-${ymd(new Date())}.xlsx`, u = URL.createObjectURL(blob);
+        const a = h('a', { href: u, download: nombre }); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000);
+        btns.forEach((b) => { b.disabled = false; }); actualizaSelBar(); toast(`Excel exportado: ${nTxt(n, 'activo', 'activos')}`, { kind: 'ok' });
+    }
+    $('bExportar').addEventListener('click', exporta); $('selExp').addEventListener('click', exporta);
+
+    // eliminar (modal propio, pide la contraseña del usuario)
+    const dDel = $('hojaDel'), DL = { codigos: [], ocupado: false };
+    function abreDel(codigos) {
+        if (!codigos.length) return; DL.codigos = codigos.slice();
+        const n = codigos.length;
+        $('dTit').textContent = n === 1 ? 'Eliminar este activo' : 'Eliminar activos';
+        $('dResumen').textContent = n === 1 ? `Vas a eliminar el activo ${etq(codigos[0])}.` : `Vas a eliminar ${n} activos.`;
+        const nombres = new Map(S.items.map((a) => [a.codigo, a.nombre]));
+        $('dCods').replaceChildren(...codigos.slice(0, 8).map((c) => h('span', { title: nombres.get(c) || '' }, etq(c))), n > 8 ? h('span', { class: 'mas' }, `+${n - 8} más`) : []);
+        $('dTodos').hidden = n <= 8; $('dTodosT').textContent = `Ver los ${n} códigos`;
+        $('dLista').replaceChildren(...(n > 8 ? codigos.map((c) => h('li', null, etq(c) + (nombres.get(c) ? ' · ' + nombres.get(c) : ''))) : []));
+        $('dPass').value = ''; $('dPass').type = 'password'; $('dVer').textContent = 'Ver'; $('dVer').setAttribute('aria-pressed', 'false');
+        $('dMsg').hidden = true; $('dMsg').textContent = ''; $('dEliminar').disabled = true; $('dEliminar').lastChild.textContent = n === 1 ? 'Eliminar 1 activo' : `Eliminar ${n} activos`;
+        if (!dDel.open) dDel.showModal(); setTimeout(() => $('dPass').focus(), 40);
+    }
+    $('selDel').addEventListener('click', () => abreDel([...S.selSet]));
+    $('bElim').addEventListener('click', () => { if (S.act) abreDel([S.act.codigo]); });
+    ['dX', 'dCancel'].forEach((id) => $(id).addEventListener('click', () => dDel.close()));
+    dDel.addEventListener('close', () => { $('dPass').value = ''; });
+    $('dPass').addEventListener('input', () => { $('dEliminar').disabled = !$('dPass').value || DL.ocupado; });
+    $('dVer').addEventListener('click', () => { const v = $('dPass').type === 'password'; $('dPass').type = v ? 'text' : 'password'; $('dVer').textContent = v ? 'Ocultar' : 'Ver'; $('dVer').setAttribute('aria-pressed', String(v)); $('dVer').setAttribute('aria-label', v ? 'Ocultar la contraseña' : 'Mostrar la contraseña'); });
+    $('formDel').addEventListener('submit', async (e) => {
+        e.preventDefault(); const pw = $('dPass').value; if (!pw || DL.ocupado) return;
+        DL.ocupado = true; const b = $('dEliminar'), txt = b.lastChild.textContent; b.disabled = true; b.lastChild.textContent = 'Eliminando…'; $('dMsg').hidden = true;
+        const r = await api('/api/activos/eliminar-lote', { method: 'POST', body: { codigos: DL.codigos, password: pw }, timeout: 60000 });
+        DL.ocupado = false; b.lastChild.textContent = txt;
+        if (!r.ok) {
+            $('dMsg').hidden = false; $('dMsg').textContent = r.status === 429 ? (r.error || 'Demasiados intentos. Espera unos minutos y vuelve a intentar.') : (r.error || 'No se pudo eliminar');
+            if (r.status === 401) { $('dPass').value = ''; $('dPass').focus(); }
+            b.disabled = !$('dPass').value; return;
+        }
+        $('dPass').value = ''; dDel.close();
+        const el = (r.data && r.data.codigos) || DL.codigos, n = r.data && r.data.eliminados != null ? r.data.eliminados : el.length, nf = (r.data && r.data.no_encontrados) || [];
+        toast((n === 1 ? 'Se eliminó 1 activo' : `Se eliminaron ${n} activos`) + (nf.length ? ` · ${nTxt(nf.length, 'ya no existía', 'ya no existían')}` : ''), { kind: 'ok' });
+        const borr = new Set(el); el.forEach((c) => S.selSet.delete(c)); if (S.soloCodigos) borr.forEach((c) => S.soloCodigos.delete(c));
+        if (S.sel && borr.has(S.sel)) { cierraFicha({ foco: false, url: false }); ponUrl(null, false); }
+        await Promise.all([cargaLista({ silencio: true }), cargaCatalogos()]); actualizaSelBar();
+    });
 
     // ------------------------------------------------------------------ buscar por código (lector, celular, cámara)
     async function buscaCodigo(texto, opts = {}) {

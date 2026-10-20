@@ -1,5 +1,6 @@
 """v1.4.14: módulo Impresora, registro de activos con etiqueta DYMO «ACT 0000» y QR."""
 import _aislamiento  # noqa: F401  (debe ser lo primero)
+import io
 import re
 import unittest
 from unittest import mock
@@ -128,7 +129,11 @@ class TestActivos(unittest.TestCase):
         r = self.c.get("/api/activos/ACT-8050/etiqueta.svg")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["content-type"], "image/svg+xml")
-        self.assertIn("ACT 8050", r.text)
+        self.assertEqual(re.findall(r"<text[^>]*>([^<]*)</text>", r.text), ["ACT", "8050"])   # v1.4.18: dos líneas
+        ys = [float(y) for y in re.findall(r'<text x="[\d.]+" y="([\d.]+)"', r.text)]
+        sizes = [float(v) for v in re.findall(r'font-size="([\d.]+)"', r.text)]
+        self.assertLess(ys[0], ys[1])
+        self.assertGreater(sizes[1], sizes[0])   # el número es la línea dominante
         self.assertIn('width="57mm" height="32mm"', r.text)
         self.assertNotIn("Prusa", r.text)   # v1.4.16: la etiqueta lleva solo «ACT 0000» y el QR, sin nombre
         for tipo in ("dymo", "label"):
@@ -141,8 +146,12 @@ class TestActivos(unittest.TestCase):
             x = self.c.get("/api/activos/ACT-8050/etiqueta/xml", params={"tipo": tipo})
             self.assertEqual(x.status_code, 200, tipo)
             self.assertIn(raiz, x.text)
-            self.assertIn("ACT 8050", x.text)
+            etiqueta_texto = "<Text>{}</Text>" if tipo == "dymo" else "<String>{}</String>"
+            self.assertIn(etiqueta_texto.format("ACT"), x.text)
+            self.assertIn(etiqueta_texto.format("8050"), x.text)
+            self.assertNotIn("ACT 8050", x.text)
             self.assertIn("<Name>QR</Name>", x.text)
+            self.assertIn("<Name>NUMERO</Name>", x.text)
         dcd = self.c.get("/api/activos/ACT-8050/etiqueta/xml").text
         self.assertRegex(dcd, r"<DataString>https?://[^<]+/impresora\?activo=ACT-8050</DataString>")
         for fmt, ext in (("dymo", "dymo"), ("label", "label")):
@@ -191,7 +200,7 @@ class TestActivos(unittest.TestCase):
         self.assertEqual((j["id"], j["tipo"]), (d["trabajo_id"], "activo"))
         s = self.c.get(f"/api/dymo/remoto/agente/trabajos/{j['id']}/svg", headers=cab)
         self.assertEqual(s.status_code, 200, s.text)
-        self.assertIn("ACT 8070", s.text)
+        self.assertEqual(re.findall(r"<text[^>]*>([^<]*)</text>", s.text), ["ACT", "8070"])
         self.assertNotIn('rx="2.5"', s.text)
         # impresión local con DYMO Connect
         self.assertEqual(self.c.post("/api/activos/ACT-8070/impreso").json(), {"ok": True})
@@ -202,20 +211,27 @@ class TestActivos(unittest.TestCase):
         from app.services.dymo_service import DymoService, MARGEN_SEGURO_MM
         url = "https://tqt.skyguardian.mx/impresora?activo=ACT-0001"
         for fmt in ("30334", "30252"):
-            d, c_cod, pt = DymoService.diseno_activo(url, "ACT 0001", fmt)
+            d, lineas = DymoService.diseno_activo(url, "ACT 0001", fmt)
             f = d.formato
-            for caja in (d.qr, c_cod):
+            self.assertEqual([t for t, _, _ in lineas], ["ACT", "0001"])
+            self.assertAlmostEqual(lineas[0][1].x, lineas[1][1].x)   # alineadas a la izquierda, junto al QR
+            self.assertGreater(lineas[1][2], lineas[0][2])
+            self.assertGreaterEqual(lineas[0][1].x, d.qr.derecha)
+            for caja in (d.qr, lineas[0][1], lineas[1][1]):
                 self.assertGreaterEqual(caja.x, MARGEN_SEGURO_MM - 1e-6)
                 self.assertGreaterEqual(caja.y, MARGEN_SEGURO_MM - 1e-6)
                 self.assertLessEqual(caja.derecha, f.ancho_mm - MARGEN_SEGURO_MM + 1e-6)
                 self.assertLessEqual(caja.abajo, f.alto_mm - MARGEN_SEGURO_MM + 1e-6)
             self.assertGreaterEqual(d.puntos_por_modulo, 4)
-            self.assertAlmostEqual(c_cod.y + c_cod.h / 2, d.qr.y + d.qr.h / 2, places=2)   # código centrado en vertical
-        d, c_cod, pt = DymoService.diseno_activo(url, "ACT 0001", "30334")
-        self.assertGreaterEqual((d.puntos_por_modulo, pt), (7, 18.0))   # más grande que la etiqueta de tarjeta (6 puntos)
+            bloque_centro = (lineas[0][1].y + lineas[1][1].abajo) / 2
+            self.assertAlmostEqual(bloque_centro, d.qr.y + d.qr.h / 2, places=2)   # bloque centrado en vertical contra el QR
+        d, lineas = DymoService.diseno_activo(url, "ACT 0001", "30334")
+        self.assertEqual(d.puntos_por_modulo, 7)   # el QR no cambió respecto a v1.4.16 (más grande que la etiqueta de tarjeta, 6)
         self.assertGreater(d.qr.w, 21)
+        self.assertGreaterEqual(lineas[1][2], 30)   # el número es grande
         # un número de 5 dígitos sigue cabiendo
-        self.assertLessEqual(DymoService.diseno_activo(url, "ACT 12345", "30334")[1].derecha, 57 - MARGEN_SEGURO_MM + 1e-6)
+        largo = DymoService.diseno_activo(url, "ACT 12345", "30334")[1]
+        self.assertLessEqual(max(c.derecha for _, c, _ in largo), 57 - MARGEN_SEGURO_MM + 1e-6)
 
     def test_numero_de(self):
         self.assertEqual([svc.numero_de(t) for t in ("ACT-0001", "ACT 0001", "act0001", "1", "ACT-12345")], [1, 1, 1, 1, 12345])
@@ -330,6 +346,120 @@ class TestLotes(unittest.TestCase):
         self.assertFalse(self.c.get("/api/activos/impresora/estado").json()["disponible"])
 
 
+class TestExportarYEliminar(unittest.TestCase):
+    """v1.4.18: exportar a Excel con los mismos filtros del listado y eliminar en lote con contraseña."""
+
+    @classmethod
+    def setUpClass(cls):
+        verificar_aislamiento()
+        db.init_db()
+        usuarios.sembrar(iteraciones=1000)
+        c = entrar()
+        c.post("/api/activos", json={"numero": 9201, "nombre": "Laptop export", "departamento": "Export", "categoria": "Cómputo",
+                                     "valor": 1234.5, "fecha_adquisicion": "2024-05-06", "serie": "SER-1", "marca": "Dell",
+                                     "caracteristicas": [{"etiqueta": "RAM", "valor": "16 GB"}, {"etiqueta": "Procesador", "valor": "i5"}]})
+        c.post("/api/activos", json={"numero": 9202, "nombre": "=1+1", "departamento": "Export", "estado": "resguardo",
+                                     "caracteristicas": [{"etiqueta": "Zeta", "valor": "z"}]})
+        c.post("/api/activos", json={"numero": 9203, "nombre": "Otro depto", "departamento": "Otro"})
+        for n, alta in ((9201, "2031-04-01T09:00:00"), (9202, "2031-04-02T09:00:00"), (9203, "2031-04-03T09:00:00")):
+            with db.get_db() as conn:
+                conn.execute("UPDATE activos SET creado_en=? WHERE numero=?", (alta, n))
+
+    def setUp(self):
+        usuarios.limitador.reiniciar()
+        self.c = entrar()
+
+    def libro(self, **params):
+        r = self.c.get("/api/activos/exportar.xlsx", params=params)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn("spreadsheetml", r.headers["content-type"])
+        self.assertRegex(r.headers["content-disposition"], r'filename="activos_\d{8}-\d{4}\.xlsx"')
+        from openpyxl import load_workbook
+        return load_workbook(io.BytesIO(r.content))["Activos"]
+
+    def test_exportar_columnas_filas_y_formato(self):
+        ws = self.libro(departamento="Export")
+        cab = [c.value for c in ws[1]]
+        self.assertEqual(cab, ["Código", "Nombre", "Estado", "Departamento", "Categoría", "Ubicación", "Responsable", "Serie", "Marca",
+                               "Modelo", "Valor", "Fecha de adquisición", "Alta", "Impresiones", "Última impresión", "Notas",
+                               "Procesador", "RAM", "Zeta"])   # + unión alfabética de las etiquetas de características
+        self.assertEqual(ws.max_row, 3)
+        a, b = [[c.value for c in ws[i]] for i in (2, 3)]
+        self.assertEqual((a[0], a[1], a[2], a[3], a[4], a[7], a[8], a[10]), ("ACT-9201", "Laptop export", "Activo", "Export", "Cómputo", "SER-1", "Dell", 1234.5))
+        self.assertEqual((a[16], a[17], a[18]), ("i5", "16 GB", None))   # celda vacía
+        self.assertEqual((b[0], b[2], b[18]), ("ACT-9202", "En resguardo", "z"))
+        self.assertEqual(a[11].date().isoformat(), "2024-05-06")
+        self.assertEqual(a[12].isoformat(timespec="minutes"), "2031-04-01T09:00")
+        self.assertEqual((a[13], a[14]), (0, None))
+        self.assertIn("$", ws.cell(2, 11).number_format)
+        self.assertEqual(ws.cell(2, 12).number_format, "yyyy-mm-dd")
+        self.assertTrue(all(c.font.bold for c in ws[1]))
+        self.assertEqual((ws.freeze_panes, ws.auto_filter.ref), ("C2", ws.dimensions))
+        self.assertGreater(ws.column_dimensions["B"].width, 20)
+        self.assertEqual(ws.cell(3, 2).data_type, "s")   # «=1+1» queda como texto, no como fórmula
+        self.assertEqual(ws.cell(3, 2).value, "=1+1")
+
+    def test_exportar_aplica_los_mismos_filtros_que_el_listado(self):
+        def codigos(ws):
+            return [ws.cell(i, 1).value for i in range(2, ws.max_row + 1)]
+        casos = ({"q": "laptop"}, {"estado": "resguardo", "departamento": "Export"}, {"desde": "2031-04-02", "hasta": "2031-04-03"},
+                 {"desde": "2031-04-01"}, {"codigos": "9203, ACT-9201"}, {"impresa": 0, "departamento": "Export"}, {"categoria": "Cómputo"})
+        for params in casos:
+            esperado = sorted(f"ACT-{x['numero']:04d}" for x in self.c.get("/api/activos", params=params).json()["items"])
+            self.assertEqual(codigos(self.libro(**params)), esperado, params)
+        self.assertEqual(codigos(self.libro(desde="2031-04-02", hasta="2031-04-03")), ["ACT-9202", "ACT-9203"])
+        self.assertEqual(codigos(self.libro(codigos="9203, ACT-9201")), ["ACT-9201", "ACT-9203"])
+        self.assertEqual(self.libro(q="no-existe-xyz").max_row, 1)   # solo encabezados
+        self.assertEqual(self.c.get("/api/activos/exportar.xlsx", params={"desde": "ayer"}).status_code, 422)
+        self.assertEqual(cliente_sin_sesion(app).get("/api/activos/exportar.xlsx").status_code, 401)
+
+    def crear(self, *numeros):
+        for n in numeros:
+            self.c.post("/api/activos", json={"numero": n, "nombre": f"Borrar {n}"})
+
+    def eliminar(self, codigos, password):
+        return self.c.post("/api/activos/eliminar-lote", json={"codigos": codigos, "password": password})
+
+    def test_eliminar_con_contrasena_incorrecta_no_borra(self):
+        self.crear(9211)
+        for malo in ("mala", ""):
+            r = self.eliminar(["ACT-9211"], malo)
+            self.assertEqual((r.status_code, r.json()["detail"]), (401, "Contraseña incorrecta."))
+        self.assertEqual(self.c.get("/api/activos/ACT-9211").status_code, 200)
+
+    def test_eliminar_con_contrasena_correcta(self):
+        self.crear(9212, 9213)
+        self.c.patch("/api/activos/ACT-9212", json={"ubicacion": "X"})   # genera más eventos
+        r = self.eliminar(["ACT-9212", "9213", "ACT-9999", "ACT-9212", "basura"], usuarios.CLAVE_INICIAL)
+        self.assertEqual(r.status_code, 200, r.text)
+        d = r.json()
+        self.assertEqual((d["eliminados"], d["codigos"], d["no_encontrados"]), (2, ["ACT-9212", "ACT-9213"], ["ACT-9999", "basura"]))
+        self.assertEqual(self.c.get("/api/activos/ACT-9212").status_code, 404)
+        self.assertEqual(self.c.get("/api/activos/ACT-9213").status_code, 404)
+        with db.get_db() as conn:
+            huerfanos = conn.execute("SELECT COUNT(*) n FROM activos_eventos WHERE activo_id NOT IN (SELECT id FROM activos)").fetchone()["n"]
+            bit = conn.execute("SELECT detalle, operador FROM escaneos WHERE evento='ACTIVOS_ELIMINADOS' ORDER BY id DESC LIMIT 1").fetchone()
+        self.assertEqual(huerfanos, 0)
+        self.assertIn("ACT-9212, ACT-9213", bit["detalle"])
+        self.assertEqual(bit["operador"], "developer@skyguardian.mx")
+
+    def test_eliminar_lista_vacia_o_demasiado_larga_da_422(self):
+        self.assertEqual(self.eliminar([], usuarios.CLAVE_INICIAL).status_code, 422)
+        self.assertEqual(self.eliminar([f"ACT-{n:04d}" for n in range(1, 502)], usuarios.CLAVE_INICIAL).status_code, 422)
+
+    def test_eliminar_se_bloquea_tras_muchos_fallos(self):
+        self.crear(9214)
+        codigos = [self.eliminar(["ACT-9214"], "mala").status_code for _ in range(12)]
+        self.assertEqual(codigos[0], 401)
+        self.assertIn(429, codigos)
+        r = self.eliminar(["ACT-9214"], usuarios.CLAVE_INICIAL)   # bloqueado: ni la correcta pasa hasta que expire
+        self.assertEqual(r.status_code, 429)
+        self.assertIn("Retry-After", r.headers)
+        self.assertEqual(self.c.get("/api/activos/ACT-9214").status_code, 200)
+        usuarios.limitador.reiniciar()
+        self.assertEqual(self.eliminar(["ACT-9214"], usuarios.CLAVE_INICIAL).status_code, 200)
+
+
 class TestAccesoImpresora(unittest.TestCase):
     EMAIL = "developer4@skyguardian.mx"
 
@@ -349,6 +479,9 @@ class TestAccesoImpresora(unittest.TestCase):
         c = entrar(self.EMAIL)
         self.assertEqual(c.get("/api/activos").status_code, 200)
         self.assertEqual(c.get("/api/activos/ACT-8080").status_code, 200)
+        self.assertEqual(c.get("/api/activos/exportar.xlsx").status_code, 200)       # exportar es solo lectura
+        self.assertEqual(c.post("/api/activos/eliminar-lote", json={"codigos": ["ACT-8080"], "password": usuarios.CLAVE_INICIAL}).status_code, 403)
+        self.assertEqual(c.get("/api/activos/ACT-8080").status_code, 200)            # y no se borró nada
         self.assertEqual(c.get("/api/activos/impresora/estado").status_code, 200)   # el estado de la DYMO sí está en el módulo
         self.assertEqual(c.get("/api/dymo/remoto/estado").status_code, 403)         # el de Escáner TQT no
         self.assertEqual(c.post("/api/activos", json={"nombre": "No"}).status_code, 403)

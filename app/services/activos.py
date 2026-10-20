@@ -4,15 +4,19 @@ Cada activo tiene un `numero` único (ACT-0001) y una bitácora propia (`activos
 URL `<base>/impresora?activo=ACT-0001`, que el celular abre para consultar el activo.
 Las tablas se crean de forma idempotente al usarse (`_asegurar`); no se toca el esquema del resto de la aplicación.
 """
+import io
 import json
 import logging
 import re
 import sqlite3
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import unquote
 
 from app.database import db
+from app.services import admin_auth as aa
+from app.services import usuarios
 from app.services.dymo_service import DymoService
 
 log = logging.getLogger(__name__)
@@ -475,3 +479,117 @@ def zip_etiquetas(codigos: List[Any], base: str, tipo: str = "dymo") -> bytes:
     if not hubo:
         raise ActivoNoEncontrado("Ninguno de los activos pedidos existe.")
     return buf.getvalue()
+
+
+# ------------------------------------------------------------------ exportar a Excel (v1.4.18)
+COLUMNAS_XLSX = (("Código", 11), ("Nombre", 34), ("Estado", 13), ("Departamento", 20), ("Categoría", 18), ("Ubicación", 22),
+                 ("Responsable", 24), ("Serie", 20), ("Marca", 16), ("Modelo", 16), ("Valor", 14), ("Fecha de adquisición", 16),
+                 ("Alta", 17), ("Impresiones", 12), ("Última impresión", 17), ("Notas", 40))
+ESTADO_NOMBRE = {e["id"]: e["nombre"] for e in ESTADOS}
+
+
+def _fecha_dt(texto: Optional[str]) -> Optional[datetime]:
+    try:
+        return datetime.fromisoformat(texto) if texto else None
+    except ValueError:
+        return None
+
+
+def exportar_xlsx(q: str = "", estado: str = "", categoria: str = "", departamento: str = "", desde: str = "", hasta: str = "",
+                  impresa: Optional[int] = None, codigos: Optional[List[Any]] = None) -> bytes:
+    """.xlsx (hoja «Activos») con los activos que cumplen los MISMOS filtros que `listar`, más una columna por cada etiqueta de
+    característica existente (unión en orden alfabético). Valor con formato de moneda, fechas como fecha, encabezado en negrita
+    con filtro automático y panel inmovilizado."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font
+    from openpyxl.utils import get_column_letter
+    _asegurar()
+    clausula, args = _filtros(q, estado, categoria, departamento, desde, hasta, impresa, codigos)
+    with db.get_db() as c:
+        filas = c.execute(f"SELECT * FROM activos{clausula} ORDER BY numero", args).fetchall()
+    carac = [_caracteristicas_dict(r["caracteristicas"]) for r in filas]
+    etiquetas = sorted({k for d in carac for k in d}, key=str.casefold)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Activos"
+    ws.append([n for n, _ in COLUMNAS_XLSX] + etiquetas)
+
+    def texto(celda, v):
+        celda.value = v
+        if isinstance(v, str) and v[:1] in ("=", "+", "-", "@"):
+            celda.data_type = "s"   # nunca se interpreta como fórmula
+
+    for r, extra in zip(filas, carac):
+        ws.append([None] * (len(COLUMNAS_XLSX) + len(etiquetas)))
+        fila = ws.max_row
+        valores = [codigo_de(r["numero"]), r["nombre"], ESTADO_NOMBRE.get(r["estado"], r["estado"]), r["departamento"], r["categoria"],
+                   r["ubicacion"], r["responsable"], r["serie"], r["marca"], r["modelo"], r["valor"],
+                   _fecha_dt(r["fecha_adquisicion"]), _fecha_dt(r["creado_en"]), r["impresiones"], _fecha_dt(r["ultima_impresion"]), r["notas"]]
+        for i, v in enumerate(valores + [extra.get(e, "") for e in etiquetas], start=1):
+            celda = ws.cell(fila, i)
+            if isinstance(v, datetime):
+                celda.value = v
+                celda.number_format = "yyyy-mm-dd" if i == 12 else "yyyy-mm-dd hh:mm"
+            else:
+                texto(celda, v)
+            if i == 11:
+                celda.number_format = '"$"#,##0.00'
+    for i, cab in enumerate(ws[1], start=1):
+        cab.font = Font(bold=True)
+        cab.alignment = Alignment(vertical="center", wrap_text=True)
+        ws.column_dimensions[get_column_letter(i)].width = COLUMNAS_XLSX[i - 1][1] if i <= len(COLUMNAS_XLSX) else 24
+    ws.auto_filter.ref = ws.dimensions
+    ws.freeze_panes = "C2"
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+# ------------------------------------------------------------------ eliminar (v1.4.18)
+def confirmar_clave(email: str, password: str, cliente: str) -> None:
+    """Exige la contraseña de la cuenta de la sesión antes de una acción destructiva. Mismo hash y MISMO limitador de intentos
+    que el inicio de sesión (claves `c:<cliente>` y `e:<email>`): aa.BloqueadoError si está bloqueado, PermissionError si no coincide."""
+    inicio = time.monotonic()
+    email = usuarios.normalizar(email)
+    claves = (f"c:{cliente}", f"e:{email}")
+    espera = max(usuarios.limitador.restante(k) for k in claves)
+    if espera:
+        aa.retardo_uniforme(inicio)
+        raise aa.BloqueadoError(espera)
+    with db.get_db() as c:
+        usuarios._asegurar_tabla(c)
+        r = c.execute("SELECT hash FROM usuarios WHERE email=? AND activo=1", (email,)).fetchone()
+    if r and aa.verificar_clave(password or "", r["hash"]):
+        for k in claves:
+            usuarios.limitador.exito(k)
+        return
+    bloqueo = max(usuarios.limitador.fallo(k) for k in claves)
+    aa.retardo_uniforme(inicio)
+    if bloqueo:
+        raise aa.BloqueadoError(bloqueo)
+    raise PermissionError("Contraseña incorrecta.")
+
+
+def eliminar_lote(codigos: List[Any], por: str) -> Dict[str, Any]:
+    """Borra los activos y su bitácora en UNA transacción y deja la lista en la bitácora global (ACTIVOS_ELIMINADOS)."""
+    _asegurar()
+    eliminados: List[str] = []
+    no_encontrados: List[str] = []
+    with db.transaction() as c:
+        for cod in dict.fromkeys(str(x) for x in codigos):
+            try:
+                n = numero_de(cod)
+            except ValueError:
+                no_encontrados.append(cod)
+                continue
+            r = c.execute("SELECT id FROM activos WHERE numero=?", (n,)).fetchone()
+            if not r:
+                no_encontrados.append(cod)
+                continue
+            c.execute("DELETE FROM activos_eventos WHERE activo_id=?", (r["id"],))
+            c.execute("DELETE FROM activos WHERE id=?", (r["id"],))
+            eliminados.append(codigo_de(n))
+    if eliminados:
+        db.log_evento("ACTIVOS_ELIMINADOS", valor=f"{len(eliminados)} activos", detalle=", ".join(eliminados), operador=por)
+        log.info("Activos eliminados por %s: %s", por, ", ".join(eliminados))
+    return {"eliminados": len(eliminados), "codigos": eliminados, "no_encontrados": no_encontrados}

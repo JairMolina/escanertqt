@@ -6,6 +6,7 @@ inválidos, 503 sin DYMO compartida disponible.
 """
 import logging
 import os
+from datetime import datetime
 from email import policy
 from email.parser import BytesParser
 from typing import Any, Callable, Dict, List, Optional
@@ -15,7 +16,9 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.routers.auth import _cliente
 from app.services import activos as svc
+from app.services import admin_auth as aa
 from app.services import activos_import
 from app.services import dymo_remoto, usuarios
 from app.services.dymo_service import FORMATO_POR_DEFECTO
@@ -24,6 +27,7 @@ router = APIRouter(prefix="/api/activos", tags=["Impresora (activos)"])
 log = logging.getLogger(__name__)
 
 FECHA = r"^(\d{4}-\d{2}-\d{2})?$"
+LOTE_MAX = 500   # etiquetas por lote de impresión y activos por eliminación
 
 
 class Caracteristica(BaseModel):
@@ -122,6 +126,35 @@ def listar(request: Request, q: str = Query("", max_length=120), estado: str = Q
     return _ejecutar(svc.listar, _base(request), q, estado, categoria, limite, departamento, desde, hasta, impresa, lista)
 
 
+@router.get("/exportar.xlsx", summary="Exporta a Excel los activos que cumplen los mismos filtros que el listado")
+def exportar(q: str = Query("", max_length=120), estado: str = Query("", max_length=20), categoria: str = Query("", max_length=80),
+             departamento: str = Query("", max_length=80), desde: str = Query("", max_length=10), hasta: str = Query("", max_length=10),
+             impresa: Optional[int] = Query(None, ge=0, le=1), codigos: str = Query("", max_length=20000)):
+    """Solo lectura: el consultor también puede exportar. Archivo `activos_AAAAMMDD-HHMM.xlsx`."""
+    lista = [c.strip() for c in codigos.split(",") if c.strip()] if codigos.strip() else None
+    datos = _ejecutar(svc.exportar_xlsx, q, estado, categoria, departamento, desde, hasta, impresa, lista)
+    nombre = f"activos_{datetime.now():%Y%m%d-%H%M}.xlsx"
+    return _sin_cache(datos, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                      {"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
+class EliminarIn(BaseModel):
+    codigos: List[str] = Field(..., min_length=1, max_length=LOTE_MAX)
+    password: str = Field("", max_length=200)
+
+
+@router.post("/eliminar-lote", summary="Elimina activos (y su bitácora) tras confirmar la contraseña de la sesión")
+def eliminar_lote(body: EliminarIn, request: Request):
+    por = _por(request)
+    try:
+        svc.confirmar_clave(por, body.password, _cliente(request))
+    except aa.BloqueadoError as e:
+        raise HTTPException(429, str(e), headers={"Retry-After": str(e.restante)})
+    except PermissionError as e:
+        raise HTTPException(401, str(e))
+    return _ejecutar(svc.eliminar_lote, body.codigos, por)
+
+
 @router.get("/impresora/estado", summary="Estado de la DYMO compartida (en línea / lista) para el módulo Impresora")
 def estado_impresora():
     """Mismo dato que `/api/dymo/remoto/estado` (que pertenece al módulo Escáner TQT y un usuario solo-Impresora no puede leer):
@@ -165,7 +198,6 @@ def buscar(request: Request, codigo: str = Query(..., max_length=500)):
 
 
 ZIP_MAX = 1000
-LOTE_MAX = 500   # etiquetas por lote de impresión
 
 
 class LoteIn(BaseModel):

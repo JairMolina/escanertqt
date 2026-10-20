@@ -215,7 +215,10 @@ def calcular_diseno_r3(formato: FormatoEtiqueta, nombres: List[str]) -> List[Mit
 CABLE_FUENTE_PT = 36.0
 
 # --- Etiqueta de activo (v1.4.14/16): «ACT 0001» grande y centrado a la derecha del QR, sin más líneas ---
-ACTIVO_CODIGO_PT = 24.0        # tope del tamaño del código
+ACTIVO_CODIGO_PT = 24.0        # tope del código de una línea: solo decide el tamaño del QR (módulo más grande que lo deja >= MIN)
+NOMBRES_ACTIVO = ("ACT", "NUMERO")   # objetos de texto de la etiqueta (arriba, abajo)
+ACTIVO_NUM_PT = 36.0           # tope del tamaño del número («0001», línea dominante)
+ACTIVO_ACT_RATIO = 0.7         # «ACT» (línea de arriba) = esta fracción del tamaño del número
 ACTIVO_MIN_CODIGO_PT = 18.0    # el QR crece mientras el código no baje de esto
 ACTIVO_MAX_PUNTOS = 8          # puntos por módulo del QR (0.68 mm a 300 dpi); la etiqueta de tarjeta usa 6
 
@@ -846,12 +849,13 @@ class DymoService:
         return b"\xef\xbb\xbf" + cls.generate_cable_dcd_xml(numero, label_format, r3).encode("utf-8"), f"{base}.dymo"
 
     # ------------------------------------------------------------------ activo (v1.4.14, simplificada en v1.4.16)
+    # v1.4.18: el texto va en dos líneas, «ACT» arriba y el número abajo (dominante), junto al QR.
     # Solo «ACT 0001» y el QR con la URL del activo. Mismo formato y reglas que la etiqueta de tarjeta (QR a la izquierda con
     # módulos exactos a 300 dpi, todo dentro de la zona segura); sin nombre ni otras líneas, así que el QR y el código crecen
     # hasta donde caben: el módulo más grande (hasta ACTIVO_MAX_PUNTOS) que aún deja al código en >= ACTIVO_MIN_CODIGO_PT.
     @classmethod
     def diseno_activo(cls, url: str, etiqueta: str, label_format: Optional[str] = None):
-        """(Diseno, caja del código centrada en vertical, pt del código) de la etiqueta de un activo."""
+        """(Diseno, [(texto, caja, pt)]) de la etiqueta de un activo: «ACT» y el número, el bloque centrado en vertical."""
         f = obtener_formato(label_format)
         modulos = len(matriz_qr(url))
         m = MARGEN_SEGURO_MM
@@ -869,19 +873,34 @@ class DymoService:
         lado, ancho, pt = medidas(ppm)
         if lado > seguro.h + 1e-9 or ancho <= 0:
             raise ValueError(f"El QR ({lado:.1f} mm) no cabe en la zona segura de {f.codigo}.")
-        pt = max(MIN_FUENTE_PT, pt)
         qr = Caja(seguro.x, seguro.y + (seguro.h - lado) / 2, lado, lado)
-        alto = pt * INTERLINEADO * PT_A_MM
-        texto = Caja(qr.derecha + SEPARACION_MM, seguro.y + (seguro.h - alto) / 2, ancho, alto)
-        return Diseno(f, seguro, qr, modulos, ppm, texto, pt, 1), texto, pt
+        partes = etiqueta.split(None, 1)
+        arriba, abajo = partes[0], (partes[1] if len(partes) > 1 else "")
+        unidad = FUENTE_AVANCE_EM * PT_A_MM   # mm por pt y por carácter
+        pt_num = min(ACTIVO_NUM_PT, ancho / (max(len(abajo or arriba), 1) * unidad))
+        pt_act = min(ACTIVO_ACT_RATIO * pt_num, ancho / (max(len(arriba), 1) * unidad)) if abajo else 0.0
+        alto_max = seguro.h / INTERLINEADO / PT_A_MM   # suma de pt de las dos líneas que cabe en la zona segura
+        if pt_num + pt_act > alto_max:
+            k = alto_max / (pt_num + pt_act)
+            pt_num, pt_act = pt_num * k, pt_act * k
+        pt_num, pt_act = max(MIN_FUENTE_PT, pt_num), (max(MIN_FUENTE_PT, pt_act) if abajo else 0.0)
+        pasos = [(arriba, pt_act), (abajo, pt_num)] if abajo else [(arriba, pt_num)]
+        total = sum(pt * INTERLINEADO * PT_A_MM for _, pt in pasos)
+        x, y, lineas = qr.derecha + SEPARACION_MM, seguro.y + (seguro.h - total) / 2, []
+        for texto, pt in pasos:   # bloque centrado en vertical contra el QR
+            alto = pt * INTERLINEADO * PT_A_MM
+            lineas.append((texto, Caja(x, y, ancho, alto), pt))
+            y += alto
+        bloque = Caja(x, lineas[0][1].y, ancho, total)
+        return Diseno(f, seguro, qr, modulos, ppm, bloque, pt_num, len(lineas)), lineas
 
     @classmethod
     def generate_activo_xml(cls, url: str, etiqueta: str, label_format: Optional[str] = None) -> str:
         """`.label` (DYMO Label v8) del activo: objetos `QR` (imagen 1 bit) y `TEXTO` («ACT 0001»)."""
-        d, c_cod, pt = cls.diseno_activo(url, etiqueta, label_format)
+        d, lineas = cls.diseno_activo(url, etiqueta, label_format)
         f = d.formato
         objetos = (_v8_imagen("QR", cls.generate_qr_base64(url, box_size=d.puntos_por_modulo), d.qr)
-                   + _v8_texto("TEXTO", etiqueta, round(pt, 1), c_cod))
+                   + "".join(_v8_texto(nom, t, round(pt, 1), c) for nom, (t, c, pt) in zip(NOMBRES_ACTIVO, lineas)))
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
     <PaperOrientation>{f.v8_orientacion}</PaperOrientation>
@@ -896,7 +915,7 @@ class DymoService:
     def generate_activo_dcd_xml(cls, url: str, etiqueta: str, label_format: Optional[str] = None) -> str:
         """`.dymo` (DYMO Connect) del activo, para `dymo.label.framework.openLabelXml`: `QR` (BarcodeObject con la URL)
         y `TEXTO` («ACT 0001», grande y centrado en vertical)."""
-        d, c_cod, pt = cls.diseno_activo(url, etiqueta, label_format)
+        d, lineas = cls.diseno_activo(url, etiqueta, label_format)
         f, seg = d.formato, d.zona_segura
         negro = cls._color(1, 0, 0, 0)
         margen = '<Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0" /></Margin>'
@@ -905,8 +924,33 @@ class DymoService:
             return (f"<ObjectLayout><DYMOPoint><X>{_pulg(c.x)}</X><Y>{_pulg(c.y)}</Y></DYMOPoint>"
                     f"<Size><Width>{_pulg(c.w)}</Width><Height>{_pulg(c.h)}</Height></Size></ObjectLayout>")
 
-        fuente = (f"<FontInfo><FontName>{FUENTE}</FontName><FontSize>{round(pt, 1):g}</FontSize><IsBold>True</IsBold>"
-                  f"<IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>")
+        def texto(nom: str, valor: str, pt: float, c: Caja) -> str:
+            fuente = (f"<FontInfo><FontName>{FUENTE}</FontName><FontSize>{round(pt, 1):g}</FontSize><IsBold>True</IsBold>"
+                      f"<IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>")
+            return f"""        <TextObject>
+          <Name>{nom}</Name>
+          {cls._brushes()}
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          {margen}
+          <HorizontalAlignment>Left</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <FitMode>AlwaysFit</FitMode>
+          <IsVertical>False</IsVertical>
+          <FormattedText>
+            <FitMode>AlwaysFit</FitMode>
+            <HorizontalAlignment>Left</HorizontalAlignment>
+            <VerticalAlignment>Middle</VerticalAlignment>
+            <IsVertical>False</IsVertical>
+            <LineTextSpan><TextSpan><Text>{xml_escape(valor)}</Text>{fuente}</TextSpan></LineTextSpan>
+          </FormattedText>
+          {layout(c)}
+        </TextObject>
+"""
+
+        textos = "".join(texto(nom, t, pt, c) for nom, (t, c, pt) in zip(NOMBRES_ACTIVO, lineas))
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <DesktopLabel Version="1">
   <DYMOLabel Version="3">
@@ -946,28 +990,7 @@ class DymoService:
           <FontInfo><FontName>{FUENTE}</FontName><FontSize>8</FontSize><IsBold>False</IsBold><IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>
           {layout(d.qr)}
         </BarcodeObject>
-        <TextObject>
-          <Name>TEXTO</Name>
-          {cls._brushes()}
-          <Rotation>Rotation0</Rotation>
-          <OutlineThickness>1</OutlineThickness>
-          <IsOutlined>False</IsOutlined>
-          <BorderStyle>SolidLine</BorderStyle>
-          {margen}
-          <HorizontalAlignment>Left</HorizontalAlignment>
-          <VerticalAlignment>Middle</VerticalAlignment>
-          <FitMode>AlwaysFit</FitMode>
-          <IsVertical>False</IsVertical>
-          <FormattedText>
-            <FitMode>AlwaysFit</FitMode>
-            <HorizontalAlignment>Left</HorizontalAlignment>
-            <VerticalAlignment>Middle</VerticalAlignment>
-            <IsVertical>False</IsVertical>
-            <LineTextSpan><TextSpan><Text>{xml_escape(etiqueta)}</Text>{fuente}</TextSpan></LineTextSpan>
-          </FormattedText>
-          {layout(c_cod)}
-        </TextObject>
-      </LabelObjects>
+{textos}      </LabelObjects>
     </DynamicLayoutManager>
   </DYMOLabel>
   <LabelApplication>Blank</LabelApplication>
@@ -980,7 +1003,7 @@ class DymoService:
     @classmethod
     def generate_activo_svg(cls, url: str, etiqueta: str, label_format: Optional[str] = None, borde: bool = False) -> str:
         """SVG a escala real (1 unidad = 1 mm) de la etiqueta del activo: vista previa e impresión del navegador / DYMO compartida."""
-        d, c_cod, pt = cls.diseno_activo(url, etiqueta, label_format)
+        d, lineas = cls.diseno_activo(url, etiqueta, label_format)
         f = d.formato
         mod = d.puntos_por_modulo / DOTS_PER_MM
         x0, y0 = d.qr.x + SILENCIO_MODULOS * mod, d.qr.y + SILENCIO_MODULOS * mod
@@ -988,8 +1011,8 @@ class DymoService:
                          for r, fila in enumerate(matriz_qr(url)) for c, v in enumerate(fila) if v)
         marco = (f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" rx="2.5" fill="#fff" stroke="#000" stroke-width="0.2"/>' if borde
                  else f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/>')
-        texto = (f'<text x="{c_cod.x:.3f}" y="{c_cod.y + c_cod.h / 2:.3f}" dominant-baseline="central" '
-                 f'font-size="{pt * PT_A_MM:.4f}">{xml_escape(etiqueta)}</text>')
+        texto = "".join(f'<text x="{c.x:.3f}" y="{c.y + c.h / 2:.3f}" dominant-baseline="central" font-size="{pt * PT_A_MM:.4f}">{xml_escape(t)}</text>'
+                        for t, c, pt in lineas)
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f.ancho_mm:g}mm" height="{f.alto_mm:g}mm" viewBox="0 0 {f.ancho_mm:g} {f.alto_mm:g}">'
                 f'{marco}<g fill="#000" shape-rendering="crispEdges">{celdas}</g>'
                 f'<g fill="#000" font-family="{FUENTE_SVG}" font-weight="700">{texto}</g></svg>')
