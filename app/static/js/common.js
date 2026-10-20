@@ -227,6 +227,7 @@
         list: 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01',
         excel: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12l4 5M13 12l-4 5',
         chevron: 'M9 6l6 6-6 6',
+        flechaIzq: 'M19 12H5M11 6l-6 6 6 6',
         wifi: 'M2 9a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0M12 19.5v.01',
         // consola de escritorio
         dash: 'M4 4h7v9H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 15h7v5H4z',
@@ -401,6 +402,11 @@
         return svg;
     }
 
+    /** Enlace discreto "← Módulos" para volver al portal (/inicio). Estilo en app.css (.ir-modulos). */
+    function irModulos() {
+        return h('a', { class: 'ir-modulos', href: '/inicio', 'aria-label': 'Volver al portal de módulos', title: 'Volver al portal de módulos' }, icon('flechaIzq'), h('span', null, 'Módulos'));
+    }
+
     /** mountShell({active, sub}) crea cabecera y pestañas dentro de .app. Devuelve {setSub, setLote}. */
     function mountShell(opts) {
         const app = document.querySelector('.app');
@@ -408,6 +414,7 @@
         // El logo lleva a "/", el sub-título abre la hoja de lotes (dos controles separados, cada uno con su nombre)
         const sub = h('button', { class: 'brand-sub', type: 'button', 'aria-haspopup': 'dialog', 'aria-label': 'Lotes: ' + (opts.sub || 'elegir lote'), onclick: () => openLotes(api2) }, subTxt, icon('chevron'));
         const top = h('header', { class: 'topbar' },
+            irModulos(),
             h('div', { class: 'brandbox' },
                 h('a', { class: 'brand-logo', href: '/', 'aria-label': 'Escáner TQT, inicio', tabindex: '-1' }, brandMark()),
                 h('a', { class: 'brand', href: '/', 'aria-label': 'Escáner TQT, inicio' }, h('span', { class: 'brand-name' }, 'Escáner TQT')),
@@ -835,6 +842,6 @@
         CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
         loteNombre, ordenarLotes, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,
-        toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, openLotes,
+        toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, irModulos, openLotes,
     };
 })();

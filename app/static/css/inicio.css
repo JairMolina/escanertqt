@@ -1,0 +1,261 @@
+/* ==========================================================================
+   Portal de módulos (/inicio) — "constelación"
+   Cielo técnico: la plataforma TQT es el núcleo; cada módulo es una estrella en órbita unida por
+   trazas de circuito. Usa los tokens de app.css (--bg, --surface, --line, --accent, …); el único
+   color propio es el acento de cada módulo (--a, viene de /api/modulos).
+   Solo se animan transform y opacity (más el trazo SVG de las líneas). Mobile-first en espíritu:
+   en pantallas chicas o bajas la constelación pasa a lista vertical (ver bloque "modo lista").
+   ========================================================================== */
+
+:root {
+  --ease: cubic-bezier(.23, 1, .32, 1);           /* ease-out fuerte: respuesta inmediata, aterriza suave */
+  --t-rapida: 180ms;
+  --t-media: 260ms;
+}
+
+html { -webkit-font-smoothing: antialiased; }
+body { position: relative; background: var(--bg); }
+
+/* ---------- fondo: noche profunda (oscuro) / plano técnico (claro) ---------- */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 85% 75% at 50% 54%, color-mix(in srgb, var(--info) 8%, var(--surface)) 0, var(--bg) 58%, var(--bg-2) 100%);
+}
+:root[data-theme="light"] body::after {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: linear-gradient(color-mix(in srgb, var(--line-2) 16%, transparent) 1px, transparent 1px),
+                    linear-gradient(90deg, color-mix(in srgb, var(--line-2) 16%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px; background-position: center;
+  -webkit-mask-image: radial-gradient(ellipse 80% 75% at 50% 54%, #000 20%, transparent 78%);
+          mask-image: radial-gradient(ellipse 80% 75% at 50% 54%, #000 20%, transparent 78%);
+}
+.campo { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; display: block; }
+
+.salto { position: absolute; left: 8px; top: -64px; z-index: 20; padding: 12px 16px; border-radius: var(--r-1); background: var(--surface); border: 1px solid var(--line-2); color: var(--text); font-weight: 700; }
+.salto:focus { top: 8px; }
+
+.portal { position: relative; z-index: 1; min-height: 100dvh; display: flex; flex-direction: column; }
+
+/* ---------- cabecera ---------- */
+.cab {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "marca saludo sistema tema";
+  align-items: center; gap: 8px 28px;
+  padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: color-mix(in srgb, var(--bg-2) 62%, transparent);
+}
+.marca { grid-area: marca; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.marca .sello { width: 34px; height: 34px; flex: none; color: var(--accent-text); }
+.marca b { font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: .03em; }
+.marca .sub { padding-left: 10px; border-left: 1px solid var(--line-2); color: var(--muted); font-size: 15px; line-height: 1.1; }
+
+.saludo { grid-area: saludo; display: grid; gap: 1px; min-width: 0; }
+.hola { font-size: 20px; font-weight: 700; line-height: 1.15; min-height: 1.15em; }
+.fecha { color: var(--muted); font-size: 15px; line-height: 1.2; min-height: 1.2em; }
+
+.sistema { grid-area: sistema; display: flex; align-items: center; gap: 8px 20px; flex-wrap: wrap; justify-content: flex-end; }
+.reloj { font-size: 20px; font-weight: 500; letter-spacing: .02em; min-width: 5ch; text-align: right; }
+.srv { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.ver { color: var(--faint); font-size: 13px; }
+.tema { grid-area: tema; }
+.punto { position: relative; width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--faint); }
+.punto[data-s="on"] { background: var(--ok); }
+.punto[data-s="off"] { background: var(--bad); }
+.punto::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--ok); opacity: 0; }
+
+/* ---------- zona del cielo ---------- */
+.cielo { flex: 1; display: flex; flex-direction: column; min-height: 0; outline: none; }
+.intro { padding: 18px max(20px, env(safe-area-inset-left)) 0; max-width: 560px; }
+.intro h1 { font-size: 26px; line-height: 1.1; font-weight: 700; letter-spacing: .005em; }
+.intro p { margin-top: 6px; color: var(--muted); font-size: 15px; max-width: 46ch; text-wrap: pretty; }
+.solo-movil { display: none; }
+
+.escena { --core: 112px; position: relative; flex: 1; min-height: 460px; overflow: hidden; }
+
+/* ---------- órbitas y trazas ---------- */
+.trazas { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+#orbitas ellipse { fill: none; stroke: var(--line-2); stroke-width: 1; stroke-dasharray: .1 7; opacity: .5; }
+.lin { transition: opacity var(--t-media) var(--ease); }
+.lin path { fill: none; }
+.lin .base { stroke: var(--line-2); stroke-width: 1; opacity: .6; stroke-dasharray: 1 2; }
+.lin .luz { stroke: var(--a, var(--accent)); stroke-width: 2; stroke-dasharray: 1 2; stroke-dashoffset: 1; transition: stroke-dashoffset 380ms var(--ease); }
+.lin.on .luz { stroke-dashoffset: 0; }
+.escena[data-act] .lin:not(.on) { opacity: .4; }
+
+/* ---------- núcleo: la plataforma ---------- */
+.nucleo { position: absolute; left: 50%; top: var(--cy, 50%); width: var(--core); height: var(--core); transform: translate(-50%, -50%); z-index: 2; display: grid; place-items: center; pointer-events: none; }
+.nucleo::before { content: ""; position: absolute; inset: -80%; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 26%, transparent) 0, transparent 62%); opacity: .55; }
+.anillo { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1px dashed var(--line-2); }
+.anillo.a { width: calc(var(--core) * 1.36); height: calc(var(--core) * 1.36); margin: calc(var(--core) * -.68) 0 0 calc(var(--core) * -.68); opacity: .6; }
+.anillo.b { width: calc(var(--core) * 1.62); height: calc(var(--core) * 1.62); margin: calc(var(--core) * -.81) 0 0 calc(var(--core) * -.81); border-style: dotted; opacity: .4; }
+.disco { position: relative; width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; color: var(--accent-text);
+         background: var(--bg-2); border: 1px solid var(--line-2); box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 9%, transparent); }
+.disco svg { width: 62%; height: 62%; overflow: visible; }
+.disco text { font-family: var(--font-ui); font-weight: 700; font-size: 10.5px; letter-spacing: .05em; }
+
+/* ---------- estrellas (módulos) ---------- */
+.astros { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; z-index: 3; pointer-events: none; }
+.mod { --d: 26px; position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.mod:not([data-estado="disponible"]) { --d: 16px; }
+.est { position: absolute; left: 0; top: 0; width: 116px; height: 116px; transform: translate(-50%, -50%); display: grid; place-items: center;
+       padding: 0; margin: 0; border: 0; background: none; color: inherit; font: inherit; text-align: center; cursor: pointer; outline: none; pointer-events: auto; touch-action: manipulation; }
+.est[aria-disabled="true"] { cursor: not-allowed; }
+.astro { position: relative; width: var(--d); height: var(--d); border-radius: 50%; display: grid; place-items: center;
+         background: radial-gradient(circle at 36% 32%, #fff 0, color-mix(in srgb, var(--a) 60%, #fff) 26%, var(--a) 62%);
+         border: 2px solid color-mix(in srgb, var(--a) 55%, var(--text));
+         box-shadow: 0 0 0 5px color-mix(in srgb, var(--a) 14%, transparent);
+         transition: transform var(--t-media) var(--ease); }
+.astro::before, .astro::after { content: ""; position: absolute; left: 50%; top: 50%; width: calc(var(--d) * 3.4); height: 1px; pointer-events: none; opacity: .6;
+                                 background: linear-gradient(90deg, transparent, var(--a) 50%, transparent); transform: translate(-50%, -50%); transition: opacity var(--t-media) var(--ease); }
+.astro::after { width: calc(var(--d) * 1.9); transform: translate(-50%, -50%) rotate(90deg); }   /* el rayo vertical es corto: no pisa la etiqueta */
+.halo { position: absolute; inset: -130%; border-radius: 50%; pointer-events: none; opacity: .55;
+        background: radial-gradient(circle, color-mix(in srgb, var(--a) 55%, transparent) 0, transparent 62%); transition: opacity var(--t-media) var(--ease), transform var(--t-media) var(--ease); }
+.onda { position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--a); opacity: 0; pointer-events: none; }
+.ico { display: none; }
+
+/* apagadas: próximamente / mantenimiento */
+.mod:not([data-estado="disponible"]) .astro { background: color-mix(in srgb, var(--a) 42%, var(--bg)); border-color: color-mix(in srgb, var(--a) 35%, var(--line-2)); box-shadow: none; }
+.mod:not([data-estado="disponible"]) .astro::before, .mod:not([data-estado="disponible"]) .astro::after { opacity: .22; }
+.mod:not([data-estado="disponible"]) .halo { opacity: .16; }
+.mod[data-estado="mantenimiento"] .astro { border-style: dashed; }
+
+/* etiqueta bajo la estrella (el texto no se atenúa: se mantiene el contraste) */
+.rot { position: absolute; left: 50%; top: calc(50% + var(--d) / 2 + 15px); transform: translateX(-50%); width: max-content; max-width: 148px;
+       display: flex; flex-direction: column; align-items: center; gap: 1px; pointer-events: none; text-shadow: 0 0 7px var(--bg), 0 0 2px var(--bg); }
+.nom { font-size: 17px; font-weight: 700; line-height: 1.1; letter-spacing: .01em; }
+.mod[data-estado="disponible"] .nom { font-size: 20px; }
+.mod:not([data-estado="disponible"]) .nom { color: var(--muted); }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--muted); }
+.tag i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.mod[data-estado="disponible"] .tag { color: var(--ok); }
+.mod[data-estado="mantenimiento"] .tag { color: var(--warn); }
+.go { display: none; }
+.desc { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* estado activo (cursor, foco de teclado o toque): crece, brilla y se detiene su órbita (desde JS) */
+.est[data-on] .astro { transform: scale(1.4); }
+.est[data-on] .astro::before, .est[data-on] .astro::after { opacity: 1; }
+.est[data-on] .halo { opacity: 1; transform: scale(1.25); }
+.est[data-on] .nom { color: var(--text); }
+.est:focus-visible .astro { outline: 2px solid var(--accent-text); outline-offset: 7px; }
+.est:focus-visible .nom { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.est[data-cargando] .astro { opacity: .7; }
+
+/* ---------- ficha de detalle ---------- */
+.ficha { position: absolute; left: 0; top: 0; z-index: 5; width: min(304px, calc(100% - 16px)); visibility: hidden; pointer-events: none; transition: visibility 0s linear var(--t-rapida); }
+.ficha[data-abierta="true"] { visibility: visible; pointer-events: auto; transition-delay: 0s; }
+.fcard { opacity: 0; transform: translateY(6px); padding: 14px 16px 16px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line-2); border-top: 3px solid var(--a, var(--accent)); box-shadow: var(--shadow);
+         transition: opacity var(--t-rapida) var(--ease), transform var(--t-rapida) var(--ease); }
+.ficha[data-abierta="true"] .fcard { opacity: 1; transform: none; }
+.fcab { display: flex; align-items: center; gap: 10px; }
+.fico { flex: none; color: color-mix(in srgb, var(--a, var(--accent)) 55%, var(--text)); }
+.fcab h2 { font-size: 22px; line-height: 1.1; font-weight: 700; }
+.fest { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.fpunto { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.ficha[data-e="disponible"] .fest { color: var(--ok); }
+.ficha[data-e="mantenimiento"] .fest { color: var(--warn); }
+.fdesc { margin-top: 6px; color: var(--muted); font-size: 16px; line-height: 1.35; text-wrap: pretty; }
+.faviso { margin-top: 8px; color: var(--warn); font-size: 15px; font-weight: 600; }
+.fentrar { width: 100%; margin-top: 14px; }
+
+/* ---------- mensajes: cargando / error / vacío / aviso de acción ---------- */
+.msg { position: absolute; left: 50%; top: calc(var(--cy, 50%) + var(--core) * .9); transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 12px; width: max-content; max-width: min(90%, 420px); text-align: center; color: var(--muted); font-size: 16px; }
+.msg p:empty { display: none; }
+.msg[data-k="error"] p { color: var(--bad); font-weight: 600; }
+.aviso { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 6; max-width: min(92%, 460px); padding: 9px 14px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow); font-size: 15px; font-weight: 600; text-align: center; }
+.aviso:empty { display: none; }
+
+/* sin JavaScript */
+.plano { position: relative; z-index: 4; margin: 24px auto 0; padding: 0 20px; max-width: 520px; list-style: none; }
+.plano li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.plano-n { position: relative; z-index: 4; max-width: 520px; margin: 12px auto 0; padding: 0 20px; color: var(--muted); }
+
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes enciende { from { opacity: 0; } }
+@keyframes nace { from { transform: scale(.35); } }
+@keyframes entra { from { opacity: 0; transform: scale(.9); } }
+@keyframes traza { from { stroke-dashoffset: 1; } }
+@keyframes gira { to { transform: rotate(360deg); } }
+@keyframes respira { from { opacity: .35; } to { opacity: .65; } }
+@keyframes onda { 0% { opacity: .65; transform: scale(1); } 70%, 100% { opacity: 0; transform: scale(3); } }
+@keyframes latido { 0% { opacity: .5; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(2.8); } }
+@keyframes aparece { from { opacity: 0; transform: translate(-50%, 6px); } }
+@keyframes pulso-halo { from { opacity: .45; transform: scale(.94); } to { opacity: .85; transform: scale(1.06); } }
+
+/* ---------- movimiento (solo si el sistema lo permite) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* secuencia de entrada, una sola vez: núcleo, órbitas, estrellas que se encienden una a una, trazas que se dibujan */
+  .nucleo .disco { animation: entra 420ms var(--ease) backwards; }
+  #orbitas ellipse { animation: fade-in 600ms ease-out 180ms backwards; }
+  .mod { animation: enciende 420ms var(--ease) backwards; animation-delay: calc(480ms + var(--i, 0) * 190ms); }
+  .mod .astro { animation: nace 420ms var(--ease) backwards; animation-delay: calc(480ms + var(--i, 0) * 190ms); }
+  .lin .base { animation: traza 900ms var(--ease) backwards; animation-delay: calc(700ms + var(--k, 0) * 220ms); }
+  /* vida suave: anillos lentos (60–120 s), respiración del núcleo, pulso de la estrella principal */
+  .anillo.a { animation: gira 90s linear infinite; }
+  .anillo.b { animation: gira 120s linear infinite reverse; }
+  .nucleo::before { animation: respira 6s ease-in-out infinite alternate; }
+  .mod[data-estado="disponible"] .halo { animation: pulso-halo 3.4s ease-in-out infinite alternate; }
+  .mod[data-estado="disponible"] .onda { animation: onda 3.6s var(--ease) 1.8s infinite; }
+  .est[data-on] .halo { animation: none; }
+  .est[data-on] .onda { animation: none; opacity: 0; }
+  .punto[data-s="on"]::after { animation: latido 2.4s ease-out infinite; }
+  .aviso:not(:empty) { animation: aparece var(--t-media) var(--ease); }
+  .tema:hover svg { transform: rotate(40deg); }
+  .tema svg { transition: transform 400ms var(--ease); }
+  .est:active .astro { transform: scale(1.22); }
+}
+
+/* Movimiento reducido: sin órbitas ni parallax (lo decide el JS); solo fundidos de opacidad cortos */
+@media (prefers-reduced-motion: reduce) {
+  .mod { animation: fade-in 150ms ease-out backwards; }
+  .nucleo .disco, #orbitas ellipse { animation: fade-in 150ms ease-out backwards; }
+  .astro, .halo { transition: opacity 150ms ease-out; }
+  .est[data-on] .astro { transform: none; outline: 2px solid var(--a); outline-offset: 4px; }
+  .est[data-on] .halo { transform: none; }
+  .lin .luz { stroke-dashoffset: 0; opacity: 0; transition: opacity 150ms ease-out; }
+  .lin.on .luz { opacity: 1; }
+  .fcard { transform: none; transition: opacity 150ms ease-out; }
+  .onda { display: none; }
+}
+
+/* ---------- modo lista: móvil (≤640 px) o pantallas bajas. Sin órbitas; estrellas grandes (≥48 px de toque) ---------- */
+@media (max-width: 640px), (max-height: 540px) {
+  .cab { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "marca tema" "saludo saludo" "sistema sistema"; gap: 6px 12px; }
+  .saludo { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 12px; }
+  .hola { font-size: 18px; }
+  .sistema { justify-content: flex-start; gap: 4px 16px; }
+  .reloj { font-size: 16px; min-width: 0; text-align: left; }
+  .marca b { font-size: 24px; }
+  .solo-pc { display: none; }
+  .solo-movil { display: inline; }
+  .intro { padding-top: 14px; }
+  .intro h1 { font-size: 24px; }
+
+  .escena { display: flex; flex-direction: column; align-items: center; min-height: 0; overflow: visible;
+            padding: 6px max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  .trazas, .ficha { display: none; }
+  .nucleo { --core: 80px; position: relative; left: auto; top: auto; transform: none; flex: none; margin: 14px 0 26px; }
+  .astros { position: relative; inset: auto; width: 100%; max-width: 540px; display: flex; flex-direction: column; gap: 12px; }
+  .mod { position: relative; width: auto; height: auto; }
+  .mod + .mod::before { content: ""; position: absolute; left: 34px; top: -12px; width: 1px; height: 12px; background: var(--line-2); }
+  .est { position: relative; left: auto; top: auto; transform: none; width: 100%; height: auto; min-height: 76px; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 4px 14px;
+         align-items: center; justify-items: start; text-align: left; padding: 10px 14px 10px 10px; border-radius: 8px; border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 84%, transparent); }
+  .est[data-on] { border-color: color-mix(in srgb, var(--a) 70%, var(--line-2)); background: var(--surface); }
+  .est:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .est:focus-visible .astro { outline: 0; }
+  .est[data-on] .astro { transform: none; }
+  .mod { --d: 52px; }
+  .mod:not([data-estado="disponible"]) { --d: 52px; }
+  .astro { grid-row: 1 / span 2; background: color-mix(in srgb, var(--a) 20%, var(--surface)); border: 2px solid color-mix(in srgb, var(--a) 60%, var(--text)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--a) 12%, transparent); }
+  .mod:not([data-estado="disponible"]) .astro { background: color-mix(in srgb, var(--a) 12%, var(--surface)); border-color: color-mix(in srgb, var(--a) 40%, var(--line-2)); box-shadow: none; }
+  .astro::before, .astro::after { display: none; }
+  .halo { inset: -40%; }
+  .ico { display: block; width: 24px; height: 24px; color: color-mix(in srgb, var(--a) 55%, var(--text)); fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .rot { position: static; transform: none; width: auto; max-width: none; align-items: flex-start; grid-column: 2; grid-row: 1; text-shadow: none; gap: 2px; }
+  .nom, .mod[data-estado="disponible"] .nom { font-size: 19px; }
+  .desc { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: normal; grid-column: 2; grid-row: 2; color: var(--muted); font-size: 15px; line-height: 1.3; text-wrap: pretty; }
+  .go { display: inline-flex; grid-column: 3; grid-row: 1 / span 2; align-self: center; justify-self: end; color: var(--accent-text); font-weight: 700; font-size: 16px; }
+  .mod:not([data-estado="disponible"]) .go { display: none; }
+  .msg { position: static; transform: none; margin-top: 0; }
+  .aviso { position: fixed; bottom: max(16px, env(safe-area-inset-bottom)); }
+}

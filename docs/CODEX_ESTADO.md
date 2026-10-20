@@ -1,7 +1,15 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-19 (Claude Code)
-Commit de referencia: `dcd0ae8` (v1.4.8; producción en 1.4.6 hasta que se despliegue)
+Actualizado: 2026-10-20 (Claude Code)
+Commit de referencia: rama `feat/portal-modulos` (v1.4.10, sin merge a main; producción en 1.4.9)
+
+## v1.4.10 (2026-10-20, Claude Code)
+- Portal de módulos en `/inicio` (constelación: núcleo TQT y módulos como estrellas en órbita). Módulos en `MODULOS` de `app/main.py`, servidos en `GET /api/modulos` (público). Sin sesión, `/` → `/inicio`; las demás páginas siguen → `/login?next=`. Enlace «← Módulos» en login, consola y móvil. Archivos nuevos: `inicio.html`, `css/inicio.css`, `js/inicio.js`.
+- Evidencia: 84 pruebas OK (test_portal_modulos nuevo, test_qa_version_hoy, test_auth_seguridad, test_api, test_admin, test_cuentas_roles, test_consultor_escritorio). Revisión en Chrome con servidor local aislado: claro, oscuro, ficha al pasar el cursor, Entrar sin sesión → login, enlace de regreso. No revisado en navegador a 375 px ni con sesión real.
+- Pendiente: probar en celular, definir los módulos reales («Próximamente» son de ejemplo), merge a main y despliegue cuando se pida.
+
+## v1.4.9 (2026-10-20, sesión del servidor)
+- DYMO compartida: la cola ya no se atora (commit `7564a21`, producción en 1.4.9).
 
 ## v1.4.7–v1.4.8 (2026-10-19, Claude Code)
 - v1.4.7: consumo de materiales por evento (R1/R2 programadas, R3 asignada, gabinete colocado); migración `migr_consumo_146` + tabla `inv_tqtr_consumo_base` (solo desde hoy); `consumir_por_evento` serializado.

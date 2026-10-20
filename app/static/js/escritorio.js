@@ -558,7 +558,7 @@
         root.replaceChildren(
             h('button', { class: 'esc-skip', type: 'button', onclick: () => refs.main.focus() }, 'Saltar al contenido'),
             h('aside', { class: 'esc-lat' },
-                h('div', { class: 'esc-brand' }, h('a', { href: '#/resumen', class: 'esc-logo', 'aria-label': 'Escáner TQT, ir al resumen' }, brandMark(), h('span', { class: 'esc-brand-t' }, h('b', null, 'Escáner TQT'), h('small', null, 'Consola')))),
+                h('div', { class: 'esc-brand' }, h('a', { href: '#/resumen', class: 'esc-logo', 'aria-label': 'Escáner TQT, ir al resumen' }, brandMark(), h('span', { class: 'esc-brand-t' }, h('b', null, 'Escáner TQT'), h('small', null, 'Consola'))), T.irModulos()),
                 refs.nav, h('div', { class: 'esc-lat-pie' }, refs.latBtn, h('div', { class: 'esc-ver', title: 'Versión de Escáner TQT' }, h('span', { class: 'esc-ver-n' }, 'Escáner TQT '), h('b', { 'data-version': '' })))),
             h('div', { class: 'esc-col' },
                 h('header', { class: 'esc-top' }, refs.titulo, h('div', { class: 'grow' }), refs.escBtn, refs.loteWrap,

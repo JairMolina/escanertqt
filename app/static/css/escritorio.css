@@ -23,6 +23,9 @@
 .esc-brand-t { display: flex; flex-direction: column; min-width: 0; color: var(--text); }
 .esc-brand-t b { font-size: 17px; letter-spacing: .02em; line-height: 1.05; white-space: nowrap; }
 .esc-brand-t small { font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+.esc .ir-modulos { min-height: 36px; min-width: 36px; margin-top: 6px; font-size: 13px; }
+.esc[data-lat="min"] .ir-modulos { padding: 0; width: 36px; }
+.esc[data-lat="min"] .ir-modulos span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .esc-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .esc-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .esc-grp { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); padding: 14px 12px 6px; }

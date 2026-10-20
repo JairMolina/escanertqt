@@ -16,18 +16,19 @@
             document.documentElement.dataset.theme = t;
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/app.css?v=1343">
+    <link rel="stylesheet" href="/static/css/app.css?v=1410">
     <style>
         /* Pantalla de acceso. Mobile-first: banda de marca arriba y formulario debajo.
            Desde 900 px: mesa de trabajo (etiqueta DYMO + circuito) a la izquierda y formulario a la derecha. */
         html, body { height: 100%; }
         body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); }
         .tema { position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 5; }
+        .ir-fijo { position: fixed; top: max(8px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); z-index: 5; }   /* simétrico al botón de tema; el banco deja una franja libre arriba */
         .pantalla { min-height: 100dvh; display: flex; flex-direction: column; }
 
         /* ---------- mesa de trabajo (marca) ---------- */
         .banco { position: relative; overflow: hidden; isolation: isolate; display: flex; align-items: center; justify-content: space-between; gap: 16px;
-                 padding: max(16px, env(safe-area-inset-top)) 60px 16px 20px; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+                 padding: max(56px, calc(env(safe-area-inset-top) + 48px)) 60px 16px 20px; background: var(--bg-2); border-bottom: 1px solid var(--line); }
         .banco::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .55;       /* cuadrícula de puntos que se desvanece hacia los bordes */
                          background-image: radial-gradient(color-mix(in srgb, var(--line-2) 70%, transparent) 1px, transparent 1.5px); background-size: 24px 24px;
                          -webkit-mask-image: radial-gradient(75% 90% at 62% 50%, #000 15%, transparent 80%); mask-image: radial-gradient(75% 90% at 62% 50%, #000 15%, transparent 80%); }
@@ -115,7 +116,7 @@
 
         @media (min-width: 900px) {
             .pantalla { flex-direction: row; }
-            .banco { flex: 1 1 56%; flex-direction: column; align-items: stretch; justify-content: space-between; padding: 44px clamp(40px, 5vw, 88px) 52px; border-bottom: 0; border-right: 1px solid var(--line); gap: 32px; }
+            .banco { flex: 1 1 56%; flex-direction: column; align-items: stretch; justify-content: space-between; padding: max(64px, calc(env(safe-area-inset-top) + 56px)) clamp(40px, 5vw, 88px) 52px; border-bottom: 0; border-right: 1px solid var(--line); gap: 32px; }
             .banco::after { background: radial-gradient(55% 55% at 52% 48%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 72%); }
             .logo .sello { width: 46px; height: 46px; }
             .logo b { font-size: 28px; }
@@ -188,6 +189,10 @@
 <button class="iconbtn tema" type="button" id="tema" aria-label="Cambiar entre tema claro y oscuro" title="Tema claro / oscuro">
     <svg id="icoTema" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
 </button>
+
+<a class="ir-modulos ir-fijo" href="/inicio" aria-label="Volver al portal de módulos" title="Volver al portal de módulos">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Módulos</span>
+</a>
 
 <div class="pantalla">
     <header class="banco" id="banco">

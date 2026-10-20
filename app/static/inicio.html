@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A1020">
+    <meta name="color-scheme" content="dark light">
+    <meta name="robots" content="noindex">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <title>Inicio · Plataforma TQT</title>
+    <script>
+        /* Tema: el que el usuario eligió (mismo ajuste `tqt.tema` que el resto de la app); si nunca eligió, el del sistema. */
+        (function () {
+            var t = 'dark';
+            try { var g = localStorage.getItem('tqt.tema'); t = g === 'light' || g === 'dark' ? g : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* sin almacenamiento */ }
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1410">
+    <link rel="stylesheet" href="/static/css/inicio.css?v=1410">
+</head>
+<body>
+<a class="salto" href="#modulos">Saltar a los módulos</a>
+<canvas class="campo" id="campo" aria-hidden="true"></canvas>
+
+<div class="portal">
+    <header class="cab">
+        <div class="marca">
+            <svg class="sello" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="8" y="8" width="32" height="32" rx="5"/><path d="M16 8v-4M24 8v-4M32 8v-4M16 44v-4M24 44v-4M32 44v-4M8 16H4M8 24H4M8 32H4M44 16h-4M44 24h-4M44 32h-4"/>
+                <path d="M17 24h5l3-6 3 12 3-6h2"/>
+            </svg>
+            <b>TQT</b><span class="sub">Plataforma</span>
+        </div>
+
+        <div class="saludo">
+            <p class="hola" id="hola">&nbsp;</p>
+            <p class="fecha" id="fecha">&nbsp;</p>
+        </div>
+
+        <div class="sistema">
+            <time class="reloj mono" id="reloj" aria-label="Hora actual">--:--</time>
+            <span class="srv" role="status" aria-live="polite"><span class="punto" id="punto" data-s="?" aria-hidden="true"></span><span id="srvTxt">Comprobando servidor</span></span>
+            <span class="ver mono">v__VERSION__</span>
+        </div>
+
+        <button class="iconbtn tema" type="button" id="tema" aria-label="Cambiar entre tema claro y oscuro" title="Tema claro / oscuro">
+            <svg id="icoTema" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+        </button>
+    </header>
+
+    <main class="cielo" id="modulos" aria-labelledby="tit" tabindex="-1">
+        <div class="intro">
+            <h1 id="tit">Módulos de la plataforma</h1>
+            <p><span class="solo-pc">Pasa el cursor sobre una estrella o usa las flechas del teclado para ver el módulo. Enter entra.</span><span class="solo-movil">Elige un módulo para entrar.</span></p>
+        </div>
+
+        <div class="escena" id="escena" aria-busy="true">
+            <svg class="trazas" id="trazas" aria-hidden="true" focusable="false" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <g id="orbitas"></g>
+                <g id="lineas"></g>
+            </svg>
+
+            <div class="nucleo" aria-hidden="true">
+                <i class="anillo a"></i><i class="anillo b"></i>
+                <div class="disco">
+                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="7" y="7" width="34" height="34" rx="5"/><path d="M15 7V3M24 7V3M33 7V3M15 45v-4M24 45v-4M33 45v-4M7 15H3M7 24H3M7 33H3M45 15h-4M45 24h-4M45 33h-4"/>
+                        <text x="24" y="28.4" text-anchor="middle" stroke="none" fill="var(--text)">TQT</text>
+                    </svg>
+                </div>
+            </div>
+
+            <ul class="astros" id="lista" role="list" aria-label="Módulos de la plataforma"></ul>
+
+            <aside class="ficha" id="ficha" aria-live="polite" data-abierta="false">
+                <div class="fcard">
+                    <div class="fcab"><svg class="fico" id="fIco" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+                        <h2 id="fNom"></h2></div>
+                    <p class="fest"><i class="fpunto" aria-hidden="true"></i><span id="fEst"></span></p>
+                    <p class="fdesc" id="fDesc"></p>
+                    <p class="faviso" id="fAviso" hidden></p>
+                    <button class="btn btn-primary fentrar" type="button" id="fEntrar" tabindex="-1">Entrar</button>
+                </div>
+            </aside>
+
+            <div class="msg" id="msg" role="status" aria-live="polite">
+                <p id="msgTxt">Cargando módulos…</p>
+                <button class="btn" type="button" id="msgBtn" hidden>Reintentar</button>
+            </div>
+            <p class="aviso" id="aviso" role="status" aria-live="polite"></p>
+
+            <noscript>
+                <ul class="plano">
+                    <li><a href="/">Escáner TQT</a>: recepción, emparejado, programación y entrega de tarjetas TQT.</li>
+                </ul>
+                <p class="plano-n">El portal animado necesita JavaScript. Usa el enlace para entrar al Escáner TQT.</p>
+            </noscript>
+        </div>
+    </main>
+</div>
+<script src="/static/js/inicio.js?v=1410"></script>
+</body>
+</html>

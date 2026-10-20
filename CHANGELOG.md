@@ -1,5 +1,13 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.10 — 2026-10-20
+- **Portal de módulos (`/inicio`).** Escáner TQT pasa a ser un módulo de la plataforma. El portal es una constelación: el núcleo TQT al centro y los módulos como estrellas en órbita (Escáner TQT disponible; Almacén, Calidad y Reportes «Próximamente»). Funciona con teclado y lector de pantalla, respeta `prefers-reduced-motion`, tiene tema claro/oscuro y en móvil muestra una lista.
+  - Los módulos se definen en un solo lugar (`MODULOS` en `app/main.py`, servido en `GET /api/modulos`, público y de solo lectura). Agregar un módulo = agregar una entrada.
+  - Sin sesión, `/` lleva al portal (antes iba al login); las demás páginas siguen yendo a `/login?next=…`. Con sesión, `/` funciona igual. Al entrar a Escáner TQT el portal consulta `/api/auth/yo`: sin sesión abre el login; con sesión va a `/`, que ya decide por rol y dispositivo.
+  - Enlace «← Módulos» en el login, la consola y las pantallas móviles.
+  - No cambia ninguna URL existente (QR impresos, agentes de Windows, DYMO compartida).
+- Pruebas nuevas en `tests/test_portal_modulos.py`.
+
 ## v1.4.9 — 2026-10-19
 - **DYMO compartida: la cola ya no se atora.** «Aprobada» se valida solo al encolar; antes el agente la volvía a validar al descargar el SVG y, si el operador ya había iniciado otra prueba TQT de la misma tarjeta (aún sin resultado), recibía 403 y la etiqueta no salía. El reporte de error de la Raspberry se rechazaba con 422 y el agente lo reintentaba para siempre sin pedir más trabajo, así que nada más se imprimía.
   - `Resultado` del agente es tolerante: acepta `null` en `detalle`/`cups_id`, recorta textos largos y toma un estado desconocido como «error» (queda en el log).

@@ -132,7 +132,7 @@ class TestSinSesionNadaAbre(Base):
         self.assertGreater(probadas, 60)
 
     def test_11_paginas_redirigen_al_login_con_next(self):
-        for ruta in ("/", "/monitor", "/emparejar", "/programar", "/consultar", "/dymo", "/admin"):
+        for ruta in ("/monitor", "/emparejar", "/programar", "/consultar", "/dymo", "/admin"):
             r = self.c.get(ruta, follow_redirects=False)
             self.assertEqual(r.status_code, 302, ruta)
             self.assertEqual(r.headers["location"], "/login?next=" + ruta.replace("/", "%2F"))
