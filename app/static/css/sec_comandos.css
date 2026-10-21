@@ -1,0 +1,231 @@
+/* Scoped to Comandos. Uses the console's local fonts and light/dark tokens. */
+.tqt-comandos { color:var(--text); font-family:var(--font-ui); min-width:0; --commands-radius:var(--r-2); }
+.tqt-comandos *, .tqt-comandos *::before, .tqt-comandos *::after { box-sizing:border-box; }
+.tqt-comandos h1,.tqt-comandos h2,.tqt-comandos h3,.tqt-comandos h4,.tqt-comandos p { margin:0; }
+.tqt-comandos button,.tqt-comandos input,.tqt-comandos select { font:inherit; color:inherit; }
+.tqt-comandos button { cursor:pointer; }
+.tqt-comandos button:disabled { opacity:.5; cursor:not-allowed; }
+.tqt-comandos button:focus-visible,.tqt-comandos a:focus-visible,.tqt-comandos input:focus-visible,.tqt-comandos select:focus-visible,.tqt-comandos summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.tqt-comandos input,.tqt-comandos select { accent-color:var(--accent); }
+.tqt-comandos code,.tqt-comandos .mono,.tqt-comandos kbd { font-family:var(--font-mono); }
+.tqt-comandos .icon { flex-shrink:0; vertical-align:middle; width:18px; height:18px; }
+.tqt-comandos .button,.tqt-comandos .text-button,.tqt-comandos .icon-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; border:1px solid var(--line); border-radius:var(--r-1); padding:9px 13px; background:var(--surface); font-weight:600; min-height:40px; }
+.tqt-comandos .button:hover,.tqt-comandos .icon-button:hover { background:var(--surface-2); border-color:var(--accent); }
+.tqt-comandos .button.primary { color:var(--accent-ink); background:var(--accent); border-color:var(--accent); }
+.tqt-comandos .text-button { border:0; background:transparent; color:var(--accent-text); padding:6px 0; justify-content:flex-start; }
+.tqt-comandos .small { font-size:13px; }
+.tqt-comandos .icon-button { width:40px; padding:8px; }
+.tqt-comandos .commands-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
+.tqt-comandos .commands-heading h2 { font-size:28px; }
+.tqt-comandos .eyebrow,.tqt-comandos .small-label { font-family:var(--font-mono); font-size:11px; letter-spacing:1px; color:var(--muted); }
+.tqt-comandos .commands-tabs { display:flex; flex-wrap:wrap; gap:8px; border-bottom:1px solid var(--line); padding-bottom:16px; }
+.tqt-comandos .commands-categories { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0; }
+.tqt-comandos .category { display:inline-flex; align-items:center; gap:6px; padding:7px 10px; border:1px solid var(--line); background:var(--surface); border-radius:var(--r-1); min-height:40px; font-size:14px; }
+.tqt-comandos .category span { color:var(--muted); font:11px var(--font-mono); }
+.tqt-comandos .category.active { border-color:var(--accent); color:var(--accent-text); background:var(--surface-2); }
+.tqt-comandos .page-heading { margin:22px 0 16px; }
+.tqt-comandos .page-heading h1 { font-size:24px; margin:5px 0; }
+.tqt-comandos .page-heading p { color:var(--muted); }
+.tqt-comandos .heading-mark { display:none; }
+.tqt-comandos .context-bar { display:flex; flex-wrap:wrap; align-items:center; gap:18px; padding:14px 18px; border:1px solid var(--line); border-radius:var(--commands-radius); background:var(--surface); }
+.tqt-comandos .context-intro { display:flex; align-items:center; gap:10px; color:var(--muted); }
+.tqt-comandos .context-intro span { display:block; font-size:12px; }
+.tqt-comandos .context-field { display:flex; flex-direction:column; gap:5px; min-width:155px; }
+.tqt-comandos .context-field>span { color:var(--muted); font-size:13px; }
+.tqt-comandos select,.tqt-comandos .text-input { border:1px solid var(--line); background:var(--bg); padding:9px 11px; border-radius:var(--r-1); min-height:40px; max-width:100%; }
+.tqt-comandos .context-summary { margin-left:auto; display:flex; flex-direction:column; font-size:14px; }
+.tqt-comandos .context-summary>span { color:var(--muted); font-size:12px; }
+.tqt-comandos .explore-tools { margin:18px 0; }
+.tqt-comandos .search-row,.tqt-comandos .filter-row,.tqt-comandos .intent-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.tqt-comandos .search-field { display:flex; align-items:center; gap:9px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-1); background:var(--surface); flex:1; min-width:180px; }
+.tqt-comandos .search-field input { width:100%; border:0; background:transparent; padding:12px 0; outline-offset:0; min-width:0; }
+.tqt-comandos .search-field kbd { border:1px solid var(--line); padding:1px 6px; color:var(--muted); }
+.tqt-comandos .favorite-filter.selected { border-color:var(--accent); color:var(--accent-text); }
+.tqt-comandos .favorite-filter small { font:12px var(--font-mono); }
+.tqt-comandos .segmented { display:inline-flex; flex-wrap:wrap; gap:3px; background:var(--bg-2); border:1px solid var(--line); border-radius:var(--r-1); padding:3px; }
+.tqt-comandos .segmented button { display:flex; gap:6px; align-items:center; justify-content:center; border:1px solid transparent; background:transparent; padding:8px 11px; min-height:38px; border-radius:var(--r-1); }
+.tqt-comandos .segmented button.active { border-color:var(--line); background:var(--surface); color:var(--accent-text); }
+.tqt-comandos .segmented button span { font:11px var(--font-mono); }
+.tqt-comandos .filter-options { display:flex; gap:14px; flex-wrap:wrap; margin-left:auto; }
+.tqt-comandos .check-label { display:inline-flex; align-items:center; gap:7px; min-height:40px; font-size:14px; color:var(--muted); }
+.tqt-comandos .check-label input { width:17px; height:17px; }
+.tqt-comandos .intent-row { font-size:13px; color:var(--muted); }
+.tqt-comandos .intent-row button { display:flex; align-items:center; gap:6px; border:0; background:transparent; color:var(--accent-text); min-height:36px; padding:5px; }
+.tqt-comandos .workspace-grid { display:grid; grid-template-columns:minmax(270px,.85fr) minmax(360px,1.15fr); gap:18px; align-items:start; }
+.tqt-comandos .command-catalog,.tqt-comandos .detail-panel { background:var(--surface); border:1px solid var(--line); border-radius:var(--commands-radius); min-width:0; overflow:hidden; }
+.tqt-comandos .catalog-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px; flex-wrap:wrap; border-bottom:1px solid var(--line); }
+.tqt-comandos .catalog-heading>div { display:flex; align-items:center; gap:9px; }
+.tqt-comandos .catalog-heading h2 { font-size:20px; }
+.tqt-comandos .result-count { font:12px var(--font-mono); color:var(--muted); }
+.tqt-comandos .kind-filter { font-size:13px; max-width:185px; }
+.tqt-comandos .command-list { max-height:690px; overflow:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.tqt-comandos .command-row { display:flex; border-bottom:1px solid var(--line); border-left:3px solid transparent; }
+.tqt-comandos .command-row.selected { border-left-color:var(--accent); background:var(--surface-2); }
+.tqt-comandos .command-row.unavailable { opacity:.7; }
+.tqt-comandos .command-select { display:flex; align-items:flex-start; gap:10px; min-width:0; width:100%; padding:15px 10px; text-align:left; border:0; background:transparent; }
+.tqt-comandos .row-icon { display:grid; place-items:center; padding:8px; background:var(--bg); border-radius:var(--r-1); color:var(--accent-text); }
+.tqt-comandos .row-body { min-width:0; flex:1; display:flex; flex-direction:column; gap:6px; }
+.tqt-comandos .row-title { font-size:17px; font-weight:600; line-height:1.3; }
+.tqt-comandos .row-body>code { font-size:12px; overflow-wrap:anywhere; }
+.tqt-comandos .row-meta { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.tqt-comandos .channel-text { font-size:12px; color:var(--muted); display:inline-flex; align-items:center; gap:3px; }
+.tqt-comandos .channel-text .icon { width:13px; height:13px; }
+.tqt-comandos .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 6px; border:1px solid var(--line); border-radius:var(--r-1); color:var(--muted); font-size:12px; white-space:normal; }
+.tqt-comandos .new-label,.tqt-comandos .availability,.tqt-comandos .yes { color:var(--ok); font-size:12px; }
+.tqt-comandos .unavailable-label,.tqt-comandos .no { color:var(--warn); font-size:12px; }
+.tqt-comandos .star-button { padding:10px; border:0; background:transparent; color:var(--muted); align-self:flex-start; min-height:44px; min-width:40px; }
+.tqt-comandos .star-button.saved { color:var(--accent-text); }
+.tqt-comandos .star-button.saved svg { fill:var(--accent); }
+.tqt-comandos .catalog-footer,.tqt-comandos .detail-footer { padding:11px 14px; border-top:1px solid var(--line); font-size:12px; color:var(--muted); display:flex; align-items:center; gap:7px; }
+.tqt-comandos .detail-topline { padding:13px 18px; border-bottom:1px solid var(--line); color:var(--muted); font:11px var(--font-mono); }
+.tqt-comandos .detail-topline span { display:flex; align-items:center; gap:8px; }
+.tqt-comandos .detail-scroll { padding:20px; max-height:690px; overflow:auto; scrollbar-width:thin; }
+.tqt-comandos .detail-title-row h2 { font-size:26px; line-height:1.2; }
+.tqt-comandos .detail-tags { display:flex; align-items:center; flex-wrap:wrap; gap:7px; margin:14px 0; }
+.tqt-comandos .command-description { font-size:17px; line-height:1.5; }
+.tqt-comandos .syntax-line { display:flex; flex-direction:column; gap:7px; margin:18px 0; padding:12px; background:var(--bg); border-radius:var(--r-1); }
+.tqt-comandos .syntax-line>span { color:var(--muted); font-size:12px; }
+.tqt-comandos .syntax-line code { font-size:13px; overflow-wrap:anywhere; }
+.tqt-comandos .section-heading { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+.tqt-comandos .section-heading h3 { font-size:19px; }
+.tqt-comandos .section-heading .small-label { margin-left:auto; font-size:9px; }
+.tqt-comandos .step { display:inline-grid; place-items:center; width:24px; height:24px; border:1px solid var(--accent); border-radius:50%; color:var(--accent-text); font:12px var(--font-mono); flex-shrink:0; }
+.tqt-comandos .builder { margin:20px 0; }
+.tqt-comandos .field-label { display:block; margin:10px 0 7px; font-weight:600; }
+.tqt-comandos .parameter-select,.tqt-comandos .text-input { width:100%; }
+.tqt-comandos .input-helper,.tqt-comandos .copy-helper,.tqt-comandos .micro-copy { color:var(--muted); font-size:13px; line-height:1.5; margin-top:8px; }
+.tqt-comandos .parameter-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.tqt-comandos .number-field { display:flex; align-items:center; gap:5px; }
+.tqt-comandos .number-field input { width:70px; padding:8px; border:1px solid var(--line); border-radius:var(--r-1); background:var(--bg); }
+.tqt-comandos input[type=range] { width:100%; margin:18px 0 4px; min-height:26px; }
+.tqt-comandos .range-labels,.tqt-comandos .time-total { display:flex; justify-content:space-between; gap:12px; color:var(--muted); }
+.tqt-comandos .range-labels { font:11px var(--font-mono); }
+.tqt-comandos .time-insight { background:var(--bg); border:1px solid var(--line); padding:14px; border-radius:var(--r-1); margin-top:14px; }
+.tqt-comandos .time-total { align-items:center; }
+.tqt-comandos .time-total strong { color:var(--accent-text); font-size:30px; }
+.tqt-comandos .time-total small { font-size:16px; }
+.tqt-comandos .time-track { display:flex; gap:3px; height:25px; margin:12px 0; font-size:11px; }
+.tqt-comandos .time-track span { display:flex; align-items:center; justify-content:center; background:var(--line); border-radius:3px; }
+.tqt-comandos .time-track .track-extra { background:var(--accent); color:var(--accent-ink); }
+.tqt-comandos .time-equation { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; font-size:12px; }
+.tqt-comandos .time-insight p { color:var(--muted); font-size:12px; margin-top:12px; }
+.tqt-comandos .separator-fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.tqt-comandos .validation-error { color:var(--bad); margin:12px 0; }
+.tqt-comandos [hidden] { display:none!important; }
+.tqt-comandos .notice { display:flex; align-items:flex-start; gap:10px; padding:13px; margin:14px 0; border:1px solid var(--line); border-left:3px solid var(--info); background:var(--bg); border-radius:var(--r-1); font-size:14px; line-height:1.5; }
+.tqt-comandos .notice p { margin:0; }
+.tqt-comandos .notice.caution { border-left-color:var(--warn); }
+.tqt-comandos .notice.danger { border-left-color:var(--bad); }
+.tqt-comandos .no-parameter { display:flex; gap:8px; color:var(--muted); font-size:14px; }
+.tqt-comandos .copy-section { margin:22px 0; }
+.tqt-comandos .delivery-control { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+.tqt-comandos .delivery-control>span { font-size:13px; color:var(--muted); }
+.tqt-comandos .delivery-switch { display:flex; }
+.tqt-comandos .delivery-switch button { flex:1; }
+.tqt-comandos .terminal-box { border:1px solid var(--line-2); border-radius:var(--r-2); background:var(--bg-2); overflow:hidden; }
+.tqt-comandos .terminal-meta { display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:12px 14px; color:var(--muted); font:10px var(--font-mono); }
+.tqt-comandos .terminal-meta>span:last-child { margin-left:auto; }
+.tqt-comandos .terminal-dot { width:6px; height:6px; background:var(--ok); border-radius:50%; }
+.tqt-comandos .terminal-command { padding:12px 16px 20px; overflow-wrap:anywhere; font:18px var(--font-mono); line-height:1.6; }
+.tqt-comandos .terminator-symbol { font-size:12px; color:var(--accent-text); }
+.tqt-comandos .copy-button { display:flex; align-items:center; justify-content:center; width:100%; gap:8px; padding:12px; min-height:44px; border:0; background:var(--accent); color:var(--accent-ink); font-weight:700; }
+.tqt-comandos .crlf-option { margin-top:8px; }
+.tqt-comandos .crlf-option code { font-size:11px; }
+.tqt-comandos .default-preview { display:flex; gap:12px; padding:14px; margin:18px 0; border:1px solid var(--line); border-radius:var(--r-1); background:var(--surface-2); }
+.tqt-comandos .default-preview strong { display:block; font:19px var(--font-mono); margin:6px 0; overflow-wrap:anywhere; }
+.tqt-comandos .default-preview span,.tqt-comandos .default-preview p { color:var(--muted); font-size:13px; line-height:1.5; }
+.tqt-comandos .technical-details { border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin:20px 0; }
+.tqt-comandos .technical-details summary { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:14px 0; font-weight:600; }
+.tqt-comandos .technical-inner h4 { margin:14px 0 6px; font-size:15px; }
+.tqt-comandos .technical-inner p { color:var(--muted); font-size:14px; line-height:1.5; margin:8px 0; }
+.tqt-comandos .compatibility-chips { display:flex; flex-wrap:wrap; gap:10px; }
+.tqt-comandos .compatibility-chips span { display:inline-flex; align-items:center; gap:5px; }
+.tqt-comandos .related-section h4 { margin-bottom:8px; font-size:14px; }
+.tqt-comandos .related-commands { display:flex; flex-wrap:wrap; gap:8px; }
+.tqt-comandos .related-commands button { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--line); border-radius:var(--r-1); background:var(--bg); min-height:40px; }
+.tqt-comandos .related-commands code { font-size:11px; }
+.tqt-comandos .source-label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--muted); margin-top:20px; }
+.tqt-comandos .empty,.tqt-comandos .detail-empty,.tqt-comandos .load-error { text-align:center; padding:35px 18px; }
+.tqt-comandos .empty h3,.tqt-comandos .empty h2 { margin:12px 0; }
+.tqt-comandos .empty p,.tqt-comandos .detail-empty p { color:var(--muted); line-height:1.5; margin:12px 0; }
+.tqt-comandos .empty button { margin-top:8px; }
+.tqt-comandos .compare-controls,.tqt-comandos .defaults-controls { display:flex; flex-wrap:wrap; align-items:center; gap:14px; margin:18px 0; }
+.tqt-comandos .compare-controls label { display:flex; flex-direction:column; gap:7px; }
+.tqt-comandos .compare-controls .icon-button { align-self:flex-end; }
+.tqt-comandos .comparison-scope,.tqt-comandos .scope-note { color:var(--muted); font-size:13px; margin:15px 0; }
+.tqt-comandos .compare-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:18px 0; }
+.tqt-comandos .compare-metrics>div { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-2); padding:16px; display:flex; flex-direction:column; gap:8px; }
+.tqt-comandos .compare-metrics strong { font:28px var(--font-mono); color:var(--accent-text); }
+.tqt-comandos .comparison-callout { border-left:3px solid var(--accent); padding:14px; background:var(--surface); margin:16px 0; }
+.tqt-comandos .comparison-callout p { color:var(--muted); margin-top:7px; line-height:1.5; }
+.tqt-comandos .table-card { border:1px solid var(--line); border-radius:var(--r-2); background:var(--surface); margin:18px 0; overflow:hidden; }
+.tqt-comandos .table-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:14px; border-bottom:1px solid var(--line); }
+.tqt-comandos .table-heading h2 { font-size:20px; }
+.tqt-comandos .table-heading h2 span { color:var(--muted); font:12px var(--font-mono); }
+.tqt-comandos .table-scroll { overflow:auto; }
+.tqt-comandos table { width:100%; border-collapse:collapse; text-align:left; font-size:14px; }
+.tqt-comandos th { color:var(--muted); font-size:12px; background:var(--bg); }
+.tqt-comandos td,.tqt-comandos th { padding:12px 14px; border-bottom:1px solid var(--line); }
+.tqt-comandos .table-command { display:flex; flex-direction:column; align-items:flex-start; gap:6px; background:transparent; border:0; text-align:left; padding:0; min-height:40px; }
+.tqt-comandos .table-command code { font-size:12px; color:var(--accent-text); }
+.tqt-comandos .table-command span,.tqt-comandos .cell-note { color:var(--muted); font-size:13px; }
+.tqt-comandos .status-cell,.tqt-comandos .table-channel { display:inline-flex; align-items:center; gap:6px; }
+.tqt-comandos .value-cell { font-family:var(--font-mono); font-size:12px; }
+.tqt-comandos .empty-table { padding:25px; color:var(--muted); text-align:center; }
+.tqt-comandos .defaults-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin:22px 0 16px; }
+.tqt-comandos .defaults-heading h2 { font-size:22px; }
+.tqt-comandos .defaults-heading span { font:12px var(--font-mono); color:var(--muted); }
+.tqt-comandos .default-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:14px; }
+.tqt-comandos .default-card { display:flex; flex-direction:column; border:1px solid var(--line); border-radius:var(--r-2); padding:18px; background:var(--surface); min-width:0; }
+.tqt-comandos .default-card-head { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.tqt-comandos .default-card-category { font:10px var(--font-mono); letter-spacing:.7px; color:var(--muted); }
+.tqt-comandos .default-card h3 { font-size:18px; }
+.tqt-comandos .factory-value { font:27px var(--font-mono); color:var(--accent-text); overflow-wrap:anywhere; margin:14px 0; }
+.tqt-comandos .factory-value small { font-size:13px; margin-left:5px; }
+.tqt-comandos .default-card p { font-size:14px; line-height:1.5; color:var(--muted); margin-bottom:14px; }
+.tqt-comandos .default-card .text-button,.tqt-comandos .default-card-foot { margin-top:auto; font-size:13px; }
+.tqt-comandos .default-card-foot { color:var(--muted); }
+.tqt-comandos.commands-guide { padding:0; border:1px solid var(--line); border-radius:var(--r-2); background:var(--surface); color:var(--text); width:min(800px,calc(100vw - 32px)); max-height:85dvh; overflow:auto; }
+.tqt-comandos.commands-guide::backdrop { background:#0009; }
+.tqt-comandos .guide-header,.tqt-comandos .guide-bottom { padding:20px; display:flex; align-items:center; justify-content:space-between; gap:14px; border-bottom:1px solid var(--line); }
+.tqt-comandos .guide-bottom { border-top:1px solid var(--line); border-bottom:0; justify-content:flex-end; }
+.tqt-comandos .guide-content { padding:20px; font-size:16px; line-height:1.6; }
+.tqt-comandos .guide-content>p { color:var(--muted); margin-bottom:16px; }
+.tqt-comandos .guide-steps>div { display:flex; gap:12px; margin:18px 0; }
+.tqt-comandos .guide-steps h3 { font-size:19px; }
+.tqt-comandos .guide-steps p { color:var(--muted); margin-top:7px; }
+.tqt-comandos .guide-subtitle { font-size:21px; margin:20px 0 12px; }
+.tqt-comandos .transport-cards { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.tqt-comandos .transport-cards>div { padding:16px; border:1px solid var(--line); border-radius:var(--r-2); background:var(--bg); }
+.tqt-comandos .transport-cards .platform-card { grid-column:1/-1; }
+.tqt-comandos .transport-cards strong,.tqt-comandos .transport-cards code { display:block; margin:8px 0; overflow-wrap:anywhere; }
+.tqt-comandos .transport-cards code { font-size:13px; }
+.tqt-comandos .transport-cards p { color:var(--muted); font-size:14px; }
+.tqt-comandos .source-downloads { display:flex; flex-wrap:wrap; gap:18px; margin:20px 0; }
+.tqt-comandos .source-downloads a { display:flex; align-items:center; gap:7px; color:var(--accent-text); }
+@media(max-width:1100px) {
+ .tqt-comandos .workspace-grid { grid-template-columns:minmax(250px,.9fr) minmax(310px,1.1fr); gap:12px; }
+ .tqt-comandos .context-summary { display:none; }
+ .tqt-comandos .row-icon { display:none; }
+ .tqt-comandos .detail-scroll { padding:16px; }
+}
+@media(max-width:800px) {
+ .tqt-comandos .workspace-grid { grid-template-columns:minmax(0,1fr); }
+ .tqt-comandos .command-list { max-height:340px; }
+ .tqt-comandos .detail-scroll { max-height:none; }
+ .tqt-comandos .context-intro { display:none; }
+ .tqt-comandos .context-field { flex:1; min-width:120px; }
+ .tqt-comandos .context-bar { gap:12px; padding:12px; }
+ .tqt-comandos .filter-options { margin-left:0; }
+ .tqt-comandos .commands-tabs .button { flex:1; padding:8px; font-size:14px; }
+ .tqt-comandos .commands-tabs .icon { display:none; }
+ .tqt-comandos .commands-categories { flex-wrap:nowrap; overflow:auto; padding:3px 2px 8px; }
+ .tqt-comandos .category { flex-shrink:0; }
+ .tqt-comandos .compare-metrics { grid-template-columns:1fr; }
+ .tqt-comandos .compare-metrics>div { flex-direction:row; align-items:center; justify-content:space-between; }
+ .tqt-comandos .transport-cards { grid-template-columns:1fr; }
+ .tqt-comandos .commands-heading { gap:8px; }
+ .tqt-comandos .commands-heading .eyebrow { font-size:9px; }
+ .tqt-comandos .terminal-command { font-size:15px; }
+ .tqt-comandos .segmented button { padding:8px; font-size:13px; }
+}

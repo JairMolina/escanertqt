@@ -1,0 +1,1347 @@
+{
+  "product": "TQT R1 STM32",
+  "hardware": "3.0",
+  "firmware_reviewed": "4.4",
+  "availability_basis": "Presencia comprobada en las fuentes locales 4.1/4.2, base web 4.3 y firmware corregido 4.4. No demuestra versiones anteriores ni prueba física de todos los comandos.",
+  "serial_terminator": "\r\n",
+  "ble_payload": "4 caracteres, sin CR/LF; el puente ESP32 agrega el fin de línea por UART.",
+  "default_motor_overcurrent_stop": false,
+  "movement_limit_ms": {
+    "base": 4000,
+    "extra_seconds_min": 0,
+    "extra_seconds_max": 10,
+    "shared_open_close": true,
+    "factory_extra_seconds": 0,
+    "factory_nominal": 4000
+  },
+  "commands": [
+    {
+      "command": "$SMSG=ON",
+      "channel": "Serial/GPS",
+      "description": "Abre o desbloquea el perno.",
+      "values": "Sin valor",
+      "example": "$SMSG=ON",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 0,
+      "title": "Abrir el perno",
+      "group": "movement",
+      "kind": "action",
+      "input": "none"
+    },
+    {
+      "command": "$SMSG=OFF",
+      "channel": "Serial/GPS",
+      "description": "Cierra o bloquea el perno.",
+      "values": "Sin valor",
+      "example": "$SMSG=OFF",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 1,
+      "title": "Cerrar el perno",
+      "group": "movement",
+      "kind": "action",
+      "input": "none"
+    },
+    {
+      "command": "$SMSG=Status",
+      "channel": "Serial/GPS",
+      "description": "Consulta estado general, versiones, entradas, salidas y datos asociados.",
+      "values": "Sin valor",
+      "example": "$SMSG=Status",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 2,
+      "title": "Consultar estado general",
+      "group": "status",
+      "kind": "query",
+      "input": "none"
+    },
+    {
+      "command": "$SMSG=Status_Motor",
+      "channel": "Serial/GPS",
+      "description": "Consulta si el perno está abierto, cerrado o en otra posición detectada.",
+      "values": "Sin valor",
+      "example": "$SMSG=Status_Motor",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 3,
+      "title": "Consultar posición del perno",
+      "group": "status",
+      "kind": "query",
+      "input": "none"
+    },
+    {
+      "command": "$SMSG=MAC",
+      "channel": "Serial/GPS",
+      "description": "Solicita la MAC del módulo Bluetooth y envía estado/configuración.",
+      "values": "Sin valor",
+      "example": "$SMSG=MAC",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 4,
+      "title": "Consultar MAC de Bluetooth",
+      "group": "status",
+      "kind": "query",
+      "input": "none"
+    },
+    {
+      "command": "$SMSG=Sensores:n",
+      "channel": "Serial/GPS",
+      "description": "Elige cómo termina el movimiento.",
+      "values": "0 = sensores; 1 = trabajar por tiempo",
+      "example": "$SMSG=Sensores:0",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "sensors_mode",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 5,
+      "title": "Elegir cómo termina el movimiento",
+      "group": "movement",
+      "kind": "config",
+      "input": "sensors"
+    },
+    {
+      "command": "$SMSG=TIEMPO:n",
+      "channel": "Serial/GPS",
+      "description": "Añade segundos al límite de apertura Y cierre; usa el mismo valor para ambos.",
+      "values": "Entero de 0 a 10; límite nominal = 4 + n segundos",
+      "example": "$SMSG=TIEMPO:5",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "extra_seconds",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 6,
+      "title": "Ajustar tiempo de movimiento",
+      "group": "movement",
+      "kind": "config",
+      "input": "time"
+    },
+    {
+      "command": "$SMSG=PARO_C:n",
+      "channel": "Serial/GPS",
+      "description": "Activa o desactiva el paro por sobrecorriente. En FW4.4 inicia desactivado.",
+      "values": "0 = desactivar; 1 = activar",
+      "example": "$SMSG=PARO_C:1",
+      "supported_versions": [
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "overcurrent_stop",
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 7,
+      "title": "Configurar paro por sobrecorriente",
+      "group": "protection",
+      "kind": "config",
+      "input": "binary"
+    },
+    {
+      "command": "$SMSG=PARO_C:?",
+      "channel": "Serial/GPS",
+      "description": "Consulta el estado de la protección del motor.",
+      "values": "Respuesta PARO_C:0 o PARO_C:1",
+      "example": "$SMSG=PARO_C:?",
+      "supported_versions": [
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": "overcurrent_stop",
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 8,
+      "title": "Consultar protección del motor",
+      "group": "protection",
+      "kind": "query",
+      "input": "none"
+    },
+    {
+      "command": "$SMSG=PROT_C:n",
+      "channel": "Serial/GPS",
+      "description": "Alias de PARO_C: realiza la misma función.",
+      "values": "0, 1 o ?",
+      "example": "$SMSG=PROT_C:1",
+      "supported_versions": [
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "overcurrent_stop",
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 9,
+      "title": "Protección del motor · alias",
+      "group": "protection",
+      "kind": "mixed",
+      "input": "protection"
+    },
+    {
+      "command": "$SMSG=MAP?",
+      "channel": "Serial/GPS",
+      "description": "Consulta el mapeo de las parejas de señales.",
+      "values": "Sin valor",
+      "example": "$SMSG=MAP?",
+      "supported_versions": [
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 10,
+      "title": "Consultar mapeo de señales",
+      "group": "mapping",
+      "kind": "query",
+      "input": "none"
+    },
+    {
+      "command": "$SMSG=MAP_M1:n",
+      "channel": "Serial/GPS",
+      "description": "Cambia el mapeo del par 1. Solo se permite con el motor detenido.",
+      "values": "0 = normal; 1 = intercambiado",
+      "example": "$SMSG=MAP_M1:1",
+      "supported_versions": [
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "map_m1",
+      "default_by_version": {
+        "4.1": null,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 11,
+      "title": "Configurar mapeo del par 1",
+      "group": "mapping",
+      "kind": "config",
+      "input": "mapping"
+    },
+    {
+      "command": "$SMSG=MAP_M2:n",
+      "channel": "Serial/GPS",
+      "description": "Cambia el mapeo del par 2. Solo se permite con el motor detenido.",
+      "values": "0 = normal; 1 = intercambiado",
+      "example": "$SMSG=MAP_M2:1",
+      "supported_versions": [
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "map_m2",
+      "default_by_version": {
+        "4.1": null,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 12,
+      "title": "Configurar mapeo del par 2",
+      "group": "mapping",
+      "kind": "config",
+      "input": "mapping"
+    },
+    {
+      "command": "$SMSG=INT_1:n",
+      "channel": "Serial/GPS",
+      "description": "Configura o consulta la entrada 1.",
+      "values": "0 = deshabilitar seguimiento; 1 o 2 = seguimiento habilitado; 3 = lectura puntual sin cambiar configuración",
+      "example": "$SMSG=INT_1:3",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": "int_1",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 13,
+      "title": "Consultar o configurar entrada 1",
+      "group": "io",
+      "kind": "mixed",
+      "input": "input"
+    },
+    {
+      "command": "$SMSG=INT_2:n",
+      "channel": "Serial/GPS",
+      "description": "Configura o consulta la entrada 2.",
+      "values": "0 = deshabilitar seguimiento; 1 o 2 = seguimiento habilitado; 3 = lectura puntual sin cambiar configuración",
+      "example": "$SMSG=INT_2:3",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": "int_2",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 14,
+      "title": "Consultar o configurar entrada 2",
+      "group": "io",
+      "kind": "mixed",
+      "input": "input"
+    },
+    {
+      "command": "$SMSG=INT_3:n",
+      "channel": "Serial/GPS",
+      "description": "Configura o consulta la entrada 3.",
+      "values": "0 = deshabilitar seguimiento; 1 o 2 = seguimiento habilitado; 3 = lectura puntual sin cambiar configuración",
+      "example": "$SMSG=INT_3:3",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": "int_3",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 15,
+      "title": "Consultar o configurar entrada 3",
+      "group": "io",
+      "kind": "mixed",
+      "input": "input"
+    },
+    {
+      "command": "$SMSG=OUT_1:n",
+      "channel": "Serial/GPS",
+      "description": "Controla la salida lógica 1.",
+      "values": "0 = nivel bajo; 1 = nivel alto",
+      "example": "$SMSG=OUT_1:1",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "out_1",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 16,
+      "title": "Controlar salida lógica 1",
+      "group": "io",
+      "kind": "config",
+      "input": "output"
+    },
+    {
+      "command": "$SMSG=OUT_2:n",
+      "channel": "Serial/GPS",
+      "description": "Controla la salida lógica 2.",
+      "values": "0 = nivel bajo; 1 = nivel alto",
+      "example": "$SMSG=OUT_2:1",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "out_2",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 17,
+      "title": "Controlar salida lógica 2",
+      "group": "io",
+      "kind": "config",
+      "input": "output"
+    },
+    {
+      "command": "$SMSG=Bloqueo:n",
+      "channel": "Serial/GPS",
+      "description": "Selecciona la salida del equipo GPS utilizada para bloqueo.",
+      "values": "0 = ninguna; 1 a 4 = salida del equipo",
+      "example": "$SMSG=Bloqueo:1",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "blocking_output",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 18,
+      "title": "Elegir salida GPS de bloqueo",
+      "group": "io",
+      "kind": "config",
+      "input": "blocking"
+    },
+    {
+      "command": "$SMSG=Nombre:texto",
+      "channel": "Serial/GPS",
+      "description": "Cambia el nombre de configuración/Bluetooth. La identidad fija del inventario continúa en Flash.",
+      "values": "Hasta 22 caracteres; evitar cambiarlo sin revisar el inventario",
+      "example": "$SMSG=Nombre:TQT_R1_V30_0023",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "name",
+      "default_by_version": {
+        "4.1": "Identidad de la tarjeta",
+        "4.2": "Identidad de la tarjeta",
+        "4.3": "Identidad de la tarjeta",
+        "4.4": "Identidad de la tarjeta"
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 19,
+      "title": "Cambiar nombre de la tarjeta",
+      "group": "system",
+      "kind": "config",
+      "input": "name"
+    },
+    {
+      "command": "$SMSG=SPAS;c",
+      "channel": "Serial/GPS",
+      "description": "Cambia el carácter que separa campos del mensaje de estado.",
+      "values": "Un carácter; distinto de SPAV, comillas y fin de línea",
+      "example": "$SMSG=SPAS;|",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": "field_separator",
+      "default_by_version": {
+        "4.1": "|",
+        "4.2": "|",
+        "4.3": "|",
+        "4.4": "|"
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 20,
+      "title": "Separar campos del estado",
+      "group": "system",
+      "kind": "config",
+      "input": "separator"
+    },
+    {
+      "command": "$SMSG=SPAV;c",
+      "channel": "Serial/GPS",
+      "description": "Cambia el carácter que separa el nombre de un campo y su valor.",
+      "values": "Un carácter; distinto de SPAS, comillas y fin de línea",
+      "example": "$SMSG=SPAV;:",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": "value_separator",
+      "default_by_version": {
+        "4.1": ";",
+        "4.2": ";",
+        "4.3": ";",
+        "4.4": ";"
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 21,
+      "title": "Separar nombre y valor",
+      "group": "system",
+      "kind": "config",
+      "input": "separator"
+    },
+    {
+      "command": "$SMSG=DBG_TQT;n",
+      "channel": "Serial/GPS",
+      "description": "Activa o desactiva los mensajes de eventos TQT. No es la opción de compilación MODO_DEBUG.",
+      "values": "0 = desactivar; 1 = activar",
+      "example": "$SMSG=DBG_TQT;1",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": "debug_events",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 22,
+      "title": "Configurar mensajes de eventos",
+      "group": "system",
+      "kind": "config",
+      "input": "binary"
+    },
+    {
+      "command": "$SMSG=Reset",
+      "channel": "Serial/GPS",
+      "description": "Reinicia la tarjeta; no es un restablecimiento de fábrica.",
+      "values": "Sin valor",
+      "example": "$SMSG=Reset",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 23,
+      "title": "Reiniciar la tarjeta",
+      "group": "reset",
+      "kind": "action",
+      "input": "none"
+    },
+    {
+      "command": "$SMSG=Reset_BLE",
+      "channel": "Serial/GPS",
+      "description": "Reinicia la alimentación del módulo Bluetooth.",
+      "values": "Sin valor",
+      "example": "$SMSG=Reset_BLE",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 24,
+      "title": "Reiniciar módulo Bluetooth",
+      "group": "reset",
+      "kind": "action",
+      "input": "none"
+    },
+    {
+      "command": "$SMSG=Reset_44",
+      "channel": "Serial/GPS",
+      "description": "Restablece valores predeterminados y reinicia; pierde la configuración personalizada de EEPROM.",
+      "values": "Sin valor; usar solo con intención de restablecer",
+      "example": "$SMSG=Reset_44",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 25,
+      "title": "Restablecer valores de fábrica",
+      "group": "reset",
+      "kind": "destructive",
+      "input": "none"
+    },
+    {
+      "command": "$OK / OK",
+      "channel": "Serial/GPS",
+      "description": "Confirmación del mensaje enviado al equipo GPS. Es parte del protocolo, no una orden de operador.",
+      "values": "Enviar solo al confirmar recepción correcta",
+      "example": "$OK",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 26,
+      "title": "Confirmar recepción GPS",
+      "group": "protocol",
+      "kind": "protocol",
+      "input": "none"
+    },
+    {
+      "command": "PPON",
+      "channel": "Bluetooth",
+      "description": "Abre o desbloquea el perno.",
+      "values": "Exactamente 4 caracteres",
+      "example": "PPON",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 27,
+      "title": "Abrir el perno",
+      "group": "movement",
+      "kind": "action",
+      "input": "none"
+    },
+    {
+      "command": "POFF",
+      "channel": "Bluetooth",
+      "description": "Cierra o bloquea el perno.",
+      "values": "Exactamente 4 caracteres",
+      "example": "POFF",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 28,
+      "title": "Cerrar el perno",
+      "group": "movement",
+      "kind": "action",
+      "input": "none"
+    },
+    {
+      "command": "RST4",
+      "channel": "Bluetooth",
+      "description": "Restablece valores de fábrica y reinicia.",
+      "values": "Exactamente 4 caracteres",
+      "example": "RST4",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": null,
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": null
+      },
+      "default_note": "Acción o consulta: sin valor predeterminado propio; ver estados de fábrica.",
+      "id": 29,
+      "title": "Restablecer valores de fábrica",
+      "group": "reset",
+      "kind": "destructive",
+      "input": "none"
+    },
+    {
+      "command": "I1_1",
+      "channel": "Bluetooth",
+      "description": "Habilita entrada 1: equivale a INT_1:2.",
+      "values": "Exactamente 4 caracteres",
+      "example": "I1_1",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "int_1",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 30,
+      "title": "Habilitar seguimiento de entrada 1",
+      "group": "io",
+      "kind": "config",
+      "input": "none"
+    },
+    {
+      "command": "I1_0",
+      "channel": "Bluetooth",
+      "description": "Deshabilita seguimiento de entrada 1: equivale a INT_1:0.",
+      "values": "Exactamente 4 caracteres",
+      "example": "I1_0",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "int_1",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 31,
+      "title": "Deshabilitar seguimiento de entrada 1",
+      "group": "io",
+      "kind": "config",
+      "input": "none"
+    },
+    {
+      "command": "I2_1",
+      "channel": "Bluetooth",
+      "description": "Habilita entrada 2: equivale a INT_2:2.",
+      "values": "Exactamente 4 caracteres",
+      "example": "I2_1",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "int_2",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 32,
+      "title": "Habilitar seguimiento de entrada 2",
+      "group": "io",
+      "kind": "config",
+      "input": "none"
+    },
+    {
+      "command": "I2_0",
+      "channel": "Bluetooth",
+      "description": "Deshabilita seguimiento de entrada 2: equivale a INT_2:0.",
+      "values": "Exactamente 4 caracteres",
+      "example": "I2_0",
+      "supported_versions": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "int_2",
+      "default_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 33,
+      "title": "Deshabilitar seguimiento de entrada 2",
+      "group": "io",
+      "kind": "config",
+      "input": "none"
+    },
+    {
+      "command": "PC_1",
+      "channel": "Bluetooth",
+      "description": "Activa el paro por sobrecorriente.",
+      "values": "Exactamente 4 caracteres",
+      "example": "PC_1",
+      "supported_versions": [
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "overcurrent_stop",
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 34,
+      "title": "Activar paro por sobrecorriente",
+      "group": "protection",
+      "kind": "config",
+      "input": "none"
+    },
+    {
+      "command": "PC_0",
+      "channel": "Bluetooth",
+      "description": "Desactiva el paro por sobrecorriente.",
+      "values": "Exactamente 4 caracteres",
+      "example": "PC_0",
+      "supported_versions": [
+        "4.4"
+      ],
+      "requires_care": true,
+      "default_setting_key": "overcurrent_stop",
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 35,
+      "title": "Desactivar paro por sobrecorriente",
+      "group": "protection",
+      "kind": "config",
+      "input": "none"
+    },
+    {
+      "command": "PC_?",
+      "channel": "Bluetooth",
+      "description": "Consulta el ajuste; la respuesta se genera por Serial/GPS.",
+      "values": "Exactamente 4 caracteres",
+      "example": "PC_?",
+      "supported_versions": [
+        "4.4"
+      ],
+      "requires_care": false,
+      "default_setting_key": "overcurrent_stop",
+      "default_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": 0
+      },
+      "default_note": "Ver factory_defaults para significado y unidad.",
+      "id": 36,
+      "title": "Consultar protección del motor",
+      "group": "protection",
+      "kind": "query",
+      "input": "none"
+    }
+  ],
+  "defaults_scope": "Valores de fábrica o restablecimiento; una actualización conserva configuración válida existente. Los estados vivos cambian con arranque, sensores y operación.",
+  "factory_defaults": [
+    {
+      "key": "int_1",
+      "label": "Entrada 1: seguimiento",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = seguimiento deshabilitado; el nivel eléctrico depende de la señal física.",
+      "unit": null
+    },
+    {
+      "key": "int_2",
+      "label": "Entrada 2: seguimiento",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = seguimiento deshabilitado; el nivel eléctrico depende de la señal física.",
+      "unit": null
+    },
+    {
+      "key": "int_3",
+      "label": "Entrada 3: seguimiento",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = seguimiento deshabilitado; el nivel eléctrico depende de la señal física.",
+      "unit": null
+    },
+    {
+      "key": "out_1",
+      "label": "Salida 1: valor lógico guardado",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = bajo lógico. OUT_3 no tiene comando de edición en los parsers revisados; no expresa tensión ni cableado.",
+      "unit": null
+    },
+    {
+      "key": "out_2",
+      "label": "Salida 2: valor lógico guardado",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = bajo lógico. OUT_3 no tiene comando de edición en los parsers revisados; no expresa tensión ni cableado.",
+      "unit": null
+    },
+    {
+      "key": "out_3",
+      "label": "Salida 3: valor lógico guardado",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = bajo lógico. OUT_3 no tiene comando de edición en los parsers revisados; no expresa tensión ni cableado.",
+      "unit": null
+    },
+    {
+      "key": "movement_base_ms",
+      "label": "Tiempo base de apertura y cierre",
+      "values_by_version": {
+        "4.1": 4000,
+        "4.2": 4000,
+        "4.3": 4000,
+        "4.4": 4000
+      },
+      "meaning": "Base común a ambos movimientos.",
+      "unit": "ms"
+    },
+    {
+      "key": "extra_seconds",
+      "label": "TIEMPO: segundos adicionales",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = sin tiempo extra; límite nominal de fábrica de 4 segundos.",
+      "unit": "s"
+    },
+    {
+      "key": "extra_seconds_max",
+      "label": "Máximo adicional configurable",
+      "values_by_version": {
+        "4.1": 10,
+        "4.2": 10,
+        "4.3": 10,
+        "4.4": 10
+      },
+      "meaning": "Rango TIEMPO: 0 a 10; máximo nominal 14 segundos.",
+      "unit": "s"
+    },
+    {
+      "key": "post_movement_pause_ms",
+      "label": "Pausa después del movimiento",
+      "values_by_version": {
+        "4.1": 3000,
+        "4.2": 3000,
+        "4.3": 3000,
+        "4.4": 3000
+      },
+      "meaning": "Espera con motor apagado; se añade al proceso, no a los 4 segundos de accionamiento.",
+      "unit": "ms"
+    },
+    {
+      "key": "wait_constant_ms",
+      "label": "Constante interna Tiempo_Espera",
+      "values_by_version": {
+        "4.1": 5000,
+        "4.2": 5000,
+        "4.3": 5000,
+        "4.4": 5000
+      },
+      "meaning": "Constante interna; no es un ajuste TIEMPO del usuario.",
+      "unit": "ms"
+    },
+    {
+      "key": "sensors_mode",
+      "label": "Sensores del motor (SEN_MOT)",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = terminar por sensores, sujeto al límite de tiempo; 1 = trabajar por tiempo.",
+      "unit": null
+    },
+    {
+      "key": "overcurrent_stop",
+      "label": "Paro por sobrecorriente configurable",
+      "values_by_version": {
+        "4.1": null,
+        "4.2": null,
+        "4.3": null,
+        "4.4": 0
+      },
+      "meaning": "FW4.4: 0 = desactivado; 1 = activado. En FW4.1–4.3 no existe este ajuste: el paro está fijo en la lógica.",
+      "unit": null
+    },
+    {
+      "key": "map_m1",
+      "label": "Mapeo M1",
+      "values_by_version": {
+        "4.1": null,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = normal; 1 = intercambiado. FW4.1 no dispone del ajuste.",
+      "unit": null
+    },
+    {
+      "key": "map_m2",
+      "label": "Mapeo M2",
+      "values_by_version": {
+        "4.1": null,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = normal; 1 = intercambiado. FW4.1 no dispone del ajuste.",
+      "unit": null
+    },
+    {
+      "key": "blocking_output",
+      "label": "Bloqueo: salida GPS elegida",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = ninguna salida GPS seleccionada.",
+      "unit": null
+    },
+    {
+      "key": "legacy_motor",
+      "label": "Campo MOTOR del estado",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "Campo histórico; no equivale al paro por sobrecorriente ni tiene comando MOTOR de edición.",
+      "unit": null
+    },
+    {
+      "key": "field_separator",
+      "label": "SPAS: separador entre campos",
+      "values_by_version": {
+        "4.1": "|",
+        "4.2": "|",
+        "4.3": "|",
+        "4.4": "|"
+      },
+      "meaning": "Carácter que separa campos de estado.",
+      "unit": null
+    },
+    {
+      "key": "value_separator",
+      "label": "SPAV: separador campo/valor",
+      "values_by_version": {
+        "4.1": ";",
+        "4.2": ";",
+        "4.3": ";",
+        "4.4": ";"
+      },
+      "meaning": "Carácter entre nombre del campo y valor.",
+      "unit": null
+    },
+    {
+      "key": "debug_events",
+      "label": "DBG_TQT: eventos",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "0 = desactivados; independiente de la compilación Debug/Release.",
+      "unit": null
+    },
+    {
+      "key": "s_on",
+      "label": "S_ON: estado inicial guardado",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "Se actualiza con la lectura del sensor; no asegura perno abierto o cerrado.",
+      "unit": null
+    },
+    {
+      "key": "s_off",
+      "label": "S_OFF: estado inicial guardado",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "Se actualiza con la lectura del sensor; no asegura perno abierto o cerrado.",
+      "unit": null
+    },
+    {
+      "key": "error",
+      "label": "ERROR: valor inicial",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "Estado vivo; puede cambiar durante la operación.",
+      "unit": null
+    },
+    {
+      "key": "alive",
+      "label": "VIVA: valor inicial",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "Se alterna al arrancar y durante operación; puede observarse 1 tras el arranque.",
+      "unit": null
+    },
+    {
+      "key": "resets",
+      "label": "RESET: contador inicial",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "Se incrementa al arrancar: tras inicializar valores de fábrica puede observarse 1.",
+      "unit": null
+    },
+    {
+      "key": "eeprom_schema",
+      "label": "Versión de estructura EEPROM",
+      "values_by_version": {
+        "4.1": 5,
+        "4.2": 6,
+        "4.3": 6,
+        "4.4": 7
+      },
+      "meaning": "Versión de datos; distinta de la versión de firmware.",
+      "unit": null
+    },
+    {
+      "key": "movement_count",
+      "label": "MOV: contador inicial",
+      "values_by_version": {
+        "4.1": 0,
+        "4.2": 0,
+        "4.3": 0,
+        "4.4": 0
+      },
+      "meaning": "MovMotor se inicializa en 0; aumenta con movimientos reales.",
+      "unit": null
+    },
+    {
+      "key": "name",
+      "label": "Nombre de tarjeta",
+      "values_by_version": {
+        "4.1": "Identidad de la tarjeta",
+        "4.2": "Identidad de la tarjeta",
+        "4.3": "Identidad de la tarjeta",
+        "4.4": "Identidad de la tarjeta"
+      },
+      "meaning": "Nombre individual obtenido de la identidad programada; no existe un nombre numérico universal.",
+      "unit": null
+    }
+  ],
+  "catalog_schema": 1,
+  "firmware_versions": [
+    "4.1",
+    "4.2",
+    "4.3",
+    "4.4"
+  ],
+  "hardware_versions": [
+    "3.0"
+  ],
+  "maintenance": "IDs are permanent, independent of array order. Assign a new unique ID for each added command; never recycle an existing ID."
+}

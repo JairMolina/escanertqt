@@ -1,107 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-21 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.28; producción en 1.4.26 — 1.4.27 con prompt entregado, sin confirmar)
-
-## v1.4.28 (2026-10-21, Claude Code, rama tpms-pestanas)
-- TPMS replica la consola de Escáner TQT sin MAC ni R2/R3 (una placa = una tarjeta): Operación (Dashboard, Recibir, Programar, Consultar) y Gestión (Inventario, Lotes, Movimientos, Excel); celular con barra inferior + «Más». JS en `static/js/tpms_*.js`, CSS en `css/tpms*.css`. Hecho con 2 agentes (backend/frontend) sobre un contrato de API común.
-- API `/api/tpms`: pcb (filtros), manual, por-codigo, firmware, patch/delete, masa (todo o nada), resumen (actividad 14 días, últimos; `firmwares` incluye null = sin firmware), eventos, lotes, lotes/renombrar, exportar (xlsx). `tpms_pcb` ampliada por migración idempotente; historial propio `tpms_eventos` (nunca `escaneos`/log_evento).
-- `_serve_file` también reemplaza `__VERSION__` (pie de /tpms con la versión).
-- Evidencia: test_tpms (17), suite 841+: solo los 3 errores previos; frontend probado por el agente con API simulada en Chrome 375/1280. Sin prueba con backend real en navegador ni cámara.
-
-## v1.4.27 (2026-10-21, Claude Code, rama tpms-modulo)
-- Módulo TPMS disponible (`modulos.py`, acento #FF6A00): `/tpms/acceso` (login propio, `_pagina_acceso` compartido con Impresora), `/tpms` (escaneo QR con `mountVisor`, lote por dispositivo, historial en sessionStorage), API `/api/tpms/escanear|pcb` (`services/tpms.py`, tabla propia `tpms_pcb`; no escribe en `escaneos` para no mezclar tableros TQT). Consultor puede abrir /tpms (sus POST siguen bloqueados).
-- QR TPMS: `models.parse_tpms`. Las PCB TPMS V1 traen la plantilla R3 Timer CON GUIONES (`PCB_TQT-R3_V2_0_TIMER-0004`) → TPMS-V1-0004; la R3 Timer real va con guiones bajos (`PCB_TQT_R3_V2_0_TIMER_0073`; producción tiene R3-V20-0102 y 0104 montadas) y sigue en TQT. `parse_tarjeta_code` y `T.parseNombre` (espejo `T.esTpms`) rechazan TPMS; Recibir avisa sin ofrecer «¿Qué placa es?».
-- `_serve_file` y las páginas de login/inicio/invitación reescriben `?v=` de JS/CSS con `APP_VERSION` (`_VER_ESTATICO`): el `?v=` manual quedaba viejo (sec_inventario.js?v=1352) y producción servía JS de 1.4.25 tras desplegar 1.4.26.
-- `list_lotes` añade `placas` (pcb_inventario.lote_id); `T.loteConteo` «N tarjetas · M placas»; Mover a lote recarga lotes.
-- Evidencia: tests nuevos test_tpms, test_version_estaticos, test_invitaciones_modulo (TPMS); suite 830: solo los 3 errores previos. Sin prueba con cámara/placa real.
-
-## v1.4.26 (2026-10-21, Claude Code, rama fix/filtros-inventario)
-- sec_inventario.js: `replaceChildren` recibía arreglos (opciones convertidas en texto) en los filtros de hardware y lote → spread + conteos; la selección se poda a las filas filtradas. Revisados tipo, estado, sin MAC, búsqueda y lote. Revisado el resto del frontend: no hay otro `replaceChildren` con arreglo sin spread.
-- Evidencia: `node --check` OK, test_qa_version_hoy OK. Sin prueba visual.
-
-## v1.4.25 (2026-10-21, Claude Code, rama feat/mover-a-lote)
-- `inv.mover_a_lote` + `POST /api/pcb/mover-lote` (modelo `MoverALote`): todo o nada, tarjetas de otro lote solo con `con_tarjetas`, choque de número = 409. Evento único `LOTE_MOVIDO` (registrado en `admin_ops.EVENTOS`, categoría edición; ningún tablero filtra eventos por patrón). Aviso WS: se reutilizan `PCB_ACTUALIZADA` y `TARJETA_ACTUALIZADA` (sin evento nuevo).
-- sec_inventario.js: filtro/columna Lote (`recibida_lote_id`), acción «Mover a lote». common.js/sec_lotes.js: «Usar este lote» para todos menos consultor y textos de lote por cuenta. Recibir: chip `btnLote` reutiliza `T.openLotes(shell)`.
-- Evidencia: tests nuevos en test_lote_por_usuario (mover sueltas, tarjetas con confirmación, choque, un solo evento); suite 825: solo los 3 errores previos. Sin prueba visual. Producción: el usuario confirmó v1.4.24 desplegada.
-
-## v1.4.24 (2026-10-21, Claude Code, rama fix/lote-por-usuario)
-- Lote por usuario: `db.USUARIO_LOTE` (ContextVar) lo fija `_exigir_sesion` en main.py; `get_active_lote`/`list_lotes`/`set_active_lote`/`create_lote` usan `ajustes['lote_usuario:<correo>']`; sin usuario, el global de siempre. `resolver_lote_id` hereda el lote del usuario (recepción, emparejar, Excel, correo…). El WS no tiene usuario: su `lote_activo` inicial es el global.
-- `pcb_inventario.lote_id` (migración en `_asegurar_columnas`), expuesto como `recibida_lote_id`; filtro `lote_id` en `GET /api/pcb`. Se descartó filtrar el emparejado por lote (bloqueaba sobrantes de otros lotes y rompía pruebas).
-- Recibir (Lote especial): `visor.forget()` + `start()`, `scrollIntoView` del visor y toast al pedir la muestra (el aviso quedaba fuera de pantalla y el escáner ignoraba el QR que seguía en cuadro).
-- Evidencia: tests/test_lote_por_usuario.py (2 usuarios, recepción con lote); test_lotes_dia_semana.test_04 adaptado; suite completa 824 pruebas: solo los 3 errores previos (2 test_correo_excel en corrida completa, test_excel_r3_v1112.test_06 sin etiqueta v1.1.11). Sin prueba en teléfonos reales.
-
-## v1.4.23 (2026-10-21, Claude Code, rama feat/recibir-muestra-lote)
-- Recibir: `state.muestra` (espera de placa de muestra) → `hojaEspecial(muestra)` con vista previa vía `nombreEspecial(text, cfg)`; con la hoja abierta (`espHoja`) el visor no registra. Al activar se registra la muestra con `onCode`.
-- Evidencia: `node --check` OK, suites de recepción/versión OK, Docker local redesplegado. Sin prueba visual ni con cámara real.
-
-## v1.4.22 (2026-10-21, Claude Code, rama feat/recibir-formato-especial)
-- Recibir: botón `btnEspecial` («Lote especial») en index.html; `state.especial = {version, tipo}`; `nombreEspecial()` traduce cualquier QR (tipo R1/R2/R3/Timer o fijo + último número de 1–4 dígitos) a `TQT-Rx-V<ver>-nnnn` antes de `parseNombre`, y se envía el nombre canónico a `/api/pcb/escanear`. Solo cliente; el modo no persiste al recargar.
-- Evidencia: `node --check` OK, `nombreEspecial` probado con node (TQT_R2_0008, TQT_Timer_0033, solo número con tipo fijo); suites de recepción/versión OK. Sin prueba visual ni con cámara real. El usuario reporta que aún no recibe: producción sigue en 1.4.13 (falta desplegar).
-
-## v1.4.21 (2026-10-21, Claude Code, rama fix/qr-recibir-formatos)
-- QR flexibles: `_TARJETA_REGEX` (models.py) y `NOMBRE_RE` (common.js, exportado como `T.NOMBRE_RE` y reutilizado en sec_macs.js) aceptan versión opcional (`VERSION_SIN_MARCA = "10"`) y `TIMER` = R3. QR reales leídos de fotos: `TQT_R2_0008`, `TQT_Timer_0033`.
-- Recibir: `registrarComo()` ofrece R1/R2/R3 para un QR desconocido con número (usa `state.version`, reutiliza `onCode` con el nombre canónico).
-- Evidencia: suite completa 822 pruebas; tras ajustar 2 pruebas que exigían rechazar QR sin versión, test_inventario/test_qa_recepcion/test_business_rules/test_escaner_remoto OK. Pendientes ajenos: test_excel_r3_v1112.test_06 (falta la etiqueta git v1.1.11, falla igual en main) y 2 de test_correo_excel que fallaron solo en la corrida completa (pasan aisladas). `node --check` OK. Sin prueba con cámara real.
-
-## v1.4.20 (2026-10-21, Claude Code)
-- Estado «programada» con FW capturado a mano: `r2_programming.statuses` ya no exige evidencia BLE (compara FW guardado o `firmware_r2` de la tarjeta contra el más reciente; `verified` sigue aparte). `_SELECT_PCB` hereda `firmware_r1/r2` de la tarjeta, así las listas R1/R3 coinciden con Tarjetas.
-- TQT R2 con la estructura de R1/R3 (tarjeta → acciones → avance → firmware → Bluetooth/monitor/USB).
-- Pruebas TQT: historial bajo «Elige una tarjeta», oculto sin tarjeta elegida. Prueba automática y resultado lado a lado. TQT R2 con detalle en dos mitades («Elige una R2»). Docker local con la BD de producción 1.4.19 del 2026-10-21 (respaldo previo en el volumen: tqt_produccion.db.bak-antes-prod-20261021).
-- Evidencia: 240 pruebas de suites pertinentes OK (2 de test_r2_programming adaptadas a la nueva regla), `node --check` OK. Sin revisión visual con sesión ni con la BD de producción.
-
-## v1.4.19 (2026-10-20, Claude Code)
-- Programación R1/R3: estatus por tarjeta en la lista, detalle en dos mitades, botones y avance arriba, estación J-Link automática (sin menú). Pruebas TQT: tarjeta + inventario arriba, intro/serial/historial apilados, prueba automática a todo el ancho.
-- Evidencia: test_qa_version_hoy OK, `node --check` OK, Docker local 1.4.19. Sin revisión visual con sesión ni hardware.
-- Pendiente: el usuario reporta que ON/OFF BLE sale por serial; el código revisado envía por BLE (puente Windows y Web Bluetooth). Falta evidencia del registro.
-
-## v1.4.18 (2026-10-20, Claude Code)
-- Impresora: etiqueta «ACT» arriba y número abajo junto al QR; exportar Excel (`/api/activos/exportar.xlsx`, filtros o selección); selección en lote y eliminación con contraseña del usuario (`/api/activos/eliminar-lote`, mismo limitador que el login, bitácora `ACTIVOS_ELIMINADOS`).
-- Evidencia: 174 pruebas de las suites pertinentes OK; Docker local 1.4.18 con los 372 activos. Exportar/eliminar sin probar con datos reales.
-
-## v1.4.14–v1.4.17 (2026-10-20, Claude Code)
-- Módulo Impresora disponible: activos ACT 0000 (`app/services/activos.py`, `app/routers/activos.py`, tablas `activos`/`activos_eventos` creadas solas), etiqueta DYMO 30334 solo con «ACT 0000» + QR (`/impresora?activo=ACT-0000`), impresión individual y por lote a la DYMO compartida (misma cola que TQT, tipo `activo`), estado `/api/activos/impresora/estado`, vincular celular, importación de Excel (`activos_import.py`, solo filas verdes) con departamento y características. Interfaz propia y acceso propio `/impresora/acceso`.
-- Permiso por módulo de cada ruta (`modulos.modulo_de_ruta`, rutas compartidas); invitaciones por correo a módulos desde el núcleo (`/api/plataforma/invitaciones`).
-- Evidencia: suites pertinentes OK (test_activos, test_activos_import, test_invitaciones_modulo y las de plataforma/auth/dymo). Docker local 1.4.17 con 372 activos importados del Excel de inventario (BD local; el Excel no está en el repo). Sin impresión física ni prueba con celular real.
-- Para producción: `TQT_PUBLIC_URL` debe estar definida (si no, el QR toma la URL con que la Raspberry pide la etiqueta); SMTP con `TQT_SMTP_*`; verificar que el agente de la Raspberry acepte trabajos de tipo `activo` (descarga el mismo SVG genérico). La carga inicial de activos se hace con el botón «Importar Excel».
-- Pendiente: activos ACT-0281 y ACT-0377 traen una contraseña en notas (decisión del usuario).
-
-## v1.4.11–v1.4.13 (2026-10-20, Claude Code)
-- Plataforma «I+D»: portal `/inicio` con 7 módulos (catálogo `app/modulos.py`; Escáner TQT disponible, el resto «Próximamente»), órbitas con una sola elipse por anillo.
-- Acceso por módulo: columna `usuarios.modulos` (default `escaner-tqt`, la crea sola al arrancar); administradores entran a todo; sin Escáner TQT asignado, páginas → `/inicio?denegado=escaner-tqt` y API 403 `X-Acceso: modulo`.
-- Núcleo I+D: siempre botón; pide «Acceso de administrador» (`POST /api/plataforma/entrar`, solo abre sesión a administradores) y despliega «Cuentas y módulos» (`app/routers/plataforma.py`: GET/PATCH cuentas, POST `/modulos/{id}/todos`). También en Administración › Cuentas.
-- Evidencia: 125 pruebas de las suites pertinentes OK (test_plataforma_cuentas y test_portal_modulos nuevas). Docker local 1.4.13 healthy. Móvil revisado con emulación CDP a 360/390/412 px (sin desborde, objetivos ≥40 px) y panel de cuentas con servidor aislado. Sin prueba en celular físico ni con cuentas reales.
-- Pendiente: desplegar; los 6 módulos nuevos aún no tienen aplicación.
-
-## v1.4.10 (2026-10-20, Claude Code)
-- Portal de módulos en `/inicio` (constelación: núcleo TQT y módulos como estrellas en órbita). Módulos en `MODULOS` de `app/main.py`, servidos en `GET /api/modulos` (público). Sin sesión, `/` → `/inicio`; las demás páginas siguen → `/login?next=`. Enlace «← Módulos» en login, consola y móvil. Archivos nuevos: `inicio.html`, `css/inicio.css`, `js/inicio.js`.
-- Evidencia: 84 pruebas OK (test_portal_modulos nuevo, test_qa_version_hoy, test_auth_seguridad, test_api, test_admin, test_cuentas_roles, test_consultor_escritorio). Revisión en Chrome con servidor local aislado: claro, oscuro, ficha al pasar el cursor, Entrar sin sesión → login, enlace de regreso. No revisado en navegador a 375 px ni con sesión real.
-- Pendiente: probar en celular, definir los módulos reales («Próximamente» son de ejemplo), merge a main y despliegue cuando se pida.
-
-## v1.4.9 (2026-10-20, sesión del servidor)
-- DYMO compartida: la cola ya no se atora (commit `7564a21`, producción en 1.4.9).
-
-## v1.4.7–v1.4.8 (2026-10-19, Claude Code)
-- v1.4.7: consumo de materiales por evento (R1/R2 programadas, R3 asignada, gabinete colocado); migración `migr_consumo_146` + tabla `inv_tqtr_consumo_base` (solo desde hoy); `consumir_por_evento` serializado.
-- v1.4.8: criterio único de «programada» (`db._R1R2_PROGRAMADAS`, `T.programada`/`T.conFw`); reporte por fecha corregido; STM32 y programación por lote notifican la tarjeta.
-- Evidencia: suites de inventario, programación, emparejado, DYMO, admin y API OK (test_correo_excel solo falla en conjunto, preexistente; pasa aislado). Docker local 1.4.8 healthy con la BD de producción 1.4.6 del 2026-10-19 (migración: base placas 34, r3 26, gabinete 19). Sin prueba física.
-- Pendiente de decisión: «Pendientes» de MAC y firmware solo miran MAC; OTA migration_required queda verified sin guardar firmware; vista de estado R2 por versión.
-
-## v1.4.5–v1.4.6 (2026-10-19, Claude Code)
-- v1.4.5: zona «Cable R3» en Etiquetas DYMO (TQT: 0000 / R3: 0000), parámetro `r3` en `/api/dymo/cable/*` y DYMO compartida.
-- v1.4.6: impresión automática del cable R3 en la DYMO compartida al asignar una R3 (`app/services/cable_r3_auto.py`, gancho en `_notificar_tarjeta`), interruptor en Administración › Resumen (apagado por defecto). Crea la tabla `dymo_cable_r3_hechas` sola.
-- Evidencia: 89 pruebas Python OK (test_cable_r3_auto, test_dymo_cable, test_dymo_remoto, test_dymo, test_admin, test_api, test_qa_version_hoy); Docker local 1.4.6 healthy. Sin prueba física con la Raspberry ni revisión visual en navegador.
-- Pendiente: desplegar 1.4.4→1.4.6 en producción, activar el interruptor y probar una asignación real de R3.
+Actualizado: 2026-10-21 22:54 UTC
+Commit de referencia: `7fe97eb5e036` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Desplegada1.4.3 autorizada porusuario enOrangePi /home/orangepi/escanertqt commit11cc0585dc430208d1c1f2e83f3dd423e8badacf. Fastforward desde76d71a1 y recreate solo servicio tqt con servidor/compose.yml. Datos/volumenes/tunel conservados. Loginpublico confirma1.4.3 y apihealthOK.
+Integracion nativa Gestion > Comandos preparada sobre main 7fe97eb/web1.4.28 en rama codex/comandos-r1-local. Catalogo separado de37 comandos y28 valores de fabrica, filtros, comparacion, favoritos y constructor dinamico. Plataforma inicial; CRLF manual solo Serial/GPS; BLE y acuse originales. URL de revision http://localhost:18086/monitor#/comandos con base aislada. Usuario autoriza publicar la rama, actualizar con pull y sincronizar memoria; no autoriza desplegar produccion.
 
 ## Siguiente paso
-Revisar operacion de puente BLE Windows por usuario en produccion; pruebas fisicas previas locales14/14 no repetidas. UART28/99 lineas corruptas pendiente diagnostico. Previewlocal no reiniciado. Android/Skytec pendientes.
+Publicar la rama verificada y completar pull y sincronizacion central. Integrar a main y desplegar solo cuando se solicite. Conservar checkout anterior y sus cambios locales; documentacion tecnica en docs/COMANDOS_R1_INTEGRACION.md.
 
 ## Evidencia
-Sin trabajos activos antes de despliegue; respaldo SQLite predeploy_1.4.3_20261016_134402.db en /backups servidor. ContenedorAPP_VERSION1.4.3 y arranqueOK; httpsinventariotqt.site/login muestra1.4.3, apihealthok. 502 transitorio durante arranque resuelto; recursosstatic protegidos requieren sesion. Pruebas previas24Python14JSUIpass.
-
-## Nota operativa R2 (2026-10-16)
-
-Documentado en R2_ALTA_GENERICA_42.md el inicio de programar_base.ps1 con ExecutionPolicy Bypass limitado al proceso. El usuario reporto bloqueo de PowerShell; no confirmo nueva grabacion. Se mantiene BIN generico4.0 fijo seguido de alta y OTA web con datos/credencial por unidad; evidencia previa0067 FW4.2. Sin cambios de codigo ni nueva prueba fisica.
+52Python,9Node y16escenarios Playwright aprobados; enlace movil adicional PASS; clipboard real. Docker build y Compose validos; tqt-comandos-qa-web-1 healthy en127.0.0.1:18086. Capturas1440/1024/390 claro/oscuro sin desborde; sin errores JS/HTTP E2E. git fetch confirma origin/main 7fe97eb, sin cambios nuevos. ECC E2E/verificacion y ui-ux-pro-max aplicados.

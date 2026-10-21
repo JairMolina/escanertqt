@@ -1,0 +1,11 @@
+# Test-only build context; no credentials, DBs, backups or originals.
+**
+!tests/
+!tests/**
+!docs/
+!docs/COMANDOS_R1_INTEGRACION.md
+!CHANGELOG.md
+!deploy/
+!deploy/local-tests/
+!deploy/local-tests/Dockerfile.commands-tests
+!deploy/local-tests/Dockerfile.commands-tests.dockerignore

@@ -1,0 +1,38 @@
+# Isolated local review: no production data, tunnel or hardware agent.
+services:
+  web:
+    image: tqt-comandos-local:review
+    build:
+      context: .
+      dockerfile: deploy/local-tests/Dockerfile
+    ports:
+      - "127.0.0.1:18086:8000"
+    restart: unless-stopped
+    environment:
+      TQT_HOST_IP: 127.0.0.1
+      TQT_DB_PATH: /data/db/commands_review.db
+      TQT_EXCEL_DIR: /data/excel
+      TQT_EXPORTS_DIR: /data/exports
+      TQT_BACKUP_DIR: /data/backups
+      TQT_USER_SEED_PASSWORD: ${TQT_COMMANDS_QA_PASSWORD:?Define a local review password}
+      TZ: America/Mexico_City
+    volumes:
+      - commands_review:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  tests:
+    profiles: [tests]
+    build:
+      context: .
+      dockerfile: deploy/local-tests/Dockerfile.commands-tests
+    environment:
+      TQT_HOST_IP: 127.0.0.1
+    network_mode: none
+volumes:
+  commands_review:

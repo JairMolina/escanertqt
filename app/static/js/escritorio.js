@@ -13,7 +13,7 @@
     const ATAJOS = { r: 'resumen', i: 'inventario', t: 'tarjetas', m: 'macs', c: 'consultar', l: 'lotes', x: 'excel', o: 'movimientos', e: 'etiquetas', a: 'admin' };
     // v1.3.44: el consultor (solo lectura) entra a la consola, pero solo a estas secciones; las demás no salen en el menú
     // y, si llega por enlace, hash o atajo, ve el aviso "Acceso restringido" y vuelve al Dashboard.
-    const SEC_CONSULTOR = new Set(['resumen', 'tarjetas', 'inventario', 'consultar', 'excel']);
+    const SEC_CONSULTOR = new Set(['resumen', 'tarjetas', 'inventario', 'consultar', 'excel', 'comandos']);
     const permitida = (id) => !(T.acceso && T.acceso.rol === 'consultor') || SEC_CONSULTOR.has(id);
     const ETQ_ATAJO = {}; Object.keys(ATAJOS).forEach((k) => { ETQ_ATAJO[ATAJOS[k]] = k; });
 
@@ -584,7 +584,7 @@
             if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
             const tg = e.target;
             if (tg && tg.closest && tg.closest('input,textarea,select,[contenteditable="true"]')) return;
-            if (document.querySelector('.sheet')) return;
+            if (document.querySelector('.sheet, dialog[open]')) return;
             const k = e.key;
             if (g) { const id = ATAJOS[k.toLowerCase()]; fin(); if (id && secciones.has(id)) { e.preventDefault(); irSeccion(id); } return; }
             if (k === 'g') { g = true; refs.g.hidden = false; gt = setTimeout(fin, 1400); return; }
@@ -710,7 +710,7 @@
         ws.on('CLAVE_SOLICITADA', (d) => { pushFeed('warn', `${(d && d.email) || 'Una cuenta'} pidió restablecer su contraseña`); toast('Solicitud de contraseña pendiente', { kind: 'warn' }); revisarSolicitudes(); });
         revisarSolicitudes();   // al abrir la consola: tarjetas que ya estaban concluidas sin fecha
         // Red de seguridad: reconexión del WS, regreso a la pestaña y refresco periódico (sin tocar la actividad en vivo)
-        T.resync(() => { revisarSolicitudes(); if (document.querySelector('.sheet')) return; invalidar(); refrescar(); });
+        T.resync(() => { revisarSolicitudes(); if (document.querySelector('.sheet, dialog[open]')) return; invalidar(); refrescar(); });
         ws.on('LOTE_CAMBIADO', async () => {
             const prev = S.activoId; const seguia = !S.lote || S.lote.id === prev;
             await cargarLotes();

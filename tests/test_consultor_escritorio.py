@@ -74,7 +74,7 @@ class TestConsultorEscritorio(unittest.TestCase):
 
     def test_04_frontend(self):
         esc = (STATIC / "js" / "escritorio.js").read_text(encoding="utf-8")
-        self.assertIn("SEC_CONSULTOR = new Set(['resumen', 'tarjetas', 'inventario', 'consultar', 'excel'])", esc)
+        self.assertIn("SEC_CONSULTOR = new Set(['resumen', 'tarjetas', 'inventario', 'consultar', 'excel', 'comandos'])", esc)
         self.assertIn("T.avisoAcceso('sec:'", esc)
         com = (STATIC / "js" / "common.js").read_text(encoding="utf-8")
         self.assertIn("zona === 'monitor'", com)

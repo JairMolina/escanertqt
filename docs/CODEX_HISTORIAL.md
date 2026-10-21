@@ -132,3 +132,33 @@ Evidencia: Sin trabajos activos antes de despliegue; respaldo SQLite predeploy_1
 ## 2026-10-16 — Aclaracion operativa base R2
 
 Anadida solucion temporal al bloqueo PowerShell y flujo BIN generico4.0 a alta/OTA en docs/R2_ALTA_GENERICA_42.md. No se ejecuto el programador, no se cambio politica Windows y no se verifico nueva grabacion. Produccion permanece1.4.3.
+
+## Integración local de Comandos (2026-10-21, Codex)
+- Base actual de GitHub: main `7fe97eb`, web1.4.28. Copia limpia en
+  `C:/Users/usuario/Documents/Codex/2026-10-19/new-chat/work/tqt-web-comandos`,
+  rama `codex/comandos-r1-local`; se conserva el checkout registrado anterior
+  con sus cambios locales. Sin commit, push ni despliegue de esta integración.
+- Gestión → Comandos: sección nativa (`/monitor#/comandos`) adaptada del HTML
+  aportado. Catálogo JSON separado con37 comandos y28 valores/estados por
+  firmware; filtros, comparación, favoritos, constructor y descargas.
+  Formato inicial Plataforma; CRLF manual solo Serial/GPS; BLE y $OK originales.
+  Parámetros dentro del hash, conservando query general y claves desconocidas.
+  Tema claro/oscuro y acceso «Más opciones → Comandos» desde móvil.
+- Verificación:52 pruebas Python,9 Node,16 escenarios Playwright con backend
+  y portapapeles reales; además enlace móvil comprobado. Capturas1440/1024/390
+  claro/oscuro sin desborde; sin excepciones JS ni HTTP de error en E2E.
+  Compose válido, build correcto, `tqt-comandos-qa-web-1` saludable.
+- Revisión: http://localhost:18086/monitor#/comandos, volumen nuevo
+  `tqt-comandos-qa_commands_review`, sin datos de producción ni agentes.
+  Guía:docs/COMANDOS_R1_INTEGRACION.md. Evidencia en outputs/comandos-qa del chat.
+- Pendiente:revisión del usuario en local; solo después autorizar subida y
+  publicación. No se modifica firmware ni se prueba hardware en esta tarea.
+- CM continuidad/actualización y ui-ux-pro-max/ECC E2E/verificación aplicados.
+  Respaldo central del HTML rechazado por revisión automática por faltar
+  autorización explícita de transferencia privada; original conservado en
+  Downloads, sin intento de transferencia alternativo.
+
+## 2026-10-21 22:54 UTC | 7fe97eb5e036
+Avance: Integracion nativa Gestion > Comandos preparada sobre main 7fe97eb/web1.4.28 en rama codex/comandos-r1-local. Catalogo separado de37 comandos y28 valores de fabrica, filtros, comparacion, favoritos y constructor dinamico. Plataforma inicial; CRLF manual solo Serial/GPS; BLE y acuse originales. URL de revision http://localhost:18086/monitor#/comandos con base aislada. Usuario autoriza publicar la rama, actualizar con pull y sincronizar memoria; no autoriza desplegar produccion.
+Siguiente: Publicar la rama verificada y completar pull y sincronizacion central. Integrar a main y desplegar solo cuando se solicite. Conservar checkout anterior y sus cambios locales; documentacion tecnica en docs/COMANDOS_R1_INTEGRACION.md.
+Evidencia: 52Python,9Node y16escenarios Playwright aprobados; enlace movil adicional PASS; clipboard real. Docker build y Compose validos; tqt-comandos-qa-web-1 healthy en127.0.0.1:18086. Capturas1440/1024/390 claro/oscuro sin desborde; sin errores JS/HTTP E2E. git fetch confirma origin/main 7fe97eb, sin cambios nuevos. ECC E2E/verificacion y ui-ux-pro-max aplicados.

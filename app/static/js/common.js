@@ -591,6 +591,7 @@
             title: 'Más opciones',
             body: h('div', { class: 'list' },
                 link('/monitor', 'monitor', 'Versión de escritorio', 'Consola para PC: consulta, MAC y administración (sin cámara)', () => { try { localStorage.setItem('tqt.vista', 'escritorio'); } catch (e) { /* nada */ } }),
+                link('/monitor#/comandos', 'list', 'Comandos', 'Referencia R1: parámetros, firmware y valores de fábrica'),
                 link('/escaner', 'qr', 'Escáner para la consola', 'Vincula este celular con la PC (QR del "Botón de escaneo") y escanea desde aquí'),
                 link('/dymo', 'printer', 'Etiquetas DYMO', 'Vista previa e impresión'),
                 link('/admin', 'info', 'Administración', 'Borrado, exportación y contraseña (requiere clave)')),

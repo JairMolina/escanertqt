@@ -1,0 +1,10 @@
+# Build the web image from compose.commands-local.yaml first.
+FROM tqt-comandos-local:review
+USER root
+RUN pip install --no-cache-dir httpx pytest
+COPY tests /app/tests
+COPY docs/COMANDOS_R1_INTEGRACION.md /app/docs/COMANDOS_R1_INTEGRACION.md
+COPY CHANGELOG.md /app/CHANGELOG.md
+ENV PYTHONPATH=/app/tests:/app/station/test_station:/app/station/test_station/tests
+USER tqt
+CMD ["python", "-c", "import _aislamiento; import logging, unittest; logging.disable(logging.CRITICAL); from app.ssl_cert import ensure_ssl_certificates; ensure_ssl_certificates(); suite=unittest.defaultTestLoader.loadTestsFromNames(['test_comandos_catalogo','test_consultor_escritorio','test_version_estaticos','test_qa_version_hoy','test_auth_seguridad','test_api']); result=unittest.TextTestRunner(verbosity=1).run(suite); raise SystemExit(not result.wasSuccessful())"]

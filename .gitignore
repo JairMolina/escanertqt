@@ -28,6 +28,7 @@ venv/
 .mypy_cache/
 
 # --- Artefactos de pruebas ---
+.qa-comandos/
 tests/e2e/_shots/
 tests/e2e/__pycache__/
 docs/qa/**/*.png
