@@ -200,8 +200,14 @@ document.addEventListener('DOMContentLoaded', () => {
     $('btnEspecial').addEventListener('click', () => {
         if (state.especial || state.muestra) { state.muestra = false; pintarEspecial(); return hojaEspecial(null); }
         state.muestra = true; pintarEspecial();
+        // v1.4.24: el aviso y la cámara están arriba y el botón abajo; en pantallas donde no se ven a la vez parecía que el
+        // botón no hacía nada. Se sube a la cámara, se avisa con un toast y se olvida lo visto: un QR que sigue en cuadro
+        // (p. ej. el que acaba de dar «Código no reconocido») se vuelve a leer como muestra.
+        if (visor) { visor.forget(); if (!visor.scanner.running) visor.start(); }
+        try { $('visorHost').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { $('visorHost').scrollIntoView(true); }
+        toast('Escanea una placa del lote nuevo', { kind: 'info' });
     });
-    let espHoja = null;
+    let espHoja = null, visor = null;
     function hojaEspecial(muestra) {
         const e = state.especial, pn = muestra ? T.parseNombre(muestra) : null;
         let tipo = e ? e.tipo : '';
@@ -527,7 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
     T.resync((motivo) => { if (motivo !== 'reconexion') reloadSoon(); });   // la reconexión ya recarga arriba
 
     // ------------------------------------------------------------------ arranque
-    T.mountVisor($('visorHost'), { onCode, onManual: openManual });
+    visor = T.mountVisor($('visorHost'), { onCode, onManual: openManual });
     showRead({ idle: true });
     loadVersion();
     Promise.all([loadInventory(), loadDraft()]);

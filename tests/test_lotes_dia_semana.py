@@ -96,7 +96,7 @@ class TestApiLotes(unittest.TestCase):
         self.assertEqual((sem["tipo_lote"], sem["fecha_inicio"], sem["anio"], sem["mes"]), ("semana", "2093-05-11", 2093, 5))
         self.assertTrue(sem["codigo_lote"].startswith("2093-S"))
         self.assertEqual(r_dia.json()["nombre"], "20 may 2093")
-        self.assertEqual(db.get_active_lote()["id"], r_dia2.json()["id"])
+        self.assertEqual(self.c.get("/api/status").json()["active_lote"]["id"], r_dia2.json()["id"])   # v1.4.24: lote de este usuario
         # repetido -> 409 con el nombre del lote
         r = self._crear(tipo_lote="dia", fecha_inicio="2093-05-20")
         self.assertEqual(r.status_code, 409)

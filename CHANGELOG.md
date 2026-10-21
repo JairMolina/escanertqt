@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.24 — 2026-10-21
+- **Cada usuario trabaja en su lote:** elegir o crear un lote ya no cambia el lote de los demás. La elección se guarda por cuenta; quien no ha elegido uno sigue en el lote general, que solo cambia sin sesión (tareas internas) o si aún no había ninguno activo. «Activo» en la lista de lotes es el lote propio, y el escritorio ya no anuncia «Cambió el lote activo» por el cambio de otro usuario.
+- **Las placas recibidas guardan su lote:** cada alta en Recibir (QR o sin QR) registra el lote del usuario (`pcb_inventario.lote_id`, nueva columna que se agrega sola; las anteriores quedan sin lote). `GET /api/pcb?lote_id=` lista las recibidas en un lote. El emparejado sigue usando todas las disponibles (también las sobrantes de otros lotes).
+- **Lote especial en todos los Android:** al tocar el botón, la página sube a la cámara, sale el aviso «Escanea una placa del lote nuevo» y se reinicia la cámara si estaba detenida. Además se olvida lo ya visto, así el QR que sigue en cuadro (el que dio «Código no reconocido») se toma como muestra; antes el escáner lo ignoraba mientras no saliera del cuadro.
+
 ## v1.4.23 — 2026-10-21
 - **Lote especial con placa de muestra:** al tocar «Lote especial» la cámara pide «Escanea una placa del lote». Con esa lectura se abre la hoja con la vista previa («Leído TQT_R2_0008 → TQT-R2-V10-0008»), versión y tipo editables; «Activar y registrar» deja registrada la muestra y las siguientes placas del lote entran solas. Tocar el botón otra vez mientras espera abre la configuración sin escanear.
 

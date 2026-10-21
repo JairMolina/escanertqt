@@ -32,7 +32,7 @@ _SELECT_PCB = """
            -- v1.4.20: firmware capturado en la tarjeta (programada fuera de la app) cuenta igual que en la vista de tarjetas
            COALESCE(NULLIF(TRIM(p.firmware), ''), CASE WHEN t.pcb_r1_id = p.id THEN t.firmware_r1
                     WHEN t.pcb_r2_id = p.id THEN t.firmware_r2 END) AS firmware, p.estado_ciclo, p.estado_pcb, p.origen, p.operador,
-           p.nota, p.recibida_en, p.confirmada_en, p.updated_at,
+           p.nota, p.recibida_en, p.confirmada_en, p.updated_at, p.lote_id AS recibida_lote_id,
            t.id AS tarjeta_id, t.id_tarjeta_num, t.lote_id AS tarjeta_lote_id,
            CASE WHEN t.pcb_r1_id = p.id THEN 'R1' WHEN t.pcb_r2_id = p.id THEN 'R2'
                 WHEN t.pcb_r3_id = p.id THEN 'R3' END AS ranura
@@ -216,10 +216,13 @@ def listar_recepcion(conn: Optional[sqlite3.Connection] = None, db_path: Optiona
 def listar_pcb(
     tipo: Optional[str] = None, estado_ciclo: Optional[str] = None, q: Optional[str] = None,
     sin_mac: bool = False, sin_tarjeta: bool = False, limit: int = 100, offset: int = 0,
-    conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None, sin_firmware: bool = False,
+    conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None, sin_firmware: bool = False, lote_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     def _q(c):
         where, params = [], []
+        if lote_id:   # v1.4.24: recibidas en ese lote
+            where.append("p.lote_id = ?")
+            params.append(lote_id)
         if tipo:
             where.append("p.tipo = ?")
             params.append(normalizar_tipo(tipo))
@@ -376,6 +379,12 @@ def _duplicada(c: sqlite3.Connection, fila: sqlite3.Row, sesion: Optional[str] =
             "conteos": conteos_recepcion(c, sesion)}
 
 
+def _lote_recepcion(c: sqlite3.Connection) -> Optional[int]:
+    """v1.4.24: lote del usuario (o el global) en el que queda la placa recibida; None si no hay lotes."""
+    lote = db.get_active_lote(c)
+    return lote["id"] if lote else None
+
+
 def escanear_pcb(codigo: str, operador: Optional[str] = None, tipo_forzado: Optional[str] = None,
                  version: Optional[str] = None, db_path: Optional[Path] = None, sesion: Optional[str] = None) -> Dict[str, Any]:
     """Alta automática desde el visor de cámara. Idempotente y barata: primero lee sin candado; solo si la PCB
@@ -404,9 +413,9 @@ def escanear_pcb(codigo: str, operador: Optional[str] = None, tipo_forzado: Opti
                 conn.execute("ROLLBACK")
                 return _duplicada(conn, fila, sesion)
             pid = conn.execute(
-                "INSERT INTO pcb_inventario (tipo, version, serie, nombre, origen, operador, estado_ciclo, sesion) "
-                "VALUES (?,?,?,?, 'QR', ?, 'RECIBIDA', ?)",
-                (parsed["tipo"], parsed["version"], parsed["serie"], parsed["nombre"], operador, sesion)).lastrowid
+                "INSERT INTO pcb_inventario (tipo, version, serie, nombre, origen, operador, estado_ciclo, sesion, lote_id) "
+                "VALUES (?,?,?,?, 'QR', ?, 'RECIBIDA', ?, ?)",
+                (parsed["tipo"], parsed["version"], parsed["serie"], parsed["nombre"], operador, sesion, _lote_recepcion(conn))).lastrowid
             db.log_evento("PCB_ALTA", None, parsed["nombre"], "QR", operador, conn=conn)
             conn.execute("COMMIT")
         except BaseException:
@@ -440,9 +449,10 @@ def registrar_manual(tipo: str, version: Optional[str] = None, serie: Optional[s
             "SELECT 1 FROM pcb_inventario WHERE tipo=? AND version=? AND serie=?", (tipo_n, ver, s)).fetchone()]
         if ocupadas:
             raise ConflictoError("Ya existen: " + ", ".join(ocupadas[:10]) + ("…" if len(ocupadas) > 10 else "") + ". No se agregó ninguna.")
-        ids = [c.execute("INSERT INTO pcb_inventario (tipo, version, serie, nombre, origen, operador, estado_ciclo, sesion) "
-                         "VALUES (?,?,?,?, 'MANUAL', ?, 'RECIBIDA', ?)",
-                         (tipo_n, ver, s, nombre_pcb(tipo_n, ver, s), operador, sesion)).lastrowid for s in series]
+        lid = _lote_recepcion(c)
+        ids = [c.execute("INSERT INTO pcb_inventario (tipo, version, serie, nombre, origen, operador, estado_ciclo, sesion, lote_id) "
+                         "VALUES (?,?,?,?, 'MANUAL', ?, 'RECIBIDA', ?, ?)",
+                         (tipo_n, ver, s, nombre_pcb(tipo_n, ver, s), operador, sesion, lid)).lastrowid for s in series]
         db.log_evento("PCB_ALTA", None, nombre_pcb(tipo_n, ver, series[0]),
                       f"MANUAL x{cantidad} ({series[0]}–{series[-1]})", operador, conn=c)
         return {"pcbs": [_pcb_por_id(c, i) for i in ids], "conteos": conteos_recepcion(c, sesion)}

@@ -200,6 +200,7 @@ async def _exigir_sesion(request: Request):
         return None
     try:
         u = await run_in_threadpool(usuarios.validar_sesion, request.cookies.get(usuarios.COOKIE))
+        db.USUARIO_LOTE.set(u["email"])   # v1.4.24: el lote activo es por usuario (lo leen get_active_lote/resolver_lote_id)
         mod = modulos_cat.modulo_de_ruta(ruta)   # v1.4.14: cada módulo con su permiso (antes todo era Escáner TQT)
         if not (modulos_cat.puede(u, mod) if mod else modulos_cat.alguno(u)) and not ruta.startswith("/api/auth/"):
             return _sin_modulo(ruta, request.method, mod)

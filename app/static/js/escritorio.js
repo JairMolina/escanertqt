@@ -713,7 +713,9 @@
         T.resync(() => { revisarSolicitudes(); if (document.querySelector('.sheet')) return; invalidar(); refrescar(); });
         ws.on('LOTE_CAMBIADO', async () => {
             const prev = S.activoId; const seguia = !S.lote || S.lote.id === prev;
-            await cargarLotes(); if (seguia && S.activoId && S.lote && S.lote.id !== S.activoId) seleccionarLote(S.activoId);
+            await cargarLotes();
+            if (S.activoId === prev) return;   // v1.4.24: el lote es por usuario; el cambio de otro solo refresca la lista
+            if (seguia && S.activoId && S.lote && S.lote.id !== S.activoId) seleccionarLote(S.activoId);
             pushFeed('info', 'Cambió el lote activo'); invalidar(); refrescar();
         });
     }

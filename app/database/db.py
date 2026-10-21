@@ -9,6 +9,7 @@ import re
 import sqlite3
 import unicodedata
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
@@ -413,6 +414,8 @@ def _asegurar_columnas(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE pcb_inventario ADD COLUMN firmware TEXT")
     if cols and "sesion" not in cols:
         conn.execute("ALTER TABLE pcb_inventario ADD COLUMN sesion TEXT")
+    if cols and "lote_id" not in cols:   # v1.4.24: lote en el que se recibió la placa (NULL = recibida antes de v1.4.24)
+        conn.execute("ALTER TABLE pcb_inventario ADD COLUMN lote_id INTEGER REFERENCES lotes_mensuales(id) ON DELETE SET NULL")
     _asegurar_fechas_entrega(conn)
     lcols = {r[1] for r in conn.execute("PRAGMA table_info(lotes_mensuales)")}
     if lcols and "tipo_lote" not in lcols:   # v1.3.44: lotes de mes, semana o día; los existentes quedan como 'mes'
@@ -480,9 +483,35 @@ def _con_conn(conn: Optional[sqlite3.Connection], db_path: Optional[Path], fn, e
         return fn(c)
 
 
+# v1.4.24: cada usuario trabaja en SU lote. El middleware de sesión fija USUARIO_LOTE (correo) por petición; el lote
+# elegido se guarda en `ajustes` ('lote_usuario:<correo>'). Sin usuario (tareas internas, pruebas) o sin elección propia
+# se usa el lote global (lotes_mensuales.activo), que ya no cambia cuando un usuario elige otro lote.
+USUARIO_LOTE: ContextVar[Optional[str]] = ContextVar("usuario_lote", default=None)
+
+
+def _lote_de_usuario(c: sqlite3.Connection) -> Optional[Dict[str, Any]]:
+    u = USUARIO_LOTE.get()
+    if not u:
+        return None
+    row = c.execute("SELECT l.* FROM ajustes a JOIN lotes_mensuales l ON l.id = CAST(a.valor AS INTEGER) WHERE a.clave = ?",
+                    ("lote_usuario:" + u,)).fetchone()
+    return {**dict(row), "activo": 1} if row else None
+
+
+def _fijar_lote_usuario(c: sqlite3.Connection, lote_id: int) -> None:
+    c.execute("INSERT INTO ajustes (clave, valor, updated_at) VALUES (?, ?, datetime('now','localtime')) "
+              "ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor, updated_at = excluded.updated_at",
+              ("lote_usuario:" + USUARIO_LOTE.get(), str(lote_id)))
+    if not c.execute("SELECT 1 FROM lotes_mensuales WHERE activo = 1").fetchone():   # primer lote: también es el global
+        c.execute("UPDATE lotes_mensuales SET activo = (id = ?)", (lote_id,))
+
+
 def get_active_lote(conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
-    """Obtiene el lote que se encuentra marcado como activo actualmente."""
+    """Lote del usuario de la petición (v1.4.24) o, si no eligió uno, el lote global activo."""
     def _q(c):
+        propio = _lote_de_usuario(c)
+        if propio:
+            return propio
         row = c.execute("SELECT * FROM lotes_mensuales WHERE activo = 1 ORDER BY id DESC LIMIT 1").fetchone()
         return dict(row) if row else None
     return _con_conn(conn, db_path, _q)
@@ -509,8 +538,11 @@ def list_lotes(conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path
     def _q(c):
         filas = [dict(r) for r in c.execute("SELECT l.*, (SELECT COUNT(*) FROM tarjetas_produccion t WHERE t.lote_id = l.id) AS tarjetas FROM lotes_mensuales l "
                                             "ORDER BY COALESCE(l.fecha_inicio, printf('%04d-%02d-01', l.anio, l.mes)) DESC, l.id DESC").fetchall()]
+        actual = _lote_de_usuario(c) if USUARIO_LOTE.get() else None
         for f in filas:
             f["nombre"] = nombre_lote_de(f)
+            if actual:   # v1.4.24: «Activo» es el lote de este usuario
+                f["activo"] = int(f["id"] == actual["id"])
         return filas
     return _con_conn(conn, db_path, _q)
 
@@ -526,14 +558,19 @@ def create_lote(
     tipo_lote: str = "mes",
     fecha_inicio: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Crea un nuevo lote (mes, semana o día). Si activo=True, desactiva los demás."""
+    """Crea un nuevo lote (mes, semana o día). Si activo=True: con usuario (v1.4.24) pasa a ser SU lote; sin usuario, el global."""
+    usuario = USUARIO_LOTE.get()
+
     def _exec(c):
-        if activo:
+        if activo and not usuario:
             c.execute("UPDATE lotes_mensuales SET activo = 0")
         lote_id = c.execute(
             "INSERT INTO lotes_mensuales (codigo_lote, mes, anio, ruta_excel, activo, tipo_lote, fecha_inicio) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (codigo_lote, mes, anio, ruta_excel, 1 if activo else 0, tipo_lote or "mes", fecha_inicio or f"{anio}-{mes:02d}-01"),
+            (codigo_lote, mes, anio, ruta_excel, 1 if activo and not usuario else 0, tipo_lote or "mes", fecha_inicio or f"{anio}-{mes:02d}-01"),
         ).lastrowid
+        if activo and usuario:
+            _fijar_lote_usuario(c, lote_id)
+            return {**dict(c.execute("SELECT * FROM lotes_mensuales WHERE id = ?", (lote_id,)).fetchone()), "activo": 1}
         return dict(c.execute("SELECT * FROM lotes_mensuales WHERE id = ?", (lote_id,)).fetchone())
     return _con_conn(conn, db_path, _exec, escribe=True)
 
@@ -554,10 +591,13 @@ def crear_lote(conn: sqlite3.Connection, anio: int, mes: int, activar: bool = Tr
 
 
 def set_active_lote(lote_id: int, conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
-    """Activa un lote específico y desactiva todos los demás."""
+    """Con usuario (v1.4.24): solo cambia SU lote. Sin usuario: activa el lote global y desactiva los demás."""
     def _exec(c):
         if not c.execute("SELECT id FROM lotes_mensuales WHERE id = ?", (lote_id,)).fetchone():
             return None
+        if USUARIO_LOTE.get():
+            _fijar_lote_usuario(c, lote_id)
+            return {**dict(c.execute("SELECT * FROM lotes_mensuales WHERE id = ?", (lote_id,)).fetchone()), "activo": 1}
         c.execute("UPDATE lotes_mensuales SET activo = (id = ?)", (lote_id,))
         return dict(c.execute("SELECT * FROM lotes_mensuales WHERE id = ?", (lote_id,)).fetchone())
     return _con_conn(conn, db_path, _exec, escribe=True)

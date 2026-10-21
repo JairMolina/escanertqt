@@ -1,7 +1,13 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-21 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.23; producción en 1.4.13 hasta que se despliegue)
+Commit de referencia: ver `git log` de main (v1.4.24; producción en 1.4.13 hasta que se despliegue)
+
+## v1.4.24 (2026-10-21, Claude Code, rama fix/lote-por-usuario)
+- Lote por usuario: `db.USUARIO_LOTE` (ContextVar) lo fija `_exigir_sesion` en main.py; `get_active_lote`/`list_lotes`/`set_active_lote`/`create_lote` usan `ajustes['lote_usuario:<correo>']`; sin usuario, el global de siempre. `resolver_lote_id` hereda el lote del usuario (recepción, emparejar, Excel, correo…). El WS no tiene usuario: su `lote_activo` inicial es el global.
+- `pcb_inventario.lote_id` (migración en `_asegurar_columnas`), expuesto como `recibida_lote_id`; filtro `lote_id` en `GET /api/pcb`. Se descartó filtrar el emparejado por lote (bloqueaba sobrantes de otros lotes y rompía pruebas).
+- Recibir (Lote especial): `visor.forget()` + `start()`, `scrollIntoView` del visor y toast al pedir la muestra (el aviso quedaba fuera de pantalla y el escáner ignoraba el QR que seguía en cuadro).
+- Evidencia: tests/test_lote_por_usuario.py (2 usuarios, recepción con lote); test_lotes_dia_semana.test_04 adaptado; suite completa 824 pruebas: solo los 3 errores previos (2 test_correo_excel en corrida completa, test_excel_r3_v1112.test_06 sin etiqueta v1.1.11). Sin prueba en teléfonos reales.
 
 ## v1.4.23 (2026-10-21, Claude Code, rama feat/recibir-muestra-lote)
 - Recibir: `state.muestra` (espera de placa de muestra) → `hojaEspecial(muestra)` con vista previa vía `nombreEspecial(text, cfg)`; con la hoja abierta (`espHoja`) el visor no registra. Al activar se registra la muestra con `onCode`.

@@ -143,9 +143,10 @@ def listar_pcb(
     limit: int = Query(100, ge=1, le=5000),
     offset: int = Query(0, ge=0),
     sin_firmware: bool = Query(False, description="PCB activas sin firmware (con tipo=R3: R3 por programar)"),
+    lote_id: Optional[int] = Query(None, ge=1, le=2**31, description="v1.4.24: solo las recibidas en ese lote"),
 ):
     try:
-        return inv.listar_pcb(tipo, estado_ciclo, q, sin_mac, sin_tarjeta, limit, offset, sin_firmware=sin_firmware)
+        return inv.listar_pcb(tipo, estado_ciclo, q, sin_mac, sin_tarjeta, limit, offset, sin_firmware=sin_firmware, lote_id=lote_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 

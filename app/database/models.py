@@ -312,6 +312,7 @@ CREATE TABLE IF NOT EXISTS pcb_inventario (
     origen TEXT NOT NULL DEFAULT 'QR' CHECK (origen IN ('QR','MANUAL')),
     operador TEXT,
     sesion TEXT,                                  -- marca anónima del equipo que la recibió (borrador propio)
+    lote_id INTEGER REFERENCES lotes_mensuales(id) ON DELETE SET NULL,  -- v1.4.24: lote en el que se recibió
     nota TEXT,
     recibida_en TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     confirmada_en TEXT,
