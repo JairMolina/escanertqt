@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A1020">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <meta name="color-scheme" content="dark light">
+    <meta name="robots" content="noindex">
+    <title>TPMS · Plataforma I+D</title>
+    <script>
+        /* Tema: el que el usuario eligió (mismo ajuste que el resto de la plataforma); si nunca eligió, el del sistema. */
+        (function () {
+            var t = 'dark';
+            try { var g = localStorage.getItem('tqt.tema'); t = g === 'light' || g === 'dark' ? g : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* sin almacenamiento */ }
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1411">
+    <style>
+        /* Acceso al módulo TPMS — "banco de presión": caucho y asfalto (oscuro) o gris de taller (claro),
+           un manómetro con su aguja y el naranja de seguridad #FF6A00 como único acento, encendido. */
+        :root[data-theme="dark"], :root:not([data-theme]) {
+            --bg: #15130F; --bg-2: #0E0D0B; --surface: #1F1C18; --surface-2: #2A2620; --line: #38332C; --line-2: #6E665B;
+            --text: #F5EFE7; --muted: #B9AFA2; --faint: #A0968A; --accent: #FF6A00; --accent-ink: #1C0B00; --accent-text: #FF8A3D;
+            --ok: #4CD08B; --warn: #F2B33D; --bad: #FF6B6B; --mod-text: #FF9A55;
+            --campo: #110F0C; --dial: #0B0A08; --dial-line: #4A433A; --glow: 0 0 10px rgba(255, 106, 0, .55);
+            --sombra: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 28px 40px -28px rgba(0, 0, 0, .9); color-scheme: dark;
+        }
+        :root[data-theme="light"] {
+            --bg: #E4E1DC; --bg-2: #D6D2CB; --surface: #FBFAF8; --surface-2: #F0EDE8; --line: #CFC9C0; --line-2: #857D72;
+            --text: #1D1A16; --muted: #575047; --faint: #6A6359; --accent: #FF6A00; --accent-ink: #1C0B00; --accent-text: #B04400;
+            --ok: #1D6B45; --warn: #8A5200; --bad: #B42424; --mod-text: #A84200;
+            --campo: #FFFFFF; --dial: #1B1915; --dial-line: #4A433A; --glow: 0 0 8px rgba(255, 106, 0, .45);
+            --sombra: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 24px 34px -26px rgba(40, 28, 10, .55); color-scheme: light;
+        }
+        :root { --ease: cubic-bezier(.23, 1, .32, 1); --rad: 6px; }
+        html { -webkit-font-smoothing: antialiased; }
+        html, body { height: 100%; }
+        body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); }
+        .tema { position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 5; }
+        .tema, .ir-modulos { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--rad); }
+        .ir-fijo { position: fixed; top: max(10px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); z-index: 5; min-height: 44px; min-width: 44px; padding: 0 12px 0 9px; }
+        .pantalla { min-height: 100dvh; display: flex; flex-direction: column; }
+        .btn { border-radius: var(--rad); }
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        /* ---------- banco: rodada de llanta + manómetro ---------- */
+        .banco { position: relative; overflow: hidden; isolation: isolate; background: var(--bg-2);
+                 display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: max(64px, calc(env(safe-area-inset-top) + 56px)) max(18px, env(safe-area-inset-right)) 22px max(18px, env(safe-area-inset-left)); }
+        /* banda de rodada: chevrones del dibujo de la llanta, apenas visibles */
+        .banco::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 10px; z-index: -1; opacity: .55;
+                        background: repeating-linear-gradient(135deg, var(--line-2) 0 3px, transparent 3px 12px), repeating-linear-gradient(45deg, var(--line-2) 0 3px, transparent 3px 12px);
+                        background-size: 24px 50%; background-position: 0 0, 0 100%; background-repeat: repeat-x; }
+        .marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .sello { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 50%; color: var(--accent-ink); background: var(--accent); box-shadow: var(--glow), inset 0 -2px 0 rgba(0, 0, 0, .25); }
+        .sello svg { width: 30px; height: 30px; }
+        .tit { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .kick { font-size: 13px; font-weight: 600; color: var(--muted); line-height: 1.1; }
+        .tit b { font-size: 30px; font-weight: 700; letter-spacing: .06em; line-height: .9; }
+        .titular { display: none; }
+
+        /* manómetro (SVG): arco, marcas por pathLength, franja de presión normal y aguja */
+        .mano { flex: none; width: 128px; }
+        .mano svg { display: block; width: 100%; height: auto; overflow: visible; }
+        .mano .cara { fill: var(--dial); stroke: var(--dial-line); stroke-width: 1.5; }
+        .mano .arco { fill: none; stroke: #4F483F; stroke-width: 2; }
+        .mano .menor { fill: none; stroke: #8C8377; stroke-width: 5; stroke-dasharray: .14 .86; stroke-dashoffset: .07; }
+        .mano .mayor { fill: none; stroke: #F5EFE7; stroke-width: 9; stroke-dasharray: .5 9.5; stroke-dashoffset: .25; }
+        .mano .rango { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 106, 0, .7)); }
+        .mano .num { fill: #BDB3A6; font: 600 13px/1 var(--font-mono); text-anchor: middle; }
+        .mano .uni { fill: #A0968A; font: 500 10px/1 var(--font-mono); letter-spacing: .12em; text-anchor: middle; }
+        .mano .lect { fill: var(--accent); font: 600 26px/1 var(--font-mono); text-anchor: middle; font-variant-numeric: tabular-nums slashed-zero; filter: drop-shadow(0 0 6px rgba(255, 106, 0, .55)); }
+        .mano .aguja { transform-box: view-box; transform-origin: 100px 96px; transform: rotate(var(--giro, 8deg)); }
+        .mano .aguja path { fill: var(--accent); filter: drop-shadow(0 0 3px rgba(255, 106, 0, .8)); }
+        .mano .eje { fill: #2A2620; stroke: var(--accent); stroke-width: 2; }
+        .mano .lect, .mano .uni { display: none; }
+        .leyenda { display: none; }
+
+        /* ---------- hoja de acceso ---------- */
+        .zona { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 26px max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+        .acceso { position: relative; width: min(440px, 100%); display: flex; flex-direction: column; gap: 18px; padding: 24px 22px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--sombra); }
+        .acceso::before { content: ""; position: absolute; left: 22px; right: 22px; top: -1px; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent); box-shadow: var(--glow); }
+        .acceso .silk { display: block; font-size: 14px; font-weight: 600; color: var(--mod-text); margin-bottom: 6px; }
+        .acceso h2 { margin: 0; font-size: 32px; line-height: 1.05; font-weight: 700; letter-spacing: .01em; }
+        .acceso .sub { color: var(--muted); margin: 8px 0 0; font-size: 16px; font-weight: 500; text-wrap: pretty; }
+        .acceso form { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+        .acceso form[hidden] { display: none; }
+        .acceso .field > label { color: var(--muted); }
+        .acceso .input { min-height: 52px; font-size: 16px; border-radius: var(--rad); background: var(--campo, var(--bg)); border-color: var(--line-2); }
+        .acceso .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+        .acceso .clave { display: flex; gap: 8px; }
+        .acceso .clave .input { flex: 1; min-width: 0; }
+        .acceso .clave .btn { min-width: 72px; min-height: 52px; padding: 0 14px; font-size: 15px; }
+        .acceso .mayus { display: flex; align-items: center; gap: 6px; margin: 8px 2px 0; color: var(--warn); font-size: 14px; font-weight: 600; }
+        .acceso .mayus[hidden] { display: none; }
+        .acceso .btn { min-height: 52px; }
+        .acceso .btn-primary { font-size: 18px; font-weight: 700; letter-spacing: .04em; box-shadow: var(--glow), 0 2px 0 #A84300; transition: transform .12s var(--ease), filter .15s, box-shadow .12s; }
+        .acceso .btn-primary:hover:not([disabled]) { filter: brightness(1.07); }
+        .acceso .btn-primary:active:not([disabled]) { transform: translateY(2px) scale(.99); box-shadow: none; }
+        .acceso .btn-primary[disabled] { opacity: .75; cursor: progress; }
+        .acceso .btn-ghost { border: 1.5px solid var(--line-2); background: transparent; }
+        .msg { margin: 0; min-height: 0; font-weight: 600; font-size: 15px; color: var(--bad); }
+        .msg:empty { display: none; }
+        .msg.ok { color: var(--ok); }
+        .acceso .ayuda { margin: 0; color: var(--muted); font-size: 15px; }
+        .acceso .ayuda .btn { min-height: 44px; padding: 0 4px; border: 0; font-size: 15px; text-decoration: underline; text-underline-offset: 3px; color: var(--accent-text); }
+        .row { display: flex; align-items: center; gap: 10px; }
+        .estado { display: flex; align-items: center; gap: 8px; margin: 0; padding-top: 14px; border-top: 1px dashed var(--line-2); font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+        .estado .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+        .estado .punto[data-s="on"] { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+        .estado .punto[data-s="off"] { background: var(--bad); }
+        .estado .ver { margin-left: auto; color: var(--faint); }
+        .pie { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--faint); font-size: 13px; }
+
+        @media (max-width: 380px) { .tit b { font-size: 26px; } .tit .kick { display: none; } .mano { width: 104px; } .acceso { padding: 20px 16px 16px; } .acceso::before { left: 16px; right: 16px; } .acceso h2 { font-size: 28px; } }
+
+        /* ---------- escritorio: banco a la izquierda, hoja a la derecha ---------- */
+        @media (min-width: 900px) {
+            .pantalla { flex-direction: row; }
+            .banco { flex: 1 1 56%; flex-direction: column; align-items: flex-start; justify-content: center; gap: 40px; min-height: 100dvh; padding: 96px clamp(40px, 5vw, 88px) 56px; }
+            .banco::after { left: auto; top: 0; right: 0; bottom: 0; width: 12px; height: auto; background: repeating-linear-gradient(45deg, var(--line-2) 0 3px, transparent 3px 12px), repeating-linear-gradient(-45deg, var(--line-2) 0 3px, transparent 3px 12px);
+                            background-size: 50% 24px; background-position: 0 0, 100% 0; background-repeat: repeat-y; }
+            .sello { width: 50px; height: 50px; } .tit b { font-size: 34px; }
+            .mano { width: min(380px, 30vw); align-self: center; }
+            .mano .lect, .mano .uni { display: block; }
+            .leyenda { display: block; margin: 12px 0 0; text-align: center; color: var(--muted); font-size: 15px; font-weight: 500; }
+            .titular { display: block; max-width: 540px; }
+            .titular h1 { margin: 0 0 12px; font-size: clamp(36px, 3.4vw, 50px); line-height: 1.02; font-weight: 700; letter-spacing: .01em; text-wrap: balance; }
+            .titular p { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.45; max-width: 44ch; text-wrap: pretty; }
+            .zona { flex: 1 1 44%; align-items: center; padding: 48px clamp(28px, 4vw, 72px); }
+            .acceso { padding: 30px 30px 24px; gap: 22px; } .acceso::before { left: 30px; right: 30px; } .acceso h2 { font-size: 36px; }
+        }
+
+        /* ---------- movimiento (solo si no se pidió reducirlo): la aguja sube de 0 a la presión y luego respira ---------- */
+        @media (prefers-reduced-motion: no-preference) {
+            .mano .aguja { animation: infla 1.4s cubic-bezier(.34, 1.45, .64, 1) .25s backwards; transition: transform 1.6s var(--ease); }
+            .acceso > *, .acceso form > * { animation: sube-suave .5s var(--ease) both; }
+            .acceso > :nth-child(2) { animation-delay: .1s; } .acceso > :nth-child(3) { animation-delay: .2s; } .acceso > :nth-child(4) { animation-delay: .3s; }
+            @keyframes infla { from { transform: rotate(-120deg); } }
+            @keyframes sube-suave { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        }
+    </style>
+</head>
+<body>
+<button class="iconbtn tema" type="button" id="tema" aria-label="Cambiar entre tema claro y oscuro" title="Tema claro / oscuro">
+    <svg id="icoTema" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+</button>
+<a class="ir-modulos ir-fijo" href="/inicio" aria-label="Volver al portal de módulos" title="Volver al portal de módulos">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Módulos</span>
+</a>
+<div class="pantalla">
+    <header class="banco">
+        <div class="marca">
+            <span class="sello" aria-hidden="true">
+                <!-- llanta vista de frente con la válvula -->
+                <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="20" r="14"/><circle cx="20" cy="20" r="6.5"/><path d="M20 6v3M20 31v3M6 20h3M31 20h3M10.1 10.1l2.1 2.1M27.8 27.8l2.1 2.1M10.1 29.9l2.1-2.1M27.8 12.2l2.1-2.1"/><path d="M24.6 15.4 29 11" stroke-width="3"/></svg>
+            </span>
+            <div class="tit"><span class="kick">Plataforma I+D</span><b>TPMS</b></div>
+        </div>
+        <div class="mano" aria-hidden="true">
+            <svg viewBox="0 0 200 192">
+                <circle class="cara" cx="100" cy="96" r="94"/>
+                <path class="arco" d="M32.5 135 A78 78 0 1 1 167.5 135"/>
+                <path class="menor" pathLength="60" d="M41.1 130 A68 68 0 1 1 158.9 130"/>
+                <path class="mayor" pathLength="120" d="M41.1 130 A68 68 0 1 1 158.9 130"/>
+                <!-- presión normal 30–36 PSI (θ = 210° − v/60·240°) -->
+                <path class="rango" d="M100 18 A78 78 0 0 1 131.7 24.7"/>
+                <text class="num" x="55" y="122">0</text>
+                <text class="num" x="100" y="48">30</text>
+                <text class="num" x="145" y="122">60</text>
+                <text class="lect" x="100" y="140" id="psi">32</text>
+                <text class="uni" x="100" y="158">PSI</text>
+                <g class="aguja" id="aguja"><path d="M97.6 96 L100 26 L102.4 96 Z"/></g>
+                <circle class="eje" cx="100" cy="96" r="7"/>
+            </svg>
+            <p class="leyenda">Presión de cada llanta, desde su sensor</p>
+        </div>
+        <div class="titular">
+            <h1>Acceso al banco de sensores TPMS</h1>
+            <p>Escanea el código de cada sensor de presión de llantas para identificarlo y darle seguimiento.</p>
+        </div>
+    </header>
+    <main class="zona">
+        <section class="acceso" aria-labelledby="tit">
+            <div>
+                <span class="silk">Sensores de presión de llantas</span>
+                <h2 id="tit">Iniciar sesión</h2>
+                <p class="sub" id="sub">Entra con tu correo y tu contraseña.</p>
+            </div>
+
+            <form id="fLogin" autocomplete="on" novalidate>
+                <div class="field"><label for="email">Correo</label>
+                    <input class="input" id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" placeholder=" " required autofocus></div>
+                <div class="field"><label for="pass">Contraseña</label>
+                    <div class="clave"><input class="input" id="pass" name="password" type="password" autocomplete="current-password" maxlength="200" placeholder=" " required aria-describedby="mayus">
+                        <button class="btn" type="button" id="ver" aria-pressed="false" aria-label="Mostrar la contraseña">Ver</button></div>
+                    <p class="mayus" id="mayus" role="status" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 4 13h4v7h8v-7h4z"/></svg>Bloq Mayús está activado.</p></div>
+                <p class="msg" id="msg" role="alert" aria-live="assertive"></p>
+                <button class="btn btn-primary" type="submit" id="entrar">Entrar</button>
+            </form>
+
+            <p class="ayuda" id="olvidoBox"><button class="btn btn-ghost" type="button" id="olvido">¿Olvidaste tu contraseña?</button></p>
+
+            <form id="fOlvide" autocomplete="off" novalidate hidden>
+                <div id="olvP1">
+                    <p class="sub">Escribe tu correo. Otra persona con la sesión abierta deberá aprobar el cambio.</p>
+                    <div class="field"><label for="olvEmail">Correo</label><input class="input" id="olvEmail" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" placeholder=" "></div>
+                </div>
+                <div id="olvP2" hidden>
+                    <p class="sub" role="status" aria-live="polite">Solicitud enviada. Pide a otra persona con sesión abierta que la apruebe en la consola (candado, "Solicitudes de contraseña"). Esta pantalla avanza sola cuando lo haga.</p>
+                </div>
+                <div id="olvP3" hidden>
+                    <p class="sub">Aprobada. Pide a esa persona el código de 6 dígitos y elige tu contraseña nueva (mínimo 10 caracteres).</p>
+                    <div class="field"><label for="olvCodigo">Código de 6 dígitos</label><input class="input mono" id="olvCodigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder=" "></div>
+                    <div class="field"><label for="olvNueva">Contraseña nueva</label><input class="input" id="olvNueva" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                    <div class="field"><label for="olvRepite">Repite la nueva</label><input class="input" id="olvRepite" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                </div>
+                <p class="msg" id="msgOlv" role="alert" aria-live="assertive"></p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" type="submit" id="olvEnviar" style="flex:1">Pedir ayuda</button>
+                    <button class="btn btn-ghost" type="button" id="olvVolver">Volver</button>
+                </div>
+            </form>
+
+            <form id="fClave" autocomplete="off" novalidate hidden>
+                <p class="sub" id="avisoClave">Por seguridad, cambia tu contraseña (mínimo 10 caracteres).</p>
+                <div class="field"><label for="actual">Contraseña actual</label><input class="input" id="actual" type="password" autocomplete="current-password" maxlength="200" placeholder=" "></div>
+                <div class="field"><label for="nueva">Contraseña nueva</label><input class="input" id="nueva" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                <div class="field"><label for="repite">Repite la nueva</label><input class="input" id="repite" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                <p class="msg" id="msgClave" role="alert" aria-live="assertive"></p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" type="submit" id="guardar" style="flex:1">Guardar contraseña</button>
+                    <button class="btn btn-ghost" type="button" id="luego">Más tarde</button>
+                </div>
+            </form>
+            <p class="ayuda">¿Sin cuenta? Pide acceso a un supervisor.</p>
+            <p class="estado"><span class="punto" id="punto" data-s="?"></span><span id="estadoTxt">Comprobando servidor…</span><span class="ver mono">v__VERSION__</span></p>
+            <p class="pie"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Conexión cifrada. Solo cuentas autorizadas.</p>
+        </section>
+    </main>
+</div>
+<script>
+    /* Efectos de la pantalla de acceso (no tocan el flujo de login.js). */
+    (function () {
+        var $ = function (id) { return document.getElementById(id); };
+        var quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        /* Manómetro decorativo: la aguja marca la presión (0–60 PSI en 240°) y oscila ±1 PSI alrededor de 32. */
+        var aguja = $('aguja'), psi = $('psi');
+        function marca(v) { aguja.style.setProperty('--giro', (v / 60 * 240 - 120) + 'deg'); psi.textContent = String(v); }
+        marca(32);
+        if (!quieto) setInterval(function () {
+            if (document.hidden) return;
+            marca(31 + Math.floor(Math.random() * 3));
+        }, 6000);
+        /* Aviso de Bloq Mayús en la contraseña. */
+        var pass = $('pass'), mayus = $('mayus');
+        function caps(e) { if (e.getModifierState) mayus.hidden = !e.getModifierState('CapsLock'); }
+        pass.addEventListener('keydown', caps); pass.addEventListener('keyup', caps); pass.addEventListener('blur', function () { mayus.hidden = true; });
+        /* Botón: "Entrando…" mientras login.js lo tiene deshabilitado. */
+        var entrar = $('entrar');
+        new MutationObserver(function () { entrar.textContent = entrar.disabled ? 'Entrando…' : 'Entrar'; }).observe(entrar, { attributes: true, attributeFilter: ['disabled'] });
+        /* Pulso del servidor (público): punto verde "En línea" / rojo "Sin conexión". */
+        var p = $('punto'), t = $('estadoTxt');
+        function ver() {
+            fetch('/api/health', { cache: 'no-store' }).then(function (r) { return r.ok; }, function () { return false; }).then(function (ok) {
+                p.dataset.s = ok ? 'on' : 'off'; t.textContent = ok ? 'Servidor en línea' : 'Sin conexión con el servidor';
+            });
+        }
+        ver(); setInterval(ver, 20000);
+    })();
+</script>
+<script src="/static/js/login.js?v=1333"></script>
+</body>
+</html>

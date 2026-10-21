@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.27 — 2026-10-21
+- **Módulo TPMS disponible:** nueva identidad naranja, inicio de sesión propio en `/tpms/acceso` (misma cuenta que el resto de la plataforma) y página `/tpms` que por ahora es una ventana de escaneo de QR con cámara, entrada manual e historial de la sesión. Los permisos por módulo y las invitaciones ya lo incluían.
+- **Escáner TQT — ya no se queda el JS viejo tras desplegar:** las páginas ponían `?v=` a mano en sus scripts y algunos llevaban meses sin cambiar (Inventario PCB seguía en `?v=1352`), así que Cloudflare/el navegador servían la versión anterior: por eso el filtro de hardware seguía mostrando «[object HTMLOptionElement]» y pocas versiones. Ahora el servidor sirve cada JS/CSS con la versión actual de la app.
+- **Lotes cuentan sus placas:** la lista de lotes (consola, hoja de lotes y sección Lotes) muestra «N tarjetas · M placas»; antes un lote al que se movieron placas sueltas aparecía vacío porque solo contaba tarjetas. «Mover a lote» refresca el conteo al momento.
+
 ## v1.4.26 — 2026-10-21
 - **Inventario PCB — filtros corregidos:** el filtro de hardware mostraba «[object HTMLOptionElement]» y no se podía usar (lo mismo pasaba con el de lote). Ahora dice «Todas las versiones de hardware» y cada opción lleva su conteo («Hardware V10 · 24»); el de lote muestra solo los lotes que tienen placas, también con conteo.
 - **Selección coherente con los filtros:** al filtrar se quitan de la selección las placas que dejan de verse, así «Cambiar hardware», «Mover a lote» y «Eliminar» actúan solo sobre lo que está en pantalla.

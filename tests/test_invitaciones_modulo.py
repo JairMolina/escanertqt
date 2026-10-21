@@ -107,5 +107,18 @@ class TestInvitacionesModulo(unittest.TestCase):
         self.assertEqual(imp["login"], "/impresora/acceso")
 
 
+    def test_tpms_tiene_su_propia_pantalla_de_acceso(self):
+        """v1.4.27: TPMS ya está disponible, con su login propio y su ventana de escaneo."""
+        c = cliente_sin_sesion(app)
+        r = c.get("/tpms", follow_redirects=False)
+        self.assertEqual(r.headers["location"], "/tpms/acceso?next=%2Ftpms")
+        r = c.get("/tpms/acceso")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("__VERSION__", r.text)
+        t = next(m for m in c.get("/api/modulos").json()["modulos"] if m["id"] == "tpms")
+        self.assertEqual((t["estado"], t["url"], t["login"]), ("disponible", "/tpms", "/tpms/acceso"))
+        self.assertEqual(modulos_cat.modulo_de_ruta("/static/js/tpms.js"), "tpms")
+
+
 if __name__ == "__main__":
     unittest.main()

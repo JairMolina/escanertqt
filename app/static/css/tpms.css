@@ -1,0 +1,141 @@
+/* tpms.css - Módulo TPMS (sensores de presión de llantas): ventana de escaneo.
+   Identidad "banco de presión": caucho y asfalto (oscuro) o gris de taller (claro), naranja de seguridad #FF6A00 encendido
+   como único acento. Se apoya en app.css (botones, campos, visor) y solo redefine tokens y lo propio de la pantalla. */
+
+:root[data-theme="dark"], :root:not([data-theme]) {
+  --bg: #15130F; --bg-2: #0E0D0B; --surface: #1F1C18; --surface-2: #2A2620; --line: #38332C; --line-2: #6E665B;
+  --text: #F5EFE7; --muted: #B9AFA2; --faint: #A0968A; --accent: #FF6A00; --accent-ink: #1C0B00; --accent-text: #FF8A3D;
+  --ok: #4CD08B; --warn: #F2B33D; --bad: #FF6B6B;
+  --campo: #110F0C; --glow: 0 0 12px rgba(255, 106, 0, .5); --glow-fuerte: 0 0 18px rgba(255, 106, 0, .65);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #E4E1DC; --bg-2: #D6D2CB; --surface: #FBFAF8; --surface-2: #F0EDE8; --line: #CFC9C0; --line-2: #857D72;
+  --text: #1D1A16; --muted: #575047; --faint: #6A6359; --accent: #FF6A00; --accent-ink: #1C0B00; --accent-text: #B04400;
+  --ok: #1D6B45; --warn: #8A5200; --bad: #B42424;
+  --campo: #FFFFFF; --glow: 0 0 10px rgba(255, 106, 0, .4); --glow-fuerte: 0 0 14px rgba(255, 106, 0, .5);
+  color-scheme: light;
+}
+:root { --tp-rad: 6px; --tp-ease: cubic-bezier(.23, 1, .32, 1); --vp-wide: 1280px; }
+
+html { -webkit-font-smoothing: antialiased; }
+body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); overflow-x: hidden; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.salto { position: absolute; left: 12px; top: -60px; z-index: 20; padding: 10px 14px; background: var(--accent); color: var(--accent-ink); font-weight: 700; border-radius: var(--tp-rad); text-decoration: none; }
+.salto:focus { top: 10px; }
+.tp .btn { border-radius: var(--tp-rad); }
+.tp .btn-primary { box-shadow: var(--glow), 0 2px 0 #A84300; }
+.tp .btn-primary:active:not([disabled]) { box-shadow: none; }
+
+/* ---------- cabecera ---------- */
+.cab { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
+       padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+       background: var(--bg-2); border-bottom: 1px solid var(--line); }
+/* banda de rodada bajo la cabecera: el dibujo de la llanta, apenas visible */
+.cab::after { content: ""; position: absolute; left: 0; right: 0; bottom: -7px; height: 6px; pointer-events: none; opacity: .4;
+              background: repeating-linear-gradient(135deg, var(--line-2) 0 2px, transparent 2px 9px), repeating-linear-gradient(45deg, var(--line-2) 0 2px, transparent 2px 9px);
+              background-size: 18px 50%; background-position: 0 0, 0 100%; background-repeat: repeat-x; }
+.cab .ir-modulos { min-height: 44px; border-radius: var(--tp-rad); }
+.marca { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sello { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 50%; color: var(--accent-ink); background: var(--accent); box-shadow: var(--glow), inset 0 -2px 0 rgba(0, 0, 0, .25); }
+.sello svg { width: 26px; height: 26px; }
+.marca .nombre { font-size: 24px; font-weight: 700; letter-spacing: .06em; line-height: 1; }
+.espacio { flex: 1; min-width: 0; }
+.usuario { display: none; align-items: baseline; gap: 8px; min-width: 0; font-size: 14px; color: var(--muted); }
+.usuario .mail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 24ch; font-weight: 600; }
+.usuario .rol { flex: none; padding: 1px 7px; border: 1px solid var(--line-2); border-radius: 3px; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; }
+.cab .iconbtn { border-radius: var(--tp-rad); }
+
+/* ---------- página ---------- */
+.pag { width: 100%; max-width: var(--vp-wide); margin-inline: auto; box-sizing: border-box; display: grid; gap: 20px;
+       padding: 22px max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.camara { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.lado { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.tp h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .01em; }
+
+/* visor: el de app.css, con marco naranja encendido y más alto */
+.marco-cam { position: relative; border-radius: 10px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px var(--line); }
+.marco-cam[data-cam="on"] { box-shadow: 0 0 0 2px var(--accent), var(--glow-fuerte); }
+.marco-cam .visor { aspect-ratio: 3 / 4; max-height: 62dvh; min-height: 300px; clip-path: none; outline: 0; }
+.marco-cam .visor .frame { inset: 18% 14%; }
+.marco-cam .visor .frame i { width: 38px; height: 38px; border-color: var(--accent); filter: drop-shadow(0 0 5px rgba(255, 106, 0, .85)); }
+.marco-cam .visor .frame i:nth-child(1) { border-top-left-radius: 10px; }
+.marco-cam .visor .frame i:nth-child(2) { border-top-right-radius: 10px; }
+.marco-cam .visor .frame i:nth-child(3) { border-bottom-left-radius: 10px; }
+.marco-cam .visor .frame i:nth-child(4) { border-bottom-right-radius: 10px; }
+.marco-cam .visor .frame::after { background: var(--accent); box-shadow: 0 0 16px 3px rgba(255, 106, 0, .7); }
+.marco-cam .visor .tools .iconbtn.is-torch[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.marco-cam[data-cam="off"] .visor .status, .marco-cam[data-cam="off"] .visor .tools { visibility: hidden; }
+
+/* cámara apagada: capa encima del visor */
+.apagada { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center;
+           background: radial-gradient(70% 60% at 50% 45%, #2A2620 0%, #0E0D0B 100%); color: #F5EFE7; }
+.apagada .ico-cam { width: 64px; height: 64px; color: #FF8A3D; margin-bottom: 6px; }
+.apagada .t { margin: 0; font-size: 20px; font-weight: 700; }
+.apagada .s { margin: 0; max-width: 30ch; color: #C9BFB2; font-size: 15px; text-wrap: pretty; }
+.marco-cam:not([data-cam="off"]) .apagada { display: none; }
+
+.btn-cam { width: 100%; min-height: 56px; font-size: 18px; }
+.btn-cam .svg-i { width: 22px; height: 22px; }
+.btn-cam[aria-pressed="true"] { background: var(--surface-2); color: var(--text); border-color: var(--accent); box-shadow: none; }
+
+/* ---------- último código ---------- */
+.ultimo { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.ultimo::before { content: ""; position: absolute; left: 16px; right: 16px; top: -1px; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent); box-shadow: var(--glow); }
+.ultimo[data-vacio="1"]::before { background: var(--line-2); box-shadow: none; }
+.ult-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.origen { font-size: 14px; color: var(--muted); font-weight: 600; }
+.codigo { margin: 0; font-family: var(--font-mono); font-weight: 600; font-size: clamp(22px, 6vw, 30px); line-height: 1.2; letter-spacing: .02em; font-variant-numeric: tabular-nums slashed-zero;
+          color: var(--accent-text); overflow-wrap: anywhere; word-break: break-word; min-height: 1.2em; }
+.ultimo[data-vacio="1"] .codigo { color: var(--faint); font-family: inherit; font-weight: 500; font-size: 18px; }
+.ult-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.hora { color: var(--muted); font-size: 13px; }
+.ultimo.nuevo .codigo { animation: tp-llega .45s var(--tp-ease); }
+
+/* ---------- entrada manual ---------- */
+.manual .field > label { color: var(--muted); }
+.man-fila { display: flex; gap: 8px; }
+.man-fila .input { flex: 1; min-width: 0; min-height: 52px; font-size: 16px; border-radius: var(--tp-rad); background: var(--campo); border-color: var(--line-2); }
+.man-fila .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.man-fila .btn { min-height: 52px; }
+.manual .ayuda { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+
+/* ---------- historial ---------- */
+.historial { display: flex; flex-direction: column; gap: 10px; }
+.hist-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+.cuenta { color: var(--muted); font-size: 14px; font-weight: 500; }
+.lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.lista:empty { display: none; }
+.lista li { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; min-height: 56px; border-top: 1px solid var(--line); }
+.lista li:first-child { border-top: 0; }
+.lista .dato { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lista .cod { font-family: var(--font-mono); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums slashed-zero; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista .meta { font-size: 13px; color: var(--muted); }
+.lista .veces { color: var(--accent-text); font-weight: 600; }
+.lista .iconbtn { border-radius: var(--tp-rad); color: var(--muted); }
+.lista .iconbtn:hover { color: var(--text); }
+.hist-vacio { margin: 0; padding: 14px; border: 1px dashed var(--line-2); border-radius: 10px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+.hist-vacio[hidden] { display: none; }
+
+/* ---------- anchos ---------- */
+@media (max-width: 420px) {
+  .cab .ir-modulos span { display: none; }
+  .cab .ir-modulos { padding: 0; width: 44px; }
+}
+@media (min-width: 640px) {
+  .usuario:not([hidden]) { display: inline-flex; }
+}
+@media (min-width: 900px) {
+  .pag { grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); align-items: start; gap: 28px; padding-top: 28px; }
+  .camara { position: sticky; top: 84px; }
+  .marco-cam .visor { aspect-ratio: 4 / 3; max-height: calc(100dvh - 210px); }
+  .codigo { font-size: clamp(24px, 2.2vw, 32px); }
+}
+/* móvil horizontal: el visor no se come la pantalla */
+@media (orientation: landscape) and (max-height: 480px) { .marco-cam .visor { min-height: 160px; max-height: 60dvh; aspect-ratio: 16 / 9; } }
+
+/* ---------- movimiento ---------- */
+@keyframes tp-llega { from { opacity: .2; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .ultimo.nuevo .codigo { animation: none; }
+}

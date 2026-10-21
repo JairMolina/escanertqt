@@ -1,5 +1,6 @@
 """App FastAPI principal: rutas REST, WebSocket, archivos estáticos y ciclo de vida."""
 import os
+import re
 import secrets
 import logging
 from contextlib import asynccontextmanager
@@ -122,11 +123,11 @@ CABECERAS_SEGURIDAD = {
 
 # Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
-RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
+RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js")
 
 
-PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora"}   # v1.4.14: Impresora en solo lectura
+PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo)
 ROL_NOMBRE = {"general": "General", "consultor": "Consultor"}
 # Páginas (y sus copias bajo /static) → zona que se nombra en el aviso "sin acceso" (v1.3.42)
 ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "emparejar", "/static/emparejar.html": "emparejar",
@@ -270,14 +271,31 @@ app.include_router(plataforma.router)   # v1.4.12: cuentas por módulo desde el 
 app.include_router(activos.router)      # v1.4.14: módulo Impresora (activos con etiqueta DYMO + QR)
 
 
-@app.get("/impresora/acceso", include_in_schema=False)
-async def serve_impresora_acceso(request: Request):
-    """v1.4.17: inicio de sesión propio del módulo Impresora (misma cuenta y API que /login, otra identidad)."""
-    html = (settings.STATIC_DIR / "impresora_acceso.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
+def _pagina_acceso(request: Request, archivo: str) -> HTMLResponse:
+    html = (settings.STATIC_DIR / archivo).read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
+    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, html)
     resp = HTMLResponse(html, headers={"Cache-Control": "no-store"})
     if not request.cookies.get("tqt_cid"):   # misma marca anónima que /login para el límite de intentos
         resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
     return resp
+
+
+@app.get("/impresora/acceso", include_in_schema=False)
+async def serve_impresora_acceso(request: Request):
+    """v1.4.17: inicio de sesión propio del módulo Impresora (misma cuenta y API que /login, otra identidad)."""
+    return _pagina_acceso(request, "impresora_acceso.html")
+
+
+@app.get("/tpms/acceso", include_in_schema=False)
+async def serve_tpms_acceso(request: Request):
+    """v1.4.27: inicio de sesión propio del módulo TPMS (misma cuenta y API que /login)."""
+    return _pagina_acceso(request, "tpms_acceso.html")
+
+
+@app.get("/tpms", include_in_schema=False)
+async def serve_tpms():
+    """v1.4.27: módulo TPMS; por ahora solo la ventana de escaneo de QR."""
+    return _serve_file(settings.STATIC_DIR / "tpms.html")
 
 
 @app.get("/impresora", include_in_schema=False)
@@ -286,11 +304,19 @@ async def serve_impresora():
     return _serve_file(settings.STATIC_DIR / "impresora.html")
 
 
-def _serve_file(file_path: Path, fallback_path: Path = None) -> FileResponse:
+_VER_ESTATICO = re.compile(r"""(/static/[\w./-]+\.(?:js|css))(?:\?v=[\w.]*)?(?=["'])""")
+
+
+def _serve_file(file_path: Path, fallback_path: Path = None):
+    """v1.4.27: cada página sale con `?v=<versión>` en sus JS/CSS. Antes el `?v=` se subía a mano y se quedaba viejo
+    (p. ej. sec_inventario.js?v=1352): Cloudflare o el navegador seguían sirviendo el JS anterior tras desplegar."""
     target = file_path if file_path.exists() else fallback_path
-    if target and target.exists():
+    if not (target and target.exists()):
+        target = settings.STATIC_DIR / "index.html"
+    if target.suffix != ".html":
         return FileResponse(target, headers={"Cache-Control": "no-cache"})
-    return FileResponse(settings.STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, target.read_text(encoding="utf-8"))
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/", include_in_schema=False)
@@ -350,6 +376,7 @@ async def serve_admin(request: Request):
 async def serve_invitacion():
     """Activar una cuenta invitada (el token viaja en el #fragmento: nunca llega a registros del servidor ni del proxy)."""
     html = (settings.STATIC_DIR / "invitacion.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
+    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, html)
     resp = HTMLResponse(html)
     resp.headers["Cache-Control"] = "no-store"
     return resp
@@ -359,6 +386,7 @@ async def serve_invitacion():
 async def serve_login(request: Request):
     """Pantalla de acceso (correo y contraseña). Es la única página pública."""
     html = (settings.STATIC_DIR / "login.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
+    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, html)
     resp = HTMLResponse(html)   # la versión se inyecta aquí para que la pantalla de acceso siempre muestre la que corre
     resp.headers["Cache-Control"] = "no-store"
     if not request.cookies.get("tqt_cid"):   # marca anónima de este equipo, para el límite de intentos fallidos
@@ -381,6 +409,7 @@ async def modulos(request: Request):
 async def serve_inicio(request: Request):
     """Portal de módulos (público): Escáner TQT es un módulo más de la plataforma."""
     html = (settings.STATIC_DIR / "inicio.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
+    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, html)
     resp = HTMLResponse(html, headers={"Cache-Control": "no-store"})
     if not request.cookies.get("tqt_cid"):   # v1.4.13: el núcleo I+D tiene ingreso propio; misma marca anónima que /login para el límite de intentos
         resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")

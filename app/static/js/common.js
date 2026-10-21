@@ -1,6 +1,6 @@
 (function () {
-    /** v1.4.17: cada módulo tiene su pantalla de inicio de sesión (Impresora: /impresora/acceso; el resto, /login). */
-    function accesoDelModulo() { return location.pathname.indexOf('/impresora') === 0 ? '/impresora/acceso' : '/login'; }
+    /** v1.4.17: cada módulo tiene su pantalla de inicio de sesión (Impresora: /impresora/acceso; TPMS: /tpms/acceso; el resto, /login). */
+    function accesoDelModulo() { var p = location.pathname; return p.indexOf('/impresora') === 0 ? '/impresora/acceso' : p.indexOf('/tpms') === 0 ? '/tpms/acceso' : '/login'; }
     window.accesoDelModulo = accesoDelModulo;
     // Sesión de usuario caducada o cerrada en otro equipo: cualquier respuesta 401 marcada por el servidor lleva al login.
     const _fetch = window.fetch.bind(window);
@@ -164,6 +164,8 @@
     const MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     function fechaLote(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; }
     function semanaIso(d) { const t = new Date(d); t.setUTCDate(t.getUTCDate() + 3 - ((t.getUTCDay() + 6) % 7)); const y = t.getUTCFullYear(); const s = new Date(Date.UTC(y, 0, 4)); return { anio: y, sem: 1 + Math.round(((t - s) / 864e5 - 3 + ((s.getUTCDay() + 6) % 7)) / 7) }; }
+    /** v1.4.27: tarjetas del lote y placas recibidas/movidas a él (las sueltas no cuentan como tarjeta). */
+    function loteConteo(l) { const t = l.tarjetas || 0, p = l.placas || 0; return `${t} tarjeta${t === 1 ? '' : 's'} · ${p} placa${p === 1 ? '' : 's'}`; }
     function loteNombre(l) {
         if (!l) return 'Sin lote';
         const f = fechaLote(l.fecha_inicio), tipo = l.tipo_lote || 'mes';
@@ -556,7 +558,7 @@
             else body.append(h('ul', { class: 'lote-list' }, lotes.map((l) => h('li', { class: 'lote', dataset: { activo: l.activo ? '1' : '' } },
                 h('div', { class: 'lote-info' },
                     h('div', { class: 'lote-nom' }, loteNombre(l), l.activo ? badge('Activo', 'ok', 'check') : null),
-                    h('div', { class: 't2' }, `${l.tarjetas || 0} tarjeta${l.tarjetas === 1 ? '' : 's'}`)),
+                    h('div', { class: 't2' }, loteConteo(l))),
                 h('div', { class: 'lote-acc' },
                     l.activo || acceso.rol === 'consultor' ? null : h('button', { class: 'btn btn-sm btn-primary', type: 'button', disabled: busy ? '' : null, 'aria-label': `Usar el lote ${loteNombre(l)}`, onclick: () => usar(l) }, 'Usar este lote'),
                     h('a', { class: 'btn btn-sm', href: `/monitor?lote=${l.id}`, 'aria-label': `Ver el lote ${loteNombre(l)} en el monitor` }, icon('monitor'), 'Ver en el monitor'))))));
@@ -846,7 +848,7 @@
         versionP,
         hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
-        loteNombre, ordenarLotes, debounce, hora,
+        loteNombre, loteConteo, ordenarLotes, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,
         toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, irModulos, openLotes,
     };

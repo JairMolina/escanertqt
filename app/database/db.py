@@ -536,7 +536,8 @@ def get_lote_by_codigo(codigo: str, conn: Optional[sqlite3.Connection] = None, d
 def list_lotes(conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
     """Lista todos los lotes, del más reciente al más antiguo por fecha de inicio (cada uno con su `nombre` visible)."""
     def _q(c):
-        filas = [dict(r) for r in c.execute("SELECT l.*, (SELECT COUNT(*) FROM tarjetas_produccion t WHERE t.lote_id = l.id) AS tarjetas FROM lotes_mensuales l "
+        filas = [dict(r) for r in c.execute("SELECT l.*, (SELECT COUNT(*) FROM tarjetas_produccion t WHERE t.lote_id = l.id) AS tarjetas, "
+                                            "(SELECT COUNT(*) FROM pcb_inventario p WHERE p.lote_id = l.id) AS placas FROM lotes_mensuales l "
                                             "ORDER BY COALESCE(l.fecha_inicio, printf('%04d-%02d-01', l.anio, l.mes)) DESC, l.id DESC").fetchall()]
         actual = _lote_de_usuario(c) if USUARIO_LOTE.get() else None
         for f in filas:

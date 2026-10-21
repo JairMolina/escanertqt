@@ -185,7 +185,7 @@
                         if (!r.ok) { err.textContent = r.error; return false; }
                         const d = r.data || {}; st.sel.clear();
                         toast(`${d.movidas} placa${d.movidas === 1 ? '' : 's'} en ${loteNom(Number(sel.value))}${d.tarjetas && d.tarjetas.length ? ` · tarjetas ${d.tarjetas.join(', ')}` : ''}`, { kind: 'ok' });
-                        ctx.invalidar && ctx.invalidar(); ctx.actualizar(); return true;
+                        ctx.invalidar && ctx.invalidar(); ctx.recargarLotes && ctx.recargarLotes(); ctx.actualizar(); return true;   // v1.4.27: el conteo de placas del lote se refresca
                     } }] });
             }
             function eliminarMasa() {

@@ -256,7 +256,7 @@
     function abrirMenu() {
         if (S.menu) { cerrarMenu(true); return; }
         const item = (l) => h('button', { class: 'esc-mi', type: 'button', role: 'menuitemradio', 'aria-checked': S.lote && S.lote.id === l.id ? 'true' : 'false', onclick: () => { cerrarMenu(true); seleccionarLote(l.id); } },
-            h('span', { class: 'nm' }, T.loteNombre(l)), l.activo ? T.badge('Activo', 'ok') : null, h('span', { class: 'mono t2' }, `${l.tarjetas || 0} tarj.`));
+            h('span', { class: 'nm' }, T.loteNombre(l)), l.activo ? T.badge('Activo', 'ok') : null, h('span', { class: 'mono t2' }, `${l.tarjetas || 0} tarj. · ${l.placas || 0} pl.`));
         S.menu = h('div', { class: 'esc-menu', role: 'menu', 'aria-label': 'Lotes' },
             S.lotes.length ? S.lotes.map(item) : h('div', { class: 'esc-mi-vacio muted' }, 'Todavía no hay lotes'),
             h('div', { class: 'esc-sep', role: 'separator' }),

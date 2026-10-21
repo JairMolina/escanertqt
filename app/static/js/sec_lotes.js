@@ -30,7 +30,7 @@
                 if (!lotes.length) { cont.append(T.empty('layers', 'Todavía no hay lotes', 'Crea el primero con "Usar o crear lote".')); return; }
                 cont.append(h('ul', { class: 'esc-lista', 'aria-label': 'Lotes mensuales' }, lotes.map((l) => h('li', { dataset: { activo: l.activo ? '1' : '' } },
                     h('div', { class: 'grow' }, h('div', { class: 'nm' }, T.loteNombre(l), l.activo ? T.badge('Activo', 'ok', 'check') : null, sel && sel.id === l.id ? T.badge('En pantalla', 'accent', 'monitor') : null),
-                        h('div', { class: 't2' }, `${l.tarjetas || 0} tarjeta${l.tarjetas === 1 ? '' : 's'} · ${l.codigo_lote || ''}`)),
+                        h('div', { class: 't2' }, `${T.loteConteo(l)} · ${l.codigo_lote || ''}`)),
                     h('div', { class: 'acc' },
                         sel && sel.id === l.id ? null : h('button', { class: 'btn', type: 'button', 'aria-label': `Ver el lote ${T.loteNombre(l)} en la consola`, onclick: () => { ctx.seleccionarLote(l.id); pintar(); } }, icon('monitor'), 'Ver'),
                         l.activo ? null : h('button', { class: 'btn btn-primary', type: 'button', disabled: ocupado ? '' : null, 'aria-label': `Usar el lote ${T.loteNombre(l)} como activo`, onclick: () => usar(l) }, 'Usar como activo'))))));
