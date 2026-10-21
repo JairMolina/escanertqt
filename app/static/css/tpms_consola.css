@@ -22,6 +22,10 @@
 .mas-op[aria-current="page"] { border-color: var(--accent); }
 .mas-op .svg-i { width: 22px; height: 22px; color: var(--accent-text); }
 
+/* ---------- pie con la versión (v1.4.28) ---------- */
+.pie { margin: 32px 0 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; text-align: center; }
+.pie .mono { color: var(--accent-text); }
+
 /* ---------- navegación: escritorio (consola) ---------- */
 @media (min-width: 1024px) {
   :root { --tab-h: 0px; }

@@ -213,5 +213,13 @@ class TestTpms(unittest.TestCase):
         self.assertEqual(r["estado"], "PROGRAMADA")
 
 
+    def test_pie_con_version(self):
+        """v1.4.28: el pie de /tpms muestra la versión de la app."""
+        from app.config import settings
+        html = self.c.get("/tpms").text
+        self.assertIn(f"v{settings.APP_VERSION}</span></footer>", html)
+        self.assertNotIn("__VERSION__", html)
+
+
 if __name__ == "__main__":
     unittest.main()

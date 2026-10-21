@@ -1,7 +1,13 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-21 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.27 rama tpms-modulo; producción en 1.4.26, confirmado 2026-10-21)
+Commit de referencia: ver `git log` de main (v1.4.28; producción en 1.4.26 — 1.4.27 con prompt entregado, sin confirmar)
+
+## v1.4.28 (2026-10-21, Claude Code, rama tpms-pestanas)
+- TPMS replica la consola de Escáner TQT sin MAC ni R2/R3 (una placa = una tarjeta): Operación (Dashboard, Recibir, Programar, Consultar) y Gestión (Inventario, Lotes, Movimientos, Excel); celular con barra inferior + «Más». JS en `static/js/tpms_*.js`, CSS en `css/tpms*.css`. Hecho con 2 agentes (backend/frontend) sobre un contrato de API común.
+- API `/api/tpms`: pcb (filtros), manual, por-codigo, firmware, patch/delete, masa (todo o nada), resumen (actividad 14 días, últimos; `firmwares` incluye null = sin firmware), eventos, lotes, lotes/renombrar, exportar (xlsx). `tpms_pcb` ampliada por migración idempotente; historial propio `tpms_eventos` (nunca `escaneos`/log_evento).
+- `_serve_file` también reemplaza `__VERSION__` (pie de /tpms con la versión).
+- Evidencia: test_tpms (17), suite 841+: solo los 3 errores previos; frontend probado por el agente con API simulada en Chrome 375/1280. Sin prueba con backend real en navegador ni cámara.
 
 ## v1.4.27 (2026-10-21, Claude Code, rama tpms-modulo)
 - Módulo TPMS disponible (`modulos.py`, acento #FF6A00): `/tpms/acceso` (login propio, `_pagina_acceso` compartido con Impresora), `/tpms` (escaneo QR con `mountVisor`, lote por dispositivo, historial en sessionStorage), API `/api/tpms/escanear|pcb` (`services/tpms.py`, tabla propia `tpms_pcb`; no escribe en `escaneos` para no mezclar tableros TQT). Consultor puede abrir /tpms (sus POST siguen bloqueados).

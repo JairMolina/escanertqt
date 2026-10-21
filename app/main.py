@@ -316,7 +316,7 @@ def _serve_file(file_path: Path, fallback_path: Path = None):
         target = settings.STATIC_DIR / "index.html"
     if target.suffix != ".html":
         return FileResponse(target, headers={"Cache-Control": "no-cache"})
-    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, target.read_text(encoding="utf-8"))
+    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, target.read_text(encoding="utf-8")).replace("__VERSION__", settings.APP_VERSION)
     return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 

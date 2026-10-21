@@ -1,6 +1,7 @@
 # Historial de versiones — Escáner TQT
 
 ## v1.4.28 — 2026-10-21
+- **TPMS muestra su versión** en el pie de página («TPMS · Plataforma I+D · v1.4.28»).
 - **TPMS con pestañas como Escáner TQT:** Recibir · Programar · Consultar · Inventario (barra inferior en celular, riel lateral en PC), con el estilo naranja de TPMS. No hay Emparejar ni MAC: cada placa TPMS es una sola tarjeta con hardware y firmware.
   - **Recibir:** escaneo o serie a mano, lote por dispositivo y contador de recibidas hoy.
   - **Programar:** escanea o teclea la placa y asigna el firmware (se recuerda el último); en modo lote guarda sin confirmar; «Marcar falla».
