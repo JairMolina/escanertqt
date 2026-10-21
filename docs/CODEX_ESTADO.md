@@ -1,7 +1,7 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-21 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.26; producción en 1.4.25 `a119776`, confirmado 2026-10-21)
+Commit de referencia: ver `git log` de main (v1.4.26 `78d2131`; producción en 1.4.26, confirmado 2026-10-21)
 
 ## v1.4.26 (2026-10-21, Claude Code, rama fix/filtros-inventario)
 - sec_inventario.js: `replaceChildren` recibía arreglos (opciones convertidas en texto) en los filtros de hardware y lote → spread + conteos; la selección se poda a las filas filtradas. Revisados tipo, estado, sin MAC, búsqueda y lote. Revisado el resto del frontend: no hay otro `replaceChildren` con arreglo sin spread.
