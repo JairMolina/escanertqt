@@ -319,6 +319,7 @@
             btnOtaVerify.disabled = btnOtaDiscard.disabled = blocked;
             btnOtaCancel.hidden = !otaController; btnOtaCancel.disabled = S.otaCommitting;
             otaPanel.hidden = S.tipoEsp !== 'R2' || !S.tarjeta;
+            monPanel.hidden = usbPanel.hidden = !S.tarjeta;   // v1.4.20: como R1/R3, solo con tarjeta elegida
             otaHint.textContent = ownPending ? 'Hay una actualización pendiente de comprobar. Conecta la R2 encendida para verificarla.' :
                 saved ? 'Verifica o descarta la OTA pendiente de ' + (saved.nombre || 'otra R2') + ' antes de iniciar otra.' :
                 S.capability?.needs_enrollment ? 'Con base4.0 genérica: selecciona el dispositivo XXXX por Bluetooth. La web le asignará esta tarjeta e instalará el firmware elegido.' :
@@ -743,6 +744,7 @@
         function pintarDetalle() {
                         enableFirmware();
             vacio.querySelector('b').textContent = 'Elige una ' + S.tipoEsp;
+            monPanel.hidden = usbPanel.hidden = !S.tarjeta;
             if (!S.tarjeta) { detalle.hidden = true; vacio.hidden = false; return; }
             vacio.hidden = true; detalle.hidden = false;
             const p = S.tarjeta;
