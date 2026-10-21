@@ -1,18 +1,61 @@
-"""v1.4.27: módulo TPMS. Alta de placas PCB TPMS por QR (versión, serie, lote de texto libre y quién/cuándo la recibió).
+"""Módulo TPMS. Alta de placas PCB TPMS por QR o manual, firmware, estado, edición, operaciones en masa y resumen.
 
-Tabla propia `tpms_pcb` (se crea sola). No escribe en `escaneos` ni en el inventario TQT: los tableros de Escáner TQT no
-deben contar placas TPMS. El QR se interpreta con `models.parse_tpms` (el mismo que hace que Escáner TQT las rechace).
+v1.4.27: tabla propia `tpms_pcb` (se crea sola) y alta por QR.
+v1.4.28: firmware/estado/nota/programada_en/actualizado_en (migración idempotente sobre la tabla vieja) y bitácora propia
+`tpms_eventos`. No escribe en `escaneos`, ni en el inventario TQT, ni usa log_evento: los tableros de Escáner TQT no deben
+contar placas TPMS. El QR se interpreta con `models.parse_tpms` (el mismo que hace que Escáner TQT las rechace).
 """
-from typing import Any, Dict, List, Optional
+import re
+import sqlite3
+from typing import Any, Dict, Iterable, List, Optional
 
 from app.database import db
+from app.database.inventario import normalizar_serie
 from app.database.models import parse_tpms
+
+ESTADOS = ("RECIBIDA", "PROGRAMADA", "FALLA", "BAJA")
+ACCIONES_MASA = ("firmware", "version", "lote", "estado", "eliminar")
+SIN_FIRMWARE = "__sin"
+_AHORA = "datetime('now','localtime')"
+_SOLO_SERIE = re.compile(r"^\d{1,4}$", re.A)
+_VERSION = re.compile(r"^(\d{1,2})(?:\.(\d))?$", re.A)
+
+
+# ============================================================================
+# Errores de negocio (el router los traduce a 404 / 409 / 422)
+# ============================================================================
+class TpmsError(Exception):
+    pass
+
+
+class NoEncontrada(TpmsError):
+    pass
+
+
+class Duplicada(TpmsError):
+    pass
+
+
+class Invalida(TpmsError):
+    pass
+
+
+# ============================================================================
+# Esquema
+# ============================================================================
+_COLUMNAS_NUEVAS = {   # ALTER TABLE ADD COLUMN solo admite valores por omisión constantes
+    "firmware": "TEXT",
+    "estado": "TEXT NOT NULL DEFAULT 'RECIBIDA'",
+    "nota": "TEXT NOT NULL DEFAULT ''",
+    "programada_en": "TEXT",
+    "actualizado_en": "TEXT",
+}
 
 
 def _asegurar() -> None:
-    """Crea la tabla si falta (idempotente)."""
+    """Crea o migra las tablas (idempotente; la tabla de v1.4.27 puede existir sin las columnas nuevas)."""
     with db.get_db() as c:
-        c.executescript(
+        c.execute(
             """
             CREATE TABLE IF NOT EXISTS tpms_pcb(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,12 +66,115 @@ def _asegurar() -> None:
               lote TEXT NOT NULL DEFAULT '',
               operador TEXT,
               recibida_en TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-            );
-            CREATE INDEX IF NOT EXISTS ix_tpms_pcb_lote ON tpms_pcb(lote);
+            )
             """
         )
+        existentes = {r[1] for r in c.execute("PRAGMA table_info(tpms_pcb)")}
+        for col, tipo in _COLUMNAS_NUEVAS.items():
+            if col not in existentes:
+                c.execute(f"ALTER TABLE tpms_pcb ADD COLUMN {col} {tipo}")
+        c.execute("UPDATE tpms_pcb SET actualizado_en = recibida_en WHERE actualizado_en IS NULL")
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tpms_eventos(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              pcb_id INTEGER,
+              nombre TEXT NOT NULL DEFAULT '',
+              accion TEXT NOT NULL,
+              detalle TEXT NOT NULL DEFAULT '',
+              operador TEXT,
+              creado_en TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            )
+            """
+        )
+        for sql in ("CREATE INDEX IF NOT EXISTS ix_tpms_pcb_lote ON tpms_pcb(lote)",
+                    "CREATE INDEX IF NOT EXISTS ix_tpms_pcb_estado ON tpms_pcb(estado)",
+                    "CREATE INDEX IF NOT EXISTS ix_tpms_pcb_version ON tpms_pcb(version)",
+                    "CREATE INDEX IF NOT EXISTS ix_tpms_pcb_firmware ON tpms_pcb(firmware)",
+                    "CREATE INDEX IF NOT EXISTS ix_tpms_eventos_pcb ON tpms_eventos(pcb_id, id)",
+                    "CREATE INDEX IF NOT EXISTS ix_tpms_eventos_nombre ON tpms_eventos(nombre)"):
+            c.execute(sql)
 
 
+# ============================================================================
+# Utilidades
+# ============================================================================
+def normalizar_version(valor: Optional[str]) -> str:
+    """'V1' / '1' / '1.0' -> '1'; '1.1' / 'v1_1' -> '1.1' (mismo criterio que parse_tpms)."""
+    s = str(valor or "").strip().upper().replace("_", ".")
+    if s.startswith("V"):
+        s = s[1:]
+    m = _VERSION.fullmatch(s)
+    if not m or int(m.group(1)) == 0:
+        raise Invalida(f"Versión inválida: '{valor}'. Usa un número como 1 o 1.1.")
+    menor = m.group(2)
+    return f"{int(m.group(1))}.{menor}" if menor and menor != "0" else str(int(m.group(1)))
+
+
+def _serie(valor: Optional[str]) -> str:
+    try:
+        return normalizar_serie(valor)
+    except ValueError as e:
+        raise Invalida(str(e))
+
+
+def nombre_canonico(version: str, serie: str) -> str:
+    return f"TPMS-V{version}-{serie}"
+
+
+def _texto(valor: Optional[str], largo: int) -> str:
+    return (valor or "").strip()[:largo]
+
+
+def _estado(valor: Optional[str]) -> str:
+    e = str(valor or "").strip().upper()
+    if e not in ESTADOS:
+        raise Invalida(f"Estado inválido: '{valor}'. Usa {', '.join(ESTADOS)}.")
+    return e
+
+
+def _evento(c: sqlite3.Connection, pcb_id: Optional[int], nombre: str, accion: str, detalle: str,
+            operador: Optional[str]) -> None:
+    c.execute("INSERT INTO tpms_eventos(pcb_id, nombre, accion, detalle, operador) VALUES (?,?,?,?,?)",
+              (pcb_id, nombre, accion, detalle[:300], operador))
+
+
+def _fila(c: sqlite3.Connection, pcb_id: int) -> Dict[str, Any]:
+    r = c.execute("SELECT * FROM tpms_pcb WHERE id = ?", (pcb_id,)).fetchone()
+    if not r:
+        raise NoEncontrada(f"Placa TPMS con ID {pcb_id} no encontrada.")
+    return dict(r)
+
+
+def _nombre_ocupado(c: sqlite3.Connection, nombre: str, excluir: Iterable[int] = ()) -> bool:
+    excl = list(excluir)
+    sql = "SELECT 1 FROM tpms_pcb WHERE nombre = ?"
+    if excl:
+        sql += f" AND id NOT IN ({','.join('?' * len(excl))})"
+    return c.execute(sql, (nombre, *excl)).fetchone() is not None
+
+
+def _aplicar_firmware(c: sqlite3.Connection, fila: Dict[str, Any], firmware: Optional[str]) -> None:
+    """Con firmware y RECIBIDA => PROGRAMADA; sin firmware y PROGRAMADA => RECIBIDA."""
+    estado = fila["estado"]
+    if firmware:
+        if estado == "RECIBIDA":
+            c.execute(f"UPDATE tpms_pcb SET firmware = ?, estado = 'PROGRAMADA', programada_en = {_AHORA}, "
+                      f"actualizado_en = {_AHORA} WHERE id = ?", (firmware, fila["id"]))
+            return
+        c.execute(f"UPDATE tpms_pcb SET firmware = ?, programada_en = COALESCE(programada_en, {_AHORA}), "
+                  f"actualizado_en = {_AHORA} WHERE id = ?", (firmware, fila["id"]))
+        return
+    if estado == "PROGRAMADA":
+        c.execute(f"UPDATE tpms_pcb SET firmware = NULL, estado = 'RECIBIDA', programada_en = NULL, "
+                  f"actualizado_en = {_AHORA} WHERE id = ?", (fila["id"],))
+    else:
+        c.execute(f"UPDATE tpms_pcb SET firmware = NULL, actualizado_en = {_AHORA} WHERE id = ?", (fila["id"],))
+
+
+# ============================================================================
+# Operaciones
+# ============================================================================
 def escanear(codigo: str, lote: str = "", operador: Optional[str] = None) -> Dict[str, Any]:
     """Alta idempotente: AGREGADA | REPETIDA | INVALIDA (nunca lanza por negocio)."""
     p = parse_tpms(codigo)
@@ -39,18 +185,194 @@ def escanear(codigo: str, lote: str = "", operador: Optional[str] = None) -> Dic
         fila = c.execute("SELECT * FROM tpms_pcb WHERE nombre = ?", (p["nombre"],)).fetchone()
         if fila:
             return {"resultado": "REPETIDA", "mensaje": f"{p['nombre']} ya estaba registrada.", "pcb": dict(fila)}
-        c.execute("INSERT INTO tpms_pcb(nombre, version, serie, codigo_qr, lote, operador) VALUES (?,?,?,?,?,?)",
-                  (p["nombre"], p["version"], p["serie"], (codigo or "").strip()[:120], (lote or "").strip()[:60], operador))
-        fila = c.execute("SELECT * FROM tpms_pcb WHERE nombre = ?", (p["nombre"],)).fetchone()
-    return {"resultado": "AGREGADA", "mensaje": f"{p['nombre']} registrada.", "pcb": dict(fila)}
+        cur = c.execute("INSERT INTO tpms_pcb(nombre, version, serie, codigo_qr, lote, operador) VALUES (?,?,?,?,?,?)",
+                        (p["nombre"], p["version"], p["serie"], (codigo or "").strip()[:120], _texto(lote, 60), operador))
+        _evento(c, cur.lastrowid, p["nombre"], "RECIBIDA", "Alta por QR", operador)
+        fila = _fila(c, cur.lastrowid)
+    return {"resultado": "AGREGADA", "mensaje": f"{p['nombre']} registrada.", "pcb": fila}
 
 
-def listar(lote: Optional[str] = None, limit: int = 500) -> Dict[str, Any]:
+def alta_manual(version: str, serie: str, lote: str = "", operador: Optional[str] = None) -> Dict[str, Any]:
+    v, s = normalizar_version(version), _serie(serie)
+    nombre = nombre_canonico(v, s)
     _asegurar()
-    sql, args = "SELECT * FROM tpms_pcb", []
+    with db.transaction() as c:
+        if _nombre_ocupado(c, nombre):
+            raise Duplicada(f"{nombre} ya está registrada.")
+        cur = c.execute("INSERT INTO tpms_pcb(nombre, version, serie, codigo_qr, lote, operador) VALUES (?,?,?,'',?,?)",
+                        (nombre, v, s, _texto(lote, 60), operador))
+        _evento(c, cur.lastrowid, nombre, "RECIBIDA", "Alta manual", operador)
+        return _fila(c, cur.lastrowid)
+
+
+def listar(lote: Optional[str] = None, limit: int = 500, q: Optional[str] = None, estado: Optional[str] = None,
+           version: Optional[str] = None, firmware: Optional[str] = None) -> Dict[str, Any]:
+    _asegurar()
+    where: List[str] = []
+    args: List[Any] = []
     if lote is not None:
-        sql, args = sql + " WHERE lote = ?", [lote]
+        where.append("lote = ?"); args.append(lote)
+    if estado:
+        where.append("estado = ?"); args.append(_estado(estado))
+    if version:
+        where.append("version = ?"); args.append(normalizar_version(version))
+    if firmware == SIN_FIRMWARE:
+        where.append("(firmware IS NULL OR firmware = '')")
+    elif firmware:
+        where.append("firmware = ?"); args.append(firmware)
+    if q and q.strip():
+        patron = f"%{q.strip()}%"
+        where.append("(nombre LIKE ? OR serie LIKE ? OR IFNULL(firmware,'') LIKE ? OR nota LIKE ?)")
+        args += [patron] * 4
+    filtro = (" WHERE " + " AND ".join(where)) if where else ""
     with db.get_db() as c:
-        items: List[Dict[str, Any]] = [dict(r) for r in c.execute(sql + " ORDER BY id DESC LIMIT ?", (*args, limit))]
-        total = c.execute("SELECT COUNT(*) FROM tpms_pcb").fetchone()[0]
+        items = [dict(r) for r in c.execute(f"SELECT * FROM tpms_pcb{filtro} ORDER BY id DESC LIMIT ?", (*args, limit))]
+        total = c.execute(f"SELECT COUNT(*) FROM tpms_pcb{filtro}", args).fetchone()[0]
     return {"items": items, "total": total}
+
+
+def _nombre_de_codigo(codigo: str) -> Optional[str]:
+    raw = (codigo or "").strip()
+    if _SOLO_SERIE.fullmatch(raw):
+        return nombre_canonico("1", raw.zfill(4)) if int(raw) else None
+    p = parse_tpms(raw)
+    return p["nombre"] if p else None
+
+
+def por_codigo(codigo: str) -> Dict[str, Any]:
+    """QR, 'TPMS-V1-0004' o solo la serie ('4' => V1) -> {pcb, eventos}."""
+    nombre = _nombre_de_codigo(codigo)
+    if not nombre:
+        raise NoEncontrada(f"'{(codigo or '')[:40]}' no corresponde a una placa TPMS.")
+    _asegurar()
+    with db.get_db() as c:
+        r = c.execute("SELECT * FROM tpms_pcb WHERE nombre = ?", (nombre,)).fetchone()
+        if not r:
+            raise NoEncontrada(f"{nombre} no está registrada.")
+        eventos = [dict(e) for e in c.execute(
+            "SELECT id, accion, detalle, operador, creado_en FROM tpms_eventos WHERE pcb_id = ? ORDER BY id DESC", (r["id"],))]
+    return {"pcb": dict(r), "eventos": eventos}
+
+
+def poner_firmware(pcb_id: int, firmware: Optional[str], operador: Optional[str] = None) -> Dict[str, Any]:
+    fw = _texto(firmware, 60) or None
+    _asegurar()
+    with db.transaction() as c:
+        fila = _fila(c, pcb_id)
+        _aplicar_firmware(c, fila, fw)
+        if fw:
+            _evento(c, pcb_id, fila["nombre"], "PROGRAMADA", f"Firmware {fw}", operador)
+        else:
+            _evento(c, pcb_id, fila["nombre"], "EDITADA", "Firmware quitado", operador)
+        return _fila(c, pcb_id)
+
+
+def editar(pcb_id: int, cambios: Dict[str, Any], operador: Optional[str] = None) -> Dict[str, Any]:
+    """Cambia version/serie/lote/estado/nota (las claves ausentes o None no se tocan)."""
+    _asegurar()
+    with db.transaction() as c:
+        fila = _fila(c, pcb_id)
+        nuevo: Dict[str, Any] = {}
+        if cambios.get("version") is not None:
+            nuevo["version"] = normalizar_version(cambios["version"])
+        if cambios.get("serie") is not None:
+            nuevo["serie"] = _serie(cambios["serie"])
+        if cambios.get("lote") is not None:
+            nuevo["lote"] = _texto(cambios["lote"], 60)
+        if cambios.get("estado") is not None:
+            nuevo["estado"] = _estado(cambios["estado"])
+        if cambios.get("nota") is not None:
+            nuevo["nota"] = _texto(cambios["nota"], 500)
+        nuevo = {k: v for k, v in nuevo.items() if v != fila[k]}
+        if not nuevo:
+            return fila
+        if "version" in nuevo or "serie" in nuevo:
+            nombre = nombre_canonico(nuevo.get("version", fila["version"]), nuevo.get("serie", fila["serie"]))
+            if _nombre_ocupado(c, nombre, [pcb_id]):
+                raise Duplicada(f"{nombre} ya está registrada.")
+            nuevo["nombre"] = nombre
+        sets = ", ".join(f"{k} = ?" for k in nuevo)
+        extra = ", programada_en = COALESCE(programada_en, " + _AHORA + ")" if nuevo.get("estado") == "PROGRAMADA" else ""
+        try:
+            c.execute(f"UPDATE tpms_pcb SET {sets}{extra}, actualizado_en = {_AHORA} WHERE id = ?", (*nuevo.values(), pcb_id))
+        except sqlite3.IntegrityError:
+            raise Duplicada(f"{nuevo.get('nombre', fila['nombre'])} ya está registrada.")
+        detalle = "; ".join(f"{k}: {fila[k]!s} -> {v}" for k, v in nuevo.items() if k != "nombre")
+        _evento(c, pcb_id, nuevo.get("nombre", fila["nombre"]), "EDITADA", detalle, operador)
+        return _fila(c, pcb_id)
+
+
+def eliminar(pcb_id: int, operador: Optional[str] = None) -> Dict[str, Any]:
+    _asegurar()
+    with db.transaction() as c:
+        fila = _fila(c, pcb_id)
+        c.execute("DELETE FROM tpms_pcb WHERE id = ?", (pcb_id,))
+        _evento(c, pcb_id, fila["nombre"], "ELIMINADA", "Placa eliminada", operador)
+    return {"ok": True}
+
+
+def masa(ids: List[int], accion: str, valor: Optional[str] = None, operador: Optional[str] = None) -> Dict[str, Any]:
+    """Aplica una acción a varias placas: todo o nada (si una falla, no cambia ninguna)."""
+    if accion not in ACCIONES_MASA:
+        raise Invalida(f"Acción inválida: '{accion}'. Usa {', '.join(ACCIONES_MASA)}.")
+    ids = list(dict.fromkeys(int(i) for i in ids))
+    if not ids:
+        raise Invalida("Selecciona al menos una placa.")
+    if accion == "version":
+        valor = normalizar_version(valor)
+    elif accion == "estado":
+        valor = _estado(valor)
+    elif accion == "firmware":
+        valor = _texto(valor, 60) or None
+    elif accion == "lote":
+        valor = _texto(valor, 60)
+    _asegurar()
+    with db.transaction() as c:
+        filas = [dict(r) for r in c.execute(f"SELECT * FROM tpms_pcb WHERE id IN ({','.join('?' * len(ids))})", ids)]
+        faltan = sorted(set(ids) - {f["id"] for f in filas})
+        if faltan:
+            raise NoEncontrada(f"Placas TPMS no encontradas: {', '.join(map(str, faltan[:20]))}.")
+        if accion == "version":
+            nombres = [nombre_canonico(valor, f["serie"]) for f in filas]
+            repetidos = {n for n in nombres if nombres.count(n) > 1}
+            ocupados = [n for n in nombres if _nombre_ocupado(c, n, ids)]
+            if repetidos or ocupados:
+                raise Duplicada(f"Nombre duplicado: {sorted(repetidos | set(ocupados))[0]}.")
+        try:
+            for f in filas:
+                if accion == "firmware":
+                    _aplicar_firmware(c, f, valor)
+                elif accion == "version":
+                    c.execute(f"UPDATE tpms_pcb SET version = ?, nombre = ?, actualizado_en = {_AHORA} WHERE id = ?",
+                              (valor, nombre_canonico(valor, f["serie"]), f["id"]))
+                elif accion == "lote":
+                    c.execute(f"UPDATE tpms_pcb SET lote = ?, actualizado_en = {_AHORA} WHERE id = ?", (valor, f["id"]))
+                elif accion == "estado":
+                    extra = f", programada_en = COALESCE(programada_en, {_AHORA})" if valor == "PROGRAMADA" else ""
+                    c.execute(f"UPDATE tpms_pcb SET estado = ?{extra}, actualizado_en = {_AHORA} WHERE id = ?", (valor, f["id"]))
+                else:
+                    c.execute("DELETE FROM tpms_pcb WHERE id = ?", (f["id"],))
+                nombre = nombre_canonico(valor, f["serie"]) if accion == "version" else f["nombre"]
+                detalle = "eliminada" if accion == "eliminar" else f"{accion}: {'' if valor is None else valor}"
+                _evento(c, f["id"], nombre, "MASA", detalle, operador)
+        except sqlite3.IntegrityError as e:
+            raise Duplicada(f"Nombre duplicado: {e}")
+    return {"afectadas": len(filas)}
+
+
+def resumen() -> Dict[str, Any]:
+    _asegurar()
+    with db.get_db() as c:
+        total = c.execute("SELECT COUNT(*) FROM tpms_pcb").fetchone()[0]
+        por_estado = {e: 0 for e in ESTADOS}
+        for r in c.execute("SELECT estado, COUNT(*) FROM tpms_pcb GROUP BY estado"):
+            por_estado[r[0]] = r[1]
+        versiones = [{"version": r[0], "n": r[1]} for r in
+                     c.execute("SELECT version, COUNT(*) FROM tpms_pcb GROUP BY version ORDER BY version")]
+        firmwares = [{"firmware": r[0], "n": r[1]} for r in c.execute(   # firmware None = placas sin firmware (filtro «__sin»)
+            "SELECT NULLIF(firmware, ''), COUNT(*) FROM tpms_pcb GROUP BY NULLIF(firmware, '') ORDER BY firmware IS NULL, firmware")]
+        lotes = [{"lote": r[0], "n": r[1]} for r in
+                 c.execute("SELECT lote, COUNT(*) FROM tpms_pcb GROUP BY lote ORDER BY lote")]
+        hoy = c.execute("SELECT COUNT(*) FROM tpms_pcb WHERE date(recibida_en) = date('now','localtime')").fetchone()[0]
+    return {"total": total, "por_estado": por_estado, "versiones": versiones, "firmwares": firmwares,
+            "lotes": lotes, "hoy": hoy}

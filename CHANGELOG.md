@@ -1,5 +1,14 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.28 — 2026-10-21
+- **TPMS con pestañas como Escáner TQT:** Recibir · Programar · Consultar · Inventario (barra inferior en celular, riel lateral en PC), con el estilo naranja de TPMS. No hay Emparejar ni MAC: cada placa TPMS es una sola tarjeta con hardware y firmware.
+  - **Recibir:** escaneo o serie a mano, lote por dispositivo y contador de recibidas hoy.
+  - **Programar:** escanea o teclea la placa y asigna el firmware (se recuerda el último); en modo lote guarda sin confirmar; «Marcar falla».
+  - **Consultar:** ficha con hardware, firmware, estado, lote, fechas, quién la registró e historial.
+  - **Inventario:** filtros por búsqueda, estado, hardware, firmware (incluye «sin firmware») y lote, con conteos; selección múltiple con firmware/hardware/lote/estado/eliminar en masa; editar y alta manual.
+  - Una sola cámara compartida entre pestañas. El consultor ve todo, sin acciones de escritura.
+- **API TPMS:** `/api/tpms/pcb` (filtros), `/pcb/manual`, `/pcb/por-codigo`, `/pcb/{id}` (editar/eliminar), `/pcb/{id}/firmware`, `/pcb/masa` (todo o nada) y `/resumen`. Historial propio (`tpms_eventos`): nada de TPMS cuenta en los tableros de Escáner TQT. La tabla `tpms_pcb` se amplía sola con firmware, estado y nota.
+
 ## v1.4.27 — 2026-10-21
 - **Módulo TPMS disponible:** nueva identidad naranja, inicio de sesión propio en `/tpms/acceso` (misma cuenta que el resto de la plataforma) y página `/tpms` que por ahora es una ventana de escaneo de QR con cámara, entrada manual e historial de la sesión. Los permisos por módulo y las invitaciones ya lo incluían.
 - **Placas TPMS por QR:** `/tpms` registra cada placa (tabla propia `tpms_pcb`: versión, serie, lote de texto libre, quién y cuándo) y avisa si ya estaba. Las PCB TPMS V1 traen por error la plantilla de la R3 Timer con guiones (`PCB_TQT-R3_V2_0_TIMER-0004`) y se registran como **TPMS-V1-0004**; también se acepta el formato propio `TPMS_V1_0004` y, a mano, solo la serie. La R3 Timer real (`PCB_TQT_R3_V2_0_TIMER_0073`, con guiones bajos; hay dos en producción) sigue siendo de Escáner TQT.

@@ -1,4 +1,4 @@
-/* tpms.css - Módulo TPMS (sensores de presión de llantas): ventana de escaneo.
+/* tpms.css - Módulo TPMS (sensores de presión de llantas): cabecera, cámara compartida y Recibir (vistas: tpms_vistas.css).
    Identidad "banco de presión": caucho y asfalto (oscuro) o gris de taller (claro), naranja de seguridad #FF6A00 encendido
    como único acento. Se apoya en app.css (botones, campos, visor) y solo redefine tokens y lo propio de la pantalla. */
 
@@ -16,7 +16,7 @@
   --campo: #FFFFFF; --glow: 0 0 10px rgba(255, 106, 0, .4); --glow-fuerte: 0 0 14px rgba(255, 106, 0, .5);
   color-scheme: light;
 }
-:root { --tp-rad: 6px; --tp-ease: cubic-bezier(.23, 1, .32, 1); --vp-wide: 1280px; }
+:root { --tp-rad: 6px; --tp-ease: cubic-bezier(.23, 1, .32, 1); --vp-wide: 1280px; --tab-h: 64px; }
 
 html { -webkit-font-smoothing: antialiased; }
 body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); overflow-x: hidden; }
@@ -48,7 +48,10 @@ body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text);
 
 /* ---------- página ---------- */
 .pag { width: 100%; max-width: var(--vp-wide); margin-inline: auto; box-sizing: border-box; display: grid; gap: 20px;
-       padding: 22px max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+       padding: 22px max(16px, env(safe-area-inset-right)) calc(var(--tab-h) + 28px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left)); }
+.pag[hidden] { display: none; }
+.cam-slot { min-width: 0; }
+.cam-slot:empty { display: none; }
 .camara { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .lado { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .tp h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .01em; }
@@ -93,7 +96,8 @@ body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text);
 .ultimo.nuevo .codigo { animation: tp-llega .45s var(--tp-ease); }
 
 /* ---------- entrada manual ---------- */
-.manual .field > label { color: var(--muted); }
+/* etiquetas en frase normal, no en versalitas (app.css las pone en mayúsculas mono) */
+.field > label { font-family: inherit; font-size: 14px; letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--muted); }
 .man-fila { display: flex; gap: 8px; }
 .man-fila .input { flex: 1; min-width: 0; min-height: 52px; font-size: 16px; border-radius: var(--tp-rad); background: var(--campo); border-color: var(--line-2); }
 .man-fila .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -131,7 +135,8 @@ body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text);
   .usuario:not([hidden]) { display: inline-flex; }
 }
 @media (min-width: 900px) {
-  .pag { grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); align-items: start; gap: 28px; padding-top: 28px; }
+  .pag:not(.pag-ancha) { grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); align-items: start; gap: 28px; padding-top: 28px; }
+  .pag:not(.pag-ancha):has(> .cam-slot:empty) { grid-template-columns: minmax(0, 760px); justify-content: center; }
   .camara { position: sticky; top: 84px; }
   .marco-cam .visor { aspect-ratio: 4 / 3; max-height: calc(100dvh - 210px); }
   .codigo { font-size: clamp(24px, 2.2vw, 32px); }
