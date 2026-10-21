@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.29 — 2026-10-21
+
+- Corrige los errores intermitentes "database is locked" (500) al consultar o recibir en TPMS. `tpms._asegurar()`
+  corre en cada petición y hacía lectura + UPDATE en un BEGIN diferido; con los agentes escribiendo ~9 veces por
+  segundo, SQLite rechazaba la escritura al instante (sin esperar busy_timeout). Ahora usa BEGIN IMMEDIATE y espera.
+
 ## v1.4.28 — 2026-10-21
 - **TPMS muestra su versión** en el pie de página («TPMS · Plataforma I+D · v1.4.28»).
 - **TPMS con pestañas como Escáner TQT:** Recibir · Programar · Consultar · Inventario (barra inferior en celular, riel lateral en PC), con el estilo naranja de TPMS. No hay Emparejar ni MAC: cada placa TPMS es una sola tarjeta con hardware y firmware.

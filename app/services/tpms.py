@@ -53,8 +53,13 @@ _COLUMNAS_NUEVAS = {   # ALTER TABLE ADD COLUMN solo admite valores por omisión
 
 
 def _asegurar() -> None:
-    """Crea o migra las tablas (idempotente; la tabla de v1.4.27 puede existir sin las columnas nuevas)."""
-    with db.get_db() as c:
+    """Crea o migra las tablas (idempotente; la tabla de v1.4.27 puede existir sin las columnas nuevas).
+
+    v1.4.29: BEGIN IMMEDIATE. Con el BEGIN diferido leía PRAGMA table_info y luego hacía UPDATE; si un agente
+    (STM32/BLE/DYMO, ~9 escrituras/s) escribía en medio, SQLite devolvía 'database is locked' al instante, sin respetar
+    busy_timeout (500 intermitentes al consultar o recibir TPMS). Tomando el candado al inicio, espera su turno.
+    """
+    with db.transaction() as c:
         c.execute(
             """
             CREATE TABLE IF NOT EXISTS tpms_pcb(
