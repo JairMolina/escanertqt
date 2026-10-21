@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-21 22:54 UTC
-Commit de referencia: `7fe97eb5e036` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-21 22:56 UTC
+Commit de referencia: `df5d11e6492d` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Integracion nativa Gestion > Comandos preparada sobre main 7fe97eb/web1.4.28 en rama codex/comandos-r1-local. Catalogo separado de37 comandos y28 valores de fabrica, filtros, comparacion, favoritos y constructor dinamico. Plataforma inicial; CRLF manual solo Serial/GPS; BLE y acuse originales. URL de revision http://localhost:18086/monitor#/comandos con base aislada. Usuario autoriza publicar la rama, actualizar con pull y sincronizar memoria; no autoriza desplegar produccion.
+Comandos integrado y publicado en GitHub JairMolina/escanertqt, rama codex/comandos-r1-local, commit funcional df5d11e, sobre web1.4.28/main7fe97eb. Gestion > Comandos es nativo, con37 comandos y28 valores de fabrica, filtros, comparacion, favoritos, constructor reactivo y catalogo extensible. Plataforma inicial; CRLF manual solo Serial/GPS; BLE y acuse originales. URL local http://localhost:18086/monitor#/comandos, base de prueba nueva. Git pull --ff-only origin main completo sin cambios remotos nuevos y push de rama confirmado. No se desplego produccion ni se integro a main.
 
 ## Siguiente paso
-Publicar la rama verificada y completar pull y sincronizacion central. Integrar a main y desplegar solo cuando se solicite. Conservar checkout anterior y sus cambios locales; documentacion tecnica en docs/COMANDOS_R1_INTEGRACION.md.
+Revisar/integrar codex/comandos-r1-local a main cuando se solicite; despliegue de produccion pendiente de instruccion expresa. Checkout activo C:/Users/usuario/Documents/Codex/2026-10-19/new-chat/work/tqt-web-comandos. Checkout registrado anterior permanece con su rama y cambios documentales, sin reset/stash. Consultar docs/COMANDOS_R1_INTEGRACION.md; completar sincronizacion central del presente checkpoint.
 
 ## Evidencia
-52Python,9Node y16escenarios Playwright aprobados; enlace movil adicional PASS; clipboard real. Docker build y Compose validos; tqt-comandos-qa-web-1 healthy en127.0.0.1:18086. Capturas1440/1024/390 claro/oscuro sin desborde; sin errores JS/HTTP E2E. git fetch confirma origin/main 7fe97eb, sin cambios nuevos. ECC E2E/verificacion y ui-ux-pro-max aplicados.
+52Python,9Node,16escenarios Playwright y enlace movil aprobados; clipboard real y capturas1440/1024/390 claro/oscuro sin desborde ni errores JS/HTTP. Compose/build OK, contenedor tqt-comandos-qa-web-1 healthy en127.0.0.1:18086. git pull --ff-only origin main: Already up to date. CM git push: Commits enviados codex/comandos-r1-local. Sin datos, capturas, contrasenas de QA ni bases en commit. CM, ui-ux-pro-max y ECC E2E/verificacion aplicados.
