@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.26 — 2026-10-21
+- **Inventario PCB — filtros corregidos:** el filtro de hardware mostraba «[object HTMLOptionElement]» y no se podía usar (lo mismo pasaba con el de lote). Ahora dice «Todas las versiones de hardware» y cada opción lleva su conteo («Hardware V10 · 24»); el de lote muestra solo los lotes que tienen placas, también con conteo.
+- **Selección coherente con los filtros:** al filtrar se quitan de la selección las placas que dejan de verse, así «Cambiar hardware», «Mover a lote» y «Eliminar» actúan solo sobre lo que está en pantalla.
+
 ## v1.4.25 — 2026-10-21
 - **Inventario PCB — «Mover a lote»:** con una o varias placas seleccionadas se elige el lote destino. Las sueltas cambian de lote; si alguna está montada en una tarjeta de otro lote, la hoja lo avisa y solo se mueve marcando «Mover también esas tarjetas completas» (sus 3 placas y sus pruebas). Si el destino ya tiene una tarjeta con ese número no se mueve nada. Queda en la bitácora como «Placas o tarjetas movidas de lote» (evento único `LOTE_MOVIDO`).
 - **Inventario PCB — filtro y columna «Lote»:** lote en el que se recibió cada placa («Sin lote» = recibidas antes de v1.4.24).

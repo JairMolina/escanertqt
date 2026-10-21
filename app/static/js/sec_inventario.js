@@ -18,14 +18,18 @@
             const segBtns = [['', 'Todas'], ['R1', 'R1'], ['R2', 'R2'], ['R3', 'R3']].map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(st.tipo === v), dataset: { v }, onclick: () => { st.tipo = v; st.limit = 200; segBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v))); lista(); } }, l));
             const selCiclo = h('select', { class: 'input', id: 'invCiclo', 'aria-label': 'Estado de la placa', onchange: (e) => { st.ciclo = e.target.value; st.limit = 200; lista(); } },
                 h('option', { value: '' }, 'Todos los estados'), CICLOS.map(([v, l]) => h('option', { value: v, selected: st.ciclo === v ? '' : null }, l)));
-            const selVer = h('select', { class: 'input', id: 'invVer', 'aria-label': 'Versión de hardware', onchange: (e) => { st.ver = e.target.value; st.limit = 200; lista(); } }, h('option', { value: '' }, 'Todo el hardware'));
+            const selVer = h('select', { class: 'input', id: 'invVer', 'aria-label': 'Versión de hardware', onchange: (e) => { st.ver = e.target.value; st.limit = 200; lista(); } }, h('option', { value: '' }, 'Todas las versiones de hardware'));
             // v1.4.25: lote en el que se recibió cada placa (recibida_lote_id; vacío = recibida antes de v1.4.24)
             const loteNom = (id) => { const l = id && ctx.lotes().find((x) => x.id === id); return l ? T.loteNombre(l) : ''; };
             const selLote = h('select', { class: 'input', id: 'invLote', 'aria-label': 'Lote de recepción', onchange: (e) => { st.lote = e.target.value; st.limit = 200; lista(); } });
+            // v1.4.26: replaceChildren no acepta arreglos (los volvía texto «[object HTMLOptionElement]»): opciones con spread y conteo
+            const cuenta = (fn) => { const m = new Map(); st.pcbs.forEach((p) => { const k = fn(p); m.set(k, (m.get(k) || 0) + 1); }); return m; };
             function opcionesLote() {
-                const cur = st.lote;
-                selLote.replaceChildren(h('option', { value: '' }, 'Todos los lotes'), h('option', { value: 'sin', selected: cur === 'sin' ? '' : null }, 'Sin lote'),
-                    ctx.lotes().map((l) => h('option', { value: String(l.id), selected: String(l.id) === cur ? '' : null }, T.loteNombre(l))));
+                const cur = st.lote; const n = cuenta((p) => (p.recibida_lote_id ? String(p.recibida_lote_id) : 'sin'));
+                const lotes = ctx.lotes().filter((l) => n.has(String(l.id)) || String(l.id) === cur);   // solo lotes con placas
+                selLote.replaceChildren(h('option', { value: '' }, 'Todos los lotes'),
+                    h('option', { value: 'sin', selected: cur === 'sin' ? '' : null }, `Sin lote · ${n.get('sin') || 0}`),
+                    ...lotes.map((l) => h('option', { value: String(l.id), selected: String(l.id) === cur ? '' : null }, `${T.loteNombre(l)} · ${n.get(String(l.id)) || 0}`)));
             }
             const chkMac = h('input', { type: 'checkbox', id: 'invSinMac', checked: st.sinMac ? '' : null, onchange: (e) => { st.sinMac = e.target.checked; st.limit = 200; lista(); } });
             const info = h('span', { class: 'info', role: 'status', 'aria-live': 'polite' });
@@ -65,15 +69,17 @@
             function lista() {
                 if (!st.pcbs) return;
                 const rows = filtradas();
+                if (st.sel.size) { const vis = new Set(rows.map((p) => p.id)); [...st.sel].forEach((i) => { if (!vis.has(i)) st.sel.delete(i); }); }   // las acciones en masa solo tocan lo que se ve
                 pintarInfo(rows.length);
                 util.pintarTabla(tw, { cols: COLS, rows, key: (p) => p.id, sel: st.sel, onSel: () => pintarInfo(rows.length), sort: st.sort, onSort: (id) => { st.sort = util.alternarOrden(st.sort, id); lista(); },
                     onOpen: editar, label: (p) => p.nombre, limit: st.limit, onMas: () => { st.limit += 200; lista(); }, caption: 'Inventario de placas',
                     vacio: { icono: 'box', titulo: st.pcbs.length ? 'Ninguna placa coincide con los filtros' : 'Todavía no hay placas', texto: st.pcbs.length ? 'Cambia el tipo, el estado o la búsqueda.' : 'Aparecen aquí cuando se reciben con el celular.' } });
             }
             function opcionesVersion() {
-                const cur = selVer.value; const vs = [...new Set(st.pcbs.map((p) => p.version))].sort((a, b) => a - b);
-                selVer.replaceChildren(h('option', { value: '' }, 'Todo el hardware'), vs.map((v) => h('option', { value: v, selected: v === cur ? '' : null }, 'Hardware V' + v)));
-                if (cur && !vs.includes(cur)) st.ver = '';
+                const cur = st.ver; const n = cuenta((p) => p.version); const vs = [...n.keys()].sort((a, b) => a - b);
+                selVer.replaceChildren(h('option', { value: '' }, 'Todas las versiones de hardware'),
+                    ...vs.map((v) => h('option', { value: v, selected: v === cur ? '' : null }, `Hardware V${v} · ${n.get(v)}`)));
+                if (cur && !vs.includes(cur)) { st.ver = ''; selVer.value = ''; }
             }
 
             // ---- editar una placa
