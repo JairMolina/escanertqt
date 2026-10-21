@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.20 — 2026-10-21
+- **Estado de programación correcto para tarjetas programadas fuera de la app:** el firmware capturado a mano (en la placa o en la tarjeta) cuenta como programada. TQT R2 ya no exige evidencia Bluetooth para dejar de mostrar «Sin programar»: compara el FW guardado con el más reciente («Actualizada»/«Desactualizada»); la verificación BLE sigue registrándose aparte. Las listas de R1/R3 heredan el firmware de la tarjeta igual que Tarjetas.
+- **TQT R2 con el mismo diseño que R1/R3:** tarjeta elegida arriba, botones (instalar, verificar, subir BIN/HEX) en una fila, avance y resultado debajo, después firmware, Bluetooth, monitor e instalación USB.
+
 ## v1.4.19 — 2026-10-20
 - **Programación R1/R3 — estatus en la lista:** cada tarjeta muestra «Sin programar», «Desactualizada» o «Actualizada» (FW guardado contra el más alto compatible con su HW), igual que en TQT R2.
 - **Detalle más compacto:** los datos de la tarjeta van en pares (dos por fila) en la primera mitad y el estado de programación en la segunda; los botones de programar, ESP32, subir HEX y cancelar suben justo debajo.

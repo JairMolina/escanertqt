@@ -28,7 +28,10 @@ _COL_RANURA = {"R1": "pcb_r1_id", "R2": "pcb_r2_id", "R3": "pcb_r3_id"}
 MAX_SERIE = 9999
 
 _SELECT_PCB = """
-    SELECT p.id, p.tipo, p.version, p.serie, p.nombre, p.mac, p.firmware, p.estado_ciclo, p.estado_pcb, p.origen, p.operador,
+    SELECT p.id, p.tipo, p.version, p.serie, p.nombre, p.mac,
+           -- v1.4.20: firmware capturado en la tarjeta (programada fuera de la app) cuenta igual que en la vista de tarjetas
+           COALESCE(NULLIF(TRIM(p.firmware), ''), CASE WHEN t.pcb_r1_id = p.id THEN t.firmware_r1
+                    WHEN t.pcb_r2_id = p.id THEN t.firmware_r2 END) AS firmware, p.estado_ciclo, p.estado_pcb, p.origen, p.operador,
            p.nota, p.recibida_en, p.confirmada_en, p.updated_at,
            t.id AS tarjeta_id, t.id_tarjeta_num, t.lote_id AS tarjeta_lote_id,
            CASE WHEN t.pcb_r1_id = p.id THEN 'R1' WHEN t.pcb_r2_id = p.id THEN 'R2'

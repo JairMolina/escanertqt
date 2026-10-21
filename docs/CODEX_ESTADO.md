@@ -1,7 +1,12 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-20 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.19; producción en 1.4.13 hasta que se despliegue)
+Actualizado: 2026-10-21 (Claude Code)
+Commit de referencia: ver `git log` de main (v1.4.20; producción en 1.4.13 hasta que se despliegue)
+
+## v1.4.20 (2026-10-21, Claude Code)
+- Estado «programada» con FW capturado a mano: `r2_programming.statuses` ya no exige evidencia BLE (compara FW guardado o `firmware_r2` de la tarjeta contra el más reciente; `verified` sigue aparte). `_SELECT_PCB` hereda `firmware_r1/r2` de la tarjeta, así las listas R1/R3 coinciden con Tarjetas.
+- TQT R2 con la estructura de R1/R3 (tarjeta → acciones → avance → firmware → Bluetooth/monitor/USB).
+- Evidencia: 240 pruebas de suites pertinentes OK (2 de test_r2_programming adaptadas a la nueva regla), `node --check` OK. Sin revisión visual con sesión ni con la BD de producción.
 
 ## v1.4.19 (2026-10-20, Claude Code)
 - Programación R1/R3: estatus por tarjeta en la lista, detalle en dos mitades, botones y avance arriba, estación J-Link automática (sin menú). Pruebas TQT: tarjeta + inventario arriba, intro/serial/historial apilados, prueba automática a todo el ancho.

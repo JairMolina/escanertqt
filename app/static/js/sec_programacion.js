@@ -77,7 +77,7 @@
         const uploadInput = h('input', { type: 'file', accept: '.bin,.hex', hidden: true });
         const uploadBtn = h('button', { class: 'btn', type: 'button', onclick: () => uploadInput.click() }, 'Subir BIN / HEX');
         const firmwareLabel = h('label', { for: 'esp-r2-fw' }, 'Firmware R2 a programar');
-        const firmwarePanel = h('div', { class: 'field' }, firmwareLabel, firmwareSelect, firmwareHint, h('div', { class: 'row wrap' }, uploadBtn, uploadInput));
+        const firmwarePanel = h('div', { class: 'field' }, firmwareLabel, firmwareSelect, firmwareHint);
         let esptoolProm = null;
         function cargarEsptool() { return esptoolProm || (esptoolProm = import(ESPTOOL_URL)); }
 
@@ -721,10 +721,10 @@
             h('div', { class: 'field' }, h('label', null, 'Puerto de la tarjeta'), puertosWrap,
                 h('div', { class: 'hint' }, 'Solo se listan aquí los puertos que ya autorizaste antes. «Elegir puerto» abre la lista real de puertos COM de Windows (el navegador la pide una vez por puerto; luego queda recordado).')),
             h('div', { class: 'hint' }, 'Antes de sincronizar, pon la tarjeta en modo programador; el registro avisa si no avanza.'),
-            maintenance,h('div',{class:'row'},btnFlash));
-        const detalle = h('div', { class: 'prog-detalle', hidden: true },
-            cabecera,r2Estado,h('div',{class:'row wrap'},btnVerifyR2,btnStopVerify,nextR1),
-            otaPanel,monPanel,usbPanel,barra,otaProgress,resultado);
+            maintenance);
+        // v1.4.20: mismo orden que TQT R1/R3: tarjeta → acciones → avance → firmware → paneles de configuración
+        const detalle = h('div', { class: 'prog-detalle', hidden: true }, cabecera, r2Estado);
+        const acciones = h('div', { class: 'row wrap prog-acciones' }, btnFlash, btnVerifyR2, uploadBtn, btnStopVerify, nextR1, uploadInput);
         const vacio = T.empty('flash', 'Elige una tarjeta', 'Búscala por número o nombre a la izquierda, o elige una de la lista.');
 
         function seleccionar(p) {
@@ -750,7 +750,8 @@
         host.classList.add('prog');
         host.append(h('div', { class: 'prog-wrap' },
             h('div', { class: 'prog-panel' }, h('h2', null, 'Elige una tarjeta'), h('div', { class: 'field' }, h('label', { for: 'prog-q' }, 'Buscar'), buscar), lista),
-            h('div', { class: 'prog-panel prog-panel-detalle' }, firmwarePanel, vacio, detalle)));
+            h('div', { class: 'prog-panel prog-panel-detalle' }, vacio, detalle, acciones, barra, otaProgress, resultado, firmwarePanel, otaPanel, monPanel, usbPanel,
+                h('p', { class: 'hint' }, 'Orden de la pareja: 1) ESP32 de la R2 (da su MAC) · 2) STM32 de la R1 con la MAC y número de la R2 · 3) ESP32 de la R1 (da la MAC de la R1).'))));
 
         const espHost = host.lastElementChild;
         const stmHost = h('div');

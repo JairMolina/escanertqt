@@ -65,16 +65,18 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(r2.get(identifier,self.operator)['state'],'error')
         with self.assertRaises(ValueError):self.result(identifier)
 
-    def test_unprogrammed_without_validated_evidence(self):
+    def test_manual_firmware_counts_without_evidence(self):
+        # v1.4.20: programada fuera de la app (FW capturado a mano) = programada, aunque sin evidencia BLE
         inv.set_firmware(self.p['id'],'4.1.1')
         state=next(x for x in r2.statuses()['items'] if x['pcb_id']==self.p['id'])
-        self.assertEqual(state['state'],'unprogrammed')
+        self.assertIn(state['state'],('outdated','updated'))
+        self.assertFalse(state['verified'])
 
     def test_manual_mac_change_invalidates_old_evidence(self):
         self.result(self.job())
         inv.set_mac(self.p['id'],iso.mac_unica())
         state=next(x for x in r2.statuses()['items'] if x['pcb_id']==self.p['id'])
-        self.assertEqual(state['state'],'unprogrammed')
+        self.assertFalse(state['verified'])
 
     def test_api_requires_session_and_agent_bearer(self):
         from fastapi.testclient import TestClient

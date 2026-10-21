@@ -53,12 +53,16 @@ def statuses():
         jobs={}
         for r in c.execute('SELECT pcb,state,error,updated FROM r2_programming_attempts ORDER BY created'): jobs[r['pcb']]=dict(r)
         result=[]
-        for p in c.execute("SELECT id,version,firmware,mac FROM pcb_inventario WHERE tipo='R2'"):
+        vnum=lambda v:[int(x) if x.isdigit() else 0 for x in str(v or '').split('.')]
+        # v1.4.20: el firmware capturado a mano (o en la tarjeta) también cuenta como programada, aunque no haya evidencia BLE
+        for p in c.execute("SELECT p.id,p.version,COALESCE(NULLIF(TRIM(p.firmware),''),t.firmware_r2) AS firmware,p.mac "
+                           "FROM pcb_inventario p LEFT JOIN tarjetas_produccion t ON t.pcb_r2_id=p.id WHERE p.tipo='R2'"):
             evidence=states.get(p['id']); job=jobs.get(p['id']) or {}
             current=p['firmware']; newest=latest.get(p['version'])
             verified=bool(evidence and evidence['firmware']==current and p['mac'] and
                           evidence.get('mac') and evidence['mac'].upper()==p['mac'].upper() and evidence['hw'].replace('.','')==p['version'])
-            state='updated' if verified and current==newest else 'outdated' if verified else 'unprogrammed'
+            programmed=bool(current and str(current).strip() and p['mac'])
+            state=('outdated' if newest and vnum(current)<vnum(newest) else 'updated') if programmed else 'unprogrammed'
             if job.get('state')=='error' and job.get('updated',0)>(evidence or {}).get('verified_at',0): state='error'
             if job.get('state') in ACTIVE: state='busy'
             result.append(dict(pcb_id=p['id'],state=state,installed_fw=current,latest_fw=newest,
