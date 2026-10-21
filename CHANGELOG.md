@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.23 — 2026-10-21
+- **Lote especial con placa de muestra:** al tocar «Lote especial» la cámara pide «Escanea una placa del lote». Con esa lectura se abre la hoja con la vista previa («Leído TQT_R2_0008 → TQT-R2-V10-0008»), versión y tipo editables; «Activar y registrar» deja registrada la muestra y las siguientes placas del lote entran solas. Tocar el botón otra vez mientras espera abre la configuración sin escanear.
+
 ## v1.4.22 — 2026-10-21
 - **Recibir — botón «Lote especial»:** para lotes cuyo QR no trae el formato TQT-R1-V30-0021. Se elige la versión del lote (V10 por defecto) y el tipo («Del QR»: R1/R2/R3 o Timer = R3; o fijo si el QR solo trae el número). Mientras está activo, cada QR se registra con su número y esa versión, sin preguntar «¿lote nuevo?». El botón muestra el modo activo y se desactiva desde el mismo botón.
 

@@ -1,7 +1,11 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-21 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.22; producción en 1.4.13 hasta que se despliegue)
+Commit de referencia: ver `git log` de main (v1.4.23; producción en 1.4.13 hasta que se despliegue)
+
+## v1.4.23 (2026-10-21, Claude Code, rama feat/recibir-muestra-lote)
+- Recibir: `state.muestra` (espera de placa de muestra) → `hojaEspecial(muestra)` con vista previa vía `nombreEspecial(text, cfg)`; con la hoja abierta (`espHoja`) el visor no registra. Al activar se registra la muestra con `onCode`.
+- Evidencia: `node --check` OK, suites de recepción/versión OK, Docker local redesplegado. Sin prueba visual ni con cámara real.
 
 ## v1.4.22 (2026-10-21, Claude Code, rama feat/recibir-formato-especial)
 - Recibir: botón `btnEspecial` («Lote especial») en index.html; `state.especial = {version, tipo}`; `nombreEspecial()` traduce cualquier QR (tipo R1/R2/R3/Timer o fijo + último número de 1–4 dígitos) a `TQT-Rx-V<ver>-nnnn` antes de `parseNombre`, y se envía el nombre canónico a `/api/pcb/escanear`. Solo cliente; el modo no persiste al recargar.
