@@ -1,7 +1,14 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-21 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.26 `78d2131`; producción en 1.4.26, confirmado 2026-10-21)
+Commit de referencia: ver `git log` de main (v1.4.27 rama tpms-modulo; producción en 1.4.26, confirmado 2026-10-21)
+
+## v1.4.27 (2026-10-21, Claude Code, rama tpms-modulo)
+- Módulo TPMS disponible (`modulos.py`, acento #FF6A00): `/tpms/acceso` (login propio, `_pagina_acceso` compartido con Impresora), `/tpms` (escaneo QR con `mountVisor`, lote por dispositivo, historial en sessionStorage), API `/api/tpms/escanear|pcb` (`services/tpms.py`, tabla propia `tpms_pcb`; no escribe en `escaneos` para no mezclar tableros TQT). Consultor puede abrir /tpms (sus POST siguen bloqueados).
+- QR TPMS: `models.parse_tpms`. Las PCB TPMS V1 traen la plantilla R3 Timer CON GUIONES (`PCB_TQT-R3_V2_0_TIMER-0004`) → TPMS-V1-0004; la R3 Timer real va con guiones bajos (`PCB_TQT_R3_V2_0_TIMER_0073`; producción tiene R3-V20-0102 y 0104 montadas) y sigue en TQT. `parse_tarjeta_code` y `T.parseNombre` (espejo `T.esTpms`) rechazan TPMS; Recibir avisa sin ofrecer «¿Qué placa es?».
+- `_serve_file` y las páginas de login/inicio/invitación reescriben `?v=` de JS/CSS con `APP_VERSION` (`_VER_ESTATICO`): el `?v=` manual quedaba viejo (sec_inventario.js?v=1352) y producción servía JS de 1.4.25 tras desplegar 1.4.26.
+- `list_lotes` añade `placas` (pcb_inventario.lote_id); `T.loteConteo` «N tarjetas · M placas»; Mover a lote recarga lotes.
+- Evidencia: tests nuevos test_tpms, test_version_estaticos, test_invitaciones_modulo (TPMS); suite 830: solo los 3 errores previos. Sin prueba con cámara/placa real.
 
 ## v1.4.26 (2026-10-21, Claude Code, rama fix/filtros-inventario)
 - sec_inventario.js: `replaceChildren` recibía arreglos (opciones convertidas en texto) en los filtros de hardware y lote → spread + conteos; la selección se poda a las filas filtradas. Revisados tipo, estado, sin MAC, búsqueda y lote. Revisado el resto del frontend: no hay otro `replaceChildren` con arreglo sin spread.
