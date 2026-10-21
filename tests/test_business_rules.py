@@ -48,8 +48,15 @@ class TestReglasDeNegocio(unittest.TestCase):
         self.assertEqual(parse_tarjeta_code("88", "R2", "31")["nombre"], "TQT-R2-V31-0088")
         self.assertEqual(VERSION_DEFAULT, "30")
 
+    def test_04b_qr_sin_version_y_timer(self):
+        """v1.4.21: QR reales de las primeras placas (sin versión = V10) y 'Timer' = R3."""
+        casos = {"TQT_R2_0008": "TQT-R2-V10-0008", "TQT_Timer_0033": "TQT-R3-V10-0033", "TQT-R1-0011": "TQT-R1-V10-0011",
+                 "tqt timer v20 5": "TQT-R3-V20-0005", "PCB_TQT_R3_V2_0_TIMER_0073": "TQT-R3-V20-0073"}
+        for qr, nombre in casos.items():
+            self.assertEqual(parse_tarjeta_code(qr)["nombre"], nombre, qr)
+
     def test_05_parseo_rechazos(self):
-        for basura in ("PCB-MAIN-001", "", "RANDOM", "TQT-R4-V30-0011", "TQT-R1-V30-00112", "TQT-R1-0011"):
+        for basura in ("PCB-MAIN-001", "", "RANDOM", "TQT-R4-V30-0011", "TQT-R1-V30-00112", "TQT-R1-V3A-0011", "TQT_TIMERX_0033"):
             self.assertIsNone(parse_tarjeta_code(basura, "R1"), basura)
         self.assertIsNone(parse_tarjeta_code("88", "R1"))     # solo número únicamente vale para respaldo
         self.assertIsNone(parse_tarjeta_code("88", None))

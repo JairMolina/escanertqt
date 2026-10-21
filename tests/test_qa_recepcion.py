@@ -32,13 +32,14 @@ class TestFormatosQR(Base):
         for crudo, nombre in (("TQT-R3-V30-0084", "TQT-R3-V30-0084"), ("tqt-r3-v30-0085", "TQT-R3-V30-0085"),
                               ("  TQT R1 V30 0021 ", "TQT-R1-V30-0021"), ("TQT_R2_V5_7", "TQT-R2-V5-0007"),
                               ("TQT-R1-V999-9999", "TQT-R1-V999-9999"), ("TQT-R1-V30-0013\x00", "TQT-R1-V30-0013"),
-                              ("TQT-R1-V030-0001", "TQT-R1-V30-0001")):
+                              ("TQT-R1-V030-0001", "TQT-R1-V30-0001"),
+                              ("TQT_R2_0008", "TQT-R2-V10-0008"), ("TQT_Timer_0033", "TQT-R3-V10-0033")):  # v1.4.21: QR de las primeras placas
             r = self.esc(crudo)
             self.assertEqual((r["resultado"], r["pcb"]["nombre"]), ("AGREGADA", nombre), crudo)
 
     def test_formatos_invalidos(self):
         for crudo in ("TQT-R1-V1234-0001", "TQT-R1-V30-00001", "TQT-R4-V30-0001", "   ", "x" * 200, "0084",
-                      "' OR 1=1 --", "<script>alert(1)</script>", "TQT-R1-V-0010", "TQT-R1V300009",
+                      "' OR 1=1 --", "<script>alert(1)</script>", "TQT-R1-V-0010", "TQT-R1-V3A-0010", "TQT-R1V300009",
                       "TQT-R1-V30-０００２", "TQT-R1-V30-٠٠١١",  # dígitos Unicode no son series
                       "TQT-R1-V30-0000", "TQT-R1-V0-0001", "TQT-R1-V000-0001"):  # serie 0 y versión 0 no existen
             r = self.esc(crudo)

@@ -9,8 +9,8 @@
 
     const MAC_RE = /(^|[^0-9A-Fa-f])((?:[0-9A-Fa-f]{2}[:\-.]?){5}[0-9A-Fa-f]{2})(?![0-9A-Fa-f])/;
     const MAC_ESPACIOS_RE = /(^|[^0-9A-Za-z])((?:[0-9A-Fa-f]{2}[ \t]+){5}[0-9A-Fa-f]{2})(?![0-9A-Za-z])/;
-    const NOMBRE_RE = /TQT[\s_-]*R([123])[\s_-]*V([0-9]{1,3}(?:[._][0-9](?=[\s_-]))?)(?:[\s_-]+[A-Za-z][A-Za-z0-9]*)*[\s_-]+([0-9]{1,4})(?![0-9])/i;
-    const execNombre = (s) => { const m = NOMBRE_RE.exec(s); if (m) m[2] = m[2].replace(/\D/g, ''); return m; };   // V2_0 → 20
+    // [texto, tipo '1'|'2'|'3', versión sin decimal, serie] con el mismo patrón que T.parseNombre (Timer = R3, sin versión = V10)
+    const execNombre = (s) => { const m = window.TQT.NOMBRE_RE.exec(s); return m && [m[0], m[1] || '3', m[3] ? m[3].replace(/\D/g, '') : '10', m[4]]; };
     const OTRA = '__otra';
     const MAX_LOTE = 500;
 

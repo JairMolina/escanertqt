@@ -153,8 +153,12 @@ def extract_mac(texto: Optional[str]) -> Optional[str]:
 
 # --- Nombre de tarjeta ------------------------------------------------------
 # v1.3.46: también 'PCB_TQT_R3_V2_0_TIMER_0073' (versión con decimal "2_0" = V20 y palabras entre versión y número)
-_TARJETA_REGEX = re.compile(r"TQT[\s_\-]*R([123])[\s_\-]*V(\d{1,3}(?:[._]\d(?=[\s_\-]))?)(?:[\s_\-]+[A-Za-z][A-Za-z0-9]*)*[\s_\-]+(\d{1,4})(?!\d)",
+# v1.4.21: la versión es opcional ('TQT_R2_0008' = primeras placas, V10) y 'Timer' equivale a R3 ('TQT_Timer_0033').
+#          Una palabra intermedia no puede ser una V suelta o con dígitos ('V-', 'V3A'): eso es una versión mal escrita, no V10.
+_TARJETA_REGEX = re.compile(r"TQT[\s_\-]*(?:R([123])|(TIMER))(?:[\s_\-]*V(\d{1,3}(?:[._]\d(?=[\s_\-]))?))?"
+                            r"(?:[\s_\-]+(?!V(?![A-Za-z]))[A-Za-z][A-Za-z0-9]*)*[\s_\-]+(\d{1,4})(?!\d)",
                             re.I | re.A)
+VERSION_SIN_MARCA = "10"   # QR sin versión: las primeras placas (V1.0) no la traían impresa
 _SOLO_NUMERO = re.compile(r"^\d{1,4}$", re.A)
 
 
@@ -166,7 +170,9 @@ def parse_tarjeta_code(texto: Optional[str], tipo_esperado: Optional[str] = None
     raw = (texto or "").strip()
     m = _TARJETA_REGEX.search(raw)
     if m:
-        tipo, version, numero = f"R{m.group(1)}", re.sub(r"\D", "", m.group(2)), m.group(3)
+        tipo = f"R{m.group(1) or '3'}"
+        version = re.sub(r"\D", "", m.group(3)) if m.group(3) else VERSION_SIN_MARCA
+        numero = m.group(4)
     elif tipo_esperado == "R2" and _SOLO_NUMERO.match(raw):
         tipo, version, numero = "R2", version_ref, raw
     else:

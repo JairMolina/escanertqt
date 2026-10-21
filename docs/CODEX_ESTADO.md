@@ -1,7 +1,12 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-21 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.20; producción en 1.4.13 hasta que se despliegue)
+Commit de referencia: ver `git log` de main (v1.4.21; producción en 1.4.13 hasta que se despliegue)
+
+## v1.4.21 (2026-10-21, Claude Code, rama fix/qr-recibir-formatos)
+- QR flexibles: `_TARJETA_REGEX` (models.py) y `NOMBRE_RE` (common.js, exportado como `T.NOMBRE_RE` y reutilizado en sec_macs.js) aceptan versión opcional (`VERSION_SIN_MARCA = "10"`) y `TIMER` = R3. QR reales leídos de fotos: `TQT_R2_0008`, `TQT_Timer_0033`.
+- Recibir: `registrarComo()` ofrece R1/R2/R3 para un QR desconocido con número (usa `state.version`, reutiliza `onCode` con el nombre canónico).
+- Evidencia: suite completa 822 pruebas; tras ajustar 2 pruebas que exigían rechazar QR sin versión, test_inventario/test_qa_recepcion/test_business_rules/test_escaner_remoto OK. Pendientes ajenos: test_excel_r3_v1112.test_06 (falta la etiqueta git v1.1.11, falla igual en main) y 2 de test_correo_excel que fallaron solo en la corrida completa (pasan aisladas). `node --check` OK. Sin prueba con cámara real.
 
 ## v1.4.20 (2026-10-21, Claude Code)
 - Estado «programada» con FW capturado a mano: `r2_programming.statuses` ya no exige evidencia BLE (compara FW guardado o `firmware_r2` de la tarjeta contra el más reciente; `verified` sigue aparte). `_SELECT_PCB` hereda `firmware_r1/r2` de la tarjeta, así las listas R1/R3 coinciden con Tarjetas.

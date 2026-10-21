@@ -102,16 +102,19 @@
     }
 
     // ---------------------------------------------------------------- parsers (espejo del backend)
-    const NOMBRE_RE = /TQT[\s_-]*R([123])[\s_-]*V([0-9]{1,3}(?:[._][0-9](?=[\s_-]))?)(?:[\s_-]+[A-Za-z][A-Za-z0-9]*)*[\s_-]+([0-9]{1,4})(?![0-9])/i;  // igual que el servidor (v1.3.46: acepta 'PCB_TQT_R3_V2_0_TIMER_0073' → V20)
+    // igual que el servidor (v1.3.46: 'PCB_TQT_R3_V2_0_TIMER_0073' → V20; v1.4.21: versión opcional = V10 y 'Timer' = R3)
+    const NOMBRE_RE = /TQT[\s_-]*(?:R([123])|(TIMER))(?:[\s_-]*V([0-9]{1,3}(?:[._][0-9](?=[\s_-]))?))?(?:[\s_-]+(?!V(?![A-Za-z]))[A-Za-z][A-Za-z0-9]*)*[\s_-]+([0-9]{1,4})(?![0-9])/i;
+    const VERSION_SIN_MARCA = '10';   // QR sin versión: las primeras placas (V1.0) no la traían impresa
     const VERSION_DEFAULT = '30';
 
     /** {tipo:'R3', version:'30', serie:'0084', nombre:'TQT-R3-V30-0084'} o null. */
     function parseNombre(raw) {
         const m = NOMBRE_RE.exec(String(raw || ''));
         if (!m) return null;
-        if (!Number(m[2].replace(/\D/g, '')) || !Number(m[3])) return null;   // versión 0 o serie 0000 no existen
-        const serie = m[3].padStart(4, '0'), version = String(Number(m[2].replace(/\D/g, '')));   // V030 == V30 · V2_0 == V20
-        return { tipo: 'R' + m[1], version, serie, nombre: `TQT-R${m[1]}-V${version}-${serie}` };
+        const ver = m[3] ? m[3].replace(/\D/g, '') : VERSION_SIN_MARCA, tipo = m[1] || '3';
+        if (!Number(ver) || !Number(m[4])) return null;   // versión 0 o serie 0000 no existen
+        const serie = m[4].padStart(4, '0'), version = String(Number(ver));   // V030 == V30 · V2_0 == V20
+        return { tipo: 'R' + tipo, version, serie, nombre: `TQT-R${tipo}-V${version}-${serie}` };
     }
     const nombreDe = (tipo, version, serie) => `TQT-${tipo}-V${version}-${String(serie).padStart(4, '0')}`;
 
@@ -841,7 +844,7 @@
 
     window.TQT = {
         versionP,
-        hydrateIcons, MESES, esc, h, store, api, parseNombre, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
+        hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
         loteNombre, ordenarLotes, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,

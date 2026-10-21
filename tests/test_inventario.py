@@ -65,7 +65,7 @@ class TestInventario(unittest.TestCase):
         self.assertEqual(r["pcb"]["ranura"], "R1")
 
     def test_04_invalidas(self):
-        for basura in ("hola", "", "TQT-R4-V30-0001", "TQT-R1-0001", "70:4b:ca:5b:9f:6e", "0084"):
+        for basura in ("hola", "", "TQT-R4-V30-0001", "TQT-R1-V-0001", "70:4b:ca:5b:9f:6e", "0084"):
             r = self.esc(basura)
             self.assertEqual(r["resultado"], "INVALIDA", basura)
             self.assertIsNone(r["pcb"])

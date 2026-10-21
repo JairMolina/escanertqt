@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.21 — 2026-10-21
+- **Recibir acepta los QR de las primeras placas:** `TQT_R2_0008` (sin versión) se registra como V10 y `TQT_Timer_0033` como R3 (Timer = R3). Mismo patrón en el celular y en el servidor; también lo usa la captura de MAC. Una «V» mal escrita (`V-`, `V3A`) sigue siendo inválida.
+- **«¿Qué placa es?» para formatos desconocidos:** si un QR no se reconoce pero trae un número, en lugar de solo «Código no reconocido» se ofrece registrarla eligiendo R1, R2 o R3 (con la versión de la recepción actual). Cancelar no vuelve a preguntar por ese mismo código.
+
 ## v1.4.20 — 2026-10-21
 - **Estado de programación correcto para tarjetas programadas fuera de la app:** el firmware capturado a mano (en la placa o en la tarjeta) cuenta como programada. TQT R2 ya no exige evidencia Bluetooth para dejar de mostrar «Sin programar»: compara el FW guardado con el más reciente («Actualizada»/«Desactualizada»); la verificación BLE sigue registrándose aparte. Las listas de R1/R3 heredan el firmware de la tarjeta igual que Tarjetas.
 - **TQT R2 con el mismo diseño que R1/R3:** tarjeta elegida arriba, botones (instalar, verificar, subir BIN/HEX) en una fila, avance y resultado debajo, después firmware, Bluetooth, monitor e instalación USB.

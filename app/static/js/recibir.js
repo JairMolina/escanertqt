@@ -143,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!parsed) {
             window.SoundFX.playError(); window.Haptics.error();
             showRead({ kind: 'bad', msg: 'Código no reconocido', name: text.length > 40 ? text.slice(0, 40) + '…' : text });
+            registrarComo(text);
             return;
         }
         const known = state.known.get(parsed.nombre);
@@ -157,6 +158,28 @@ document.addEventListener('DOMContentLoaded', () => {
         state.pending.unshift(item);
         ensureListBox(); renderList();
         send(item);
+    }
+
+    // v1.4.21: un QR de formato desconocido que trae un número (último grupo de 1 a 4 dígitos) se registra eligiendo el tipo a mano
+    const comoDescartados = new Set();   // textos que el operador ya descartó: el visor no vuelve a preguntar
+    let comoHoja = null;
+    function registrarComo(text) {
+        const m = /(?:^|[^0-9])([0-9]{1,4})[^0-9]*$/.exec(text);
+        if (!m || !Number(m[1]) || comoHoja || verHoja || comoDescartados.has(text)) return;
+        const serie = m[1].padStart(4, '0');
+        const elegir = (tipo) => { comoHoja = null; setTimeout(() => onCode(T.nombreDe(tipo, state.version, serie)), 0); return true; };
+        comoHoja = sheet({
+            title: '¿Qué placa es?',
+            body: [
+                h('p', null, 'El QR dice ', h('b', { class: 'mono' }, text.length > 60 ? text.slice(0, 60) + '…' : text), ', que no es un formato conocido.'),
+                h('p', { class: 'muted' }, `Elige el tipo para registrarla como número ${serie}, versión V${state.version}.`),
+            ],
+            onClose: () => { if (comoHoja) { comoHoja = null; comoDescartados.add(text); } },
+            actions: [
+                { label: 'Cancelar', kind: 'ghost', onClick: () => { comoHoja = null; comoDescartados.add(text); return true; } },
+                ...['R1', 'R2', 'R3'].map((t) => ({ label: t, kind: 'primary', onClick: () => elegir(t) })),
+            ],
+        });
     }
 
     // v1.3.46: una placa de otra versión pregunta si es un lote nuevo (confirma lo escaneado y cambia la versión por defecto)
