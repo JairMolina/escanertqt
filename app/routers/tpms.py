@@ -2,7 +2,9 @@
 edición, borrado, operaciones en masa (todo o nada) y resumen. El consultor solo lee (lo aplica el middleware de roles)."""
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from datetime import datetime
+
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -33,6 +35,11 @@ class EdicionTpms(BaseModel):
     lote: Optional[str] = Field(None, max_length=60)
     estado: Optional[str] = Field(None, max_length=20)
     nota: Optional[str] = Field(None, max_length=500)
+
+
+class RenombrarLote(BaseModel):
+    de: str = Field(..., max_length=60)
+    a: str = Field(..., max_length=60)
 
 
 class MasaTpms(BaseModel):
@@ -86,6 +93,33 @@ async def listar(q: Optional[str] = Query(None, max_length=100), estado: Optiona
                  version: Optional[str] = Query(None, max_length=10), firmware: Optional[str] = Query(None, max_length=60),
                  lote: Optional[str] = Query(None, max_length=60), limit: int = Query(500, ge=1, le=5000)):
     return await _ejecutar(svc.listar, lote, limit, q, estado, version, firmware)
+
+
+@router.get("/eventos", summary="Movimientos TPMS (filtrados y paginados)")
+async def eventos(accion: Optional[str] = Query(None, max_length=20), q: Optional[str] = Query(None, max_length=100),
+                  desde: Optional[str] = Query(None, max_length=10), hasta: Optional[str] = Query(None, max_length=10),
+                  limit: int = Query(200, ge=1, le=2000), offset: int = Query(0, ge=0)):
+    return await _ejecutar(svc.eventos, accion, q, desde, hasta, limit, offset)
+
+
+@router.get("/lotes", summary="Lotes con conteos por estado")
+async def lotes():
+    return await _ejecutar(svc.lotes)
+
+
+@router.post("/lotes/renombrar", summary="Renombrar un lote (todas sus placas)")
+async def renombrar_lote(body: RenombrarLote, request: Request):
+    return await _ejecutar(svc.renombrar_lote, body.de, body.a, _email(request))
+
+
+@router.get("/exportar", summary="Exportar placas y movimientos a Excel (.xlsx)")
+async def exportar(q: Optional[str] = Query(None, max_length=100), estado: Optional[str] = Query(None, max_length=20),
+                   version: Optional[str] = Query(None, max_length=10), firmware: Optional[str] = Query(None, max_length=60),
+                   lote: Optional[str] = Query(None, max_length=60)):
+    datos = await _ejecutar(svc.exportar_xlsx, q, estado, version, firmware, lote)
+    nombre = f"TPMS_placas_{datetime.now():%Y%m%d}.xlsx"
+    return Response(content=datos, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{nombre}"', "Cache-Control": "no-store"})
 
 
 @router.put("/pcb/{pcb_id}/firmware", summary="Asignar o quitar firmware")

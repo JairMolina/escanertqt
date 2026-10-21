@@ -374,5 +374,118 @@ def resumen() -> Dict[str, Any]:
         lotes = [{"lote": r[0], "n": r[1]} for r in
                  c.execute("SELECT lote, COUNT(*) FROM tpms_pcb GROUP BY lote ORDER BY lote")]
         hoy = c.execute("SELECT COUNT(*) FROM tpms_pcb WHERE date(recibida_en) = date('now','localtime')").fetchone()[0]
+        actividad = _actividad(c, 14)
+        ultimos = [dict(r) for r in c.execute(f"SELECT {_COLS_EVENTO} FROM tpms_eventos ORDER BY id DESC LIMIT 8")]
     return {"total": total, "por_estado": por_estado, "versiones": versiones, "firmwares": firmwares,
-            "lotes": lotes, "hoy": hoy}
+            "lotes": lotes, "hoy": hoy, "actividad": actividad, "ultimos": ultimos}
+
+
+# ============================================================================
+# v1.4.28b: consola (actividad, eventos, lotes, exportar)
+# ============================================================================
+_COLS_EVENTO = "id, pcb_id, nombre, accion, detalle, operador, creado_en"
+_FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$", re.A)
+
+
+def _actividad(c: sqlite3.Connection, dias: int) -> List[Dict[str, Any]]:
+    """Recibidas y programadas por día de los últimos `dias` días (incluye días en 0), del más antiguo al de hoy."""
+    fechas = [r[0] for r in c.execute(
+        "WITH RECURSIVE d(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM d WHERE n < ?) "
+        "SELECT date('now','localtime', '-' || n || ' days') FROM d ORDER BY n DESC", (dias - 1,))]
+    desde = fechas[0]
+    rec = dict(c.execute("SELECT date(recibida_en), COUNT(*) FROM tpms_pcb WHERE date(recibida_en) >= ? "
+                         "GROUP BY date(recibida_en)", (desde,)).fetchall())
+    prog = dict(c.execute("SELECT date(programada_en), COUNT(*) FROM tpms_pcb WHERE programada_en IS NOT NULL "
+                          "AND date(programada_en) >= ? GROUP BY date(programada_en)", (desde,)).fetchall())
+    return [{"dia": f, "recibidas": rec.get(f, 0), "programadas": prog.get(f, 0)} for f in fechas]
+
+
+def _fecha(valor: Optional[str], campo: str) -> Optional[str]:
+    if not valor:
+        return None
+    if not _FECHA.fullmatch(valor.strip()):
+        raise Invalida(f"Fecha inválida en «{campo}»: '{valor}'. Usa AAAA-MM-DD.")
+    return valor.strip()
+
+
+def eventos(accion: Optional[str] = None, q: Optional[str] = None, desde: Optional[str] = None,
+            hasta: Optional[str] = None, limit: int = 200, offset: int = 0) -> Dict[str, Any]:
+    _asegurar()
+    where: List[str] = []
+    args: List[Any] = []
+    if accion:
+        where.append("accion = ?"); args.append(accion.strip().upper())
+    if q and q.strip():
+        patron = f"%{q.strip()}%"
+        where.append("(nombre LIKE ? OR detalle LIKE ? OR IFNULL(operador,'') LIKE ?)"); args += [patron] * 3
+    d, h = _fecha(desde, "desde"), _fecha(hasta, "hasta")
+    if d:
+        where.append("date(creado_en) >= ?"); args.append(d)
+    if h:
+        where.append("date(creado_en) <= ?"); args.append(h)
+    filtro = (" WHERE " + " AND ".join(where)) if where else ""
+    with db.get_db() as c:
+        items = [dict(r) for r in c.execute(
+            f"SELECT {_COLS_EVENTO} FROM tpms_eventos{filtro} ORDER BY id DESC LIMIT ? OFFSET ?", (*args, limit, offset))]
+        total = c.execute(f"SELECT COUNT(*) FROM tpms_eventos{filtro}", args).fetchone()[0]
+    return {"items": items, "total": total}
+
+
+def lotes() -> Dict[str, Any]:
+    _asegurar()
+    with db.get_db() as c:
+        items = [dict(r) for r in c.execute(
+            "SELECT lote, COUNT(*) AS placas, "
+            "SUM(estado = 'RECIBIDA') AS recibidas, SUM(estado = 'PROGRAMADA') AS programadas, "
+            "SUM(estado = 'FALLA') AS falla, SUM(estado = 'BAJA') AS baja, "
+            "MIN(recibida_en) AS primera, MAX(recibida_en) AS ultima "
+            "FROM tpms_pcb GROUP BY lote ORDER BY MAX(recibida_en) DESC")]
+    return {"items": items}
+
+
+def renombrar_lote(de: str, a: str, operador: Optional[str] = None) -> Dict[str, Any]:
+    origen, destino = _texto(de, 60), _texto(a, 60)
+    if origen == destino:
+        raise Invalida("El nombre nuevo del lote es igual al actual.")
+    _asegurar()
+    with db.transaction() as c:
+        filas = [dict(r) for r in c.execute("SELECT id, nombre FROM tpms_pcb WHERE lote = ?", (origen,))]
+        c.execute(f"UPDATE tpms_pcb SET lote = ?, actualizado_en = {_AHORA} WHERE lote = ?", (destino, origen))
+        for f in filas:
+            _evento(c, f["id"], f["nombre"], "EDITADA", f"lote: {origen} -> {destino}", operador)
+    return {"afectadas": len(filas)}
+
+
+COLUMNAS_XLSX = [("Nombre", 18), ("Hardware", 10), ("Serie", 8), ("Firmware", 16), ("Estado", 12), ("Lote", 20),
+                 ("Nota", 30), ("Operador", 26), ("Recibida", 20), ("Programada", 20)]
+COLUMNAS_MOV = [("Fecha", 20), ("Placa", 18), ("Acción", 12), ("Detalle", 40), ("Operador", 26)]
+
+
+def exportar_xlsx(q: Optional[str] = None, estado: Optional[str] = None, version: Optional[str] = None,
+                  firmware: Optional[str] = None, lote: Optional[str] = None) -> bytes:
+    """Libro con hoja «Placas» (mismos filtros que la lista) y hoja «Movimientos» (últimos 2000 eventos)."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+
+    placas = listar(lote, 1_000_000, q, estado, version, firmware)["items"]
+    movs = eventos(limit=2000)["items"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Placas"
+    hojas = [(ws, COLUMNAS_XLSX, [[p["nombre"], f"V{p['version']}", p["serie"], p["firmware"] or "", p["estado"], p["lote"],
+                                  p["nota"], p["operador"] or "", p["recibida_en"], p["programada_en"] or ""] for p in placas]),
+             (wb.create_sheet("Movimientos"), COLUMNAS_MOV,
+              [[e["creado_en"], e["nombre"], e["accion"], e["detalle"], e["operador"] or ""] for e in movs])]
+    for hoja, columnas, filas in hojas:
+        hoja.append([t for t, _ in columnas])
+        for i, (_, ancho) in enumerate(columnas, start=1):
+            hoja.cell(row=1, column=i).font = Font(bold=True)
+            hoja.column_dimensions[get_column_letter(i)].width = ancho
+        for f in filas:
+            hoja.append(f)
+        hoja.freeze_panes = "A2"
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

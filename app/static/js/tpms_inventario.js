@@ -22,14 +22,18 @@
     }
     async function pintaOpciones() {
         const d = await P.resumen();
-        const pon = (sel, base, ops) => { const v = sel.value; sel.replaceChildren(base, ...ops); sel.value = ops.some((o) => o.value === v) ? v : ''; };
+        // el valor deseado es el del filtro (puede venir de otra sección antes de que haya opciones)
+        const pon = (sel, base, ops, clave) => {
+            const v = st.f[clave];
+            if (v && !ops.some((o) => o.value === v)) ops.push(opcion(v, v === SIN ? 'Sin firmware' : v));
+            sel.replaceChildren(base, ...ops); sel.value = v;
+        };
         const pe = (d && d.por_estado) || {};
-        pon(ui.fEstado.s, opcion('', 'Todos'), Object.keys(P.ESTADOS).map((k) => opcion(k, P.ESTADOS[k].txt, d ? pe[k] || 0 : null)));
-        pon(ui.fVer.s, opcion('', 'Todos'), ((d && d.versiones) || []).map((x) => opcion(String(x.version), P.hw(x.version), x.n)));
+        pon(ui.fEstado.s, opcion('', 'Todos'), Object.keys(P.ESTADOS).map((k) => opcion(k, P.ESTADOS[k].txt, d ? pe[k] || 0 : null)), 'estado');
+        pon(ui.fVer.s, opcion('', 'Todos'), ((d && d.versiones) || []).map((x) => opcion(String(x.version), P.hw(x.version), x.n)), 'version');
         const fws = (d && d.firmwares) || [], sinFw = fws.find((x) => !x.firmware);
-        pon(ui.fFw.s, opcion('', 'Todos'), [opcion(SIN, 'Sin firmware', sinFw ? sinFw.n : null)].concat(fws.filter((x) => x.firmware).map((x) => opcion(x.firmware, x.firmware, x.n))));
-        pon(ui.fLote.s, opcion('', 'Todos'), ((d && d.lotes) || []).filter((x) => x.lote).map((x) => opcion(x.lote, x.lote, x.n)));
-        Object.keys(st.f).forEach((k) => { if (k !== 'q') st.f[k] = { estado: ui.fEstado, version: ui.fVer, firmware: ui.fFw, lote: ui.fLote }[k].s.value; });
+        pon(ui.fFw.s, opcion('', 'Todos'), [opcion(SIN, 'Sin firmware', sinFw ? sinFw.n : null)].concat(fws.filter((x) => x.firmware).map((x) => opcion(x.firmware, x.firmware, x.n))), 'firmware');
+        pon(ui.fLote.s, opcion('', 'Todos'), ((d && d.lotes) || []).filter((x) => x.lote).map((x) => opcion(x.lote, x.lote, x.n)), 'lote');
     }
     function limpiar() {
         st.f = { q: '', estado: '', version: '', firmware: '', lote: '' };
@@ -307,8 +311,18 @@
         cargar();
     }
 
+    /** Filtros actuales (los usa Excel para exportar lo mismo que se ve). */
+    P.filtrosInventario = () => Object.assign({}, st.f);
+
     P.registrar('inventario', {
         montar,
+        /** Abrir el inventario ya filtrado: {estado, version, firmware, lote, q}. */
+        recibirDato(f) {
+            if (!f || typeof f !== 'object') return;
+            st.f = Object.assign({ q: '', estado: '', version: '', firmware: '', lote: '' }, f);
+            ui.q.value = st.f.q; st.sel.clear(); st.viejo = false;
+            pintaOpciones(); cargar();
+        },
         entrar() { if (st.viejo) { st.viejo = false; cargar(); } },
     });
 })();

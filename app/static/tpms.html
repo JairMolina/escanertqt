@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="/static/css/app.css?v=1411">
     <link rel="stylesheet" href="/static/css/tpms.css?v=1">
     <link rel="stylesheet" href="/static/css/tpms_vistas.css?v=1">
+    <link rel="stylesheet" href="/static/css/tpms_consola.css?v=1">
 </head>
 <body>
 <a class="salto" href="#contenido">Saltar al contenido</a>
@@ -39,10 +40,21 @@
     </header>
 
     <nav class="pestanas" id="pestanas" aria-label="Secciones de TPMS">
-        <a href="#recibir" data-tab="recibir"><i class="svg-slot" data-i="recibir"></i><span>Recibir</span></a>
-        <a href="#programar" data-tab="programar"><i class="svg-slot" data-i="programar"></i><span>Programar</span></a>
-        <a href="#consultar" data-tab="consultar"><i class="svg-slot" data-i="consultar"></i><span>Consultar</span></a>
-        <a href="#inventario" data-tab="inventario"><i class="svg-slot" data-i="list"></i><span>Inventario</span></a>
+        <div class="grupo">
+            <p class="grupo-t" aria-hidden="true">Operación</p>
+            <a href="#dashboard" data-tab="dashboard" data-mas><i class="svg-slot" data-i="dash"></i><span>Dashboard</span></a>
+            <a href="#recibir" data-tab="recibir"><i class="svg-slot" data-i="recibir"></i><span>Recibir</span></a>
+            <a href="#programar" data-tab="programar"><i class="svg-slot" data-i="programar"></i><span>Programar</span></a>
+            <a href="#consultar" data-tab="consultar"><i class="svg-slot" data-i="consultar"></i><span>Consultar</span></a>
+        </div>
+        <div class="grupo">
+            <p class="grupo-t" aria-hidden="true">Gestión</p>
+            <a href="#inventario" data-tab="inventario"><i class="svg-slot" data-i="list"></i><span>Inventario</span></a>
+            <a href="#lotes" data-tab="lotes" data-mas><i class="svg-slot" data-i="layers"></i><span>Lotes</span></a>
+            <a href="#movimientos" data-tab="movimientos" data-mas><i class="svg-slot" data-i="clock"></i><span>Movimientos</span></a>
+            <a href="#excel" data-tab="excel" data-mas><i class="svg-slot" data-i="excel"></i><span>Excel</span></a>
+        </div>
+        <button class="mas" type="button" id="bMas" aria-haspopup="dialog"><i class="svg-slot" data-i="more"></i><span>Más</span></button>
     </nav>
 
     <main id="contenido" tabindex="-1">
@@ -139,6 +151,43 @@
             <p class="solo-lectura" hidden>Tu rol es de consulta: ves todo el inventario, pero no puedes editar, mover ni eliminar placas.</p>
             <div id="iCuerpo"></div>
         </section>
+        <!-- ============================================================ DASHBOARD -->
+        <section class="vista pag pag-ancha" id="v-dashboard" data-vista="dashboard" aria-labelledby="tDashboard" hidden>
+            <div class="inv-cab">
+                <h1 id="tDashboard" tabindex="-1">Dashboard</h1>
+                <span class="inv-cuenta" id="dAct" aria-live="polite"></span>
+                <span class="espacio"></span>
+                <button class="btn" type="button" id="bDRef"><i class="svg-slot" data-i="refresh"></i>Actualizar</button>
+            </div>
+            <div id="dCuerpo"></div>
+        </section>
+
+        <!-- ============================================================ LOTES -->
+        <section class="vista pag pag-ancha" id="v-lotes" data-vista="lotes" aria-labelledby="tLotes" hidden>
+            <div class="inv-cab">
+                <h1 id="tLotes" tabindex="-1">Lotes</h1>
+                <span class="inv-cuenta" id="lCuenta" aria-live="polite"></span>
+            </div>
+            <p class="solo-lectura" hidden>Tu rol es de consulta: ves los lotes y sus placas, pero no puedes renombrarlos.</p>
+            <div id="lCuerpo"></div>
+        </section>
+
+        <!-- ============================================================ MOVIMIENTOS -->
+        <section class="vista pag pag-ancha" id="v-movimientos" data-vista="movimientos" aria-labelledby="tMovimientos" hidden>
+            <div class="inv-cab">
+                <h1 id="tMovimientos" tabindex="-1">Movimientos</h1>
+                <span class="inv-cuenta" id="mCuenta" aria-live="polite"></span>
+            </div>
+            <div id="mCuerpo"></div>
+        </section>
+
+        <!-- ============================================================ EXCEL -->
+        <section class="vista pag pag-ancha" id="v-excel" data-vista="excel" aria-labelledby="tExcel" hidden>
+            <div class="inv-cab">
+                <h1 id="tExcel" tabindex="-1">Exportar a Excel</h1>
+            </div>
+            <div id="xCuerpo"></div>
+        </section>
     </main>
 </div>
 
@@ -156,5 +205,9 @@
 <script src="/static/js/tpms_programar.js?v=1"></script>
 <script src="/static/js/tpms_consultar.js?v=1"></script>
 <script src="/static/js/tpms_inventario.js?v=1"></script>
+<script src="/static/js/tpms_dashboard.js?v=1"></script>
+<script src="/static/js/tpms_lotes.js?v=1"></script>
+<script src="/static/js/tpms_movimientos.js?v=1"></script>
+<script src="/static/js/tpms_excel.js?v=1"></script>
 </body>
 </html>

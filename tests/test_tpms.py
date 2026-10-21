@@ -124,6 +124,64 @@ class TestTpms(unittest.TestCase):
         self.assertGreaterEqual(r["hoy"], 1)
         self.assertTrue(any(v["version"] == "1" for v in r["versiones"]))
 
+    # ---------------- v1.4.28b ----------------
+    def test_resumen_actividad_y_ultimos(self):
+        p = self._manual("801", lote="L-act")
+        self.c.put(f"/api/tpms/pcb/{p['id']}/firmware", json={"firmware": "fw-a"})
+        r = self.c.get("/api/tpms/resumen").json()
+        self.assertEqual(len(r["actividad"]), 14)
+        dias = [d["dia"] for d in r["actividad"]]
+        self.assertEqual(dias, sorted(dias))
+        self.assertGreaterEqual(r["actividad"][-1]["recibidas"], 1)
+        self.assertGreaterEqual(r["actividad"][-1]["programadas"], 1)
+        self.assertLessEqual(len(r["ultimos"]), 8)
+        self.assertEqual(set(r["ultimos"][0]), {"id", "pcb_id", "nombre", "accion", "detalle", "operador", "creado_en"})
+        self.assertEqual((r["ultimos"][0]["nombre"], r["ultimos"][0]["accion"]), ("TPMS-V1-0801", "PROGRAMADA"))
+
+    def test_eventos_filtrados(self):
+        p = self._manual("811", lote="L-ev")
+        self.c.patch(f"/api/tpms/pcb/{p['id']}", json={"nota": "nota-ev"})
+        r = self.c.get("/api/tpms/eventos", params={"q": "TPMS-V1-0811"}).json()
+        self.assertEqual(r["total"], 2)
+        self.assertEqual([e["accion"] for e in r["items"]], ["EDITADA", "RECIBIDA"])
+        r = self.c.get("/api/tpms/eventos", params={"q": "TPMS-V1-0811", "accion": "RECIBIDA"}).json()
+        self.assertEqual(r["total"], 1)
+        r = self.c.get("/api/tpms/eventos", params={"q": "TPMS-V1-0811", "limit": 1, "offset": 1}).json()
+        self.assertEqual((r["total"], [e["accion"] for e in r["items"]]), (2, ["RECIBIDA"]))
+        self.assertEqual(self.c.get("/api/tpms/eventos", params={"q": "TPMS-V1-0811", "hasta": "2000-01-01"}).json()["total"], 0)
+        self.assertEqual(self.c.get("/api/tpms/eventos", params={"desde": "ayer"}).status_code, 422)
+
+    def test_lotes_y_renombrar(self):
+        a, _ = self._manual("821", lote="L-ren"), self._manual("822", lote="L-ren")
+        self.c.put(f"/api/tpms/pcb/{a['id']}/firmware", json={"firmware": "fw-l"})
+        lote = next(x for x in self.c.get("/api/tpms/lotes").json()["items"] if x["lote"] == "L-ren")
+        self.assertEqual((lote["placas"], lote["recibidas"], lote["programadas"], lote["falla"], lote["baja"]), (2, 1, 1, 0, 0))
+        self.assertTrue(lote["primera"] and lote["ultima"])
+        self.assertEqual(self.c.post("/api/tpms/lotes/renombrar", json={"de": "L-ren", "a": "L-ren"}).status_code, 422)
+        self.assertEqual(self.c.post("/api/tpms/lotes/renombrar", json={"de": "L-ren", "a": "L-ren2"}).json(), {"afectadas": 2})
+        nombres = {x["lote"] for x in self.c.get("/api/tpms/lotes").json()["items"]}
+        self.assertIn("L-ren2", nombres)
+        self.assertNotIn("L-ren", nombres)
+        ev = self.c.get("/api/tpms/eventos", params={"q": "L-ren -> L-ren2", "accion": "EDITADA"}).json()
+        self.assertEqual(ev["total"], 2)
+
+    def test_exportar_xlsx(self):
+        import io
+        from openpyxl import load_workbook
+        self._manual("831", lote="L-xlsx")
+        self._manual("832", lote="L-xlsx")
+        r = self.c.get("/api/tpms/exportar", params={"lote": "L-xlsx"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("spreadsheetml", r.headers["content-type"])
+        self.assertRegex(r.headers["content-disposition"], r'attachment; filename="TPMS_placas_\d{8}\.xlsx"')
+        wb = load_workbook(io.BytesIO(r.content))
+        self.assertEqual(wb.sheetnames, ["Placas", "Movimientos"])
+        filas = list(wb["Placas"].iter_rows(values_only=True))
+        self.assertEqual(filas[0][:3], ("Nombre", "Hardware", "Serie"))
+        self.assertEqual(sorted(f[0] for f in filas[1:]), ["TPMS-V1-0831", "TPMS-V1-0832"])
+        self.assertEqual(filas[1][1], "V1")
+        self.assertGreaterEqual(wb["Movimientos"].max_row, 3)
+
     def test_no_toca_escaneos(self):
         with db.get_db() as c:
             antes = c.execute("SELECT COUNT(*) FROM escaneos").fetchone()[0]

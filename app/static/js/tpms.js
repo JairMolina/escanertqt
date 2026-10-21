@@ -1,4 +1,6 @@
 /* tpms.js - Módulo TPMS: shell de 4 pestañas (Recibir · Programar · Consultar · Inventario) con hash (#recibir…).
+ * En escritorio (≥1024px) es una consola con riel agrupado (Operación / Gestión) y Dashboard por defecto; en celular,
+ * barra inferior con «Más» (Dashboard, Lotes, Movimientos, Excel).
  * Expone window.TPMS para las vistas (tpms_recibir.js, tpms_programar.js, tpms_consultar.js, tpms_inventario.js):
  *   TPMS.registrar(nombre, {montar(el), entrar(), salir()}) · TPMS.cam.unir(slot, {onCode, onManual, pista}) · TPMS.cam.apagar()
  *   TPMS.resumen(forzar) · TPMS.cambio() (avisa 'tpms:cambio') · TPMS.porCodigo(codigo) · TPMS.soloLectura() · utilidades de formato.
@@ -10,7 +12,9 @@
     const { h, icon, api } = T;
     const $ = (id) => document.getElementById(id);
     const ROLES = { administrador: 'Administrador', general: 'General', consultor: 'Consulta' };
-    const VISTAS = ['recibir', 'programar', 'consultar', 'inventario'];
+    const VISTAS = ['dashboard', 'recibir', 'programar', 'consultar', 'inventario', 'lotes', 'movimientos', 'excel'];
+    const MAS = { dashboard: 'Dashboard', lotes: 'Lotes', movimientos: 'Movimientos', excel: 'Excel' };   // en celular, dentro de «Más»
+    const escritorio = () => matchMedia('(min-width: 1024px)').matches;
 
     // El tema lo fija el <head>; common.js lo pisa a "oscuro" si no hay ajuste guardado: se restablece la preferencia del sistema.
     (function () {
@@ -48,7 +52,7 @@
         mal: () => { if (window.SoundFX) window.SoundFX.playError(); if (window.Haptics) window.Haptics.error(); },
     };
 
-    let resumenP = null;
+    let resumenP = null;   // /resumen (v1.4.28b: también actividad 14 días y últimos eventos)
     function resumen(forzar) {
         if (!resumenP || forzar) {
             resumenP = api('/api/tpms/resumen').then((r) => {
@@ -151,7 +155,7 @@
     function registrar(nombre, def) { vistas[nombre] = { def, montada: false }; }
 
     function ir(nombre, enfocar) {
-        if (!VISTAS.includes(nombre)) nombre = soloLectura() ? 'consultar' : 'recibir';
+        if (!VISTAS.includes(nombre)) nombre = escritorio() ? 'dashboard' : (soloLectura() ? 'consultar' : 'recibir');
         if (actual === nombre) return;
         const previa = actual && vistas[actual];
         if (previa && previa.def.salir) { try { previa.def.salir(); } catch (e) { console.error(e); } }
@@ -161,6 +165,8 @@
         document.querySelectorAll('#pestanas a').forEach((a) => {
             if (a.dataset.tab === nombre) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
         });
+        $('bMas').classList.toggle('activa', !!MAS[nombre]);
+        $('bMas').querySelector('span').textContent = MAS[nombre] || 'Más';
         const sec = $('v-' + nombre), v = vistas[nombre];
         if (v) {
             if (!v.montada) { v.montada = true; try { v.def.montar(sec); } catch (e) { console.error(e); } }
@@ -168,6 +174,15 @@
         }
         if (enfocar) { const t = sec.querySelector('h1'); if (t) t.focus({ preventScroll: true }); window.scrollTo(0, 0); }
     }
+    // «Más» (celular): hoja con las secciones de consola que no caben en la barra
+    $('bMas').addEventListener('click', () => {
+        let hoja = null;
+        const enlaces = Object.keys(MAS).map((k) => h('a', {
+            class: 'mas-op', href: '#' + k, 'aria-current': actual === k ? 'page' : null,
+            onclick: () => { if (hoja) hoja.close(); },
+        }, icon({ dashboard: 'dash', lotes: 'layers', movimientos: 'clock', excel: 'excel' }[k]), h('span', null, MAS[k])));
+        hoja = T.sheet({ title: 'Más secciones', body: h('nav', { class: 'mas-lista', 'aria-label': 'Más secciones' }, enlaces) });
+    });
     function desdeHash(enfocar) { ir((location.hash || '').replace(/^#/, '').split('?')[0], enfocar); }
     window.addEventListener('hashchange', () => desdeHash(true));
     /** Navegar a otra vista con un dato (p. ej. abrir una placa en Consultar). */

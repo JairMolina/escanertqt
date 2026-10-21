@@ -1,5 +1,4 @@
-/* tpms_vistas.css - Módulo TPMS: pestañas (barra inferior en móvil, riel lateral en escritorio), Programar, Consultar e
-   Inventario. Mismos tokens que tpms.css; el naranja de seguridad solo marca la pestaña activa, la acción principal y
+/* tpms_vistas.css - Módulo TPMS: Recibir (contador), Programar, Consultar e Inventario. Mismos tokens que tpms.css; el naranja de seguridad solo marca la pestaña activa, la acción principal y
    lo recién leído. */
 
 /* ---------- consultor: sin acciones de escritura ---------- */
@@ -8,29 +7,8 @@
                 background: var(--surface); color: var(--muted); font-size: 15px; line-height: 1.45; max-width: 70ch; }
 .solo-lectura[hidden] { display: none; }
 
-/* ---------- pestañas ---------- */
-main:focus { outline: none; }
-.vista h1:focus { outline: none; }
-.pestanas { position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-            background: var(--bg-2); border-top: 1px solid var(--line); padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-.pestanas a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: var(--tab-h); min-width: 0;
-              color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600; }
-.pestanas a span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pestanas .svg-i { width: 22px; height: 22px; padding: 4px 14px; box-sizing: content-box; border-radius: 999px; transition: background-color .16s var(--tp-ease), color .16s var(--tp-ease); }
-.pestanas a:hover { color: var(--text); }
-.pestanas a[aria-current="page"] { color: var(--text); }
-.pestanas a[aria-current="page"] .svg-i { background: var(--accent); color: var(--accent-ink); box-shadow: var(--glow); }
-.pestanas a:focus-visible { outline-offset: -4px; }
-
-@media (min-width: 768px) {
-  :root { --tab-h: 0px; }
-  .tp { display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 100dvh; }
-  .tp > .cab { grid-column: 1 / -1; }
-  .pestanas { position: sticky; top: 61px; bottom: auto; align-self: start; display: flex; flex-direction: column; gap: 6px; height: calc(100dvh - 61px);
-              padding: 18px 8px; border-top: 0; border-right: 1px solid var(--line); box-sizing: border-box; }
-  .pestanas a { min-height: 68px; border-radius: var(--tp-rad); }
-  .tp > main { min-width: 0; }
-}
+/* pestañas y consola: tpms_consola.css */
+main:focus, .vista h1:focus { outline: none; }
 
 /* ---------- Recibir: contador de hoy ---------- */
 .hoy { display: flex; align-items: baseline; gap: 10px; padding: 2px 2px 0; }
