@@ -3,7 +3,8 @@
 ## v1.4.20 — 2026-10-21
 - **Estado de programación correcto para tarjetas programadas fuera de la app:** el firmware capturado a mano (en la placa o en la tarjeta) cuenta como programada. TQT R2 ya no exige evidencia Bluetooth para dejar de mostrar «Sin programar»: compara el FW guardado con el más reciente («Actualizada»/«Desactualizada»); la verificación BLE sigue registrándose aparte. Las listas de R1/R3 heredan el firmware de la tarjeta igual que Tarjetas.
 - **TQT R2 con el mismo diseño que R1/R3:** tarjeta elegida arriba, botones (instalar, verificar, subir BIN/HEX) en una fila, avance y resultado debajo, después firmware, Bluetooth, monitor e instalación USB.
-- **Pruebas TQT:** «Historial de la tarjeta seleccionada» pasa debajo de «Elige una tarjeta» y solo aparece cuando hay una tarjeta elegida.
+- **Pruebas TQT:** «Historial de la tarjeta seleccionada» pasa debajo de «Elige una tarjeta» y solo aparece cuando hay una tarjeta elegida. «Prueba automática» y el resultado de la ejecución quedan lado a lado.
+- **TQT R2 al elegir tarjeta:** detalle en dos mitades como R1/R3 (datos: nombre, ID, MAC, HW, firmware | estado de programación); el aviso vacío dice «Elige una R2».
 
 ## v1.4.19 — 2026-10-20
 - **Programación R1/R3 — estatus en la lista:** cada tarjeta muestra «Sin programar», «Desactualizada» o «Actualizada» (FW guardado contra el más alto compatible con su HW), igual que en TQT R2.

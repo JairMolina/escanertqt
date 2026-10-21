@@ -723,9 +723,13 @@
             h('div', { class: 'hint' }, 'Antes de sincronizar, pon la tarjeta en modo programador; el registro avisa si no avanza.'),
             maintenance);
         // v1.4.20: mismo orden que TQT R1/R3: tarjeta → acciones → avance → firmware → paneles de configuración
-        const detalle = h('div', { class: 'prog-detalle', hidden: true }, cabecera, r2Estado);
+        // v1.4.20: detalle en dos mitades como R1/R3 (datos | estado)
+        const datosDl = h('dl', { class: 'prog-dl' });
+        const detalle = h('div', { class: 'prog-detalle', hidden: true }, h('div', { class: 'prog-split' },
+            h('div', { class: 'prog-datos' }, cabecera, datosDl,
+                h('p', { class: 'hint' }, 'Conecta la tarjeta por USB o enciéndela cerca para Bluetooth. El resultado aparece aquí.')), r2Estado));
         const acciones = h('div', { class: 'row wrap prog-acciones' }, btnFlash, btnVerifyR2, uploadBtn, btnStopVerify, nextR1, uploadInput);
-        const vacio = T.empty('flash', 'Elige una tarjeta', 'Búscala por número o nombre a la izquierda, o elige una de la lista.');
+        const vacio = T.empty('flash', 'Elige una R2', 'Búscala por número o nombre a la izquierda, o elige una de la lista.');
 
         function seleccionar(p) {
             if (S.busy || uploadBusy) return;
@@ -738,11 +742,16 @@
         }
         function pintarDetalle() {
                         enableFirmware();
+            vacio.querySelector('b').textContent = 'Elige una ' + S.tipoEsp;
             if (!S.tarjeta) { detalle.hidden = true; vacio.hidden = false; return; }
             vacio.hidden = true; detalle.hidden = false;
             const p = S.tarjeta;
             cabecera.replaceChildren(T.tipoChip(p.tipo), h('span', { class: 'prog-nm' }, p.nombre),
-                h('span', { class: 'dim' }, `Hardware V${p.version}${p.id_tarjeta_num ? ' · Tarjeta #' + String(p.id_tarjeta_num).padStart(4, '0') : ' · suelta'}`));
+                h('span', { class: 'dim' }, p.id_tarjeta_num ? 'Tarjeta #' + String(p.id_tarjeta_num).padStart(4, '0') : 'Suelta'));
+            const hw = String(p.version || ''), filas = [['Nombre ' + p.tipo, String(p.nombre || '').replace(/-/g, '_')],
+                ['ID', p.id_tarjeta_num ? String(p.id_tarjeta_num).padStart(4, '0') : '—'], ['MAC', p.mac ? String(p.mac).toUpperCase() : 'sin MAC'],
+                ['HW', hw.length > 1 ? hw[0] + '.' + hw.slice(1) : hw || '—'], ['Firmware', p.firmware || 'sin firmware']];
+            datosDl.replaceChildren(...filas.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)]));
             resetPasos(); relleno.style.width = '0'; resultado.hidden = true;
         }
 

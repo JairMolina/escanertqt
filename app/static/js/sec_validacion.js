@@ -282,11 +282,12 @@
         h("div", { class: "tqt-stack" }, introPanel, serialPanel), blePanel),
       status, announcer,
       h("div", { class: "tqt-layout tqt-layout-full" },
-        h("div", { class: "tqt-col tqt-main" }, summary,
+        // v1.4.20: prueba automática y resultado lado a lado (ahorra el espacio sobrante de las etapas)
+        h("div", { class: "tqt-col tqt-main" }, h("div", { class: "tqt-auto-split" },
           h("section", { class: "prog-panel tqt-card" },
             h("h3", null, "Prueba automática"), h("div", { class: "row wrap" }, start, stop), progress,
             h("p", { class: "hint" }, "ON = sensor de cierre · OFF = sensor de apertura (valores crudos 0/1; no son los comandos PPON/POFF)."), steps,
-            h("details", { class: "tqt-livewrap" }, h("summary", null, "Registro de comandos y respuestas (en vivo)"), liveLog)),
+            h("details", { class: "tqt-livewrap" }, h("summary", null, "Registro de comandos y respuestas (en vivo)"), liveLog)), summary),
           h("section", { class: "prog-panel tqt-card" }, h("h3", null, "Sensores y estados S29"), sensors))),
       reportHost);
     search.id = "tqt-search";

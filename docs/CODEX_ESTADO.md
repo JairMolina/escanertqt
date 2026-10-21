@@ -6,7 +6,7 @@ Commit de referencia: ver `git log` de main (v1.4.20; producción en 1.4.13 hast
 ## v1.4.20 (2026-10-21, Claude Code)
 - Estado «programada» con FW capturado a mano: `r2_programming.statuses` ya no exige evidencia BLE (compara FW guardado o `firmware_r2` de la tarjeta contra el más reciente; `verified` sigue aparte). `_SELECT_PCB` hereda `firmware_r1/r2` de la tarjeta, así las listas R1/R3 coinciden con Tarjetas.
 - TQT R2 con la estructura de R1/R3 (tarjeta → acciones → avance → firmware → Bluetooth/monitor/USB).
-- Pruebas TQT: historial bajo «Elige una tarjeta», oculto sin tarjeta elegida.
+- Pruebas TQT: historial bajo «Elige una tarjeta», oculto sin tarjeta elegida. Prueba automática y resultado lado a lado. TQT R2 con detalle en dos mitades («Elige una R2»). Docker local con la BD de producción 1.4.19 del 2026-10-21 (respaldo previo en el volumen: tqt_produccion.db.bak-antes-prod-20261021).
 - Evidencia: 240 pruebas de suites pertinentes OK (2 de test_r2_programming adaptadas a la nueva regla), `node --check` OK. Sin revisión visual con sesión ni con la BD de producción.
 
 ## v1.4.19 (2026-10-20, Claude Code)
