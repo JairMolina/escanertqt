@@ -569,6 +569,44 @@ def cambiar_version_masiva(ids: List[int], version: str, operador: Optional[str]
     return db._con_conn(conn, db_path, _e, escribe=True)
 
 
+def mover_a_lote(ids: List[int], lote_id: int, con_tarjetas: bool = False, operador: Optional[str] = None,
+                 conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> Dict[str, Any]:
+    """v1.4.25: pasa varias PCB al lote indicado (lote de recepción, `pcb_inventario.lote_id`). Todo o nada.
+    Una PCB montada en una tarjeta de OTRO lote solo se mueve con `con_tarjetas`: entonces se mueve la tarjeta completa
+    (sus tres placas; las pruebas cuelgan de la tarjeta y la acompañan). Si el lote destino ya tiene una tarjeta con ese
+    número, no se mueve nada."""
+    def _e(c):
+        destino = db.get_lote_by_id(lote_id, conn=c)
+        if not destino:
+            raise NoEncontradoError(f"Lote con ID {lote_id} no encontrado.")
+        pcbs, faltan = [], []
+        for pid in dict.fromkeys(ids):
+            p = _pcb_por_id(c, pid)
+            (pcbs.append(p) if p else faltan.append(str(pid)))
+        if faltan:
+            raise NoEncontradoError("No existen las PCB con ID: " + ", ".join(faltan) + ". No se movió ninguna.")
+        tarjetas = {p["tarjeta_id"]: p["id_tarjeta_num"] for p in pcbs if p["tarjeta_id"] and p["tarjeta_lote_id"] != lote_id}
+        if tarjetas and not con_tarjetas:
+            raise ConflictoError("Hay placas montadas en tarjetas de otro lote (" + ", ".join(sorted(tarjetas.values())[:10])
+                                 + "). Confirma mover también esas tarjetas completas.")
+        choques = sorted(n for n in tarjetas.values() if c.execute(
+            "SELECT 1 FROM tarjetas_produccion WHERE lote_id = ? AND id_tarjeta_num = ?", (lote_id, n)).fetchone())
+        if choques:
+            raise ConflictoError(f"El lote {db.nombre_lote_de(destino)} ya tiene las tarjetas " + ", ".join(choques[:10]) + ". No se movió nada.")
+        ahora, mover = _ahora(), {p["id"] for p in pcbs}
+        for tid in tarjetas:
+            t = c.execute("SELECT pcb_r1_id, pcb_r2_id, pcb_r3_id FROM tarjetas_produccion WHERE id = ?", (tid,)).fetchone()
+            mover.update(x for x in t if x)
+            c.execute("UPDATE tarjetas_produccion SET lote_id = ?, updated_at = ? WHERE id = ?", (lote_id, ahora, tid))
+        ph = ",".join("?" * len(mover))
+        c.execute(f"UPDATE pcb_inventario SET lote_id = ?, updated_at = ? WHERE id IN ({ph})", (lote_id, ahora, *mover))
+        detalle = f"{len(mover)} PCB" + (f" y tarjetas {', '.join(sorted(tarjetas.values()))}" if tarjetas else "")
+        db.log_evento("LOTE_MOVIDO", lote_id, db.nombre_lote_de(destino), detalle, operador, conn=c)
+        return {"lote_id": lote_id, "movidas": len(mover), "tarjetas": sorted(tarjetas.values()),
+                "pcbs": [_pcb_por_id(c, i) for i in sorted(mover)]}
+    return db._con_conn(conn, db_path, _e, escribe=True)
+
+
 def eliminar_pcb(pcb_id: int, operador: Optional[str] = None, conn: Optional[sqlite3.Connection] = None,
                  db_path: Optional[Path] = None) -> Dict[str, Any]:
     """RECIBIDA/DISPONIBLE se borra; FALLA pasa a BAJA (conserva su rastro y su MAC); ASIGNADA es 409."""

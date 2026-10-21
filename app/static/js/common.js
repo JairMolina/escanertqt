@@ -516,7 +516,7 @@
             const r = await conClave(() => api(`/api/lotes/${l.id}/activar`, { method: 'POST' }));
             if (!r) return;
             if (!r.ok) { error = r.error; pintar(); return; }
-            toast(`Lote ${loteNombre(l)} activo para todos los celulares`, { kind: 'ok' });
+            toast(`Ahora trabajas en el lote ${loteNombre(l)}`, { kind: 'ok' });
             s.close(); loteCambiado(shell, (r.data && r.data.lote) || l);
         }
         async function crear() {
@@ -535,13 +535,13 @@
             const r = await conClave(() => api('/api/lotes', { method: 'POST', body: cuerpo, timeout: 30000 }));
             if (!r) return;
             if (!r.ok) { nlErr.textContent = r.status === 409 ? `${r.error} Búscalo en la lista y pulsa "Usar este lote".` : r.error; return; }
-            toast(`Lote ${loteNombre(r.data)} creado y activo para todos`, { kind: 'ok' });
+            toast(`Lote ${loteNombre(r.data)} creado: ahora trabajas en él`, { kind: 'ok' });
             s.close(); loteCambiado(shell, r.data);
         }
 
         function pintar() {
             body.replaceChildren();
-            body.append(h('p', { class: 'muted lotes-intro' }, 'Elige con qué lote se trabaja. Al usar otro lote, cambia en todos los celulares y en el monitor.'));
+            body.append(h('p', { class: 'muted lotes-intro' }, 'Elige en qué lote trabajas. Es solo para tu cuenta: lo que recibas y emparejes queda en ese lote, y los demás siguen en el suyo.'));
             if (pendiente) {
                 body.append(h('form', { class: 'panel pad stack lote-auth', onsubmit: (e) => { e.preventDefault(); entrar(); } },
                     h('b', null, 'Estas acciones las hace el supervisor'),
@@ -558,7 +558,7 @@
                     h('div', { class: 'lote-nom' }, loteNombre(l), l.activo ? badge('Activo', 'ok', 'check') : null),
                     h('div', { class: 't2' }, `${l.tarjetas || 0} tarjeta${l.tarjetas === 1 ? '' : 's'}`)),
                 h('div', { class: 'lote-acc' },
-                    l.activo || !esAdmin() ? null : h('button', { class: 'btn btn-sm btn-primary', type: 'button', disabled: busy ? '' : null, 'aria-label': `Usar el lote ${loteNombre(l)}`, onclick: () => usar(l) }, 'Usar este lote'),
+                    l.activo || acceso.rol === 'consultor' ? null : h('button', { class: 'btn btn-sm btn-primary', type: 'button', disabled: busy ? '' : null, 'aria-label': `Usar el lote ${loteNombre(l)}`, onclick: () => usar(l) }, 'Usar este lote'),
                     h('a', { class: 'btn btn-sm', href: `/monitor?lote=${l.id}`, 'aria-label': `Ver el lote ${loteNombre(l)} en el monitor` }, icon('monitor'), 'Ver en el monitor'))))));
             if (!esAdmin()) {   // v1.3.42: cambiar o crear lotes es de administradores; se explica en vez de mostrar botones que fallan
                 body.append(h('div', { class: 'acceso-aviso' }, h('span', { class: 'acceso-ico' }, icon('lock')),

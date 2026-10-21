@@ -1,7 +1,7 @@
 /**
  * sec_inventario.js - Inventario de PCB: filtros (tipo, estado, hardware, sin MAC, búsqueda), orden, selección múltiple,
- * edición de una placa, cambio de versión de hardware en masa y eliminación con confirmación en pantalla.
- * API: GET /api/pcb · PATCH/DELETE /api/pcb/{id} · PUT /api/pcb/{id}/mac|firmware · POST /api/pcb/version · GET /api/firmware
+ * edición de una placa, cambio de versión de hardware en masa, mover a lote (v1.4.25) y eliminación con confirmación.
+ * API: GET /api/pcb · PATCH/DELETE /api/pcb/{id} · PUT /api/pcb/{id}/mac|firmware · POST /api/pcb/version · POST /api/pcb/mover-lote · GET /api/firmware
  */
 (function () {
     'use strict';
@@ -11,7 +11,7 @@
         montar(host, ctx) {
             const { T, api, h, icon, toast, sheet, util } = ctx;
             const P = ctx.params();
-            const st = { pcbs: null, error: '', tipo: ['R1', 'R2', 'R3'].includes(P.get('tipo')) ? P.get('tipo') : '', ciclo: P.get('estado') || '', ver: '', sinMac: P.get('sin_mac') === '1', q: P.get('q') || '', sort: { id: 'nombre', dir: 'asc' }, limit: 200, sel: new Set() };
+            const st = { pcbs: null, error: '', tipo: ['R1', 'R2', 'R3'].includes(P.get('tipo')) ? P.get('tipo') : '', ciclo: P.get('estado') || '', ver: '', sinMac: P.get('sin_mac') === '1', q: P.get('q') || '', sort: { id: 'nombre', dir: 'asc' }, limit: 200, sel: new Set(), lote: '' };
             const CICLOS = [['RECIBIDA', 'Sin confirmar'], ['DISPONIBLE', 'Sueltas'], ['PROGRAMADA', 'Programadas'], ['ASIGNADA', 'Asignadas'], ['FALLA', 'Falla'], ['BAJA', 'Baja']];
 
             const q = h('input', { class: 'input', type: 'search', id: 'invQ', placeholder: 'Serie, nombre o MAC', 'aria-label': 'Buscar placa por serie, nombre o MAC', 'data-buscar': '1', value: st.q, autocomplete: 'off' });
@@ -19,12 +19,21 @@
             const selCiclo = h('select', { class: 'input', id: 'invCiclo', 'aria-label': 'Estado de la placa', onchange: (e) => { st.ciclo = e.target.value; st.limit = 200; lista(); } },
                 h('option', { value: '' }, 'Todos los estados'), CICLOS.map(([v, l]) => h('option', { value: v, selected: st.ciclo === v ? '' : null }, l)));
             const selVer = h('select', { class: 'input', id: 'invVer', 'aria-label': 'Versión de hardware', onchange: (e) => { st.ver = e.target.value; st.limit = 200; lista(); } }, h('option', { value: '' }, 'Todo el hardware'));
+            // v1.4.25: lote en el que se recibió cada placa (recibida_lote_id; vacío = recibida antes de v1.4.24)
+            const loteNom = (id) => { const l = id && ctx.lotes().find((x) => x.id === id); return l ? T.loteNombre(l) : ''; };
+            const selLote = h('select', { class: 'input', id: 'invLote', 'aria-label': 'Lote de recepción', onchange: (e) => { st.lote = e.target.value; st.limit = 200; lista(); } });
+            function opcionesLote() {
+                const cur = st.lote;
+                selLote.replaceChildren(h('option', { value: '' }, 'Todos los lotes'), h('option', { value: 'sin', selected: cur === 'sin' ? '' : null }, 'Sin lote'),
+                    ctx.lotes().map((l) => h('option', { value: String(l.id), selected: String(l.id) === cur ? '' : null }, T.loteNombre(l))));
+            }
             const chkMac = h('input', { type: 'checkbox', id: 'invSinMac', checked: st.sinMac ? '' : null, onchange: (e) => { st.sinMac = e.target.checked; st.limit = 200; lista(); } });
             const info = h('span', { class: 'info', role: 'status', 'aria-live': 'polite' });
             const btnVer = h('button', { class: 'btn', type: 'button', 'data-escribe': true, onclick: versionMasa }, icon('edit'), 'Cambiar hardware');
+            const btnLote = h('button', { class: 'btn', type: 'button', 'data-escribe': true, onclick: moverMasa }, icon('box'), 'Mover a lote');
             const btnDel = h('button', { class: 'btn btn-danger', type: 'button', 'data-escribe': true, onclick: eliminarMasa }, icon('trash'), 'Eliminar');
             const btnLimpiar = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { st.sel.clear(); lista(); } }, 'Quitar selección');
-            const barSel = h('div', { class: 'esc-sel', hidden: true }, h('b', { class: 'cnt' }), h('div', { class: 'grow' }), btnVer, btnDel, btnLimpiar);
+            const barSel = h('div', { class: 'esc-sel', hidden: true }, h('b', { class: 'cnt' }), h('div', { class: 'grow' }), btnVer, btnLote, btnDel, btnLimpiar);
             const tw = h('div');
             q.addEventListener('input', T.debounce(() => { st.q = q.value; st.limit = 200; lista(); }, 180));
 
@@ -32,6 +41,7 @@
             function filtradas() {
                 const txt = norm(st.q).trim(); const hex = txt.replace(/[^0-9a-f]/g, '');
                 return st.pcbs.filter((p) => (!st.tipo || p.tipo === st.tipo) && (!st.ciclo || (st.ciclo === 'PROGRAMADA' ? T.programada(p) && ['RECIBIDA', 'DISPONIBLE'].includes(p.estado_ciclo) : p.estado_ciclo === st.ciclo)) && (!st.ver || p.version === st.ver)
+                    && (!st.lote || (st.lote === 'sin' ? !p.recibida_lote_id : String(p.recibida_lote_id) === st.lote))
                     && (!st.sinMac || (p.tipo !== 'R3' && !p.mac && ['RECIBIDA', 'DISPONIBLE', 'ASIGNADA'].includes(p.estado_ciclo)))
                     && (!txt || norm(p.nombre).includes(txt) || String(p.serie).includes(txt) || (hex.length >= 2 && norm(p.mac).replace(/:/g, '').includes(hex))));
             }
@@ -43,6 +53,7 @@
                 { id: 'mac', titulo: 'MAC', cel: (p) => (p.tipo === 'R3' ? h('span', { class: 'muted' }, 'no aplica') : p.mac ? h('span', { class: 'mono' }, String(p.mac).toLowerCase()) : h('span', { class: 'muted' }, 'sin MAC')), valor: (p) => (p.tipo === 'R3' ? '' : p.mac) },
                 { id: 'estado_ciclo', titulo: 'Estado', cel: (p) => T.cicloBadge(p.estado_ciclo, p) },
                 { id: 'tarjeta', titulo: 'Tarjeta', cls: 'c-3', cel: (p) => (p.id_tarjeta_num ? h('a', { class: 'mono', href: `#/tarjetas?id=${p.tarjeta_id}` }, p.id_tarjeta_num) : h('span', { class: 'muted' }, '—')), valor: (p) => p.id_tarjeta_num },
+                { id: 'lote', titulo: 'Lote', cls: 'c-2', cel: (p) => (p.recibida_lote_id ? h('span', null, loteNom(p.recibida_lote_id)) : h('span', { class: 'muted' }, '—')), valor: (p) => loteNom(p.recibida_lote_id) },
                 { id: 'recibida_en', titulo: 'Recibida', cls: 'c-2', cel: (p) => h('span', { class: 'mono' }, util.fecha(p.recibida_en)), valor: (p) => p.recibida_en },
                 { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (p) => h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'data-escribe': true, 'aria-label': `Editar ${p.nombre}`, onclick: () => editar(p) }, icon('edit'), 'Editar') },
             ];
@@ -143,6 +154,34 @@
                         st.sel.clear(); toast(`Hardware V${inp.value} aplicado a ${ids.length}`, { kind: 'ok' }); ctx.actualizar(); return true;
                     } }] });
             }
+            function moverMasa() {
+                const ids = [...st.sel]; const items = st.pcbs.filter((p) => st.sel.has(p.id)); const err = h('div', { class: 'hint err', role: 'alert' });
+                const lotes = ctx.lotes(); const actual = ctx.lote && ctx.lote();
+                const sel = h('select', { class: 'input', id: 'mLote' }, lotes.map((l) => h('option', { value: String(l.id), selected: actual && actual.id === l.id ? '' : null }, T.loteNombre(l))));
+                const chk = h('input', { type: 'checkbox', id: 'mLoteTarj' });
+                const avisoTarj = h('div');
+                const pintarAviso = () => {   // placas montadas en tarjetas de OTRO lote: solo se mueven junto con su tarjeta
+                    const dest = Number(sel.value);
+                    const nums = [...new Set(items.filter((p) => p.tarjeta_id && p.tarjeta_lote_id !== dest).map((p) => p.id_tarjeta_num))].sort();
+                    avisoTarj.replaceChildren(nums.length ? h('div', { class: 'stack' }, T.banner('warn', 'alert', `${nums.length === 1 ? 'Una placa está montada en la tarjeta' : 'Hay placas montadas en las tarjetas'} ${nums.slice(0, 10).join(', ')}${nums.length > 10 ? '…' : ''} de otro lote.`),
+                        h('label', { class: 'esc-chk', for: 'mLoteTarj' }, chk, 'Mover también esas tarjetas completas (sus 3 placas y sus pruebas)')) : '');
+                    chk.checked = false;
+                };
+                sel.addEventListener('change', pintarAviso); pintarAviso();
+                sheet({ title: `Mover ${ids.length} placa${ids.length === 1 ? '' : 's'} a otro lote`, body: [
+                    h('div', { class: 'field' }, h('label', { for: 'mLote' }, 'Lote destino'), sel),
+                    h('p', { class: 'hint' }, 'Cambia el lote en el que quedaron registradas. Si una tarjeta del mismo número ya existe en el lote destino, no se mueve nada.'),
+                    avisoTarj,
+                    h('p', { class: 'mono muted', style: 'max-height:96px;overflow:auto' }, items.slice(0, 12).map((p) => p.nombre).join(', ') + (items.length > 12 ? ` y ${items.length - 12} más` : '')), err],
+                    actions: [{ label: 'Cancelar', kind: 'ghost', onClick: () => true }, { label: 'Mover', kind: 'primary', keepOpen: true, onClick: async () => {
+                        if (!sel.value) { err.textContent = 'Elige el lote destino.'; return false; }
+                        const r = await api('/api/pcb/mover-lote', { method: 'POST', body: { ids, lote_id: Number(sel.value), con_tarjetas: chk.checked } });
+                        if (!r.ok) { err.textContent = r.error; return false; }
+                        const d = r.data || {}; st.sel.clear();
+                        toast(`${d.movidas} placa${d.movidas === 1 ? '' : 's'} en ${loteNom(Number(sel.value))}${d.tarjetas && d.tarjetas.length ? ` · tarjetas ${d.tarjetas.join(', ')}` : ''}`, { kind: 'ok' });
+                        ctx.invalidar && ctx.invalidar(); ctx.actualizar(); return true;
+                    } }] });
+            }
             function eliminarMasa() {
                 const ids = [...st.sel]; const items = st.pcbs.filter((p) => st.sel.has(p.id)); const err = h('div', { class: 'hint err', role: 'alert' });
                 const asignadas = items.filter((p) => p.estado_ciclo === 'ASIGNADA').length;
@@ -162,13 +201,13 @@
                 try { st.pcbs = await ctx.pcbs(); st.error = ''; } catch (e) { st.error = e.message; }
                 if (st.error && !st.pcbs) { tw.replaceChildren(util.errorBox(st.error, () => cargar(true))); return; }
                 const ids = new Set(st.pcbs.map((p) => p.id)); [...st.sel].forEach((i) => { if (!ids.has(i)) st.sel.delete(i); });
-                opcionesVersion(); lista();
+                opcionesVersion(); opcionesLote(); lista();
             }
 
             host.append(
                 h('div', { class: 'esc-bar' },
                     h('div', { class: 'esc-buscar' }, icon('search'), q),
-                    h('div', { class: 'esc-seg', role: 'group', 'aria-label': 'Tipo de placa' }, segBtns), selCiclo, selVer,
+                    h('div', { class: 'esc-seg', role: 'group', 'aria-label': 'Tipo de placa' }, segBtns), selCiclo, selVer, selLote,
                     h('label', { class: 'esc-chk', for: 'invSinMac' }, chkMac, 'Solo sin MAC'), h('div', { class: 'grow' }), info),
                 barSel, tw);
             cargar(true);

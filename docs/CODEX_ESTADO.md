@@ -1,7 +1,12 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-21 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.24; producción en 1.4.13 hasta que se despliegue)
+Commit de referencia: ver `git log` de main (v1.4.25; producción en 1.4.24)
+
+## v1.4.25 (2026-10-21, Claude Code, rama feat/mover-a-lote)
+- `inv.mover_a_lote` + `POST /api/pcb/mover-lote` (modelo `MoverALote`): todo o nada, tarjetas de otro lote solo con `con_tarjetas`, choque de número = 409. Evento único `LOTE_MOVIDO` (registrado en `admin_ops.EVENTOS`, categoría edición; ningún tablero filtra eventos por patrón). Aviso WS: se reutilizan `PCB_ACTUALIZADA` y `TARJETA_ACTUALIZADA` (sin evento nuevo).
+- sec_inventario.js: filtro/columna Lote (`recibida_lote_id`), acción «Mover a lote». common.js/sec_lotes.js: «Usar este lote» para todos menos consultor y textos de lote por cuenta. Recibir: chip `btnLote` reutiliza `T.openLotes(shell)`.
+- Evidencia: tests nuevos en test_lote_por_usuario (mover sueltas, tarjetas con confirmación, choque, un solo evento); suite 825: solo los 3 errores previos. Sin prueba visual. Producción: el usuario confirmó v1.4.24 desplegada.
 
 ## v1.4.24 (2026-10-21, Claude Code, rama fix/lote-por-usuario)
 - Lote por usuario: `db.USUARIO_LOTE` (ContextVar) lo fija `_exigir_sesion` en main.py; `get_active_lote`/`list_lotes`/`set_active_lote`/`create_lote` usan `ajustes['lote_usuario:<correo>']`; sin usuario, el global de siempre. `resolver_lote_id` hereda el lote del usuario (recepción, emparejar, Excel, correo…). El WS no tiene usuario: su `lote_activo` inicial es el global.

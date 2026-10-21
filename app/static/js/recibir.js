@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const $ = (id) => document.getElementById(id);
 
     T.hydrateIcons();
-    T.mountShell({ active: 'recibir', sub: 'Recepción' });
+    const shell = T.mountShell({ active: 'recibir', sub: 'Recepción' });
 
     const state = {
         items: [],              // borrador confirmado por el servidor (RECIBIDA)
@@ -490,6 +490,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     $('btnManual').addEventListener('click', openManual);
+    // v1.4.25: a la vista el lote (propio de la cuenta) en el que quedan las placas; abre la misma hoja de lotes del encabezado
+    $('btnLote').addEventListener('click', () => T.openLotes(shell));
+    api('/api/status').then((r) => { if (r.ok && r.data && r.data.active_lote) $('loteChip').textContent = 'Lote ' + T.loteNombre(r.data.active_lote); });
 
     // ------------------------------------------------------------------ confirmar el lote
     $('btnConfirm').addEventListener('click', () => {

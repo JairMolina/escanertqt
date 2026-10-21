@@ -31,6 +31,7 @@ from app.database.models import (
     TarjetaDatos,
     TarjetaNueva,
     VersionMasiva,
+    MoverALote,
 )
 from app.routers.ws import manager
 from app.services import cable_r3_auto, inventario_tqtr, firmware_build, esp32_firmware, usuarios
@@ -166,6 +167,15 @@ async def pcb_version_masiva(payload: VersionMasiva):
     resultado = await _run(inv.cambiar_version_masiva, payload.ids, payload.version, payload.operador)
     if resultado["pcbs"]:
         await manager.broadcast("PCB_ACTUALIZADA", {"pcbs": resultado["pcbs"], "pcb": resultado["pcbs"][-1], "conteos": await run_in_threadpool(_conteos)})
+    return resultado
+
+
+@router.post("/pcb/mover-lote", summary="Mover varias PCB (y, si se confirma, sus tarjetas) a otro lote")
+async def pcb_mover_lote(payload: MoverALote):
+    resultado = await _run(inv.mover_a_lote, payload.ids, payload.lote_id, payload.con_tarjetas, payload.operador)
+    await manager.broadcast("PCB_ACTUALIZADA", {"pcbs": resultado["pcbs"], "pcb": resultado["pcbs"][-1], "conteos": await run_in_threadpool(_conteos)})
+    if resultado["tarjetas"]:
+        await manager.broadcast("TARJETA_ACTUALIZADA", {"lote_id": payload.lote_id, "tarjetas": resultado["tarjetas"]})   # mismo aviso que una edición
     return resultado
 
 

@@ -18,13 +18,13 @@
                 ocupado = false;
                 if (r.status === 401 && T.acceso.rol && T.acceso.rol !== 'administrador') { pintar(); T.avisoAcceso('lotes'); return; }   // v1.3.42
                 if (!r.ok) { error = r.status === 401 ? 'Tu sesión de supervisor caducó. Entra otra vez para usar este lote.' : r.error; pintar(); return; }
-                error = ''; toast(`Lote ${T.loteNombre(l)} activo para todos los celulares`, { kind: 'ok' });
+                error = ''; toast(`Ahora trabajas en el lote ${T.loteNombre(l)}`, { kind: 'ok' });
                 await ctx.recargarLotes(); ctx.seleccionarLote(l.id); pintar();
             }
             function pintar() {
                 const lotes = ctx.lotes(); const sel = ctx.lote();
                 cont.replaceChildren();
-                cont.append(h('div', { class: 'esc-bar' }, h('p', { class: 'muted grow' }, 'El lote activo es el que usan todos los celulares. "Ver" cambia solo lo que muestra esta consola.'),
+                cont.append(h('div', { class: 'esc-bar' }, h('p', { class: 'muted grow' }, 'El lote activo es el tuyo (cada cuenta tiene el suyo): ahí queda lo que recibes y emparejas. "Ver" cambia solo lo que muestra esta consola.'),
                     h('button', { class: 'btn btn-primary', type: 'button', onclick: () => ctx.hojaLotes() }, icon('plus'), 'Usar o crear lote…')));
                 if (error) cont.append(T.banner('bad', 'alert', error));
                 if (!lotes.length) { cont.append(T.empty('layers', 'Todavía no hay lotes', 'Crea el primero con "Usar o crear lote".')); return; }

@@ -165,6 +165,7 @@ EVENTOS: Dict[str, tuple] = {
     "LOTE_CREADO": ("alta", "Lote creado"),
     "PCB_EDITADA": ("edicion", "Placa editada"),
     "VERSION_MASIVA": ("edicion", "Versión de hardware cambiada"),
+    "LOTE_MOVIDO": ("edicion", "Placas o tarjetas movidas de lote"),   # v1.4.25: único evento de «Mover a lote»
     "MAC_GUARDADA": ("edicion", "MAC guardada"),
     "FIRMWARE_GUARDADO": ("edicion", "Firmware guardado"),
     "FIRMWARE_CATALOGO": ("edicion", "Catálogo de firmware"),

@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.25 — 2026-10-21
+- **Inventario PCB — «Mover a lote»:** con una o varias placas seleccionadas se elige el lote destino. Las sueltas cambian de lote; si alguna está montada en una tarjeta de otro lote, la hoja lo avisa y solo se mueve marcando «Mover también esas tarjetas completas» (sus 3 placas y sus pruebas). Si el destino ya tiene una tarjeta con ese número no se mueve nada. Queda en la bitácora como «Placas o tarjetas movidas de lote» (evento único `LOTE_MOVIDO`).
+- **Inventario PCB — filtro y columna «Lote»:** lote en el que se recibió cada placa («Sin lote» = recibidas antes de v1.4.24).
+- **Cualquier cuenta elige su lote:** «Usar este lote» ya no es solo para administradores (excepto consultor); los textos dicen que el lote es propio de la cuenta.
+- **Recibir muestra el lote:** chip «Lote …» junto a la versión; abre la misma hoja de lotes del encabezado.
+
 ## v1.4.24 — 2026-10-21
 - **Cada usuario trabaja en su lote:** elegir o crear un lote ya no cambia el lote de los demás. La elección se guarda por cuenta; quien no ha elegido uno sigue en el lote general, que solo cambia sin sesión (tareas internas) o si aún no había ninguno activo. «Activo» en la lista de lotes es el lote propio, y el escritorio ya no anuncia «Cambió el lote activo» por el cambio de otro usuario.
 - **Las placas recibidas guardan su lote:** cada alta en Recibir (QR o sin QR) registra el lote del usuario (`pcb_inventario.lote_id`, nueva columna que se agrega sola; las anteriores quedan sin lote). `GET /api/pcb?lote_id=` lista las recibidas en un lote. El emparejado sigue usando todas las disponibles (también las sobrantes de otros lotes).

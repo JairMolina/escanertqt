@@ -468,6 +468,14 @@ class VersionMasiva(BaseModel):
     operador: Optional[str] = Field(None, max_length=60)
 
 
+class MoverALote(BaseModel):
+    """v1.4.25: «Mover a lote» de Inventario PCB."""
+    ids: List[int] = Field(..., min_length=1, max_length=2000)
+    lote_id: int = Field(..., ge=1, le=2**31)
+    con_tarjetas: bool = False  # mover también las tarjetas (de otro lote) donde están montadas
+    operador: Optional[str] = Field(None, max_length=60)
+
+
 class AjustesUpdate(BaseModel):
     version_defecto: str = Field(..., max_length=5)
 
