@@ -269,6 +269,7 @@
       h("div", { class: "row wrap" }, bleOn, bleOff), nativeInfo, nativeInstall, bleHint, manualOut);
     const historyPanel = h("section", { class: "prog-panel tqt-card tqt-history-panel" },
       h("h3", null, "Historial de la tarjeta seleccionada"), historyHost);
+    historyPanel.hidden = true;   // v1.4.20: bajo «Elige una tarjeta», solo con una tarjeta elegida
     // v1.4.19: tarjeta arriba; intro + serial apilados en una columna; Bluetooth al lado
     const cardPanel = h("section", { class: "prog-panel tqt-card tqt-pick-panel" },
       h("h3", null, "Elige una tarjeta"),
@@ -276,9 +277,9 @@
       h("div", { class: "tqt-pick-row" }, search, button("Cargar QR / código", () => scan(search.value))),
       cardList, moreBtn);
     host.append(
-      h("div", { class: "tqt-header" }, cardPanel,
+      h("div", { class: "tqt-header" }, h("div", { class: "tqt-stack" }, cardPanel, historyPanel),
         h("section", { class: "prog-panel tqt-card tqt-inventory-panel" }, h("h3", null, "R1 y R2 · datos del inventario"), cardHost),
-        h("div", { class: "tqt-stack" }, introPanel, serialPanel, historyPanel), blePanel),
+        h("div", { class: "tqt-stack" }, introPanel, serialPanel), blePanel),
       status, announcer,
       h("div", { class: "tqt-layout tqt-layout-full" },
         h("div", { class: "tqt-col tqt-main" }, summary,
@@ -381,6 +382,7 @@
       }
       const my = ++selSeq;
       tarjeta = t;
+      historyPanel.hidden = !t;
       card = null;
       markSelected();
       cardHost.replaceChildren(h("p", { class: "hint" }, "Cargando tarjeta " + cardNum(t) + "…"));

@@ -270,3 +270,6 @@
     .tqt-header .btn { min-height: 44px; }
     .tqt-cards { max-height: 300px; }
 }
+
+/* v1.4.20: historial bajo «Elige una tarjeta»; [hidden] gana a display:flex de .tqt-stack > section */
+.tqt-stack > section[hidden] { display: none; }
