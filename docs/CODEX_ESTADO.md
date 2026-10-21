@@ -1,7 +1,7 @@
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-21 (Claude Code)
-Commit de referencia: ver `git log` de main (v1.4.25; producción en 1.4.24)
+Commit de referencia: ver `git log` de main (v1.4.25 `a119776`; producción en 1.4.25, confirmado 2026-10-21)
 
 ## v1.4.25 (2026-10-21, Claude Code, rama feat/mover-a-lote)
 - `inv.mover_a_lote` + `POST /api/pcb/mover-lote` (modelo `MoverALote`): todo o nada, tarjetas de otro lote solo con `con_tarjetas`, choque de número = 409. Evento único `LOTE_MOVIDO` (registrado en `admin_ops.EVENTOS`, categoría edición; ningún tablero filtra eventos por patrón). Aviso WS: se reutilizan `PCB_ACTUALIZADA` y `TARJETA_ACTUALIZADA` (sin evento nuevo).
