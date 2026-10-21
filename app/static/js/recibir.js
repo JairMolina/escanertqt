@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
         known: new Map(),       // nombre -> pcb (todo el inventario) para detectar repetidas al instante
         huecos: {}, avisos: [],
         version: T.VERSION_DEFAULT,
+        especial: null,         // v1.4.22: {version, tipo} del «Lote especial» (QR sin formato TQT-Rx-Vxx-nnnn)
         seq: 0,
     };
 
@@ -139,6 +140,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionSeen = new Set();
 
     function onCode(text) {
+        if (state.especial) {   // lote especial: el QR se traduce al nombre canónico con la versión elegida
+            const nombre = nombreEspecial(text);
+            if (!nombre) {
+                window.SoundFX.playError(); window.Haptics.error();
+                showRead({ kind: 'bad', msg: state.especial.tipo ? 'El QR no trae un número' : 'No se ve el tipo: fija R1, R2 o R3 en Lote especial', name: text.length > 40 ? text.slice(0, 40) + '…' : text });
+                return;
+            }
+            text = nombre;
+        }
         const parsed = T.parseNombre(text);
         if (!parsed) {
             window.SoundFX.playError(); window.Haptics.error();
@@ -159,6 +169,57 @@ document.addEventListener('DOMContentLoaded', () => {
         ensureListBox(); renderList();
         send(item);
     }
+
+    // v1.4.22: «Lote especial» para placas cuyo QR no sigue TQT-Rx-Vxx-nnnn (p. ej. 'TQT_R2_0008', 'TQT_Timer_0033').
+    // Mientras está activo, de cada lectura se toma el tipo (R1/R2/R3 o Timer = R3; si no viene, el tipo fijado) y el
+    // número (último grupo de 1 a 4 dígitos), y se registra con la versión elegida. Se envía el nombre canónico al servidor.
+    function nombreEspecial(text) {
+        const e = state.especial, raw = String(text || '');
+        const mt = /(?:^|[^A-Za-z0-9])R[\s_-]*([123])(?![0-9])/i.exec(raw);
+        const tipo = mt ? 'R' + mt[1] : /TIMER/i.test(raw) ? 'R3' : e.tipo;
+        const ms = /(?:^|[^0-9])([0-9]{1,4})[^0-9]*$/.exec(raw);
+        if (!tipo || !ms || !Number(ms[1])) return null;
+        return T.nombreDe(tipo, e.version, ms[1]);
+    }
+    function pintarEspecial() {
+        const e = state.especial, b = $('btnEspecial');
+        b.setAttribute('aria-pressed', e ? 'true' : 'false');
+        b.classList.toggle('btn-primary', !!e);
+        $('espLbl').textContent = e ? `Lote especial V${e.version}${e.tipo ? ' · ' + e.tipo : ''}` : 'Lote especial';
+        if (e) showRead({ idle: true, msg: `Lote especial activo: todo se registra como V${e.version}` });
+    }
+    $('btnEspecial').addEventListener('click', () => {
+        const e = state.especial;
+        let tipo = e ? e.tipo : '';
+        const inp = h('input', { class: 'input mono', id: 'espVer', inputmode: 'numeric', maxlength: 3, value: e ? e.version : '10', 'aria-label': 'Versión del lote especial' });
+        inp.addEventListener('input', () => { inp.value = inp.value.replace(/\D/g, ''); });
+        const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Tipo de placa' });
+        const pintarSeg = () => seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x.dataset.t === tipo ? 'true' : 'false'));
+        [['', 'Del QR'], ['R1', 'R1'], ['R2', 'R2'], ['R3', 'R3']].forEach(([t, l]) => seg.appendChild(
+            h('button', { type: 'button', 'data-t': t, onclick: () => { tipo = t; pintarSeg(); } }, l)));
+        pintarSeg();
+        const err = h('div', { class: 'hint err', role: 'alert' });
+        sheet({
+            title: 'Lote especial',
+            body: [
+                h('p', { class: 'muted' }, 'Para placas cuyo QR no trae el formato TQT-R1-V30-0021 (por ejemplo TQT_R2_0008 o TQT_Timer_0033). Mientras esté activo, cada QR se registra con el número que trae y la versión de abajo.'),
+                h('div', { class: 'field' }, h('label', { for: 'espVer' }, 'Versión de hardware del lote (V)'), inp),
+                h('div', { class: 'field' }, h('label', null, 'Tipo'), seg,
+                    h('p', { class: 'hint' }, '«Del QR» toma R1, R2 o R3 (Timer = R3) del código. Fija un tipo si el QR solo trae el número.')),
+                err,
+            ],
+            actions: [
+                ...(e ? [{ label: 'Desactivar', kind: 'ghost', onClick: () => { state.especial = null; pintarEspecial(); showRead({ idle: true, msg: 'Lote especial desactivado' }); return true; } }] : [{ label: 'Cancelar', kind: 'ghost', onClick: () => true }]),
+                { label: e ? 'Guardar' : 'Activar', kind: 'primary', onClick: () => {
+                    const v = String(Number(inp.value || 0));
+                    if (!Number(v)) { err.textContent = 'Escribe una versión (por ejemplo 10)'; return false; }
+                    state.especial = { version: v, tipo };
+                    verOk.add(v);   // la versión del lote especial no pregunta «¿lote nuevo?» en cada lectura
+                    pintarEspecial(); return true;
+                } },
+            ],
+        });
+    });
 
     // v1.4.21: un QR de formato desconocido que trae un número (último grupo de 1 a 4 dígitos) se registra eligiendo el tipo a mano
     const comoDescartados = new Set();   // textos que el operador ya descartó: el visor no vuelve a preguntar

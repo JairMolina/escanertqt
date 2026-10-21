@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.22 — 2026-10-21
+- **Recibir — botón «Lote especial»:** para lotes cuyo QR no trae el formato TQT-R1-V30-0021. Se elige la versión del lote (V10 por defecto) y el tipo («Del QR»: R1/R2/R3 o Timer = R3; o fijo si el QR solo trae el número). Mientras está activo, cada QR se registra con su número y esa versión, sin preguntar «¿lote nuevo?». El botón muestra el modo activo y se desactiva desde el mismo botón.
+
 ## v1.4.21 — 2026-10-21
 - **Recibir acepta los QR de las primeras placas:** `TQT_R2_0008` (sin versión) se registra como V10 y `TQT_Timer_0033` como R3 (Timer = R3). Mismo patrón en el celular y en el servidor; también lo usa la captura de MAC. Una «V» mal escrita (`V-`, `V3A`) sigue siendo inválida.
 - **«¿Qué placa es?» para formatos desconocidos:** si un QR no se reconoce pero trae un número, en lugar de solo «Código no reconocido» se ofrece registrarla eligiendo R1, R2 o R3 (con la versión de la recepción actual). Cancelar no vuelve a preguntar por ese mismo código.
