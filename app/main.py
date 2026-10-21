@@ -21,7 +21,7 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station, esp32, dymo_remoto, plataforma, activos
+from app.routers import test_station, esp32, dymo_remoto, plataforma, activos, tpms
 from app.ssl_cert import ensure_ssl_certificates
 from app import modulos as modulos_cat
 
@@ -269,6 +269,7 @@ app.include_router(test_station.agent_router)
 app.include_router(dymo_remoto.router)   # v1.4.2: DYMO compartida (Raspberry)
 app.include_router(plataforma.router)   # v1.4.12: cuentas por módulo desde el portal
 app.include_router(activos.router)      # v1.4.14: módulo Impresora (activos con etiqueta DYMO + QR)
+app.include_router(tpms.router)         # v1.4.27: módulo TPMS
 
 
 def _pagina_acceso(request: Request, archivo: str) -> HTMLResponse:

@@ -60,6 +60,7 @@
                     <span class="origen" id="uOrigen"></span>
                 </div>
                 <p class="codigo" id="uCodigo" aria-live="polite">Aún no hay lecturas</p>
+                <p class="estado" id="uEstado" role="status" hidden></p>
                 <div class="ult-pie">
                     <span class="hora mono" id="uHora"></span>
                     <button class="btn" type="button" id="bCopiar" disabled><i class="svg-slot" data-i="paste"></i>Copiar código</button>
@@ -68,12 +69,17 @@
 
             <form class="manual" id="fManual" novalidate>
                 <div class="field">
+                    <label for="loteTpms">Lote</label>
+                    <input class="input" id="loteTpms" type="text" autocomplete="off" maxlength="60" placeholder="Ej. Marzo 2026" aria-describedby="loteAyuda">
+                    <p class="ayuda" id="loteAyuda">Las placas que registres desde este dispositivo quedan en este lote. Déjalo vacío si no aplica.</p>
+                </div>
+                <div class="field">
                     <label for="manCod">Escribir código</label>
                     <div class="man-fila">
                         <input class="input mono" id="manCod" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="300" enterkeyhint="done" aria-describedby="manAyuda">
                         <button class="btn" type="submit" id="bManual">Añadir</button>
                     </div>
-                    <p class="ayuda" id="manAyuda">Si el QR está dañado, teclea el código impreso o usa un lector USB con este campo enfocado.</p>
+                    <p class="ayuda" id="manAyuda">Si el QR está dañado, teclea la serie impresa (ej. 0004, se toma como TPMS V1) o el código completo, o usa un lector USB con este campo enfocado.</p>
                 </div>
             </form>
 

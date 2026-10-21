@@ -162,12 +162,39 @@ VERSION_SIN_MARCA = "10"   # QR sin versión: las primeras placas (V1.0) no la t
 _SOLO_NUMERO = re.compile(r"^\d{1,4}$", re.A)
 
 
+# v1.4.27: placas TPMS. Las primeras (PCB TPMS V1, 24/03/2026) traen por error la plantilla de la R3 Timer con GUIONES
+# ('PCB_TQT-R3_V2_0_TIMER-0004'); la R3 Timer real usa guiones bajos ('PCB_TQT_R3_V2_0_TIMER_0073') y sigue siendo TQT.
+# Formato propio esperado: 'TPMS_V1_0004' / 'PCB_TPMS-V1-0004' (versión opcional = V1).
+_TPMS_PLANTILLA_R3 = re.compile(r"^(?:PCB_)?TQT-R3_V2_0_TIMER-(\d{1,4})$", re.I | re.A)
+_TPMS_REGEX = re.compile(r"^(?:PCB[\s_\-]*)?TPMS(?:[\s_\-]*V(\d{1,2})(?:[._](\d))?)?[\s_\-]+(\d{1,4})$", re.I | re.A)
+
+
+def parse_tpms(texto: Optional[str]) -> Optional[Dict[str, str]]:
+    """QR de placa TPMS → {version, serie, nombre:'TPMS-V1-0004'} o None. V1.0 == V1."""
+    raw = (texto or "").strip()
+    m = _TPMS_PLANTILLA_R3.match(raw)
+    if m:
+        mayor, menor, serie = "1", None, m.group(1)
+    else:
+        m = _TPMS_REGEX.match(raw)
+        if not m:
+            return None
+        mayor, menor, serie = m.group(1) or "1", m.group(2), m.group(3)
+    if not int(mayor) or not int(serie):   # V0 o serie 0000 no existen
+        return None
+    version = f"{int(mayor)}.{menor}" if menor and menor != "0" else str(int(mayor))
+    serie = serie.zfill(4)
+    return {"version": version, "serie": serie, "nombre": f"TPMS-V{version}-{serie}"}
+
+
 def parse_tarjeta_code(texto: Optional[str], tipo_esperado: Optional[str] = None,
                        version_ref: str = VERSION_DEFAULT) -> Optional[Dict[str, str]]:
     """Interpreta 'TQT-R1-V30-0011' (tolera espacios, guiones bajos y minúsculas).
     Para respaldo (tipo_esperado='R2') acepta además solo el número asignado ('11').
     Devuelve {tipo, version, numero, nombre} canónicos o None si no es una tarjeta TQT."""
     raw = (texto or "").strip()
+    if parse_tpms(raw):   # v1.4.27: placa TPMS, no es de Escáner TQT
+        return None
     m = _TARJETA_REGEX.search(raw)
     if m:
         tipo = f"R{m.group(1) or '3'}"

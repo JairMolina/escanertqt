@@ -47,7 +47,7 @@ TPMS = "tpms"
 # tener CUALQUIER módulo; lo demás que no es de otro módulo es de Escáner TQT (la app original).
 _RUTAS_MODULO = (
     (IMPRESORA, ("/impresora", "/static/impresora.html", "/api/activos", "/static/js/impresora", "/static/css/impresora")),
-    (TPMS, ("/tpms", "/static/tpms.html", "/static/js/tpms", "/static/css/tpms")),   # v1.4.27
+    (TPMS, ("/tpms", "/api/tpms", "/static/tpms.html", "/static/js/tpms", "/static/css/tpms")),   # v1.4.27
 )
 _COMPARTIDAS = ("/escaner", "/static/escaner.html", "/api/escaner/", "/ws", "/api/auth/", "/api/plataforma/", "/api/config",
                 "/api/status", "/static/js/common.js", "/static/js/escaner.js", "/static/js/visor.js", "/static/js/vendor/",

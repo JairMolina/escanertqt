@@ -1,4 +1,4 @@
-/* tpms.js - Módulo TPMS: ventana de escaneo de QR con cámara (por ahora sin backend propio).
+/* tpms.js - Módulo TPMS: escaneo de QR con cámara y alta de placas TPMS (POST /api/tpms/escanear, v1.4.27).
  * Reutiliza el visor compartido (visor.js + scanner.js + jsQR), sonido (audio.js) y vibración/anillo (haptics.js).
  * El historial vive en sessionStorage de esta pestaña y se borra al cerrar sesión (cerrarSesion limpia sessionStorage). */
 (function () {
@@ -76,9 +76,27 @@
         $('hCuenta').textContent = hist.length ? `(${hist.length})` : '';
     }
 
+    // ------------------------------------------------------------------ lote (por dispositivo) y alta en el servidor
+    const CLAVE_LOTE = 'tqt.tpms.lote', inLote = $('loteTpms');
+    try { inLote.value = localStorage.getItem(CLAVE_LOTE) || ''; } catch (e) { /* nada */ }
+    inLote.addEventListener('change', () => { try { localStorage.setItem(CLAVE_LOTE, inLote.value.trim()); } catch (e) { /* nada */ } });
+    const RES = { AGREGADA: ['ok', 'registrada'], REPETIDA: ['warn', 'ya estaba registrada'], INVALIDA: ['bad', ''] };
+    function pintaEstado(k, txt) { const e = $('uEstado'); e.hidden = !txt; e.dataset.k = k; e.textContent = txt; }
+
+    async function darDeAlta(codigo) {
+        pintaEstado('', 'Registrando…');
+        const r = await api('/api/tpms/escanear', { method: 'POST', body: { codigo, lote: inLote.value.trim() } });
+        if (hist[0] && hist[0].codigo !== codigo) return;   // ya llegó otra lectura
+        if (!r.ok) { pintaEstado('bad', r.error || 'No se pudo registrar. Revisa la conexión e inténtalo otra vez.'); if (window.SoundFX) window.SoundFX.playError(); return; }
+        const d = r.data || {}, [k, txt] = RES[d.resultado] || ['bad', ''];
+        pintaEstado(k, d.pcb ? `${d.pcb.nombre} · ${txt}${d.pcb.lote ? ' · lote ' + d.pcb.lote : ''}` : d.mensaje);
+        if (k === 'bad') { if (window.SoundFX) window.SoundFX.playError(); if (window.Haptics) window.Haptics.error(); }
+    }
+
     /** Registra una lectura: si ya estaba, sube al inicio y cuenta otra vez (aviso de repetido). */
     function registrar(texto, origen) {
-        const codigo = String(texto || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 300);
+        let codigo = String(texto || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 300);
+        if (origen === 'manual' && /^[0-9]{1,4}$/.test(codigo)) codigo = 'TPMS_V1_' + codigo.padStart(4, '0');   // solo la serie
         if (!codigo) return false;
         const i = hist.findIndex((x) => x.codigo === codigo);
         const previo = i >= 0 ? hist.splice(i, 1)[0] : null;
@@ -93,6 +111,7 @@
             if (window.SoundFX) window.SoundFX.playScan('R2');
             if (window.Haptics) window.Haptics.scan();
         }
+        darDeAlta(codigo);
         return true;
     }
 

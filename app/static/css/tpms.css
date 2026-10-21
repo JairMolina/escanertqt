@@ -98,6 +98,11 @@ body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text);
 .man-fila .input { flex: 1; min-width: 0; min-height: 52px; font-size: 16px; border-radius: var(--tp-rad); background: var(--campo); border-color: var(--line-2); }
 .man-fila .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 .man-fila .btn { min-height: 52px; }
+.ultimo .estado { margin: 4px 0 0; font-weight: 600; font-size: 15px; line-height: 1.4; }
+.ultimo .estado[data-k="ok"] { color: var(--ok); }
+.ultimo .estado[data-k="warn"] { color: var(--warn); }
+.ultimo .estado[data-k="bad"] { color: var(--bad); }
+.manual .field + .field { margin-top: 14px; }
 .manual .ayuda { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
 
 /* ---------- historial ---------- */

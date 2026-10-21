@@ -22,6 +22,7 @@ from app.database.models import (
     VERSION_DEFAULT,
     extract_mac,
     parse_tarjeta_code,
+    parse_tpms,
 )
 
 _COL_RANURA = {"R1": "pcb_r1_id", "R2": "pcb_r2_id", "R3": "pcb_r3_id"}
@@ -395,6 +396,9 @@ def escanear_pcb(codigo: str, operador: Optional[str] = None, tipo_forzado: Opti
             parsed = parsear_qr(codigo, tipo_forzado, version, get_version_defecto(conn))
         except ValueError as e:
             return {"resultado": "INVALIDA", "mensaje": str(e), "pcb": None, "conteos": conteos_recepcion(conn, sesion)}
+        if not parsed and parse_tpms(codigo):   # v1.4.27
+            return {"resultado": "INVALIDA", "mensaje": f"{parse_tpms(codigo)['nombre']} es una placa TPMS: regístrala en el módulo TPMS.",
+                    "pcb": None, "conteos": conteos_recepcion(conn, sesion)}
         if not parsed:
             return {"resultado": "INVALIDA",
                     "mensaje": f"'{(codigo or '')[:40]}' no es un QR de PCB TQT (ej. TQT-R1-V30-0011)",

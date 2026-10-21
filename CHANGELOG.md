@@ -2,6 +2,8 @@
 
 ## v1.4.27 — 2026-10-21
 - **Módulo TPMS disponible:** nueva identidad naranja, inicio de sesión propio en `/tpms/acceso` (misma cuenta que el resto de la plataforma) y página `/tpms` que por ahora es una ventana de escaneo de QR con cámara, entrada manual e historial de la sesión. Los permisos por módulo y las invitaciones ya lo incluían.
+- **Placas TPMS por QR:** `/tpms` registra cada placa (tabla propia `tpms_pcb`: versión, serie, lote de texto libre, quién y cuándo) y avisa si ya estaba. Las PCB TPMS V1 traen por error la plantilla de la R3 Timer con guiones (`PCB_TQT-R3_V2_0_TIMER-0004`) y se registran como **TPMS-V1-0004**; también se acepta el formato propio `TPMS_V1_0004` y, a mano, solo la serie. La R3 Timer real (`PCB_TQT_R3_V2_0_TIMER_0073`, con guiones bajos; hay dos en producción) sigue siendo de Escáner TQT.
+- **Escáner TQT rechaza las placas TPMS:** Recibir muestra «Placa TPMS: regístrala en el módulo TPMS» y no ofrece «¿Qué placa es?», para que no entren como R3 V20. Las placas TPMS no escriben en los eventos de Escáner TQT, así que no cuentan en sus tableros.
 - **Escáner TQT — ya no se queda el JS viejo tras desplegar:** las páginas ponían `?v=` a mano en sus scripts y algunos llevaban meses sin cambiar (Inventario PCB seguía en `?v=1352`), así que Cloudflare/el navegador servían la versión anterior: por eso el filtro de hardware seguía mostrando «[object HTMLOptionElement]» y pocas versiones. Ahora el servidor sirve cada JS/CSS con la versión actual de la app.
 - **Lotes cuentan sus placas:** la lista de lotes (consola, hoja de lotes y sección Lotes) muestra «N tarjetas · M placas»; antes un lote al que se movieron placas sueltas aparecía vacío porque solo contaba tarjetas. «Mover a lote» refresca el conteo al momento.
 

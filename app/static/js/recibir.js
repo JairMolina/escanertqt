@@ -157,6 +157,11 @@ document.addEventListener('DOMContentLoaded', () => {
             text = nombre;
         }
         const parsed = T.parseNombre(text);
+        if (!parsed && T.esTpms(text)) {   // v1.4.27: placa TPMS; no se ofrece «¿Qué placa es?» para no darla de alta como TQT
+            window.SoundFX.playError(); window.Haptics.error();
+            showRead({ kind: 'bad', msg: 'Placa TPMS: regístrala en el módulo TPMS', name: text.length > 40 ? text.slice(0, 40) + '…' : text });
+            return;
+        }
         if (!parsed) {
             window.SoundFX.playError(); window.Haptics.error();
             showRead({ kind: 'bad', msg: 'Código no reconocido', name: text.length > 40 ? text.slice(0, 40) + '…' : text });

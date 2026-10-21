@@ -108,7 +108,12 @@
     const VERSION_DEFAULT = '30';
 
     /** {tipo:'R3', version:'30', serie:'0084', nombre:'TQT-R3-V30-0084'} o null. */
+    // v1.4.27: placas TPMS (espejo de models.parse_tpms). Las V1 traen la plantilla de la R3 Timer CON GUIONES
+    // ('PCB_TQT-R3_V2_0_TIMER-0004'); la R3 Timer real va con guiones bajos y sigue siendo TQT.
+    const TPMS_RE = [/^(?:PCB_)?TQT-R3_V2_0_TIMER-[0-9]{1,4}$/i, /^(?:PCB[\s_-]*)?TPMS(?:[\s_-]*V[0-9]{1,2}(?:[._][0-9])?)?[\s_-]+[0-9]{1,4}$/i];
+    const esTpms = (raw) => { const s = String(raw || '').trim(); return TPMS_RE.some((r) => r.test(s)); };
     function parseNombre(raw) {
+        if (esTpms(raw)) return null;   // no es de Escáner TQT
         const m = NOMBRE_RE.exec(String(raw || ''));
         if (!m) return null;
         const ver = m[3] ? m[3].replace(/\D/g, '') : VERSION_SIN_MARCA, tipo = m[1] || '3';
@@ -846,7 +851,7 @@
 
     window.TQT = {
         versionP,
-        hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
+        hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, esTpms, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
         loteNombre, loteConteo, ordenarLotes, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,
