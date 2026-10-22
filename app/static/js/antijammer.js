@@ -201,11 +201,12 @@
         return v && v.def.escaneo ? v.def.escaneo(codigo) : null;
     }
 
-    /** Código de otro producto (Escáner TQT, TPMS o SpeedLocker) → mensaje de rechazo; '' si puede ser de Skudo AntiJammer.
+    /** Código de otro producto (Escáner TQT, TPMS, SpeedLocker o Skudo Sigfox) → mensaje de rechazo; '' si puede ser de Skudo AntiJammer.
      *  El servidor también lo rechaza; esto solo da un aviso claro sin esperar la red. */
     function ajeno(codigo) {
         const c = String(codigo || '').trim();
         if (!c || (T.esAntijammer && T.esAntijammer(c))) return '';
+        if (T.esSigfox && T.esSigfox(c)) return `${c} es una placa Skudo Sigfox: regístrala en el módulo Skudo Sigfox, no en Skudo AntiJammer.`;   // v1.4.33
         if (T.esSpeedlocker && T.esSpeedlocker(c)) return `${c} es una placa SpeedLocker: regístrala en el módulo SpeedLocker, no en Skudo AntiJammer.`;   // v1.4.32
         if (T.esTpms && T.esTpms(c)) return `${c} es una placa TPMS: regístrala en el módulo TPMS, no en Skudo AntiJammer.`;
         if (T.parseNombre && T.parseNombre(c)) return `${c} es una tarjeta de Escáner TQT: regístrala en Escáner TQT, no en Skudo AntiJammer.`;

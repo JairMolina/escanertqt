@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.33 — 2026-10-22
+- **Nuevo módulo Skudo Sigfox** (morado #A855F7), disponible en el portal: consola en `/sigfox` y acceso propio en `/sigfox/acceso`, clon de SpeedLocker (pestañas, filtros, operaciones en masa, movimientos, Excel `SkudoSigfox_placas_AAAAMMDD.xlsx` y botón de escaneo). API `/api/sigfox/*` (misma forma que `/api/speedlocker/*`) y tablas propias `sigfox_pcb` / `sigfox_eventos`.
+- **QR de placa (provisional, falta foto del real):** `SF-0001` / `SF_0001` se registra como `SF-V1-0001` (sin versión = V1, `models.VERSION_SIGFOX`); acepta también `SKUDO-SIGFOX-…`, `SIGFOX-…`, espacios, minúsculas, prefijo PCB y solo la serie.
+- Escáner TQT, TPMS, Skudo AntiJammer y SpeedLocker **rechazan** placas Sigfox con aviso para registrarlas en su módulo; Sigfox rechaza las de los cuatro.
+
 ## v1.4.32 — 2026-10-22
 - **Nuevo módulo SpeedLocker** (azul celeste #38BDF8), disponible en el portal: consola en `/speedlocker` y acceso propio en `/speedlocker/acceso`, clon de Skudo AntiJammer (pestañas, filtros, operaciones en masa, movimientos, Excel `SpeedLocker_placas_AAAAMMDD.xlsx` y botón de escaneo). API `/api/speedlocker/*` (misma forma que `/api/antijammer/*`) y tablas propias `speedlocker_pcb` / `speedlocker_eventos`.
 - **QR de placa:** el real es `SL-0024` y se registra como `SL-V2-0024` (la placa es hardware V2.0; sin versión en el QR = V2); acepta también `SL_0001`, `SPEEDLOCKER-…`, espacios, minúsculas, prefijo PCB y solo la serie.

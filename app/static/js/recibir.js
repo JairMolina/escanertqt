@@ -157,6 +157,11 @@ document.addEventListener('DOMContentLoaded', () => {
             text = nombre;
         }
         const parsed = T.parseNombre(text);
+        if (!parsed && T.esSigfox && T.esSigfox(text)) {   // v1.4.33: placa Skudo Sigfox
+            window.SoundFX.playError(); window.Haptics.error();
+            showRead({ kind: 'bad', msg: 'Placa Skudo Sigfox: regístrala en el módulo Skudo Sigfox', name: text.length > 40 ? text.slice(0, 40) + '…' : text });
+            return;
+        }
         if (!parsed && T.esSpeedlocker && T.esSpeedlocker(text)) {   // v1.4.32: placa SpeedLocker
             window.SoundFX.playError(); window.Haptics.error();
             showRead({ kind: 'bad', msg: 'Placa SpeedLocker: regístrala en el módulo SpeedLocker', name: text.length > 40 ? text.slice(0, 40) + '…' : text });

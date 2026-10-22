@@ -1,6 +1,6 @@
 (function () {
     /** v1.4.17: cada módulo tiene su pantalla de inicio de sesión (Impresora: /impresora/acceso; TPMS: /tpms/acceso; el resto, /login). */
-    function accesoDelModulo() { var p = location.pathname; return p.indexOf('/impresora') === 0 ? '/impresora/acceso' : p.indexOf('/tpms') === 0 ? '/tpms/acceso' : p.indexOf('/antijammer') === 0 ? '/antijammer/acceso' : p.indexOf('/speedlocker') === 0 ? '/speedlocker/acceso' : '/login'; }
+    function accesoDelModulo() { var p = location.pathname; return p.indexOf('/impresora') === 0 ? '/impresora/acceso' : p.indexOf('/tpms') === 0 ? '/tpms/acceso' : p.indexOf('/antijammer') === 0 ? '/antijammer/acceso' : p.indexOf('/speedlocker') === 0 ? '/speedlocker/acceso' : p.indexOf('/sigfox') === 0 ? '/sigfox/acceso' : '/login'; }
     window.accesoDelModulo = accesoDelModulo;
     // Sesión de usuario caducada o cerrada en otro equipo: cualquier respuesta 401 marcada por el servidor lleva al login.
     const _fetch = window.fetch.bind(window);
@@ -115,11 +115,14 @@
     const ANTIJAMMER_RE = /^(?:PCB[\s_-]*)?(?:SJ|SKUDO[\s_-]*AJ)(?:[\s_-]*V([0-9]{1,2})(?:[._]([0-9]))?)?[\s_-]+([0-9]{1,4})$/i;
     // v1.4.32: placas SpeedLocker (espejo de models._SPEEDLOCKER_REGEX; QR real 'SL-0024' → 'SL-V1-0001').
     const SPEEDLOCKER_RE = /^(?:PCB[\s_-]*)?(?:SL|SPEED[\s_-]*LOCKER)(?:[\s_-]*V([0-9]{1,2})(?:[._]([0-9]))?)?[\s_-]+([0-9]{1,4})$/i;
-    const esSpeedlocker = (raw) => { const m = SPEEDLOCKER_RE.exec(String(raw || '').trim()); return !!m && Number(m[1] || 1) > 0 && Number(m[3]) > 0; };
-    const esAntijammer = (raw) => { const s = String(raw || '').trim(); const m = ANTIJAMMER_RE.exec(s); return !esSpeedlocker(s) && !!m && Number(m[1] || 1) > 0 && Number(m[3]) > 0; };
-    const esTpms = (raw) => { const s = String(raw || '').trim(); return !esAntijammer(s) && !esSpeedlocker(s) && TPMS_RE.some((r) => r.test(s)); };
+    // v1.4.33: placas Skudo Sigfox (espejo de models._SIGFOX_REGEX; QR PROVISIONAL 'SF-0001' → 'SF-V1-0001').
+    const SIGFOX_RE = /^(?:PCB[\s_-]*)?(?:SF|(?:SKUDO[\s_-]*)?SIGFOX)(?:[\s_-]*V([0-9]{1,2})(?:[._]([0-9]))?)?[\s_-]+([0-9]{1,4})$/i;
+    const esSigfox = (raw) => { const m = SIGFOX_RE.exec(String(raw || '').trim()); return !!m && Number(m[1] || 1) > 0 && Number(m[3]) > 0; };
+    const esSpeedlocker = (raw) => { const s = String(raw || '').trim(); const m = SPEEDLOCKER_RE.exec(s); return !esSigfox(s) && !!m && Number(m[1] || 1) > 0 && Number(m[3]) > 0; };
+    const esAntijammer = (raw) => { const s = String(raw || '').trim(); const m = ANTIJAMMER_RE.exec(s); return !esSpeedlocker(s) && !esSigfox(s) && !!m && Number(m[1] || 1) > 0 && Number(m[3]) > 0; };
+    const esTpms = (raw) => { const s = String(raw || '').trim(); return !esAntijammer(s) && !esSpeedlocker(s) && !esSigfox(s) && TPMS_RE.some((r) => r.test(s)); };
     function parseNombre(raw) {
-        if (esTpms(raw) || esAntijammer(raw) || esSpeedlocker(raw)) return null;   // no son de Escáner TQT
+        if (esTpms(raw) || esAntijammer(raw) || esSpeedlocker(raw) || esSigfox(raw)) return null;   // no son de Escáner TQT
         const m = NOMBRE_RE.exec(String(raw || ''));
         if (!m) return null;
         const ver = m[3] ? m[3].replace(/\D/g, '') : VERSION_SIN_MARCA, tipo = m[1] || '3';
@@ -858,7 +861,7 @@
 
     window.TQT = {
         versionP,
-        hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, esTpms, esAntijammer, esSpeedlocker, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
+        hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, esTpms, esAntijammer, esSpeedlocker, esSigfox, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
         loteNombre, loteConteo, ordenarLotes, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,
