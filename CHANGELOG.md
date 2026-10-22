@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.32 — 2026-10-22
+- **Nuevo módulo SpeedLocker** (azul celeste #38BDF8), disponible en el portal: consola en `/speedlocker` y acceso propio en `/speedlocker/acceso`, clon de Skudo AntiJammer (pestañas, filtros, operaciones en masa, movimientos, Excel `SpeedLocker_placas_AAAAMMDD.xlsx` y botón de escaneo). API `/api/speedlocker/*` (misma forma que `/api/antijammer/*`) y tablas propias `speedlocker_pcb` / `speedlocker_eventos`.
+- **QR de placa:** el real es `SL-0024` y se registra como `SL-V2-0024` (la placa es hardware V2.0; sin versión en el QR = V2); acepta también `SL_0001`, `SPEEDLOCKER-…`, espacios, minúsculas, prefijo PCB y solo la serie.
+- Escáner TQT, TPMS y Skudo AntiJammer **rechazan** placas SpeedLocker con aviso para registrarlas en su módulo; SpeedLocker rechaza las de TQT, TPMS y AntiJammer.
+
 ## v1.4.31 — 2026-10-22
 - **Nuevo módulo Skudo AntiJammer** (verde #39FF14), disponible en el portal: consola en `/antijammer` y acceso propio en `/antijammer/acceso`, con las mismas pestañas, filtros, operaciones en masa, movimientos, exportación a Excel y botón de escaneo que TPMS. API `/api/antijammer/*` (misma forma que `/api/tpms/*`) y tablas propias `antijammer_pcb` / `antijammer_eventos`.
 - **QR de placa:** el real es `SJ_0052` (serigrafía «ST - SJ») y se registra como `SJ-V1-0052`; tolera guiones, espacios, minúsculas y solo la serie. Escáner TQT y TPMS lo rechazan.

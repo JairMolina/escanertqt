@@ -23,6 +23,7 @@ from app.database.models import (
     extract_mac,
     parse_tarjeta_code,
     parse_antijammer,
+    parse_speedlocker,
     parse_tpms,
 )
 
@@ -397,6 +398,9 @@ def escanear_pcb(codigo: str, operador: Optional[str] = None, tipo_forzado: Opti
             parsed = parsear_qr(codigo, tipo_forzado, version, get_version_defecto(conn))
         except ValueError as e:
             return {"resultado": "INVALIDA", "mensaje": str(e), "pcb": None, "conteos": conteos_recepcion(conn, sesion)}
+        if not parsed and parse_speedlocker(codigo):   # v1.4.32
+            return {"resultado": "INVALIDA", "mensaje": f"{parse_speedlocker(codigo)['nombre']} es una placa SpeedLocker: regístrala en el módulo SpeedLocker.",
+                    "pcb": None, "conteos": conteos_recepcion(conn, sesion)}
         if not parsed and parse_antijammer(codigo):   # v1.4.31
             return {"resultado": "INVALIDA", "mensaje": f"{parse_antijammer(codigo)['nombre']} es una placa Skudo AntiJammer: regístrala en el módulo Skudo AntiJammer.",
                     "pcb": None, "conteos": conteos_recepcion(conn, sesion)}

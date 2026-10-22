@@ -172,7 +172,7 @@ _TPMS_REGEX = re.compile(r"^(?:PCB[\s_\-]*)?TPMS(?:[\s_\-]*V(\d{1,2})(?:[._](\d)
 def parse_tpms(texto: Optional[str]) -> Optional[Dict[str, str]]:
     """QR de placa TPMS → {version, serie, nombre:'TPMS-V1-0004'} o None. V1.0 == V1."""
     raw = (texto or "").strip()
-    if parse_antijammer(raw):   # v1.4.31: placa Skudo AntiJammer, no es TPMS
+    if parse_antijammer(raw) or parse_speedlocker(raw):   # v1.4.31 AntiJammer / v1.4.32 SpeedLocker: no son TPMS
         return None
     m = _TPMS_PLANTILLA_R3.match(raw)
     if m:
@@ -198,7 +198,10 @@ _ANTIJAMMER_REGEX = re.compile(r"^(?:PCB[\s_\-]*)?(?:SJ|SKUDO[\s_\-]*AJ)(?:[\s_\
 
 def parse_antijammer(texto: Optional[str]) -> Optional[Dict[str, str]]:
     """QR de placa Skudo AntiJammer → {version, serie, nombre:'SJ-V1-0052'} o None (QR real: SJ_0052). V1.0 == V1."""
-    m = _ANTIJAMMER_REGEX.match((texto or "").strip())
+    raw = (texto or "").strip()
+    if parse_speedlocker(raw):   # v1.4.32: placa SpeedLocker, no es AntiJammer
+        return None
+    m = _ANTIJAMMER_REGEX.match(raw)
     if not m:
         return None
     mayor, menor, serie = m.group(1) or "1", m.group(2), m.group(3)
@@ -209,13 +212,34 @@ def parse_antijammer(texto: Optional[str]) -> Optional[Dict[str, str]]:
     return {"version": version, "serie": serie, "nombre": f"SJ-V{version}-{serie}"}
 
 
+# v1.4.32: placas SpeedLocker. QR real de la placa: 'SL-0024' (placa «15/01/2026 V2.0», sin versión en el QR) → 'SL-V2-0024'; análogo al 'SJ_0052'
+# de AntiJammer. Acepta también 'SPEEDLOCKER-...', tolera '_'/espacios/minúsculas y prefijo 'PCB'; versión opcional = V2 (VERSION_SPEEDLOCKER).
+# Para cambiar el formato basta con esta regex (y su espejo SPEEDLOCKER_RE en static/js/common.js). Grupos: (mayor, menor, serie).
+VERSION_SPEEDLOCKER = "2"   # el QR real (SL-0024) no trae versión; las placas son hardware V2.0
+_SPEEDLOCKER_REGEX = re.compile(r"^(?:PCB[\s_\-]*)?(?:SL|SPEED[\s_\-]*LOCKER)(?:[\s_\-]*V(\d{1,2})(?:[._](\d))?)?[\s_\-]+(\d{1,4})$",
+                                re.I | re.A)
+
+
+def parse_speedlocker(texto: Optional[str]) -> Optional[Dict[str, str]]:
+    """QR de placa SpeedLocker → {version, serie, nombre:'SL-V2-0024'} o None. Sin versión en el QR = V2 (hardware V2.0)."""
+    m = _SPEEDLOCKER_REGEX.match((texto or "").strip())
+    if not m:
+        return None
+    mayor, menor, serie = m.group(1) or VERSION_SPEEDLOCKER, m.group(2), m.group(3)
+    if not int(mayor) or not int(serie):
+        return None
+    version = f"{int(mayor)}.{menor}" if menor and menor != "0" else str(int(mayor))
+    serie = serie.zfill(4)
+    return {"version": version, "serie": serie, "nombre": f"SL-V{version}-{serie}"}
+
+
 def parse_tarjeta_code(texto: Optional[str], tipo_esperado: Optional[str] = None,
                        version_ref: str = VERSION_DEFAULT) -> Optional[Dict[str, str]]:
     """Interpreta 'TQT-R1-V30-0011' (tolera espacios, guiones bajos y minúsculas).
     Para respaldo (tipo_esperado='R2') acepta además solo el número asignado ('11').
     Devuelve {tipo, version, numero, nombre} canónicos o None si no es una tarjeta TQT."""
     raw = (texto or "").strip()
-    if parse_tpms(raw) or parse_antijammer(raw):   # v1.4.27 TPMS / v1.4.31 AntiJammer: no son de Escáner TQT
+    if parse_tpms(raw) or parse_antijammer(raw) or parse_speedlocker(raw):   # v1.4.27 TPMS / v1.4.31 AntiJammer / v1.4.32 SpeedLocker
         return None
     m = _TARJETA_REGEX.search(raw)
     if m:
