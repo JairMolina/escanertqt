@@ -21,7 +21,7 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station, esp32, dymo_remoto, plataforma, activos, tpms
+from app.routers import test_station, esp32, dymo_remoto, plataforma, activos, tpms, antijammer
 from app.ssl_cert import ensure_ssl_certificates
 from app import modulos as modulos_cat
 
@@ -123,11 +123,11 @@ CABECERAS_SEGURIDAD = {
 
 # Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
-RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
+RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/antijammer/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js")
 
 
-PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo)
+PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms", "/antijammer"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo); v1.4.31: AntiJammer
 ROL_NOMBRE = {"general": "General", "consultor": "Consultor"}
 # Páginas (y sus copias bajo /static) → zona que se nombra en el aviso "sin acceso" (v1.3.42)
 ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "emparejar", "/static/emparejar.html": "emparejar",
@@ -270,6 +270,7 @@ app.include_router(dymo_remoto.router)   # v1.4.2: DYMO compartida (Raspberry)
 app.include_router(plataforma.router)   # v1.4.12: cuentas por módulo desde el portal
 app.include_router(activos.router)      # v1.4.14: módulo Impresora (activos con etiqueta DYMO + QR)
 app.include_router(tpms.router)         # v1.4.27: módulo TPMS
+app.include_router(antijammer.router)   # v1.4.31: módulo Skudo AntiJammer
 
 
 def _pagina_acceso(request: Request, archivo: str) -> HTMLResponse:
@@ -297,6 +298,18 @@ async def serve_tpms_acceso(request: Request):
 async def serve_tpms():
     """v1.4.27: módulo TPMS; por ahora solo la ventana de escaneo de QR."""
     return _serve_file(settings.STATIC_DIR / "tpms.html")
+
+
+@app.get("/antijammer/acceso", include_in_schema=False)
+async def serve_antijammer_acceso(request: Request):
+    """v1.4.31: inicio de sesión propio del módulo Skudo AntiJammer (misma cuenta y API que /login)."""
+    return _pagina_acceso(request, "antijammer_acceso.html")
+
+
+@app.get("/antijammer", include_in_schema=False)
+async def serve_antijammer():
+    """v1.4.31: consola del módulo Skudo AntiJammer (clon de TPMS)."""
+    return _serve_file(settings.STATIC_DIR / "antijammer.html")
 
 
 @app.get("/impresora", include_in_schema=False)

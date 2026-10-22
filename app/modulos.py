@@ -14,7 +14,7 @@ MODULOS: List[Dict[str, Any]] = [
     {"id": "speedlocker", "nombre": "SpeedLocker", "descripcion": "Control y seguimiento de equipos SpeedLocker.",
      "icono": "candado", "url": "", "estado": "proximamente", "acento": "#4FB3BF"},
     {"id": "skudo-antijammer", "nombre": "Skudo AntiJammer", "descripcion": "Producción y pruebas de equipos Skudo AntiJammer.",
-     "icono": "escudo", "url": "", "estado": "proximamente", "acento": "#8FBF6A"},
+     "icono": "escudo", "url": "/antijammer", "login": "/antijammer/acceso", "estado": "disponible", "acento": "#39FF14"},   # v1.4.31
     {"id": "tpms", "nombre": "TPMS", "descripcion": "Sensores de presión de llantas: alta, pruebas y seguimiento.",
      "icono": "llanta", "url": "/tpms", "login": "/tpms/acceso", "estado": "disponible", "acento": "#FF6A00"},
     {"id": "skudo-sigfox", "nombre": "Skudo Sigfox", "descripcion": "Equipos Skudo con red Sigfox: alta y validación.",
@@ -42,12 +42,15 @@ def normalizar_lista(valor: Any) -> List[str]:
 
 IMPRESORA = "impresora"
 TPMS = "tpms"
+ANTIJAMMER = "skudo-antijammer"
 
 # v1.4.14: cada ruta pertenece a un módulo. Las compartidas (celular escáner, WebSocket, sesión, estilos) bastan con
 # tener CUALQUIER módulo; lo demás que no es de otro módulo es de Escáner TQT (la app original).
 _RUTAS_MODULO = (
     (IMPRESORA, ("/impresora", "/static/impresora.html", "/api/activos", "/static/js/impresora", "/static/css/impresora")),
     (TPMS, ("/tpms", "/api/tpms", "/static/tpms.html", "/static/js/tpms", "/static/css/tpms")),   # v1.4.27
+    (ANTIJAMMER, ("/antijammer", "/api/antijammer", "/static/antijammer", "/static/js/antijammer",
+                  "/static/css/antijammer")),   # v1.4.31
 )
 _COMPARTIDAS = ("/escaner", "/static/escaner.html", "/api/escaner/", "/ws", "/api/auth/", "/api/plataforma/", "/api/config",
                 "/api/status", "/static/js/common.js", "/static/js/escaner.js", "/static/js/visor.js", "/static/js/vendor/",

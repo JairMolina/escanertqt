@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A0D0B">
+    <meta name="color-scheme" content="dark light">
+    <meta name="robots" content="noindex">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <title>Skudo AntiJammer · Escáner · Plataforma I+D</title>
+    <script>
+        /* Tema: el que eligió el usuario (mismo ajuste `tqt.tema` que el resto de la plataforma); si nunca eligió, el del sistema. */
+        (function () {
+            var t = 'dark';
+            try { var g = localStorage.getItem('tqt.tema'); t = g === 'light' || g === 'dark' ? g : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* sin almacenamiento */ }
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1411">
+    <link rel="stylesheet" href="/static/css/antijammer.css?v=1">
+    <link rel="stylesheet" href="/static/css/antijammer_vistas.css?v=1">
+    <link rel="stylesheet" href="/static/css/antijammer_consola.css?v=1">
+</head>
+<body>
+<a class="salto" href="#contenido">Saltar al contenido</a>
+
+<div class="tp">
+    <header class="cab">
+        <a class="ir-modulos" href="/inicio" aria-label="Volver al portal de módulos" title="Volver al portal de módulos"><i class="svg-slot" data-i="flechaIzq"></i><span>Módulos</span></a>
+        <div class="marca">
+            <span class="sello" aria-hidden="true">
+                <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5.5 31.5 10v9c0 7.6-5 13.2-11.5 15.5C13.5 32.2 8.5 26.6 8.5 19v-9Z"/><path d="M15.2 18.4a6.8 6.8 0 0 1 9.6 0M17.6 21a3.4 3.4 0 0 1 4.8 0"/><circle cx="20" cy="24.2" r="1.1" fill="currentColor" stroke="none"/><path d="M13.6 28.4 26.4 12.6" stroke-width="2.6"/></svg>
+            </span>
+            <b class="nombre">Skudo<span class="nombre-sub">AntiJammer</span></b>
+        </div>
+        <span class="espacio"></span>
+        <span class="usuario" id="usuario" hidden><span class="mail" id="uMail"></span><span class="rol" id="uRol"></span></span>
+        <button class="btn tp-escbtn" type="button" id="bEsc" aria-label="Botón de escaneo: vincular el celular como escáner" title="Botón de escaneo: vincula tu celular con un QR"><i class="svg-slot" data-i="qr"></i><span class="hb-t">Botón de escaneo</span><i class="tp-escdot" aria-hidden="true"></i></button>
+        <button class="iconbtn" type="button" id="bTema" aria-label="Cambiar entre tema claro y oscuro" title="Tema claro / oscuro"></button>
+        <button class="iconbtn" type="button" id="bSalir" aria-label="Cerrar sesión" title="Cerrar sesión"><i class="svg-slot" data-i="logout"></i></button>
+    </header>
+
+    <nav class="pestanas" id="pestanas" aria-label="Secciones de Skudo AntiJammer">
+        <div class="grupo">
+            <p class="grupo-t" aria-hidden="true">Operación</p>
+            <a href="#dashboard" data-tab="dashboard" data-mas><i class="svg-slot" data-i="dash"></i><span>Dashboard</span></a>
+            <a href="#recibir" data-tab="recibir"><i class="svg-slot" data-i="recibir"></i><span>Recibir</span></a>
+            <a href="#programar" data-tab="programar"><i class="svg-slot" data-i="programar"></i><span>Programar</span></a>
+            <a href="#consultar" data-tab="consultar"><i class="svg-slot" data-i="consultar"></i><span>Consultar</span></a>
+        </div>
+        <div class="grupo">
+            <p class="grupo-t" aria-hidden="true">Gestión</p>
+            <a href="#inventario" data-tab="inventario"><i class="svg-slot" data-i="list"></i><span>Inventario</span></a>
+            <a href="#lotes" data-tab="lotes" data-mas><i class="svg-slot" data-i="layers"></i><span>Lotes</span></a>
+            <a href="#movimientos" data-tab="movimientos" data-mas><i class="svg-slot" data-i="clock"></i><span>Movimientos</span></a>
+            <a href="#excel" data-tab="excel" data-mas><i class="svg-slot" data-i="excel"></i><span>Excel</span></a>
+        </div>
+        <button class="mas" type="button" id="bMas" aria-haspopup="dialog"><i class="svg-slot" data-i="more"></i><span>Más</span></button>
+    </nav>
+
+    <main id="contenido" tabindex="-1">
+        <!-- ============================================================ RECIBIR -->
+        <section class="vista pag" id="v-recibir" data-vista="recibir" aria-labelledby="tRecibir" hidden>
+            <h1 class="sr-only" id="tRecibir" tabindex="-1">Recibir placas Skudo AntiJammer</h1>
+            <p class="solo-lectura" hidden>Tu rol es de consulta: puedes ver cuántas placas se recibieron hoy, pero no registrar placas nuevas.</p>
+            <div class="cam-slot" data-escribe>
+                <!-- visor de cámara compartido: antijammer.js lo mueve a la pestaña activa -->
+                <section class="camara" id="camara" aria-label="Cámara">
+                    <div class="marco-cam" id="marcoCam" data-cam="off">
+                        <div id="camHost"></div>
+                        <div class="apagada" id="apagada">
+                            <svg class="ico-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2M14 18h2M18 18h2v2"/></svg>
+                            <p class="t">Cámara apagada</p>
+                            <p class="s" id="camPista">Apunta al código QR de la placa.</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-cam" type="button" id="bCam" aria-controls="marcoCam" aria-pressed="false">
+                        <i class="svg-slot" data-i="camera"></i><span id="bCamT">Iniciar cámara</span>
+                    </button>
+                </section>
+            </div>
+
+            <div class="lado">
+                <div class="hoy" id="rHoy" aria-live="polite">
+                    <span class="hoy-n mono" id="rHoyN">–</span>
+                    <span class="hoy-t">recibidas hoy</span>
+                </div>
+
+                <section class="ultimo" id="ultimo" aria-labelledby="tUlt" data-vacio="1">
+                    <div class="ult-cab">
+                        <h2 id="tUlt">Último código</h2>
+                        <span class="origen" id="uOrigen"></span>
+                    </div>
+                    <p class="codigo" id="uCodigo" aria-live="polite">Aún no hay lecturas</p>
+                    <p class="estado" id="uEstado" role="status" hidden></p>
+                    <div class="ult-pie">
+                        <span class="hora mono" id="uHora"></span>
+                        <button class="btn" type="button" id="bCopiar" disabled><i class="svg-slot" data-i="paste"></i>Copiar código</button>
+                    </div>
+                </section>
+
+                <form class="manual" id="fManual" novalidate data-escribe>
+                    <div class="field">
+                        <label for="loteAj">Lote</label>
+                        <input class="input" id="loteAj" type="text" autocomplete="off" maxlength="60" placeholder="Ej. Marzo 2026" aria-describedby="loteAyuda" list="dlLotes">
+                        <p class="ayuda" id="loteAyuda">Las placas que registres desde este dispositivo quedan en este lote. Déjalo vacío si no aplica.</p>
+                    </div>
+                    <div class="field">
+                        <label for="manCod">Escribir código</label>
+                        <div class="man-fila">
+                            <input class="input mono" id="manCod" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="300" enterkeyhint="done" aria-describedby="manAyuda">
+                            <button class="btn" type="submit" id="bManual">Añadir</button>
+                        </div>
+                        <p class="ayuda" id="manAyuda">Si el QR está dañado, teclea la serie impresa (ej. 0004, se toma como Skudo AntiJammer V1) o el código completo, o usa un lector USB con este campo enfocado.</p>
+                    </div>
+                </form>
+
+                <section class="historial" aria-labelledby="tHist">
+                    <div class="hist-cab">
+                        <h2 id="tHist">Lecturas de esta sesión <span class="cuenta mono" id="hCuenta"></span></h2>
+                        <button class="btn btn-ghost btn-sm" type="button" id="bVaciar" hidden>Vaciar</button>
+                    </div>
+                    <ol class="lista" id="hLista"></ol>
+                    <p class="hist-vacio" id="hVacio">Las lecturas aparecen aquí. Se guardan solo en este dispositivo hasta que cierres sesión.</p>
+                </section>
+            </div>
+        </section>
+
+        <!-- ============================================================ PROGRAMAR -->
+        <section class="vista pag" id="v-programar" data-vista="programar" aria-labelledby="tProgramar" hidden>
+            <h1 class="sr-only" id="tProgramar" tabindex="-1">Programar placas Skudo AntiJammer</h1>
+            <p class="solo-lectura" hidden>Tu rol es de consulta: no puedes guardar firmware ni marcar fallas. Usa Consultar para ver cada placa.</p>
+            <div class="cam-slot" data-escribe></div>
+            <div class="lado" id="pLado" data-escribe></div>
+        </section>
+
+        <!-- ============================================================ CONSULTAR -->
+        <section class="vista pag" id="v-consultar" data-vista="consultar" aria-labelledby="tConsultar" hidden>
+            <h1 class="sr-only" id="tConsultar" tabindex="-1">Consultar una placa Skudo AntiJammer</h1>
+            <div class="cam-slot"></div>
+            <div class="lado" id="cLado"></div>
+        </section>
+
+        <!-- ============================================================ INVENTARIO -->
+        <section class="vista pag pag-ancha" id="v-inventario" data-vista="inventario" aria-labelledby="tInventario" hidden>
+            <div class="inv-cab">
+                <h1 id="tInventario" tabindex="-1">Inventario</h1>
+                <span class="inv-cuenta" id="iCuenta" aria-live="polite"></span>
+                <span class="espacio"></span>
+                <button class="btn btn-primary" type="button" id="bAlta" data-escribe><i class="svg-slot" data-i="plus"></i>Dar de alta</button>
+            </div>
+            <p class="solo-lectura" hidden>Tu rol es de consulta: ves todo el inventario, pero no puedes editar, mover ni eliminar placas.</p>
+            <div id="iCuerpo"></div>
+        </section>
+        <!-- ============================================================ DASHBOARD -->
+        <section class="vista pag pag-ancha" id="v-dashboard" data-vista="dashboard" aria-labelledby="tDashboard" hidden>
+            <div class="inv-cab">
+                <h1 id="tDashboard" tabindex="-1">Dashboard</h1>
+                <span class="inv-cuenta" id="dAct" aria-live="polite"></span>
+                <span class="espacio"></span>
+                <button class="btn" type="button" id="bDRef"><i class="svg-slot" data-i="refresh"></i>Actualizar</button>
+            </div>
+            <div id="dCuerpo"></div>
+        </section>
+
+        <!-- ============================================================ LOTES -->
+        <section class="vista pag pag-ancha" id="v-lotes" data-vista="lotes" aria-labelledby="tLotes" hidden>
+            <div class="inv-cab">
+                <h1 id="tLotes" tabindex="-1">Lotes</h1>
+                <span class="inv-cuenta" id="lCuenta" aria-live="polite"></span>
+            </div>
+            <p class="solo-lectura" hidden>Tu rol es de consulta: ves los lotes y sus placas, pero no puedes renombrarlos.</p>
+            <div id="lCuerpo"></div>
+        </section>
+
+        <!-- ============================================================ MOVIMIENTOS -->
+        <section class="vista pag pag-ancha" id="v-movimientos" data-vista="movimientos" aria-labelledby="tMovimientos" hidden>
+            <div class="inv-cab">
+                <h1 id="tMovimientos" tabindex="-1">Movimientos</h1>
+                <span class="inv-cuenta" id="mCuenta" aria-live="polite"></span>
+            </div>
+            <div id="mCuerpo"></div>
+        </section>
+
+        <!-- ============================================================ EXCEL -->
+        <section class="vista pag pag-ancha" id="v-excel" data-vista="excel" aria-labelledby="tExcel" hidden>
+            <div class="inv-cab">
+                <h1 id="tExcel" tabindex="-1">Exportar a Excel</h1>
+            </div>
+            <div id="xCuerpo"></div>
+        </section>
+        <footer class="pie">Skudo AntiJammer · Plataforma I+D · <span class="mono">v__VERSION__</span></footer>
+    </main>
+</div>
+
+<datalist id="dlLotes"></datalist>
+<datalist id="dlFirmwares"></datalist>
+
+<script src="/static/js/common.js?v=1417"></script>
+<script src="/static/js/audio.js?v=1321"></script>
+<script src="/static/js/haptics.js?v=1321"></script>
+<script src="/static/js/jsQR.js?v=1321"></script>
+<script src="/static/js/scanner.js?v=1321"></script>
+<script src="/static/js/visor.js?v=1344"></script>
+<script src="/static/js/ws_client.js?v=1316"></script>
+<script src="/static/js/qrcode-generator.js?v=1316"></script>
+<script src="/static/js/antijammer.js?v=1"></script>
+<script src="/static/js/antijammer_recibir.js?v=1"></script>
+<script src="/static/js/antijammer_programar.js?v=1"></script>
+<script src="/static/js/antijammer_consultar.js?v=1"></script>
+<script src="/static/js/antijammer_inventario.js?v=1"></script>
+<script src="/static/js/antijammer_dashboard.js?v=1"></script>
+<script src="/static/js/antijammer_lotes.js?v=1"></script>
+<script src="/static/js/antijammer_movimientos.js?v=1"></script>
+<script src="/static/js/antijammer_excel.js?v=1"></script>
+<script src="/static/js/antijammer_escaner.js?v=1"></script>
+</body>
+</html>

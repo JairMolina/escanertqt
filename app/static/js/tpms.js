@@ -173,6 +173,7 @@
             if (v.def.entrar) { try { v.def.entrar(); } catch (e) { console.error(e); } }
         }
         if (enfocar) { const t = sec.querySelector('h1'); if (t) t.focus({ preventScroll: true }); window.scrollTo(0, 0); }
+        document.dispatchEvent(new CustomEvent('tpms:vista', { detail: nombre }));   // v1.4.30: el botón de escaneo avisa al celular
     }
     // «Más» (celular): hoja con las secciones de consola que no caben en la barra
     $('bMas').addEventListener('click', () => {
@@ -192,9 +193,16 @@
         ir(nombre, true);
         if (v && v.def.recibirDato) v.def.recibirDato(dato);
     }
+    /** v1.4.30: lectura del celular vinculado → la vista abierta (`escaneo(codigo)` → {ok, texto}); si no la maneja
+     *  (o es Recibir con rol de consulta), se abre en Consultar. */
+    function escaneo(codigo) {
+        let v = vistas[actual];
+        if (!v || !v.def.escaneo || (actual === 'recibir' && soloLectura())) { abrir('consultar'); v = vistas.consultar; }
+        return v && v.def.escaneo ? v.def.escaneo(codigo) : null;
+    }
 
     window.TPMS = {
-        registrar, ir, abrir, cam, resumen, cambio, porCodigo, soloLectura, yo: yoP,
+        registrar, ir, abrir, cam, escaneo, actual: () => actual, resumen, cambio, porCodigo, soloLectura, yo: yoP,
         ESTADOS, estadoBadge, hw, fecha, normal, sonar, error,
     };
 

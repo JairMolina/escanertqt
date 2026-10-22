@@ -16,24 +16,25 @@
 
     async function buscar(texto) {
         const codigo = P.normal(texto);
-        if (!codigo) return;
+        if (!codigo) return { ok: false, texto: 'Código vacío' };
         ultimo = codigo; const n = ++seq;
         P.cam.bloquear();
         ui.res.setAttribute('aria-busy', 'true');
         ui.res.replaceChildren(h('div', { class: 'tp-carga' }, h('span', { class: 'tp-giro', 'aria-hidden': 'true' }), 'Buscando ' + codigo + '…'));
         const r = await P.porCodigo(codigo);
-        if (n !== seq) return;   // llegó otra búsqueda
+        if (n !== seq) return { ok: true, texto: 'Consultando ' + codigo };   // llegó otra búsqueda
         P.cam.liberar(); ui.res.removeAttribute('aria-busy');
         if (r.status === 404) {
             P.sonar.mal();
             ui.res.replaceChildren(h('div', { class: 'c-vacio' }, icon('alert'), h('b', null, `${codigo} no está registrada`),
                 h('span', null, 'Revisa la serie o regístrala en Recibir si es una placa nueva.'),
                 P.soloLectura() ? null : h('button', { class: 'btn', type: 'button', onclick: () => P.abrir('recibir') }, icon('recibir'), 'Ir a Recibir')));
-            return;
+            return { ok: false, texto: `${codigo} no está registrada en TPMS` };
         }
-        if (!r.ok) { P.sonar.mal(); ui.res.replaceChildren(P.error((r.error || 'No se pudo consultar la placa.') + ' Revisa la conexión.', () => buscar(ultimo))); return; }
+        if (!r.ok) { P.sonar.mal(); ui.res.replaceChildren(P.error((r.error || 'No se pudo consultar la placa.') + ' Revisa la conexión.', () => buscar(ultimo))); return { ok: false, texto: r.error || 'No se pudo consultar la placa' }; }
         P.sonar.ok();
         ficha(r.data.pcb, r.data.eventos || []);
+        return { ok: true, texto: `Ficha de ${r.data.pcb.nombre} abierta` };
     }
 
     function dato(t, v, mono) { return h('div', null, h('dt', null, t), h('dd', { class: mono ? 'mono' : null }, v == null || v === '' ? '—' : v)); }
@@ -93,5 +94,7 @@
             if (ui.stale && ultimo) { ui.stale = false; buscar(ultimo); }
         },
         recibirDato(codigo) { if (codigo) { ui.cod.value = codigo; buscar(codigo); } },
+        /** v1.4.30: lectura del celular vinculado (botón de escaneo). */
+        escaneo(texto) { ui.cod.value = ''; return buscar(texto); },
     });
 })();

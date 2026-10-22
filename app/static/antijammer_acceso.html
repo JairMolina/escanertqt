@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A0D0B">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <meta name="color-scheme" content="dark light">
+    <meta name="robots" content="noindex">
+    <title>Skudo AntiJammer · Plataforma I+D</title>
+    <script>
+        /* Tema: el que el usuario eligió (mismo ajuste que el resto de la plataforma); si nunca eligió, el del sistema. */
+        (function () {
+            var t = 'dark';
+            try { var g = localStorage.getItem('tqt.tema'); t = g === 'light' || g === 'dark' ? g : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* sin almacenamiento */ }
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1411">
+    <style>
+        /* Acceso al módulo Skudo AntiJammer: "sala de RF". Carbón verdoso (oscuro) o gris de laboratorio (claro), un analizador
+           de espectro con la banda protegida y el verde fluorescente #39FF14 como único acento. Rellenos verdes con tinta
+           #04140A (13.96:1); en tema claro el verde de texto/bordes es #17700A (>=4.89:1). */
+        :root[data-theme="dark"], :root:not([data-theme]) {
+            --bg: #0F1311; --bg-2: #0A0D0B; --surface: #161B18; --surface-2: #1E2521; --line: #2C3530; --line-2: #5F6E65;
+            --text: #ECF2EE; --muted: #A7B5AC; --faint: #93A198; --accent: #39FF14; --accent-fill: #39FF14; --accent-ink: #04140A; --accent-text: #39FF14;
+            --ok: #45D3C3; --warn: #F2B33D; --bad: #FF6B6B; --mod-text: #39FF14; --borde-btn: #1E9E08;
+            --campo: #0B0F0D; --dial: #070A08; --dial-line: #2C3530; --glow: 0 0 10px rgba(57, 255, 20, .28);
+            --sombra: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 28px 40px -28px rgba(0, 0, 0, .9); color-scheme: dark;
+        }
+        :root[data-theme="light"] {
+            --bg: #DFE5E1; --bg-2: #D2D9D4; --surface: #FAFBFA; --surface-2: #EEF2EF; --line: #C6CFC9; --line-2: #77837C;
+            --text: #121814; --muted: #4C5750; --faint: #5C6861; --accent: #17700A; --accent-fill: #39FF14; --accent-ink: #04140A; --accent-text: #17700A;
+            --ok: #0B6B61; --warn: #8A5200; --bad: #B42424; --mod-text: #17700A; --borde-btn: #17700A;
+            --campo: #FFFFFF; --dial: #0B0F0D; --dial-line: #2C3530; --glow: 0 1px 2px rgba(4, 20, 10, .06);
+            --sombra: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 24px 34px -26px rgba(10, 30, 16, .4); color-scheme: light;
+        }
+        :root { --ease: cubic-bezier(.23, 1, .32, 1); --rad: 6px; }
+        html { -webkit-font-smoothing: antialiased; }
+        html, body { height: 100%; }
+        body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); }
+        .tema { position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 5; }
+        .tema, .ir-modulos { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--rad); }
+        .ir-fijo { position: fixed; top: max(10px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); z-index: 5; min-height: 44px; min-width: 44px; padding: 0 12px 0 9px; }
+        .pantalla { min-height: 100dvh; display: flex; flex-direction: column; }
+        .btn { border-radius: var(--rad); }
+        :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+
+        /* ---------- banco: regla de espectro + analizador ---------- */
+        .banco { position: relative; overflow: hidden; isolation: isolate; background: var(--bg-2);
+                 display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: max(64px, calc(env(safe-area-inset-top) + 56px)) max(18px, env(safe-area-inset-right)) 22px max(18px, env(safe-area-inset-left)); }
+        /* regla de espectro: marcas de frecuencia finas y cada 5 una mayor, apenas visibles */
+        .banco::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 10px; z-index: -1; opacity: .45;
+                        background: repeating-linear-gradient(90deg, var(--line-2) 0 1px, transparent 1px 8px), repeating-linear-gradient(90deg, var(--line-2) 0 2px, transparent 2px 40px);
+                        background-size: auto 50%, auto 100%; background-position: 0 100%, 0 0; background-repeat: repeat-x; }
+        .marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .sello { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 10px; color: var(--accent-ink); background: var(--accent-fill); box-shadow: inset 0 0 0 1px var(--borde-btn), inset 0 -2px 0 rgba(0, 0, 0, .2); }
+        .sello svg { width: 30px; height: 30px; }
+        .tit { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .kick { font-size: 13px; font-weight: 600; color: var(--muted); line-height: 1.1; }
+        .tit b { display: flex; flex-direction: column; gap: 3px; font-size: 30px; font-weight: 800; letter-spacing: .01em; line-height: .9; }
+        .tit b small { font-size: 15px; font-weight: 600; letter-spacing: .04em; color: var(--muted); }
+        .titular { display: none; }
+
+        /* analizador de espectro (SVG): siempre sobre pantalla oscura, como el instrumento real */
+        .espectro { flex: none; width: 132px; }
+        .espectro svg { display: block; width: 100%; height: auto; }
+        .espectro .pant { fill: var(--dial); stroke: var(--dial-line); stroke-width: 1.5; }
+        .espectro .rej { stroke: #1E2822; stroke-width: 1; }
+        .espectro .ruido { fill: none; stroke: #6E7D74; stroke-width: 1.5; stroke-linejoin: round; }
+        .espectro .banda { fill: rgba(57, 255, 20, .1); stroke: rgba(57, 255, 20, .45); stroke-width: 1; stroke-dasharray: 3 3; }
+        .espectro .limpia { fill: none; stroke: #39FF14; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+        .espectro .num { fill: #93A198; font: 500 10px/1 var(--font-mono); }
+        .espectro .lect { fill: #39FF14; font: 600 13px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+        .espectro .num, .espectro .lect { display: none; }
+        .leyenda { display: none; }
+
+        /* ---------- hoja de acceso ---------- */
+        .zona { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 26px max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+        .acceso { position: relative; width: min(440px, 100%); display: flex; flex-direction: column; gap: 18px; padding: 24px 22px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--sombra); }
+        .acceso::before { content: ""; position: absolute; left: 22px; right: 22px; top: -1px; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent); }
+        .acceso .silk { display: block; font-size: 14px; font-weight: 600; color: var(--mod-text); margin-bottom: 6px; }
+        .acceso h2 { margin: 0; font-size: 32px; line-height: 1.05; font-weight: 700; letter-spacing: .01em; }
+        .acceso .sub { color: var(--muted); margin: 8px 0 0; font-size: 16px; font-weight: 500; text-wrap: pretty; }
+        .acceso form { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+        .acceso form[hidden] { display: none; }
+        .acceso .field > label { color: var(--muted); }
+        .acceso .input { min-height: 52px; font-size: 16px; border-radius: var(--rad); background: var(--campo, var(--bg)); border-color: var(--line-2); }
+        .acceso .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+        .acceso .clave { display: flex; gap: 8px; }
+        .acceso .clave .input { flex: 1; min-width: 0; }
+        .acceso .clave .btn { min-width: 72px; min-height: 52px; padding: 0 14px; font-size: 15px; }
+        .acceso .mayus { display: flex; align-items: center; gap: 6px; margin: 8px 2px 0; color: var(--warn); font-size: 14px; font-weight: 600; }
+        .acceso .mayus[hidden] { display: none; }
+        .acceso .btn { min-height: 52px; }
+        .acceso .btn-primary { background: var(--accent-fill); border-color: var(--borde-btn); color: var(--accent-ink); font-size: 18px; font-weight: 700; letter-spacing: .02em; box-shadow: var(--glow), 0 2px 0 var(--borde-btn); transition: transform .12s var(--ease), filter .15s, box-shadow .12s; }
+        .acceso .btn-primary:hover:not([disabled]) { filter: brightness(1.07); }
+        .acceso .btn-primary:active:not([disabled]) { transform: translateY(2px) scale(.99); box-shadow: none; }
+        .acceso .btn-primary[disabled] { opacity: .75; cursor: progress; }
+        .acceso .btn-ghost { border: 1.5px solid var(--line-2); background: transparent; }
+        .msg { margin: 0; min-height: 0; font-weight: 600; font-size: 15px; color: var(--bad); }
+        .msg:empty { display: none; }
+        .msg.ok { color: var(--ok); }
+        .acceso .ayuda { margin: 0; color: var(--muted); font-size: 15px; }
+        .acceso .ayuda .btn { min-height: 44px; padding: 0 4px; border: 0; font-size: 15px; text-decoration: underline; text-underline-offset: 3px; color: var(--accent-text); }
+        .row { display: flex; align-items: center; gap: 10px; }
+        .estado { display: flex; align-items: center; gap: 8px; margin: 0; padding-top: 14px; border-top: 1px dashed var(--line-2); font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+        .estado .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+        .estado .punto[data-s="on"] { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+        .estado .punto[data-s="off"] { background: var(--bad); }
+        .estado .ver { margin-left: auto; color: var(--faint); }
+        .pie { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--faint); font-size: 13px; }
+
+        @media (max-width: 380px) { .tit b { font-size: 26px; } .tit .kick { display: none; } .espectro { width: 108px; } .acceso { padding: 20px 16px 16px; } .acceso::before { left: 16px; right: 16px; } .acceso h2 { font-size: 28px; } }
+
+        /* ---------- escritorio: banco a la izquierda, hoja a la derecha ---------- */
+        @media (min-width: 900px) {
+            .pantalla { flex-direction: row; }
+            .banco { flex: 1 1 56%; flex-direction: column; align-items: flex-start; justify-content: center; gap: 40px; min-height: 100dvh; padding: 96px clamp(40px, 5vw, 88px) 56px; }
+            .banco::after { left: auto; top: 0; right: 0; bottom: 0; width: 12px; height: auto; background: repeating-linear-gradient(0deg, var(--line-2) 0 1px, transparent 1px 8px), repeating-linear-gradient(0deg, var(--line-2) 0 2px, transparent 2px 40px);
+                            background-size: 50% auto, 100% auto; background-position: 100% 0, 0 0; background-repeat: repeat-y; }
+            .sello { width: 50px; height: 50px; } .tit b { font-size: 34px; }
+            .espectro { width: min(420px, 34vw); align-self: center; }
+            .espectro .num, .espectro .lect { display: block; }
+            .leyenda { display: block; margin: 12px 0 0; text-align: center; color: var(--muted); font-size: 15px; font-weight: 500; }
+            .titular { display: block; max-width: 540px; }
+            .titular h1 { margin: 0 0 12px; font-size: clamp(36px, 3.4vw, 50px); line-height: 1.02; font-weight: 700; letter-spacing: .01em; text-wrap: balance; }
+            .titular p { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.45; max-width: 44ch; text-wrap: pretty; }
+            .zona { flex: 1 1 44%; align-items: center; padding: 48px clamp(28px, 4vw, 72px); }
+            .acceso { padding: 30px 30px 24px; gap: 22px; } .acceso::before { left: 30px; right: 30px; } .acceso h2 { font-size: 36px; }
+        }
+
+        /* ---------- movimiento (solo si no se pidió reducirlo): la traza limpia se dibuja una vez al cargar ---------- */
+        @media (prefers-reduced-motion: no-preference) {
+            .espectro .limpia { stroke-dasharray: 1; stroke-dashoffset: 1; animation: traza 1.1s var(--ease) .3s forwards; }
+            .acceso > *, .acceso form > * { animation: sube-suave .5s var(--ease) both; }
+            .acceso > :nth-child(2) { animation-delay: .1s; } .acceso > :nth-child(3) { animation-delay: .2s; } .acceso > :nth-child(4) { animation-delay: .3s; }
+            @keyframes traza { to { stroke-dashoffset: 0; } }
+            @keyframes sube-suave { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        }
+    </style>
+</head>
+<body>
+<button class="iconbtn tema" type="button" id="tema" aria-label="Cambiar entre tema claro y oscuro" title="Tema claro / oscuro">
+    <svg id="icoTema" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+</button>
+<a class="ir-modulos ir-fijo" href="/inicio" aria-label="Volver al portal de módulos" title="Volver al portal de módulos">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Módulos</span>
+</a>
+<div class="pantalla">
+    <header class="banco">
+        <div class="marca">
+            <span class="sello" aria-hidden="true">
+                <!-- escudo con señal bloqueada -->
+                <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5.5 31.5 10v9c0 7.6-5 13.2-11.5 15.5C13.5 32.2 8.5 26.6 8.5 19v-9Z"/><path d="M15.2 18.4a6.8 6.8 0 0 1 9.6 0M17.6 21a3.4 3.4 0 0 1 4.8 0"/><circle cx="20" cy="24.2" r="1.1" fill="currentColor" stroke="none"/><path d="M13.6 28.4 26.4 12.6" stroke-width="2.6"/></svg>
+            </span>
+            <div class="tit"><span class="kick">Plataforma I+D</span><b>Skudo<small>AntiJammer</small></b></div>
+        </div>
+        <div class="espectro" aria-hidden="true">
+            <svg viewBox="0 0 240 150">
+                <rect class="pant" x="1" y="1" width="238" height="148" rx="8"/>
+                <path class="rej" d="M12 40H228M12 72H228M12 104H228M60 14V124M108 14V124M156 14V124M204 14V124"/>
+                <!-- banda protegida: el ruido del inhibidor no entra -->
+                <rect class="banda" x="128" y="14" width="56" height="110"/>
+                <polyline class="ruido" points="12,96 20,90 26,100 34,84 40,94 48,78 54,92 62,70 68,88 76,64 82,86 90,58 96,80 104,62 110,84 118,70 124,90 128,104"/>
+                <polyline class="ruido" points="184,104 190,88 198,96 204,76 212,92 218,82 228,98"/>
+                <polyline class="limpia" pathLength="1" points="128,104 140,104 148,102 152,48 156,102 164,104 184,104"/>
+                <text class="num" x="12" y="140">1550</text>
+                <text class="lect" x="128" y="140">1575 MHz</text>
+                <text class="num" x="204" y="140">1600</text>
+            </svg>
+            <p class="leyenda">Banda GPS protegida del ruido de un inhibidor</p>
+        </div>
+        <div class="titular">
+            <h1>Acceso al banco de placas Skudo AntiJammer</h1>
+            <p>Escanea el QR de cada placa AntiJammer para registrarla, programarla y darle seguimiento.</p>
+        </div>
+    </header>
+    <main class="zona">
+        <section class="acceso" aria-labelledby="tit">
+            <div>
+                <span class="silk">Placas Skudo AntiJammer</span>
+                <h2 id="tit">Iniciar sesión</h2>
+                <p class="sub" id="sub">Entra con tu correo y tu contraseña.</p>
+            </div>
+
+            <form id="fLogin" autocomplete="on" novalidate>
+                <div class="field"><label for="email">Correo</label>
+                    <input class="input" id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" placeholder=" " required autofocus></div>
+                <div class="field"><label for="pass">Contraseña</label>
+                    <div class="clave"><input class="input" id="pass" name="password" type="password" autocomplete="current-password" maxlength="200" placeholder=" " required aria-describedby="mayus">
+                        <button class="btn" type="button" id="ver" aria-pressed="false" aria-label="Mostrar la contraseña">Ver</button></div>
+                    <p class="mayus" id="mayus" role="status" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 4 13h4v7h8v-7h4z"/></svg>Bloq Mayús está activado.</p></div>
+                <p class="msg" id="msg" role="alert" aria-live="assertive"></p>
+                <button class="btn btn-primary" type="submit" id="entrar">Entrar</button>
+            </form>
+
+            <p class="ayuda" id="olvidoBox"><button class="btn btn-ghost" type="button" id="olvido">¿Olvidaste tu contraseña?</button></p>
+
+            <form id="fOlvide" autocomplete="off" novalidate hidden>
+                <div id="olvP1">
+                    <p class="sub">Escribe tu correo. Otra persona con la sesión abierta deberá aprobar el cambio.</p>
+                    <div class="field"><label for="olvEmail">Correo</label><input class="input" id="olvEmail" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" placeholder=" "></div>
+                </div>
+                <div id="olvP2" hidden>
+                    <p class="sub" role="status" aria-live="polite">Solicitud enviada. Pide a otra persona con sesión abierta que la apruebe en la consola (candado, "Solicitudes de contraseña"). Esta pantalla avanza sola cuando lo haga.</p>
+                </div>
+                <div id="olvP3" hidden>
+                    <p class="sub">Aprobada. Pide a esa persona el código de 6 dígitos y elige tu contraseña nueva (mínimo 10 caracteres).</p>
+                    <div class="field"><label for="olvCodigo">Código de 6 dígitos</label><input class="input mono" id="olvCodigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder=" "></div>
+                    <div class="field"><label for="olvNueva">Contraseña nueva</label><input class="input" id="olvNueva" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                    <div class="field"><label for="olvRepite">Repite la nueva</label><input class="input" id="olvRepite" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                </div>
+                <p class="msg" id="msgOlv" role="alert" aria-live="assertive"></p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" type="submit" id="olvEnviar" style="flex:1">Pedir ayuda</button>
+                    <button class="btn btn-ghost" type="button" id="olvVolver">Volver</button>
+                </div>
+            </form>
+
+            <form id="fClave" autocomplete="off" novalidate hidden>
+                <p class="sub" id="avisoClave">Por seguridad, cambia tu contraseña (mínimo 10 caracteres).</p>
+                <div class="field"><label for="actual">Contraseña actual</label><input class="input" id="actual" type="password" autocomplete="current-password" maxlength="200" placeholder=" "></div>
+                <div class="field"><label for="nueva">Contraseña nueva</label><input class="input" id="nueva" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                <div class="field"><label for="repite">Repite la nueva</label><input class="input" id="repite" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                <p class="msg" id="msgClave" role="alert" aria-live="assertive"></p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" type="submit" id="guardar" style="flex:1">Guardar contraseña</button>
+                    <button class="btn btn-ghost" type="button" id="luego">Más tarde</button>
+                </div>
+            </form>
+            <p class="ayuda">¿Sin cuenta? Pide acceso a un supervisor.</p>
+            <p class="estado"><span class="punto" id="punto" data-s="?"></span><span id="estadoTxt">Comprobando servidor…</span><span class="ver mono">v__VERSION__</span></p>
+            <p class="pie"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Conexión cifrada. Solo cuentas autorizadas.</p>
+        </section>
+    </main>
+</div>
+<script>
+    /* Efectos de la pantalla de acceso (no tocan el flujo de login.js). */
+    (function () {
+        var $ = function (id) { return document.getElementById(id); };
+        /* Aviso de Bloq Mayús en la contraseña. */
+        var pass = $('pass'), mayus = $('mayus');
+        function caps(e) { if (e.getModifierState) mayus.hidden = !e.getModifierState('CapsLock'); }
+        pass.addEventListener('keydown', caps); pass.addEventListener('keyup', caps); pass.addEventListener('blur', function () { mayus.hidden = true; });
+        /* Botón: "Entrando…" mientras login.js lo tiene deshabilitado. */
+        var entrar = $('entrar');
+        new MutationObserver(function () { entrar.textContent = entrar.disabled ? 'Entrando…' : 'Entrar'; }).observe(entrar, { attributes: true, attributeFilter: ['disabled'] });
+        /* Pulso del servidor (público): punto verde "En línea" / rojo "Sin conexión". */
+        var p = $('punto'), t = $('estadoTxt');
+        function ver() {
+            fetch('/api/health', { cache: 'no-store' }).then(function (r) { return r.ok; }, function () { return false; }).then(function (ok) {
+                p.dataset.s = ok ? 'on' : 'off'; t.textContent = ok ? 'Servidor en línea' : 'Sin conexión con el servidor';
+            });
+        }
+        ver(); setInterval(ver, 20000);
+    })();
+</script>
+<script>
+    /* Sin ?next= el login vuelve a la consola de Skudo AntiJammer (login.js lee la dirección al cargar). */
+    (function () {
+        try { var q = new URLSearchParams(location.search); if (!q.get('next')) { q.set('next', '/antijammer'); history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } } catch (e) { /* nada */ }
+    })();
+</script>
+<script src="/static/js/login.js?v=1333"></script>
+</body>
+</html>

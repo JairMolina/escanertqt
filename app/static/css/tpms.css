@@ -149,3 +149,25 @@ body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text);
 @media (prefers-reduced-motion: reduce) {
   .ultimo.nuevo .codigo { animation: none; }
 }
+
+/* ---------- botón de escaneo (v1.4.30): vincula un celular como escáner, como en la consola de Escáner TQT ---------- */
+.tp-escbtn { position: relative; min-height: 44px; font-weight: 700; border-color: var(--accent); color: var(--accent-text, var(--accent));
+             background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.tp-escbtn .tp-escdot { display: none; position: absolute; top: 5px; right: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--bg-2); }
+.tp-escbtn[data-on="esp"] .tp-escdot { display: block; }
+.tp-escbtn[data-on="1"] { border-color: var(--ok); color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.tp-escbtn[data-on="1"] .tp-escdot { display: block; background: var(--ok); }
+.tp-qr-hoja { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; align-items: start; }
+.tp-qr { background: #fff; padding: 10px; border-radius: var(--tp-rad); border: 1px solid var(--line); width: 240px; aspect-ratio: 1; box-sizing: border-box; }
+.tp-qr svg { display: block; width: 100%; height: 100%; }
+.tp-qr-txt { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.tp-qr-txt ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.4; }
+.tp-qr-est { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--tp-rad); border: 1px solid var(--line); background: var(--surface-2); font-weight: 600; }
+.tp-qr-est[data-on="1"] { border-color: var(--ok); color: var(--ok); }
+.tp-qr-pulso { width: 12px; height: 12px; border-radius: 50%; background: var(--warn); flex: none; animation: tpPulso 1.2s ease-in-out infinite; }
+@keyframes tpPulso { 50% { opacity: .3; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .tp-qr-pulso { animation: none; } }
+.tp-qr-url { display: block; margin: 6px 0; overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 1180px) { .tp-escbtn .hb-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .tp-escbtn { width: 44px; padding: 0; } }
+@media (max-width: 640px) { .tp-qr-hoja { grid-template-columns: 1fr; justify-items: center; } }
+@media (min-width: 700px) { .sheet.tp-hoja-ancha { width: min(880px, 94vw); max-width: none; } }

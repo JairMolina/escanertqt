@@ -7,7 +7,7 @@
     const { h, icon, api } = T;
     const $ = (id) => document.getElementById(id);
     const CLAVE = 'tqt.tpms.historial', CLAVE_LOTE = 'tqt.tpms.lote', MAX = 12;
-    const ORIGEN = { camara: 'Cámara', manual: 'Escrito a mano' };
+    const ORIGEN = { camara: 'Cámara', manual: 'Escrito a mano', remoto: 'Celular vinculado' };
     const RES = { AGREGADA: ['ok', 'registrada'], REPETIDA: ['warn', 'ya estaba registrada'], INVALIDA: ['bad', ''] };
     let sec = null;
 
@@ -59,15 +59,20 @@
     function pintaEstado(k, txt) { const e = $('uEstado'); e.hidden = !txt; e.dataset.k = k; e.textContent = txt; }
 
     async function darDeAlta(codigo) {
-        if (P.soloLectura()) { pintaEstado('bad', 'Tu rol es de consulta: no puedes registrar placas.'); return; }
+        if (P.soloLectura()) { pintaEstado('bad', 'Tu rol es de consulta: no puedes registrar placas.'); return { ok: false, texto: 'Rol de consulta: no puede registrar placas' }; }
         pintaEstado('', 'Registrando…');
         const r = await api('/api/tpms/escanear', { method: 'POST', body: { codigo, lote: $('loteTpms').value.trim() } });
-        if (hist[0] && hist[0].codigo !== codigo) return;   // ya llegó otra lectura
-        if (!r.ok) { pintaEstado('bad', (r.error || 'No se pudo registrar.') + ' Revisa la conexión y vuelve a leer el código.'); P.sonar.mal(); return; }
+        const vigente = !hist[0] || hist[0].codigo === codigo;   // si ya llegó otra lectura, no se pinta esta
+        if (!r.ok) {
+            const msg = (r.error || 'No se pudo registrar.') + ' Revisa la conexión y vuelve a leer el código.';
+            if (vigente) { pintaEstado('bad', msg); P.sonar.mal(); }
+            return { ok: false, texto: msg };
+        }
         const d = r.data || {}, [k, txt] = RES[d.resultado] || ['bad', ''];
-        pintaEstado(k, d.pcb ? `${d.pcb.nombre} · ${txt}${d.pcb.lote ? ' · lote ' + d.pcb.lote : ''}` : d.mensaje);
-        if (k === 'bad') P.sonar.mal();
+        const texto = d.pcb ? `${d.pcb.nombre} · ${txt}${d.pcb.lote ? ' · lote ' + d.pcb.lote : ''}` : (d.mensaje || 'Código no válido');
+        if (vigente) { pintaEstado(k, texto); if (k === 'bad') P.sonar.mal(); }
         if (d.resultado === 'AGREGADA') { P.cambio(); }
+        return { ok: k !== 'bad', texto };
     }
 
     /** Registra una lectura: si ya estaba, sube al inicio y cuenta otra vez (aviso de repetido). */
@@ -81,8 +86,7 @@
         guardaHist();
         pintaUltimo(true); pintaLista();
         if (previo) P.sonar.dup(); else P.sonar.ok();
-        darDeAlta(codigo);
-        return true;
+        return darDeAlta(codigo);   // promesa {ok, texto} (la usa el botón de escaneo)
     }
 
     P.registrar('recibir', {
@@ -114,5 +118,7 @@
             });
             pintaHoy();
         },
+        /** v1.4.30: lectura del celular vinculado (botón de escaneo). */
+        escaneo(texto) { return registrar(texto, 'remoto') || { ok: false, texto: 'Código vacío' }; },
     });
 })();

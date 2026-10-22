@@ -11,7 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from app.database import db
 from app.database.inventario import normalizar_serie
-from app.database.models import parse_tpms
+from app.database.models import parse_antijammer, parse_tpms
 
 ESTADOS = ("RECIBIDA", "PROGRAMADA", "FALLA", "BAJA")
 ACCIONES_MASA = ("firmware", "version", "lote", "estado", "eliminar")
@@ -183,6 +183,9 @@ def _aplicar_firmware(c: sqlite3.Connection, fila: Dict[str, Any], firmware: Opt
 def escanear(codigo: str, lote: str = "", operador: Optional[str] = None) -> Dict[str, Any]:
     """Alta idempotente: AGREGADA | REPETIDA | INVALIDA (nunca lanza por negocio)."""
     p = parse_tpms(codigo)
+    aj = None if p else parse_antijammer(codigo)
+    if aj:   # v1.4.31
+        return {"resultado": "INVALIDA", "mensaje": f"{aj['nombre']} es una placa Skudo AntiJammer: regístrala en el módulo Skudo AntiJammer.", "pcb": None}
     if not p:
         return {"resultado": "INVALIDA", "mensaje": f"'{(codigo or '')[:40]}' no es un QR de placa TPMS (ej. TPMS_V1_0004).", "pcb": None}
     _asegurar()
