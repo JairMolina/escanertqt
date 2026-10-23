@@ -1,4 +1,4 @@
-/* Neon City — presentación cinematográfica de los proyectos de la Plataforma I+D (v1.4.38). Noche tropical: fondos casi negros, naranja, rosa y violeta.
+/* Documentación TEAM HW — presentación cinematográfica de los proyectos de la Plataforma I+D (v1.4.38). Noche tropical: fondos casi negros, naranja, rosa y violeta.
    Todo el movimiento es transform/opacity/clip-path; con «reducir movimiento» la página queda quieta y completa. */
 :root {
     --negro: #07040D; --noche: #110A1F; --tinta: #F7F1FF; --gris: #B9AECB;
@@ -26,7 +26,7 @@ a { color: inherit; }
 .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 16px;
        padding: max(14px, env(safe-area-inset-top)) var(--gutter) 14px; transition: background .4s, backdrop-filter .4s; }
 .nav.solida { background: rgba(7, 4, 13, .72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-.logo { display: flex; gap: 6px; align-items: baseline; text-decoration: none; font-family: var(--display); font-size: 22px; letter-spacing: .06em; z-index: 2; }
+.logo { display: flex; gap: 8px; align-items: baseline; text-decoration: none; font-family: var(--display); font-size: 22px; letter-spacing: .06em; z-index: 2; }
 .logo b { font-weight: 400; color: var(--rosa); }
 .menu { display: flex; gap: 28px; align-items: center; font-size: 14px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; }
 .menu a { text-decoration: none; position: relative; padding: 6px 0; color: var(--gris); transition: color .2s; }
@@ -65,6 +65,7 @@ a { color: inherit; }
 .titulo { margin: 0; font-family: var(--display); font-weight: 400; line-height: .82; font-size: clamp(88px, 21vw, 300px); letter-spacing: .01em;
           display: flex; flex-direction: column; align-items: center; }
 .titulo .linea { display: block; overflow: hidden; padding: 0 .04em; }
+.titulo .linea.chica { font-size: .36em; letter-spacing: .12em; line-height: 1.05; margin-bottom: .08em; }   /* DOCUMENTACIÓN sobre TEAM HW */
 .titulo .letra { display: inline-block; will-change: transform;
                  background: linear-gradient(180deg, #FFF3E2 0%, var(--durazno) 28%, var(--naranja) 55%, var(--rosa) 100%);
                  -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -91,7 +92,7 @@ a { color: inherit; }
 .frase { margin: 0 0 clamp(60px, 9vw, 120px); max-width: 18ch; font-family: var(--display); font-weight: 400; font-size: clamp(40px, 6.4vw, 96px); line-height: 1; text-transform: uppercase; }
 .frase .pal { display: inline-block; }
 .ventana { overflow: hidden; border-radius: 0; clip-path: inset(0 0 0 0 round 0); }
-/* la foto es de día: se tiñe de atardecer violeta-rosa para que sea Neon City */
+/* la foto es de día: se tiñe de atardecer violeta-rosa para que combine con la noche */
 .ventana { position: relative; }
 .ventana::after { content: ""; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color; opacity: .75;
                   background: linear-gradient(180deg, var(--violeta) 0%, var(--rosa) 55%, var(--naranja) 100%); }

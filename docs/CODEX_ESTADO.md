@@ -5,8 +5,8 @@ Commit de referencia: `df5d11e6492d` (puede no incluir cambios pendientes)
 
 ## v1.4.38 (2026-10-23, Claude Code, rama colores-impresora-caiquen)
 - Impresora: acento gris grafito (`css/impresora.css`, `impresora_acceso.html`). Caiquén: rojo #EF4444 (`modulos.py` acento, `css/caiquen*.css`, `caiquen*.html`; neutros rotados a tinte rojo). v1.4.37 confirmada en producción.
-- Neon City (`modulos.NEON_CITY`, ruta `/neoncity` → `static/neoncity/index.html`, prefijo `/static/neoncity`, icono `ciudad` en inicio.js; entra con /login general). Contenido en `neoncity.js` (`PROYECTOS`: un capítulo por módulo; al agregar un módulo, agregarlo ahí y su foto en `neoncity/img`). Acceso Caiquén: escena J1939 de tractocamión. Portal: `inicio.js` con una órbita por módulo (`it.ang`, `o.w` ∝ k^-1.5, `--p` profundidad, `data-tapada`).
-- Evidencia: capturas de /inicio, /caiquen, /impresora , /neoncity (1440/390 y movimiento reducido) y accesos sin errores JS; pruebas de módulos OK.
+- Documentación TEAM HW (`modulos.DOCUMENTACION` = `documentacion-hw`, ruta `/documentacion` → `static/documentacion/index.html`, prefijo `/static/documentacion`, icono `ciudad` en inicio.js; entra con /login general). Contenido en `documentacion.js` (`PROYECTOS`: un capítulo por módulo; al agregar un módulo, agregarlo ahí y su foto en `documentacion/img`). Acceso Caiquén: escena J1939 de tractocamión. Portal: `inicio.js` con una órbita por módulo (`it.ang`, `o.w` ∝ k^-1.5, `--p` profundidad, `data-tapada`).
+- Evidencia: capturas de /inicio, /caiquen, /impresora , /documentacion (1440/390 y movimiento reducido) y accesos sin errores JS; pruebas de módulos OK.
 
 ## v1.4.37 (2026-10-23, Claude Code, commit 8e781da)
 - Módulo Caiquén: archivos `caiquen*` clonados de Sigfox (colores rotados a azul acero), `parse_caiquen`/`CAIQUEN_RE` (QR PROVISIONAL CQ-0001), rechazos cruzados en TQT/TPMS/AJ/SL/Sigfox, `modulos.CAIQUEN` disponible, costeo `caiquen` (tarjeta Caiquén).

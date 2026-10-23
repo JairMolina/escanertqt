@@ -127,7 +127,7 @@ RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/antijammer/a
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js")
 
 
-PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms", "/antijammer", "/speedlocker", "/sigfox", "/caiquen", "/neoncity"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo); v1.4.31: AntiJammer; v1.4.32: SpeedLocker; v1.4.33: Skudo Sigfox
+PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms", "/antijammer", "/speedlocker", "/sigfox", "/caiquen", "/documentacion"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo); v1.4.31: AntiJammer; v1.4.32: SpeedLocker; v1.4.33: Skudo Sigfox
 ROL_NOMBRE = {"general": "General", "consultor": "Consultor"}
 # Páginas (y sus copias bajo /static) → zona que se nombra en el aviso "sin acceso" (v1.3.42)
 ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "emparejar", "/static/emparejar.html": "emparejar",
@@ -329,10 +329,10 @@ async def serve_speedlocker():
     return _serve_file(settings.STATIC_DIR / "speedlocker.html")
 
 
-@app.get("/neoncity", include_in_schema=False)
-async def serve_neoncity():
-    """v1.4.38: módulo Neon City, experimento cinematográfico (GSAP + ScrollTrigger servidos desde /static/neoncity)."""
-    return _serve_file(settings.STATIC_DIR / "neoncity" / "index.html")
+@app.get("/documentacion", include_in_schema=False)
+async def serve_documentacion():
+    """v1.4.38: módulo Documentación TEAM HW, presentación cinematográfica de los proyectos (GSAP + ScrollTrigger en /static/documentacion)."""
+    return _serve_file(settings.STATIC_DIR / "documentacion" / "index.html")
 
 
 @app.get("/caiquen/acceso", include_in_schema=False)

@@ -1,5 +1,5 @@
-/* neoncity.js — Neon City: presentación cinematográfica de los proyectos de la Plataforma I+D (GSAP 3.12.5 + ScrollTrigger,
- * servidos desde /static/neoncity/vendor). Cada módulo es un «distrito» con su color: mapa que se desliza en horizontal,
+/* documentacion.js — Documentación TEAM HW: presentación cinematográfica de los proyectos de la Plataforma I+D (GSAP 3.12.5 + ScrollTrigger,
+ * servidos desde /static/documentacion/vendor). Cada módulo es un «distrito» con su color: mapa que se desliza en horizontal,
  * un capítulo por proyecto (foto que se abre, texto que se arma, aura del color del distrito) y botón magnético final.
  * El estado de cada módulo (disponible / sin acceso) sale de /api/modulos. Con «reducir movimiento» (o sin GSAP) la página
  * queda completa y quieta: solo funcionan el menú, los enlaces y el botón. */
@@ -52,7 +52,7 @@
         </li>`).join('');
     $('#distritos').innerHTML = PROYECTOS.map((p, i) => `
         <section class="distrito${i % 2 ? ' par' : ''}" id="d-${p.id}" style="--c:${p.color}" aria-labelledby="t-${p.id}">
-            <div class="d-foto"><div class="d-mueve"><img class="zoom" src="/static/neoncity/img/${p.img}" alt="${esc(p.alt)}" loading="lazy" decoding="async"></div></div>
+            <div class="d-foto"><div class="d-mueve"><img class="zoom" src="/static/documentacion/img/${p.img}" alt="${esc(p.alt)}" loading="lazy" decoding="async"></div></div>
             <div class="d-txt">
                 <p class="d-num d-l"><span>${String(i + 1).padStart(2, '0')}</span> ${esc(p.distrito)}</p>
                 <h2 class="d-nom d-l" id="t-${p.id}">${esc(p.nombre)}</h2>
@@ -80,9 +80,9 @@
     // ---------- título partido en letras y frase en palabras ----------
     $$('#titulo .linea').forEach((l) => {
         const txt = l.textContent; l.textContent = ''; l.setAttribute('aria-hidden', 'true');
-        for (const ch of txt) { const s = document.createElement('span'); s.className = 'letra'; s.textContent = ch; l.append(s); }
+        for (const ch of txt) { const s = document.createElement('span'); s.className = 'letra'; s.textContent = ch === ' ' ? ' ' : ch; /* el espacio de «TEAM HW» no colapsa */ l.append(s); }
     });
-    $('#titulo').setAttribute('aria-label', 'Neon City');
+    $('#titulo').setAttribute('aria-label', 'Documentación TEAM HW');
     const frase = $('.frase');
     frase.innerHTML = frase.textContent.trim().split(/\s+/).map((p) => `<span class="pal">${esc(p)}</span>`).join(' ');
 
