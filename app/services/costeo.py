@@ -18,6 +18,8 @@ from app.database import db
 MODULOS_COSTEO: Dict[str, Dict[str, Any]] = {
     "antijammer": {"modulo": "skudo-antijammer", "nombre": "Skudo AntiJammer", "tarjetas": ("RX", "TX"), "tabla_pcb": "antijammer_pcb"},
     "sigfox": {"modulo": "skudo-sigfox", "nombre": "Skudo Sigfox", "tarjetas": ("Sigfox",), "tabla_pcb": "sigfox_pcb"},
+    "tpms": {"modulo": "tpms", "nombre": "TPMS", "tarjetas": ("TPMS",), "tabla_pcb": "tpms_pcb"},   # v1.4.36
+    "speedlocker": {"modulo": "speedlocker", "nombre": "SpeedLocker", "tarjetas": ("SpeedLocker",), "tabla_pcb": "speedlocker_pcb"},
 }
 MONEDAS = ("MXN", "USD")
 TIPOS = ("produccion", "recurrente")

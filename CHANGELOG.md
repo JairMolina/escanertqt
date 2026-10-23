@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.36 — 2026-10-23
+- **Costos y Materiales también en TPMS y SpeedLocker** (pestañas «Materiales» y «Costos»; en celular, dentro de «Más»), con el mismo motor de AntiJammer y Sigfox: cotizador propio por módulo, una sola tarjeta por QR e inventario que descuenta al programar cada placa (tras «Activar inventario»).
+- Caiquén aún no tiene módulo: su cotizador queda listo para cuando exista.
+
 ## v1.4.35 — 2026-10-23
 - **Inventario de materiales en Skudo AntiJammer y Skudo Sigfox** (pestaña «Materiales»; en celular, dentro de «Más»), con el criterio de Inventario TQTR: existencias = entradas − salidas − consumo, stock mínimo por material y «tarjetas posibles» con lo disponible (manda el material más escaso).
 - **Cada placa programada descuenta** la lista de materiales de su tarjeta (la de Costos). Desprogramar o eliminar la placa devuelve el material; reprogramar lo vuelve a descontar sin duplicar. El consumo guarda la cantidad del momento.

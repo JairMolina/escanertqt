@@ -48,7 +48,8 @@ class TestCosteo(unittest.TestCase):
     def test_rutas_pertenecen_a_su_modulo(self):
         self.assertEqual(modulo_de_ruta("/api/antijammer/costos"), ANTIJAMMER)
         self.assertEqual(modulo_de_ruta("/api/sigfox/costos/exportar"), SIGFOX)
-        self.assertEqual(self.c.get("/api/speedlocker/costos").status_code, 404)
+        self.assertEqual(modulo_de_ruta("/api/tpms/costos"), "tpms")
+        self.assertEqual(self.c.get("/api/caiquen/costos").status_code, 404)   # Caiquén aún sin módulo
 
     def test_antijammer_reparte_rx_y_tx_y_calcula_por_tarjeta(self):
         r = self.importar("antijammer", cotizador([
@@ -81,6 +82,17 @@ class TestCosteo(unittest.TestCase):
         self.assertEqual(d["por_tarjeta"], {"Sigfox": round((8 + 27.5) * 18.5, 2)})
         self.assertEqual(d["recurrente"], 92.5)
         self.assertNotIn("PCB RX", {x["descripcion"] for x in d["items"]})   # no ve materiales de AntiJammer
+
+    def test_tpms_y_speedlocker_una_tarjeta(self):
+        """v1.4.36: TPMS y SpeedLocker tienen su propio cotizador; todo cae en su única tarjeta."""
+        for slug, tipo, tarjeta in (("tpms", "TPMS", "TPMS"), ("speedlocker", "Tarjeta Speedlocker", "SpeedLocker")):
+            r = self.importar(slug, cotizador([
+                (tipo, "Tarjeta PCB", f"PCB {tarjeta}", 1, "pza", 1, "USD", 18),
+                (tipo, "Cable", "Cable calibre 22 | Rojo", 100, "m", 0.5, "MXN", 4.26),
+            ], tc=18.5))
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(r.json()["por_tarjeta"], {tarjeta: round(18 * 18.5 + 2.13, 2)})
+            self.assertEqual(self.c.get(f"/api/{slug}/materiales").json()["tarjetas"], [tarjeta])
 
     def test_crud_validaciones_y_exportar(self):
         b = "/api/sigfox/costos"
