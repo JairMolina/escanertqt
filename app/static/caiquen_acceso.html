@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#090E10">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <meta name="color-scheme" content="dark light">
+    <meta name="robots" content="noindex">
+    <title>Caiquén · Plataforma I+D</title>
+    <script>
+        /* Tema: el que el usuario eligió (mismo ajuste que el resto de la plataforma); si nunca eligió, el del sistema. */
+        (function () {
+            var t = 'dark';
+            try { var g = localStorage.getItem('tqt.tema'); t = g === 'light' || g === 'dark' ? g : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch (e) { /* sin almacenamiento */ }
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css?v=1411">
+    <style>
+        /* Acceso al módulo Caiquén: "vuelo de ave". Neutros con tinte azul sutil y azul acero #6C9BD9 como único
+           acento; la escena muestra una placa que emite un mensaje corto hacia una estación base. Rellenos azul aceros con tinta
+           #060B14 (5.03:1); texto azul acero #93B8E8 en oscuro (>=6.40:1) y #245A9E en claro (>=5.94:1). "ok" es verde (#5BD48A / #116B34). */
+        :root[data-theme="dark"], :root:not([data-theme]) {
+            --bg: #0E1417; --bg-2: #090E10; --surface: #131A1F; --surface-2: #1A232A; --line: #283139; --line-2: #637480;
+            --text: #EAF0F4; --muted: #A7B4BE; --faint: #909EA9; --accent: #6C9BD9; --accent-fill: #6C9BD9; --accent-ink: #060B14; --accent-text: #93B8E8;
+            --ok: #5BD48A; --warn: #F2B33D; --bad: #FF6B6B; --mod-text: #93B8E8; --borde-btn: #3D6FB3;
+            --campo: #0A0F11; --dial: #06090B; --dial-line: #283139; --glow: 0 1px 2px rgba(0, 0, 0, .35);
+            --sombra: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 28px 40px -28px rgba(0, 0, 0, .9); color-scheme: dark;
+        }
+        :root[data-theme="light"] {
+            --bg: #E0E5EA; --bg-2: #D3DAE0; --surface: #FAFCFD; --surface-2: #EDF1F4; --line: #C3CCD4; --line-2: #707B86;
+            --text: #12191F; --muted: #475059; --faint: #4F5962; --accent: #245A9E; --accent-fill: #6C9BD9; --accent-ink: #060B14; --accent-text: #245A9E;
+            --ok: #116B34; --warn: #8A5200; --bad: #B42424; --mod-text: #245A9E; --borde-btn: #245A9E;
+            --campo: #FFFFFF; --dial: #0A0F11; --dial-line: #283139; --glow: 0 1px 2px rgba(6, 11, 20, .06);
+            --sombra: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 24px 34px -26px rgba(12, 21, 30, .4); color-scheme: light;
+        }
+        :root { --ease: cubic-bezier(.23, 1, .32, 1); --rad: 6px; }
+        html { -webkit-font-smoothing: antialiased; }
+        html, body { height: 100%; }
+        body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); }
+        .tema { position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 5; }
+        .tema, .ir-modulos { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--rad); }
+        .ir-fijo { position: fixed; top: max(10px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); z-index: 5; min-height: 44px; min-width: 44px; padding: 0 12px 0 9px; }
+        .pantalla { min-height: 100dvh; display: flex; flex-direction: column; }
+        .btn { border-radius: var(--rad); }
+        :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+
+        /* ---------- banco: regla graduada + tablero ---------- */
+        .banco { position: relative; overflow: hidden; isolation: isolate; background: var(--bg-2);
+                 display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: max(64px, calc(env(safe-area-inset-top) + 56px)) max(18px, env(safe-area-inset-right)) 22px max(18px, env(safe-area-inset-left)); }
+        /* regla graduada: marcas finas y cada 5 una mayor, apenas visibles */
+        .banco::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 10px; z-index: -1; opacity: .45;
+                        background: repeating-linear-gradient(90deg, var(--line-2) 0 1px, transparent 1px 8px), repeating-linear-gradient(90deg, var(--line-2) 0 2px, transparent 2px 40px);
+                        background-size: auto 50%, auto 100%; background-position: 0 100%, 0 0; background-repeat: repeat-x; }
+        .marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .sello { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 10px; color: var(--accent-ink); background: var(--accent-fill); box-shadow: inset 0 0 0 1px var(--borde-btn), inset 0 -2px 0 rgba(0, 0, 0, .2); }
+        .sello svg { width: 30px; height: 30px; }
+        .tit { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .kick { font-size: 13px; font-weight: 600; color: var(--muted); line-height: 1.1; }
+        .tit b { display: flex; flex-direction: column; gap: 3px; font-size: 30px; font-weight: 800; letter-spacing: .01em; line-height: .9; }
+        .tit b small { font-size: 15px; font-weight: 600; letter-spacing: .04em; color: var(--muted); }
+        .titular { display: none; }
+
+        /* escena (SVG): placa con antena que manda un mensaje a la estación base; siempre sobre pantalla oscura */
+        .tablero { flex: none; width: 132px; }
+        .tablero svg { display: block; width: 100%; height: auto; }
+        .tablero .pant { fill: var(--dial); stroke: var(--dial-line); stroke-width: 1.5; }
+        .tablero .suelo { stroke: #343E48; stroke-width: 1.5; stroke-dasharray: 3 5; }
+        .tablero .placa { fill: #1A232A; stroke: #637480; stroke-width: 1.5; }
+        .tablero .chip { fill: #6C9BD9; }
+        .tablero .ant, .tablero .torre { fill: none; stroke: #EAF0F4; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .tablero .torre .cruz { stroke: #637480; stroke-width: 1.5; }
+        .tablero .onda { fill: none; stroke: #6C9BD9; stroke-width: 2; stroke-linecap: round; }
+        .tablero .onda.lejos { opacity: .45; }
+        .tablero .ruta { fill: none; stroke: #343E48; stroke-width: 1.5; stroke-dasharray: 2 6; stroke-linecap: round; }
+        .tablero .paq { fill: #6C9BD9; }
+        .tablero .num { fill: #909EA9; font: 500 11px/1 var(--font-mono); }
+        .tablero .lect { fill: #93B8E8; font: 600 13px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+        .tablero .num, .tablero .lect { display: none; }
+        .leyenda { display: none; }
+
+        /* ---------- hoja de acceso ---------- */
+        .zona { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 26px max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+        .acceso { position: relative; width: min(440px, 100%); display: flex; flex-direction: column; gap: 18px; padding: 24px 22px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--sombra); }
+        .acceso::before { content: ""; position: absolute; left: 22px; right: 22px; top: -1px; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent); }
+        .acceso .silk { display: block; font-size: 14px; font-weight: 600; color: var(--mod-text); margin-bottom: 6px; }
+        .acceso h2 { margin: 0; font-size: 32px; line-height: 1.05; font-weight: 700; letter-spacing: .01em; }
+        .acceso .sub { color: var(--muted); margin: 8px 0 0; font-size: 16px; font-weight: 500; text-wrap: pretty; }
+        .acceso form { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+        .acceso form[hidden] { display: none; }
+        .acceso .field > label { color: var(--muted); }
+        .acceso .input { min-height: 52px; font-size: 16px; border-radius: var(--rad); background: var(--campo, var(--bg)); border-color: var(--line-2); }
+        .acceso .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+        .acceso .clave { display: flex; gap: 8px; }
+        .acceso .clave .input { flex: 1; min-width: 0; }
+        .acceso .clave .btn { min-width: 72px; min-height: 52px; padding: 0 14px; font-size: 15px; }
+        .acceso .mayus { display: flex; align-items: center; gap: 6px; margin: 8px 2px 0; color: var(--warn); font-size: 14px; font-weight: 600; }
+        .acceso .mayus[hidden] { display: none; }
+        .acceso .btn { min-height: 52px; }
+        .acceso .btn-primary { background: var(--accent-fill); border-color: var(--borde-btn); color: var(--accent-ink); font-size: 18px; font-weight: 700; letter-spacing: .02em; box-shadow: var(--glow), 0 2px 0 var(--borde-btn); transition: transform .12s var(--ease), filter .15s, box-shadow .12s; }
+        .acceso .btn-primary:hover:not([disabled]) { filter: brightness(1.07); }
+        .acceso .btn-primary:active:not([disabled]) { transform: translateY(2px) scale(.99); box-shadow: none; }
+        .acceso .btn-primary[disabled] { opacity: .75; cursor: progress; }
+        .acceso .btn-ghost { border: 1.5px solid var(--line-2); background: transparent; }
+        .msg { margin: 0; min-height: 0; font-weight: 600; font-size: 15px; color: var(--bad); }
+        .msg:empty { display: none; }
+        .msg.ok { color: var(--ok); }
+        .acceso .ayuda { margin: 0; color: var(--muted); font-size: 15px; }
+        .acceso .ayuda .btn { min-height: 44px; padding: 0 4px; border: 0; font-size: 15px; text-decoration: underline; text-underline-offset: 3px; color: var(--accent-text); }
+        .row { display: flex; align-items: center; gap: 10px; }
+        .estado { display: flex; align-items: center; gap: 8px; margin: 0; padding-top: 14px; border-top: 1px dashed var(--line-2); font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+        .estado .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+        .estado .punto[data-s="on"] { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+        .estado .punto[data-s="off"] { background: var(--bad); }
+        .estado .ver { margin-left: auto; color: var(--faint); }
+        .pie { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--faint); font-size: 13px; }
+
+        @media (max-width: 380px) { .tit b { font-size: 26px; } .tit .kick { display: none; } .tablero { width: 108px; } .acceso { padding: 20px 16px 16px; } .acceso::before { left: 16px; right: 16px; } .acceso h2 { font-size: 28px; } }
+
+        /* ---------- escritorio: banco a la izquierda, hoja a la derecha ---------- */
+        @media (min-width: 900px) {
+            .pantalla { flex-direction: row; }
+            .banco { flex: 1 1 56%; flex-direction: column; align-items: flex-start; justify-content: center; gap: 40px; min-height: 100dvh; padding: 96px clamp(40px, 5vw, 88px) 56px; }
+            .banco::after { left: auto; top: 0; right: 0; bottom: 0; width: 12px; height: auto; background: repeating-linear-gradient(0deg, var(--line-2) 0 1px, transparent 1px 8px), repeating-linear-gradient(0deg, var(--line-2) 0 2px, transparent 2px 40px);
+                            background-size: 50% auto, 100% auto; background-position: 100% 0, 0 0; background-repeat: repeat-y; }
+            .sello { width: 50px; height: 50px; } .tit b { font-size: 34px; }
+            .tablero { width: min(420px, 34vw); align-self: center; }
+            .tablero .num, .tablero .lect { display: block; }
+            .leyenda { display: block; margin: 12px 0 0; text-align: center; color: var(--muted); font-size: 15px; font-weight: 500; }
+            .titular { display: block; max-width: 540px; }
+            .titular h1 { margin: 0 0 12px; font-size: clamp(36px, 3.4vw, 50px); line-height: 1.02; font-weight: 700; letter-spacing: .01em; text-wrap: balance; }
+            .titular p { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.45; max-width: 44ch; text-wrap: pretty; }
+            .zona { flex: 1 1 44%; align-items: center; padding: 48px clamp(28px, 4vw, 72px); }
+            .acceso { padding: 30px 30px 24px; gap: 22px; } .acceso::before { left: 30px; right: 30px; } .acceso h2 { font-size: 36px; }
+        }
+
+        /* ---------- movimiento (solo si no se pidió reducirlo): el mensaje sube por la ruta hacia la estación base, sin prisa ---------- */
+        @media (prefers-reduced-motion: no-preference) {
+            .tablero .paq { animation: paq 3.6s linear infinite both; }
+            .tablero .paq.p2 { animation-delay: .25s; } .tablero .paq.p3 { animation-delay: .5s; }
+            .tablero .onda { animation: onda 3.6s ease-out infinite both; }
+            .tablero .onda.lejos { animation-delay: .2s; }
+            .acceso > *, .acceso form > * { animation: sube-suave .5s var(--ease) both; }
+            .acceso > :nth-child(2) { animation-delay: .1s; } .acceso > :nth-child(3) { animation-delay: .2s; } .acceso > :nth-child(4) { animation-delay: .3s; }
+            @keyframes paq { 0%, 8% { offset-distance: 0%; opacity: 0; } 14% { opacity: 1; } 52% { opacity: 1; } 60%, 100% { offset-distance: 100%; opacity: 0; } }
+            @keyframes onda { 0% { opacity: 0; } 6% { opacity: 1; } 30%, 100% { opacity: .2; } }
+            @keyframes sube-suave { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        }
+    </style>
+</head>
+<body>
+<button class="iconbtn tema" type="button" id="tema" aria-label="Cambiar entre tema claro y oscuro" title="Tema claro / oscuro">
+    <svg id="icoTema" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+</button>
+<a class="ir-modulos ir-fijo" href="/inicio" aria-label="Volver al portal de módulos" title="Volver al portal de módulos">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Módulos</span>
+</a>
+<div class="pantalla">
+    <header class="banco">
+        <div class="marca">
+            <span class="sello" aria-hidden="true">
+                <!-- escudo con antena y ondas de radio -->
+                <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4.5 33 9v10.2c0 8-5.5 13.6-13 16.3C12.5 32.8 7 27.2 7 19.2V9z"/><path d="M20 20.5v8"/><circle cx="20" cy="18.6" r="1.9" fill="currentColor" stroke="none"/><path d="M15.6 14.4a6 6 0 0 0 0 8.4M24.4 14.4a6 6 0 0 1 0 8.4" stroke-width="2"/></svg>
+            </span>
+            <div class="tit"><span class="kick">Plataforma I+D</span><b>Caiquén</b></div>
+        </div>
+        <div class="tablero" aria-hidden="true">
+            <svg viewBox="0 0 240 150">
+                <rect class="pant" x="1" y="1" width="238" height="148" rx="8"/>
+                <path class="suelo" d="M14 124H226"/>
+                <!-- placa con antena -->
+                <rect class="placa" x="26" y="102" width="40" height="20" rx="3"/>
+                <rect class="chip" x="32" y="108" width="10" height="8" rx="1"/>
+                <path class="ant" d="M56 102V80"/>
+                <path class="onda" d="M61 72a9 9 0 0 1 0 14"/>
+                <path class="onda lejos" d="M65 66a16 16 0 0 1 0 26"/>
+                <!-- ruta del mensaje hacia la estación base -->
+                <path class="ruta" d="M58 76C92 30 140 22 180 38"/>
+                <rect class="paq" x="-4" y="-3" width="8" height="6" rx="1" style="offset-path: path('M58 76C92 30 140 22 180 38'); offset-distance: 52%"/>
+                <rect class="paq p2" x="-3" y="-2" width="6" height="4" rx="1" style="offset-path: path('M58 76C92 30 140 22 180 38'); offset-distance: 40%; opacity: .6"/>
+                <rect class="paq p3" x="-2" y="-2" width="4" height="4" rx="1" style="offset-path: path('M58 76C92 30 140 22 180 38'); offset-distance: 30%; opacity: .35"/>
+                <!-- estación base -->
+                <g class="torre"><path d="M178 124 190 44 202 124"/><path class="cruz" d="M182 98H198M180.5 112 196 90M199.5 112 184 90M185 72H195"/><circle cx="190" cy="40" r="3"/></g>
+                <path class="onda lejos" d="M182 32a12 12 0 0 1 16 0"/>
+                <text class="num" x="46" y="140" text-anchor="middle">placa</text>
+                <text class="lect" x="120" y="22" text-anchor="middle">QR</text>
+                <text class="num" x="190" y="140" text-anchor="middle">plataforma</text>
+            </svg>
+            <p class="leyenda">Cada placa se registra y se sigue por su QR</p>
+        </div>
+        <div class="titular">
+            <h1>Acceso al banco de placas Caiquén</h1>
+            <p>Escanea el QR de cada placa Caiquén para registrarla, programarla y darle seguimiento.</p>
+        </div>
+    </header>
+    <main class="zona">
+        <section class="acceso" aria-labelledby="tit">
+            <div>
+                <span class="silk">Placas Caiquén</span>
+                <h2 id="tit">Iniciar sesión</h2>
+                <p class="sub" id="sub">Entra con tu correo y tu contraseña.</p>
+            </div>
+
+            <form id="fLogin" autocomplete="on" novalidate>
+                <div class="field"><label for="email">Correo</label>
+                    <input class="input" id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" placeholder=" " required autofocus></div>
+                <div class="field"><label for="pass">Contraseña</label>
+                    <div class="clave"><input class="input" id="pass" name="password" type="password" autocomplete="current-password" maxlength="200" placeholder=" " required aria-describedby="mayus">
+                        <button class="btn" type="button" id="ver" aria-pressed="false" aria-label="Mostrar la contraseña">Ver</button></div>
+                    <p class="mayus" id="mayus" role="status" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 4 13h4v7h8v-7h4z"/></svg>Bloq Mayús está activado.</p></div>
+                <p class="msg" id="msg" role="alert" aria-live="assertive"></p>
+                <button class="btn btn-primary" type="submit" id="entrar">Entrar</button>
+            </form>
+
+            <p class="ayuda" id="olvidoBox"><button class="btn btn-ghost" type="button" id="olvido">¿Olvidaste tu contraseña?</button></p>
+
+            <form id="fOlvide" autocomplete="off" novalidate hidden>
+                <div id="olvP1">
+                    <p class="sub">Escribe tu correo. Otra persona con la sesión abierta deberá aprobar el cambio.</p>
+                    <div class="field"><label for="olvEmail">Correo</label><input class="input" id="olvEmail" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" placeholder=" "></div>
+                </div>
+                <div id="olvP2" hidden>
+                    <p class="sub" role="status" aria-live="polite">Solicitud enviada. Pide a otra persona con sesión abierta que la apruebe en la consola (candado, "Solicitudes de contraseña"). Esta pantalla avanza sola cuando lo haga.</p>
+                </div>
+                <div id="olvP3" hidden>
+                    <p class="sub">Aprobada. Pide a esa persona el código de 6 dígitos y elige tu contraseña nueva (mínimo 10 caracteres).</p>
+                    <div class="field"><label for="olvCodigo">Código de 6 dígitos</label><input class="input mono" id="olvCodigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder=" "></div>
+                    <div class="field"><label for="olvNueva">Contraseña nueva</label><input class="input" id="olvNueva" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                    <div class="field"><label for="olvRepite">Repite la nueva</label><input class="input" id="olvRepite" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                </div>
+                <p class="msg" id="msgOlv" role="alert" aria-live="assertive"></p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" type="submit" id="olvEnviar" style="flex:1">Pedir ayuda</button>
+                    <button class="btn btn-ghost" type="button" id="olvVolver">Volver</button>
+                </div>
+            </form>
+
+            <form id="fClave" autocomplete="off" novalidate hidden>
+                <p class="sub" id="avisoClave">Por seguridad, cambia tu contraseña (mínimo 10 caracteres).</p>
+                <div class="field"><label for="actual">Contraseña actual</label><input class="input" id="actual" type="password" autocomplete="current-password" maxlength="200" placeholder=" "></div>
+                <div class="field"><label for="nueva">Contraseña nueva</label><input class="input" id="nueva" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                <div class="field"><label for="repite">Repite la nueva</label><input class="input" id="repite" type="password" autocomplete="new-password" maxlength="200" placeholder=" "></div>
+                <p class="msg" id="msgClave" role="alert" aria-live="assertive"></p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" type="submit" id="guardar" style="flex:1">Guardar contraseña</button>
+                    <button class="btn btn-ghost" type="button" id="luego">Más tarde</button>
+                </div>
+            </form>
+            <p class="ayuda">¿Sin cuenta? Pide acceso a un supervisor.</p>
+            <p class="estado"><span class="punto" id="punto" data-s="?"></span><span id="estadoTxt">Comprobando servidor…</span><span class="ver mono">v__VERSION__</span></p>
+            <p class="pie"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Conexión cifrada. Solo cuentas autorizadas.</p>
+        </section>
+    </main>
+</div>
+<script>
+    /* Efectos de la pantalla de acceso (no tocan el flujo de login.js). */
+    (function () {
+        var $ = function (id) { return document.getElementById(id); };
+        /* Aviso de Bloq Mayús en la contraseña. */
+        var pass = $('pass'), mayus = $('mayus');
+        function caps(e) { if (e.getModifierState) mayus.hidden = !e.getModifierState('CapsLock'); }
+        pass.addEventListener('keydown', caps); pass.addEventListener('keyup', caps); pass.addEventListener('blur', function () { mayus.hidden = true; });
+        /* Botón: "Entrando…" mientras login.js lo tiene deshabilitado. */
+        var entrar = $('entrar');
+        new MutationObserver(function () { entrar.textContent = entrar.disabled ? 'Entrando…' : 'Entrar'; }).observe(entrar, { attributes: true, attributeFilter: ['disabled'] });
+        /* Pulso del servidor (público): punto verde "En línea" / rojo "Sin conexión". */
+        var p = $('punto'), t = $('estadoTxt');
+        function ver() {
+            fetch('/api/health', { cache: 'no-store' }).then(function (r) { return r.ok; }, function () { return false; }).then(function (ok) {
+                p.dataset.s = ok ? 'on' : 'off'; t.textContent = ok ? 'Servidor en línea' : 'Sin conexión con el servidor';
+            });
+        }
+        ver(); setInterval(ver, 20000);
+    })();
+</script>
+<script>
+    /* Sin ?next= el login vuelve a la consola de Caiquén (login.js lee la dirección al cargar). */
+    (function () {
+        try { var q = new URLSearchParams(location.search); if (!q.get('next')) { q.set('next', '/caiquen'); history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } } catch (e) { /* nada */ }
+    })();
+</script>
+<script src="/static/js/login.js?v=1333"></script>
+</body>
+</html>

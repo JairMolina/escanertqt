@@ -206,6 +206,7 @@
     function ajeno(codigo) {
         const c = String(codigo || '').trim();
         if (!c || (T.esSigfox && T.esSigfox(c))) return '';
+        if (T.esCaiquen && T.esCaiquen(c)) return `${c} es una placa Caiquén: regístrala en el módulo Caiquén, no en Skudo Sigfox.`;   // v1.4.37
         if (T.esSpeedlocker && T.esSpeedlocker(c)) return `${c} es una placa SpeedLocker: regístrala en el módulo SpeedLocker, no en Skudo Sigfox.`;
         if (T.esAntijammer && T.esAntijammer(c)) return `${c} es una placa Skudo AntiJammer: regístrala en el módulo AntiJammer, no en Skudo Sigfox.`;
         if (T.esTpms && T.esTpms(c)) return `${c} es una placa TPMS: regístrala en el módulo TPMS, no en Skudo Sigfox.`;

@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from app.database import db
 from app.database.inventario import normalizar_serie
-from app.database.models import VERSION_SIGFOX, parse_antijammer, parse_sigfox, parse_speedlocker, parse_tarjeta_code, parse_tpms
+from app.database.models import VERSION_SIGFOX, parse_antijammer, parse_caiquen, parse_sigfox, parse_speedlocker, parse_tarjeta_code, parse_tpms
 
 ESTADOS = ("RECIBIDA", "PROGRAMADA", "FALLA", "BAJA")
 ACCIONES_MASA = ("firmware", "version", "lote", "estado", "eliminar")
@@ -176,6 +176,8 @@ def _aplicar_firmware(c: sqlite3.Connection, fila: Dict[str, Any], firmware: Opt
 def escanear(codigo: str, lote: str = "", operador: Optional[str] = None) -> Dict[str, Any]:
     """Alta idempotente: AGREGADA | REPETIDA | INVALIDA (nunca lanza por negocio)."""
     p = parse_sigfox(codigo)
+    if not p and parse_caiquen(codigo):   # v1.4.37
+        return {"resultado": "INVALIDA", "mensaje": f"{parse_caiquen(codigo)['nombre']} es una placa Caiquén: regístrala en el módulo Caiquén.", "pcb": None}
     if not p and parse_speedlocker(codigo):
         return {"resultado": "INVALIDA", "mensaje": f"{parse_speedlocker(codigo)['nombre']} es una placa SpeedLocker: regístrala en el módulo SpeedLocker.", "pcb": None}
     if not p and parse_antijammer(codigo):

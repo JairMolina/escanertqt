@@ -20,6 +20,7 @@ MODULOS_COSTEO: Dict[str, Dict[str, Any]] = {
     "sigfox": {"modulo": "skudo-sigfox", "nombre": "Skudo Sigfox", "tarjetas": ("Sigfox",), "tabla_pcb": "sigfox_pcb"},
     "tpms": {"modulo": "tpms", "nombre": "TPMS", "tarjetas": ("TPMS",), "tabla_pcb": "tpms_pcb"},   # v1.4.36
     "speedlocker": {"modulo": "speedlocker", "nombre": "SpeedLocker", "tarjetas": ("SpeedLocker",), "tabla_pcb": "speedlocker_pcb"},
+    "caiquen": {"modulo": "caiquen", "nombre": "Caiquén", "tarjetas": ("Caiquén",), "tabla_pcb": "caiquen_pcb"},   # v1.4.37
 }
 MONEDAS = ("MXN", "USD")
 TIPOS = ("produccion", "recurrente")

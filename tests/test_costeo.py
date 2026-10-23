@@ -49,7 +49,7 @@ class TestCosteo(unittest.TestCase):
         self.assertEqual(modulo_de_ruta("/api/antijammer/costos"), ANTIJAMMER)
         self.assertEqual(modulo_de_ruta("/api/sigfox/costos/exportar"), SIGFOX)
         self.assertEqual(modulo_de_ruta("/api/tpms/costos"), "tpms")
-        self.assertEqual(self.c.get("/api/caiquen/costos").status_code, 404)   # Caiquén aún sin módulo
+        self.assertEqual(self.c.get("/api/caiquen/costos").json()["tarjetas"], ["Caiquén"])   # v1.4.37
 
     def test_antijammer_reparte_rx_y_tx_y_calcula_por_tarjeta(self):
         r = self.importar("antijammer", cotizador([

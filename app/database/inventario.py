@@ -24,6 +24,7 @@ from app.database.models import (
     parse_tarjeta_code,
     parse_antijammer,
     parse_sigfox,
+    parse_caiquen,
     parse_speedlocker,
     parse_tpms,
 )
@@ -399,6 +400,9 @@ def escanear_pcb(codigo: str, operador: Optional[str] = None, tipo_forzado: Opti
             parsed = parsear_qr(codigo, tipo_forzado, version, get_version_defecto(conn))
         except ValueError as e:
             return {"resultado": "INVALIDA", "mensaje": str(e), "pcb": None, "conteos": conteos_recepcion(conn, sesion)}
+        if not parsed and parse_caiquen(codigo):   # v1.4.37
+            return {"resultado": "INVALIDA", "mensaje": f"{parse_caiquen(codigo)['nombre']} es una placa Caiquén: regístrala en el módulo Caiquén.",
+                    "pcb": None, "conteos": conteos_recepcion(conn, sesion)}
         if not parsed and parse_sigfox(codigo):   # v1.4.33
             return {"resultado": "INVALIDA", "mensaje": f"{parse_sigfox(codigo)['nombre']} es una placa Skudo Sigfox: regístrala en el módulo Skudo Sigfox.",
                     "pcb": None, "conteos": conteos_recepcion(conn, sesion)}

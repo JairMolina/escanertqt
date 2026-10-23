@@ -172,7 +172,7 @@ _TPMS_REGEX = re.compile(r"^(?:PCB[\s_\-]*)?TPMS(?:[\s_\-]*V(\d{1,2})(?:[._](\d)
 def parse_tpms(texto: Optional[str]) -> Optional[Dict[str, str]]:
     """QR de placa TPMS → {version, serie, nombre:'TPMS-V1-0004'} o None. V1.0 == V1."""
     raw = (texto or "").strip()
-    if parse_antijammer(raw) or parse_speedlocker(raw) or parse_sigfox(raw):   # v1.4.31 AntiJammer / v1.4.32 SpeedLocker / v1.4.33 Sigfox: no son TPMS
+    if parse_antijammer(raw) or parse_speedlocker(raw) or parse_sigfox(raw) or parse_caiquen(raw):   # v1.4.31 AntiJammer / v1.4.32 SpeedLocker / v1.4.33 Sigfox / v1.4.37 Caiquén: no son TPMS
         return None
     m = _TPMS_PLANTILLA_R3.match(raw)
     if m:
@@ -199,7 +199,7 @@ _ANTIJAMMER_REGEX = re.compile(r"^(?:PCB[\s_\-]*)?(?:SJ|SKUDO[\s_\-]*AJ)(?:[\s_\
 def parse_antijammer(texto: Optional[str]) -> Optional[Dict[str, str]]:
     """QR de placa Skudo AntiJammer → {version, serie, nombre:'SJ-V1-0052'} o None (QR real: SJ_0052). V1.0 == V1."""
     raw = (texto or "").strip()
-    if parse_speedlocker(raw) or parse_sigfox(raw):   # v1.4.32 SpeedLocker / v1.4.33 Sigfox: no son AntiJammer
+    if parse_speedlocker(raw) or parse_sigfox(raw) or parse_caiquen(raw):   # v1.4.37 Caiquén / v1.4.32 SpeedLocker / v1.4.33 Sigfox: no son AntiJammer
         return None
     m = _ANTIJAMMER_REGEX.match(raw)
     if not m:
@@ -223,7 +223,7 @@ _SPEEDLOCKER_REGEX = re.compile(r"^(?:PCB[\s_\-]*)?(?:SL|SPEED[\s_\-]*LOCKER)(?:
 def parse_speedlocker(texto: Optional[str]) -> Optional[Dict[str, str]]:
     """QR de placa SpeedLocker → {version, serie, nombre:'SL-V2-0024'} o None. Sin versión en el QR = V2 (hardware V2.0)."""
     raw = (texto or "").strip()
-    if parse_sigfox(raw):   # v1.4.33: placa Skudo Sigfox, no es SpeedLocker
+    if parse_sigfox(raw) or parse_caiquen(raw):   # v1.4.33 Sigfox / v1.4.37 Caiquén: no son SpeedLocker
         return None
     m = _SPEEDLOCKER_REGEX.match(raw)
     if not m:
@@ -242,6 +242,26 @@ def parse_speedlocker(texto: Optional[str]) -> Optional[Dict[str, str]]:
 VERSION_SIGFOX = "1"   # provisional: sin versión en el QR = V1
 _SIGFOX_REGEX = re.compile(r"^(?:PCB[\s_\-]*)?(?:SF|(?:SKUDO[\s_\-]*)?SIGFOX)(?:[\s_\-]*V(\d{1,2})(?:[._](\d))?)?[\s_\-]+(\d{1,4})$",
                            re.I | re.A)
+
+
+# v1.4.37: placas Caiquén. QR PROVISIONAL (falta foto del QR real): 'CQ-0001' / 'CQ_0001' → 'CQ-V1-0001'.
+# Acepta también 'CAIQUEN-...' / 'CAIQUÉN-...', tolera '_'/espacios/minúsculas y prefijo 'PCB'; versión opcional = V1 (VERSION_CAIQUEN).
+# Para cambiar el formato basta con esta regex (y su espejo CAIQUEN_RE en static/js/common.js). Grupos: (mayor, menor, serie).
+VERSION_CAIQUEN = "1"   # provisional: sin versión en el QR = V1
+_CAIQUEN_REGEX = re.compile(r"^(?:PCB[\s_\-]*)?(?:CQ|CAIQU[EÉ]N)(?:[\s_\-]*V([0-9]{1,2})(?:[._]([0-9]))?)?[\s_\-]+([0-9]{1,4})$", re.I)
+
+
+def parse_caiquen(texto: Optional[str]) -> Optional[Dict[str, str]]:
+    """QR de placa Caiquén → {version, serie, nombre:'CQ-V1-0001'} o None. Sin versión en el QR = VERSION_CAIQUEN."""
+    m = _CAIQUEN_REGEX.match((texto or "").strip())
+    if not m:
+        return None
+    mayor, menor, serie = m.group(1) or VERSION_CAIQUEN, m.group(2), m.group(3)
+    if not int(mayor) or not int(serie):
+        return None
+    version = f"{int(mayor)}.{menor}" if menor and menor != "0" else str(int(mayor))
+    serie = serie.zfill(4)
+    return {"version": version, "serie": serie, "nombre": f"CQ-V{version}-{serie}"}
 
 
 def parse_sigfox(texto: Optional[str]) -> Optional[Dict[str, str]]:
@@ -263,7 +283,7 @@ def parse_tarjeta_code(texto: Optional[str], tipo_esperado: Optional[str] = None
     Para respaldo (tipo_esperado='R2') acepta además solo el número asignado ('11').
     Devuelve {tipo, version, numero, nombre} canónicos o None si no es una tarjeta TQT."""
     raw = (texto or "").strip()
-    if parse_tpms(raw) or parse_antijammer(raw) or parse_speedlocker(raw) or parse_sigfox(raw):   # v1.4.27 TPMS / v1.4.31 AntiJammer / v1.4.32 SpeedLocker / v1.4.33 Sigfox
+    if parse_tpms(raw) or parse_antijammer(raw) or parse_speedlocker(raw) or parse_sigfox(raw) or parse_caiquen(raw):   # v1.4.37 Caiquén / v1.4.27 TPMS / v1.4.31 AntiJammer / v1.4.32 SpeedLocker / v1.4.33 Sigfox
         return None
     m = _TARJETA_REGEX.search(raw)
     if m:

@@ -20,7 +20,7 @@ MODULOS: List[Dict[str, Any]] = [
     {"id": "skudo-sigfox", "nombre": "Skudo Sigfox", "descripcion": "Equipos Skudo con red Sigfox: alta y validación.",
      "icono": "antena", "url": "/sigfox", "login": "/sigfox/acceso", "estado": "disponible", "acento": "#A855F7"},   # v1.4.33
     {"id": "caiquen", "nombre": "Caiquen", "descripcion": "Producción y control de equipos Caiquen.",
-     "icono": "ave", "url": "", "estado": "proximamente", "acento": "#6C9BD9"},
+     "icono": "ave", "url": "/caiquen", "login": "/caiquen/acceso", "estado": "disponible", "acento": "#6C9BD9"},   # v1.4.37
     {"id": "impresora", "nombre": "Impresora", "descripcion": "Registro de activos con etiqueta DYMO y QR para consultarlos con el celular.",
      "icono": "impresora", "url": "/impresora", "login": "/impresora/acceso", "estado": "disponible", "acento": "#B8B8C8"},
 ]
@@ -45,6 +45,7 @@ TPMS = "tpms"
 ANTIJAMMER = "skudo-antijammer"
 SPEEDLOCKER = "speedlocker"
 SIGFOX = "skudo-sigfox"
+CAIQUEN = "caiquen"
 
 # v1.4.14: cada ruta pertenece a un módulo. Las compartidas (celular escáner, WebSocket, sesión, estilos) bastan con
 # tener CUALQUIER módulo; lo demás que no es de otro módulo es de Escáner TQT (la app original).
@@ -56,6 +57,7 @@ _RUTAS_MODULO = (
     (SPEEDLOCKER, ("/speedlocker", "/api/speedlocker", "/static/speedlocker", "/static/js/speedlocker",
                    "/static/css/speedlocker")),   # v1.4.32
     (SIGFOX, ("/sigfox", "/api/sigfox", "/static/sigfox", "/static/js/sigfox", "/static/css/sigfox")),   # v1.4.33
+    (CAIQUEN, ("/caiquen", "/api/caiquen", "/static/caiquen", "/static/js/caiquen", "/static/css/caiquen")),   # v1.4.37
 )
 _COMPARTIDAS = ("/escaner", "/static/escaner.html", "/api/escaner/", "/ws", "/api/auth/", "/api/plataforma/", "/api/config",
                 "/api/status", "/static/js/common.js", "/static/js/escaner.js", "/static/js/visor.js", "/static/js/vendor/",

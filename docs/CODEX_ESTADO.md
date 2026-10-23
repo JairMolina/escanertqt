@@ -3,10 +3,14 @@
 Actualizado: 2026-10-21 22:56 UTC
 Commit de referencia: `df5d11e6492d` (puede no incluir cambios pendientes)
 
-## v1.4.36 (2026-10-23, Claude Code, rama costeo-tpms-speedlocker)
+## v1.4.37 (2026-10-23, Claude Code, rama costeo-tpms-speedlocker)
+- Módulo Caiquén: archivos `caiquen*` clonados de Sigfox (colores rotados a azul acero), `parse_caiquen`/`CAIQUEN_RE` (QR PROVISIONAL CQ-0001), rechazos cruzados en TQT/TPMS/AJ/SL/Sigfox, `modulos.CAIQUEN` disponible, costeo `caiquen` (tarjeta Caiquén).
+- Evidencia: test_caiquen + suites de módulos (43 pruebas) OK.
+- Pendiente: QR real de Caiquén (ajustar regex en models y common.js).
+
+## v1.4.36 (2026-10-23, Claude Code, commit 3221659)
 - `MODULOS_COSTEO` suma `tpms` (tarjeta TPMS) y `speedlocker` (tarjeta SpeedLocker); `tpms.html`/`speedlocker.html` cargan `costeo.js`/`materiales.js` (ns TPMS / SL). v1.4.35 confirmada desplegada (prod sirve `costeo.css`).
 - Evidencia: test_costeo (5) + test_materiales (2) OK; importación de los cotizadores reales en BD aislada = Excel (TPMS 439.91, SpeedLocker 544.06).
-- Pendiente: módulo Caiquén (estado «próximamente»); su cotizador corregido ya existe (505.65 MXN).
 
 ## v1.4.35 (2026-10-23, Claude Code, rama inventario-modulos → main)
 - Inventario de materiales por módulo (`services/materiales.py`, rutas `/api/<slug>/materiales` en `routers/costeo.py`, `js/materiales.js`, estilos en `css/costeo.css`). Placa realizada = `programada_en`; consumo por lista de materiales de Costos (snapshot), devuelto al desprogramar/eliminar; activación por fecha (`costeo_meta.consumo_desde`); AJ asigna RX/TX en `costeo_pcb_tarjeta`.

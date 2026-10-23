@@ -1,0 +1,179 @@
+/* caiquen.css - Módulo Caiquén: cabecera, cámara compartida y Recibir (vistas: caiquen_vistas.css).
+   Identidad "vuelo de ave": neutros con tinte azul sutil y azul acero #6C9BD9 como único acento.
+   Rellenos azul aceros con tinta casi negra (#060B14 sobre #6C9BD9, 5.03:1; blanco daría 3.96:1). Texto azul acero: #93B8E8 en oscuro
+   (7.23:1 sobre fondo, 6.40:1 sobre superficie-2) y #245A9E en claro (8.39:1 sobre superficie, 5.94:1 sobre el fondo más oscuro).
+   "ok" es verde (#5BD48A / #116B34), distinto del acento.
+   Se apoya en app.css y solo redefine tokens y lo propio de la pantalla. */
+
+:root[data-theme="dark"], :root:not([data-theme]) {
+  --bg: #0E1417; --bg-2: #090E10; --surface: #131A1F; --surface-2: #1A232A; --line: #283139; --line-2: #637480;
+  --text: #EAF0F4; --muted: #A7B4BE; --faint: #909EA9; --accent: #6C9BD9; --accent-fill: #6C9BD9; --accent-ink: #060B14; --accent-text: #93B8E8;
+  --ok: #5BD48A; --warn: #F2B33D; --bad: #FF6B6B;
+  --campo: #0A0F11; --glow: 0 1px 2px rgba(0, 0, 0, .35); --glow-fuerte: 0 0 0 4px rgba(108, 217, 175, .16); --borde-btn: #3D6FB3;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #E0E5EA; --bg-2: #D3DAE0; --surface: #FAFCFD; --surface-2: #EDF1F4; --line: #C3CCD4; --line-2: #707B86;
+  --text: #12191F; --muted: #475059; --faint: #4F5962; --accent: #245A9E; --accent-fill: #6C9BD9; --accent-ink: #060B14; --accent-text: #245A9E;
+  --ok: #116B34; --warn: #8A5200; --bad: #B42424;
+  --campo: #FFFFFF; --glow: 0 1px 2px rgba(6, 11, 20, .06); --glow-fuerte: 0 0 0 1px rgba(36, 158, 110, .25); --borde-btn: #245A9E;
+  color-scheme: light;
+}
+:root { --tp-rad: 6px; --tp-ease: cubic-bezier(.23, 1, .32, 1); --vp-wide: 1280px; --tab-h: 64px; }
+
+html { -webkit-font-smoothing: antialiased; }
+body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); overflow-x: hidden; }
+:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.salto { position: absolute; left: 12px; top: -60px; z-index: 20; padding: 10px 14px; background: var(--accent-fill); color: var(--accent-ink); font-weight: 700; border-radius: var(--tp-rad); text-decoration: none; }
+.salto:focus { top: 10px; }
+.tp .btn { border-radius: var(--tp-rad); }
+.tp .btn-primary { background: var(--accent-fill); border-color: var(--borde-btn); color: var(--accent-ink); box-shadow: var(--glow), 0 2px 0 var(--borde-btn); }
+.tp .btn-primary:hover { border-color: var(--borde-btn); }
+.tp .keypad button:active, .tp .visor .tools .iconbtn.is-torch[aria-pressed="true"] { background: var(--accent-fill); color: var(--accent-ink); border-color: var(--borde-btn); }
+.tp .btn-primary:active:not([disabled]) { box-shadow: none; }
+
+/* ---------- cabecera ---------- */
+.cab { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
+       padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+       background: var(--bg-2); border-bottom: 1px solid var(--line); }
+/* regla graduada bajo la cabecera, apenas visible */
+.cab::after { content: ""; position: absolute; left: 0; right: 0; bottom: -5px; height: 4px; pointer-events: none; opacity: .35;
+              background: repeating-linear-gradient(90deg, var(--line-2) 0 1px, transparent 1px 6px), repeating-linear-gradient(90deg, var(--line-2) 0 1px, transparent 1px 30px);
+              background-size: auto 50%, auto 100%; background-position: 0 0, 0 0; background-repeat: repeat-x; }
+.cab .ir-modulos { min-height: 44px; border-radius: var(--tp-rad); }
+.marca { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sello { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 8px; color: var(--accent-ink); background: var(--accent-fill); box-shadow: inset 0 0 0 1px var(--borde-btn), inset 0 -2px 0 rgba(0, 0, 0, .2); }
+.sello svg { width: 26px; height: 26px; }
+.marca .nombre { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 20px; font-weight: 800; letter-spacing: .01em; line-height: 1; }
+.marca .nombre-sub { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--muted); white-space: nowrap; }
+.espacio { flex: 1; min-width: 0; }
+.usuario { display: none; align-items: baseline; gap: 8px; min-width: 0; font-size: 14px; color: var(--muted); }
+.usuario .mail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 24ch; font-weight: 600; }
+.usuario .rol { flex: none; padding: 1px 7px; border: 1px solid var(--line-2); border-radius: 3px; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; }
+.cab .iconbtn { border-radius: var(--tp-rad); }
+
+/* ---------- página ---------- */
+.pag { width: 100%; max-width: var(--vp-wide); margin-inline: auto; box-sizing: border-box; display: grid; gap: 20px;
+       padding: 22px max(16px, env(safe-area-inset-right)) calc(var(--tab-h) + 28px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left)); }
+.pag[hidden] { display: none; }
+.cam-slot { min-width: 0; }
+.cam-slot:empty { display: none; }
+.camara { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.lado { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.tp h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .01em; }
+
+/* visor: el de app.css, con marco azul acero y más alto */
+.marco-cam { position: relative; border-radius: 10px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px var(--line); }
+.marco-cam[data-cam="on"] { box-shadow: 0 0 0 2px var(--accent), var(--glow-fuerte); }
+.marco-cam .visor { aspect-ratio: 3 / 4; max-height: 62dvh; min-height: 300px; clip-path: none; outline: 0; }
+.marco-cam .visor .frame { inset: 18% 14%; }
+.marco-cam .visor .frame i { width: 38px; height: 38px; border-color: #6C9BD9; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55)); }
+.marco-cam .visor .frame i:nth-child(1) { border-top-left-radius: 10px; }
+.marco-cam .visor .frame i:nth-child(2) { border-top-right-radius: 10px; }
+.marco-cam .visor .frame i:nth-child(3) { border-bottom-left-radius: 10px; }
+.marco-cam .visor .frame i:nth-child(4) { border-bottom-right-radius: 10px; }
+.marco-cam .visor .frame::after { background: #6C9BD9; box-shadow: 0 0 0 1px rgba(6, 11, 20, .5); }
+.marco-cam .visor .tools .iconbtn.is-torch[aria-pressed="true"] { background: var(--accent-fill); color: var(--accent-ink); border-color: var(--borde-btn); }
+.marco-cam[data-cam="off"] .visor .status, .marco-cam[data-cam="off"] .visor .tools { visibility: hidden; }
+
+/* cámara apagada: capa encima del visor */
+.apagada { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center;
+           background: radial-gradient(70% 60% at 50% 45%, #1A232A 0%, #090E10 100%); color: #EAF0F4; }
+.apagada .ico-cam { width: 64px; height: 64px; color: #6C9BD9; margin-bottom: 6px; }
+.apagada .t { margin: 0; font-size: 20px; font-weight: 700; }
+.apagada .s { margin: 0; max-width: 30ch; color: #A7B4BE; font-size: 15px; text-wrap: pretty; }
+.marco-cam:not([data-cam="off"]) .apagada { display: none; }
+
+.btn-cam { width: 100%; min-height: 56px; font-size: 18px; }
+.btn-cam .svg-i { width: 22px; height: 22px; }
+.btn-cam[aria-pressed="true"] { background: var(--surface-2); color: var(--text); border-color: var(--accent); box-shadow: none; }
+
+/* ---------- último código ---------- */
+.ultimo { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.ultimo::before { content: ""; position: absolute; left: 16px; right: 16px; top: -1px; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent); box-shadow: var(--glow); }
+.ultimo[data-vacio="1"]::before { background: var(--line-2); box-shadow: none; }
+.ult-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.origen { font-size: 14px; color: var(--muted); font-weight: 600; }
+.codigo { margin: 0; font-family: var(--font-mono); font-weight: 600; font-size: clamp(22px, 6vw, 30px); line-height: 1.2; letter-spacing: .02em; font-variant-numeric: tabular-nums slashed-zero;
+          color: var(--accent-text); overflow-wrap: anywhere; word-break: break-word; min-height: 1.2em; }
+.ultimo[data-vacio="1"] .codigo { color: var(--faint); font-family: inherit; font-weight: 500; font-size: 18px; }
+.ult-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.hora { color: var(--muted); font-size: 13px; }
+.ultimo.nuevo .codigo { animation: tp-llega .45s var(--tp-ease); }
+
+/* ---------- entrada manual ---------- */
+/* etiquetas en frase normal, no en versalitas (app.css las pone en mayúsculas mono) */
+.field > label { font-family: inherit; font-size: 14px; letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--muted); }
+.man-fila { display: flex; gap: 8px; }
+.man-fila .input { flex: 1; min-width: 0; min-height: 52px; font-size: 16px; border-radius: var(--tp-rad); background: var(--campo); border-color: var(--line-2); }
+.man-fila .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.man-fila .btn { min-height: 52px; }
+.ultimo .estado { margin: 4px 0 0; font-weight: 600; font-size: 15px; line-height: 1.4; }
+.ultimo .estado[data-k="ok"] { color: var(--ok); }
+.ultimo .estado[data-k="warn"] { color: var(--warn); }
+.ultimo .estado[data-k="bad"] { color: var(--bad); }
+.manual .field + .field { margin-top: 14px; }
+.manual .ayuda { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+
+/* ---------- historial ---------- */
+.historial { display: flex; flex-direction: column; gap: 10px; }
+.hist-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+.cuenta { color: var(--muted); font-size: 14px; font-weight: 500; }
+.lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.lista:empty { display: none; }
+.lista li { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; min-height: 56px; border-top: 1px solid var(--line); }
+.lista li:first-child { border-top: 0; }
+.lista .dato { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lista .cod { font-family: var(--font-mono); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums slashed-zero; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista .meta { font-size: 13px; color: var(--muted); }
+.lista .veces { color: var(--accent-text); font-weight: 600; }
+.lista .iconbtn { border-radius: var(--tp-rad); color: var(--muted); }
+.lista .iconbtn:hover { color: var(--text); }
+.hist-vacio { margin: 0; padding: 14px; border: 1px dashed var(--line-2); border-radius: 10px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+.hist-vacio[hidden] { display: none; }
+
+/* ---------- anchos ---------- */
+@media (max-width: 420px) {
+  .cab .ir-modulos span { display: none; }
+  .cab .ir-modulos { padding: 0; width: 44px; }
+}
+@media (min-width: 640px) {
+  .usuario:not([hidden]) { display: inline-flex; }
+}
+@media (min-width: 900px) {
+  .pag:not(.pag-ancha) { grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); align-items: start; gap: 28px; padding-top: 28px; }
+  .pag:not(.pag-ancha):has(> .cam-slot:empty) { grid-template-columns: minmax(0, 760px); justify-content: center; }
+  .camara { position: sticky; top: 84px; }
+  .marco-cam .visor { aspect-ratio: 4 / 3; max-height: calc(100dvh - 210px); }
+  .codigo { font-size: clamp(24px, 2.2vw, 32px); }
+}
+/* móvil horizontal: el visor no se come la pantalla */
+@media (orientation: landscape) and (max-height: 480px) { .marco-cam .visor { min-height: 160px; max-height: 60dvh; aspect-ratio: 16 / 9; } }
+
+/* ---------- movimiento ---------- */
+@keyframes tp-llega { from { opacity: .2; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .ultimo.nuevo .codigo { animation: none; }
+}
+
+/* ---------- botón de escaneo (v1.4.30): vincula un celular como escáner, como en la consola de Escáner TQT ---------- */
+.tp-escbtn { position: relative; min-height: 44px; font-weight: 700; border-color: var(--accent); color: var(--accent-text, var(--accent));
+             background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.tp-escbtn .tp-escdot { display: none; position: absolute; top: 5px; right: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--bg-2); }
+.tp-escbtn[data-on="esp"] .tp-escdot { display: block; }
+.tp-escbtn[data-on="1"] { border-color: var(--ok); color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.tp-escbtn[data-on="1"] .tp-escdot { display: block; background: var(--ok); }
+.tp-qr-hoja { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; align-items: start; }
+.tp-qr { background: #fff; padding: 10px; border-radius: var(--tp-rad); border: 1px solid var(--line); width: 240px; aspect-ratio: 1; box-sizing: border-box; }
+.tp-qr svg { display: block; width: 100%; height: 100%; }
+.tp-qr-txt { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.tp-qr-txt ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.4; }
+.tp-qr-est { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--tp-rad); border: 1px solid var(--line); background: var(--surface-2); font-weight: 600; }
+.tp-qr-est[data-on="1"] { border-color: var(--ok); color: var(--ok); }
+.tp-qr-pulso { width: 12px; height: 12px; border-radius: 50%; background: var(--warn); flex: none; animation: tpPulso 1.2s ease-in-out infinite; }
+@keyframes tpPulso { 50% { opacity: .3; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .tp-qr-pulso { animation: none; } }
+.tp-qr-url { display: block; margin: 6px 0; overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 1180px) { .tp-escbtn .hb-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .tp-escbtn { width: 44px; padding: 0; } }
+@media (max-width: 640px) { .tp-qr-hoja { grid-template-columns: 1fr; justify-items: center; } }
+@media (min-width: 700px) { .sheet.tp-hoja-ancha { width: min(880px, 94vw); max-width: none; } }

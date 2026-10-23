@@ -21,7 +21,7 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station, esp32, dymo_remoto, plataforma, activos, tpms, antijammer, speedlocker, sigfox, costeo
+from app.routers import test_station, esp32, dymo_remoto, plataforma, activos, tpms, antijammer, speedlocker, sigfox, caiquen, costeo
 from app.ssl_cert import ensure_ssl_certificates
 from app import modulos as modulos_cat
 
@@ -123,11 +123,11 @@ CABECERAS_SEGURIDAD = {
 
 # Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
-RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/antijammer/acceso", "/speedlocker/acceso", "/sigfox/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
+RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/antijammer/acceso", "/speedlocker/acceso", "/sigfox/acceso", "/caiquen/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js")
 
 
-PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms", "/antijammer", "/speedlocker", "/sigfox"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo); v1.4.31: AntiJammer; v1.4.32: SpeedLocker; v1.4.33: Skudo Sigfox
+PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms", "/antijammer", "/speedlocker", "/sigfox", "/caiquen"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo); v1.4.31: AntiJammer; v1.4.32: SpeedLocker; v1.4.33: Skudo Sigfox
 ROL_NOMBRE = {"general": "General", "consultor": "Consultor"}
 # Páginas (y sus copias bajo /static) → zona que se nombra en el aviso "sin acceso" (v1.3.42)
 ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "emparejar", "/static/emparejar.html": "emparejar",
@@ -273,6 +273,7 @@ app.include_router(tpms.router)         # v1.4.27: módulo TPMS
 app.include_router(antijammer.router)   # v1.4.31: módulo Skudo AntiJammer
 app.include_router(speedlocker.router)   # v1.4.32: módulo SpeedLocker
 app.include_router(sigfox.router)        # v1.4.33: módulo Skudo Sigfox
+app.include_router(caiquen.router)       # v1.4.37: módulo Caiquén
 for _r in costeo.routers:                # v1.4.34: Costos (cotizador) por módulo: /api/<modulo>/costos
     app.include_router(_r)
 
@@ -326,6 +327,18 @@ async def serve_speedlocker_acceso(request: Request):
 async def serve_speedlocker():
     """v1.4.32: consola del módulo SpeedLocker (clon de Skudo AntiJammer)."""
     return _serve_file(settings.STATIC_DIR / "speedlocker.html")
+
+
+@app.get("/caiquen/acceso", include_in_schema=False)
+async def serve_caiquen_acceso(request: Request):
+    """v1.4.37: inicio de sesión propio del módulo Caiquén (misma cuenta y API que /login)."""
+    return _pagina_acceso(request, "caiquen_acceso.html")
+
+
+@app.get("/caiquen", include_in_schema=False)
+async def serve_caiquen():
+    """v1.4.37: consola del módulo Caiquén (clon de Skudo Sigfox)."""
+    return _serve_file(settings.STATIC_DIR / "caiquen.html")
 
 
 @app.get("/sigfox/acceso", include_in_schema=False)
