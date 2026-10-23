@@ -77,7 +77,9 @@ class TestAccesoPorModulo(unittest.TestCase):
         return c
 
     def test_catalogo_y_ids_invalidos(self):
-        self.assertEqual(len(modulos_cat.MODULOS), 7)
+        self.assertEqual(len(modulos_cat.MODULOS), 8)   # v1.4.38: Neon City
+        self.assertEqual(modulos_cat.modulo_de_ruta("/neoncity"), "neon-city")
+        self.assertEqual(modulos_cat.modulo_de_ruta("/static/neoncity/neoncity.js"), "neon-city")
         self.assertEqual(modulos_cat.normalizar_lista("tpms,escaner-tqt,tpms"), ["escaner-tqt", "tpms"])
         with self.assertRaises(ValueError):
             usuarios.actualizar_cuenta(self.EMAIL, modulos=["no-existe"])

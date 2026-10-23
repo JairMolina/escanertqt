@@ -22,6 +22,7 @@
         llanta: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.2"/><path d="M12 3v4.8M12 16.2V21M3 12h4.8M16.2 12H21"/>',
         antena: '<circle cx="12" cy="10" r="1.6"/><path d="M12 11.6V21M9 21h6M8.2 6.2a5.4 5.4 0 0 0 0 7.6M15.8 6.2a5.4 5.4 0 0 1 0 7.6M5.4 3.6a9.4 9.4 0 0 0 0 12.8M18.6 3.6a9.4 9.4 0 0 1 0 12.8"/>',
         ave: '<path d="M2.5 9.5c3-4.5 6.5-4.5 9.5 1 3-5.5 6.5-5.5 9.5-1"/><path d="M12 10.5v5.2M12 15.7l-2.6 4.3M12 15.7l2.6 4.3"/>',
+        ciudad: '<path d="M3 21h18"/><path d="M5 21V10l4-2v13M9 21V5l6-2v18M15 21v-9l4 2v7"/><path d="M12 8v.01M12 12v.01M12 16v.01"/>',
         impresora: '<path d="M7 9V4h10v5"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14h10v6H7z"/><path d="M16.5 12h.01"/>',
         sol: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
         luna: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>'
@@ -153,8 +154,10 @@
     var act = null, fichaItem = null, fw = 0, fh = 0, entrando = false;
     var st = { hov: null, foc: null, tap: null, esc: false, t: 0, silencio: false };
     var TILT = -0.2, TILT_G = TILT * 180 / Math.PI;
-    var FASE0 = { 'in': 5.25, mid: 0.7, out: 1.4 };       // desfase de cada órbita (comprobado: las etiquetas no se encimen entre 1024 y 1920 px)
-    var fase = 0, vel = 1;                                  // las órbitas giran juntas (misma velocidad): las etiquetas nunca se alcanzan entre sí
+    // v1.4.38: órbitas realistas. Cada módulo tiene su propia órbita; las interiores giran más rápido (3.ª ley de Kepler,
+    // ω ∝ r^-1.5) y la inclinación da profundidad: al pasar por detrás del núcleo la estrella se ve más chica y tenue.
+    var ORO = 2.39996, PERIODO_EXT = 150;                   // ángulo áureo para repartir las fases iniciales; vuelta de la órbita exterior (s)
+    var vel = 1;
 
     function estadoMsg(k, txt, boton) {
         var m = $('msg'); m.dataset.k = k || ''; $('msgTxt').textContent = txt || '';
@@ -194,21 +197,26 @@
             items.push({ m: m, li: li, btn: li.firstChild, orb: null, off: 0, x: 0, y: 0, acento: acentoOk(m.acento), sin: sin });
         });
 
-        // órbitas: interior (los disponibles, hasta 3), media y exterior (el resto repartido; la media solo si hay 3 o más)
-        var dentro = items.filter(function (it) { return it.m.estado === 'disponible'; }).slice(0, 3);
-        var resto = items.filter(function (it) { return dentro.indexOf(it) < 0; });
-        var nm = resto.length >= 3 ? Math.floor(resto.length / 3) : 0;
-        function orbita(arr, tam) {
-            if (!arr.length) return;
-            // una sola trayectoria por órbita: la elipse base, el tramo iluminado (lz) y el cometa (gl) son la MISMA elipse (mismos atributos); lz y gl solo recortan con dasharray
+        // una órbita por módulo, de adentro hacia afuera en el orden de la lista (disponibles primero). La elipse base, el tramo
+        // iluminado (lz) y el cometa (gl) son la MISMA elipse; lz y gl solo recortan con dasharray.
+        items.forEach(function (it, j) {
             var el = document.createElementNS(NS, 'ellipse'), lz = document.createElementNS(NS, 'ellipse'), gl = document.createElementNS(NS, 'ellipse');
-            el.setAttribute('class', 'orb'); lz.setAttribute('class', 'tray'); gl.setAttribute('class', 'glow'); lz.setAttribute('pathLength', '1'); gl.setAttribute('pathLength', '1'); gl.style.setProperty('--n', orbs.length);
+            el.setAttribute('class', 'orb'); el.setAttribute('stroke', 'url(#gOrb)'); lz.setAttribute('class', 'tray'); gl.setAttribute('class', 'glow');
+            lz.setAttribute('pathLength', '1'); gl.setAttribute('pathLength', '1'); gl.style.setProperty('--n', j);
             $('orbitas').appendChild(el); $('orbitas').appendChild(lz); $('orbitas').appendChild(gl);
-            var o = { tam: tam, n: arr.length, rx: 0, ry: 0, el: el, lz: lz, gl: gl };
-            arr.forEach(function (it, j) { it.orb = o; it.off = FASE0[tam] + j * TAU / arr.length; });
+            var o = { tam: j, n: 1, rx: 0, ry: 0, k: 1, w: 0, el: el, lz: lz, gl: gl };
+            it.orb = o; it.ang = .6 + j * ORO;
             orbs.push(o);
+        });
+        if (!$('gOrb')) {   // trazo de órbita: tenue por detrás (arriba) y más visible por delante (abajo)
+            var defs = document.createElementNS(NS, 'defs'), gr = document.createElementNS(NS, 'linearGradient');
+            gr.id = 'gOrb'; gr.setAttribute('x1', '0'); gr.setAttribute('y1', '0'); gr.setAttribute('x2', '0'); gr.setAttribute('y2', '1');
+            [['0', '.25'], ['.5', '.55'], ['1', '1']].forEach(function (s) {
+                var sp = document.createElementNS(NS, 'stop'); sp.setAttribute('offset', s[0]);
+                sp.setAttribute('style', 'stop-color: var(--line-2); stop-opacity: ' + s[1]); gr.appendChild(sp);
+            });
+            defs.appendChild(gr); $('trazas').insertBefore(defs, $('trazas').firstChild);
         }
-        orbita(dentro, 'in'); orbita(resto.slice(0, nm), 'mid'); orbita(resto.slice(nm), 'out');
 
         // por estrella: solo el brazo curvo al núcleo (base + luz sobre exactamente el mismo trazo)
         items.forEach(function (it, k) {
@@ -239,9 +247,10 @@
         var ratio = Math.max(.46, Math.min(.8, ah / aw * .8));
         var hw1 = Math.sqrt(c * c + ratio * ratio * s * s), hh1 = Math.sqrt(s * s + ratio * ratio * c * c);
         var rx = Math.max(Math.min(aw / hw1, ah / hh1, 640), 150), ry = rx * ratio;
-        var kin = Math.max(.5, Math.min(.66, 132 / ry)), kes = { 'in': kin, mid: (kin + 1) / 2, out: 1 };
-        orbs.forEach(function (o) {
-            var k = kes[o.tam]; o.rx = rx * k; o.ry = ry * k;
+        var kin = Math.max(.42, Math.min(.6, 118 / ry)), n1 = Math.max(1, orbs.length - 1);
+        orbs.forEach(function (o, j) {
+            var k = kin + (1 - kin) * Math.pow(j / n1, .85); o.k = k; o.rx = rx * k; o.ry = ry * k;
+            o.w = TAU / PERIODO_EXT * Math.pow(k, -1.5);   // Kepler: la interior da ~3.5 vueltas por cada vuelta de la exterior
             [o.el, o.lz, o.gl].forEach(function (e) {
                 e.setAttribute('cx', r1(lay.cx)); e.setAttribute('cy', r1(lay.cy)); e.setAttribute('rx', r1(o.rx)); e.setAttribute('ry', r1(o.ry));
                 e.setAttribute('transform', 'rotate(' + r1(TILT_G) + ' ' + r1(lay.cx) + ' ' + r1(lay.cy) + ')');
@@ -261,7 +270,7 @@
     /* Tramo iluminado de la órbita de la estrella activa: recorta con dasharray/dashoffset la propia elipse (sin trazo paralelo). */
     function luzOrbita(it) {
         if (!lay.tab || !it || !it.orb) return;
-        var o = it.orb, a = fase + it.off, w = o.n > 1 ? Math.min(Math.PI / o.n, .5) : .5, f1 = frac(a - w), len = (((frac(a + w) - f1) % 1) + 1) % 1;
+        var o = it.orb, a = it.ang, w = .5, f1 = frac(a - w), len = (((frac(a + w) - f1) % 1) + 1) % 1;
         o.lz.style.strokeDasharray = len.toFixed(4) + ' ' + (1 - len).toFixed(4); o.lz.style.strokeDashoffset = (-f1).toFixed(4);
     }
 
@@ -278,11 +287,20 @@
     function colocar() {
         if (lista) { items.forEach(function (it) { it.li.style.transform = ''; }); return; }
         items.forEach(function (it) {
-            var o = it.orb, a = fase + it.off, p = pt(o, a);
-            it.x = p[0]; it.y = p[1];
+            var o = it.orb, a = it.ang, p = pt(o, a), d = (1 + Math.sin(a)) / 2;   // d: 0 = detrás del núcleo, 1 = al frente
+            it.x = p[0]; it.y = p[1]; it.d = d;
             it.li.style.transform = 'translate3d(' + r1(it.x) + 'px,' + r1(it.y) + 'px,0)';
-            var d = brazo(it.x, it.y); it.bb.setAttribute('d', d); it.bl.setAttribute('d', d);
+            it.li.style.zIndex = String(Math.round(d * 100));
+            it.li.style.setProperty('--p', (.72 + .28 * d).toFixed(3));
+            var br = brazo(it.x, it.y); it.bb.setAttribute('d', br); it.bl.setAttribute('d', br);
         });
+        // etiquetas que se enciman: la de atrás se atenúa (como un planeta que pasa detrás de otro)
+        items.forEach(function (a) { a.tapa = false; });
+        for (var i = 0; i < items.length; i++) for (var k = i + 1; k < items.length; k++) {
+            var A = items[i], B = items[k];
+            if (Math.abs(A.x - B.x) < 130 && Math.abs(A.y - B.y) < 46) (A.d < B.d ? A : B).tapa = true;
+        }
+        items.forEach(function (a) { if (a.tapa && a !== act) a.li.setAttribute('data-tapada', ''); else a.li.removeAttribute('data-tapada'); });
         if (act) luzOrbita(act);
         if (fichaItem && ficha.dataset.abierta === 'true') posFicha();
     }
@@ -457,7 +475,7 @@
         if (orbs.length) {
             vel += ((act ? 0 : 1) - vel) * (1 - Math.exp(-dt * (act ? 6 : 2.4)));     // frena y arranca con suavidad cuando hay una estrella activa
             if (vel < .002) vel = 0; else if (vel > .998) vel = 1;
-            if (vel > 0) { fase += TAU / 110 * vel * dt; colocar(); }
+            if (vel > 0) { items.forEach(function (it) { it.ang += it.orb.w * vel * dt; }); colocar(); }
         }
         pintarCampo(ts / 1000);
     }

@@ -1,7 +1,7 @@
 /* ==========================================================================
    Módulo IMPRESORA (/impresora) — "registro de patrimonio y etiquetadora"
    Dirección: libro de registro sobre la mesa del encargado. Papel cálido y tinta (no la consola azul de Escáner TQT),
-   renglones de libro mayor, placas de activo plateadas (#B8B8C8) y un sello bermellón como único acento de acción.
+   renglones de libro mayor, placas de activo plateadas (#B8B8C8) y un sello grafito como único acento de acción.
    El rollo de etiquetas (con sus muescas) es el héroe de la ficha; "Imprimir etiqueta" siempre a la vista.
    Redefine los tokens de app.css solo para esta página. Mobile-first: renglones + ficha a pantalla completa; ≥900 px libro + ficha.
    ========================================================================== */
@@ -17,9 +17,9 @@
   --text: #1B1D26;               /* tinta */
   --muted: #58564F;
   --faint: #6B685F;
-  --accent: #C2381C;             /* sello bermellón */
+  --accent: #4A4E5C;             /* sello grafito */
   --accent-ink: #FFFFFF;
-  --accent-text: #A62C13;
+  --accent-text: #3E4250;
   --ok: #1D6B45; --warn: #8A5200; --bad: #B42424; --info: #1D5FB8;
   --mod-text: #4D5169;
   --paper: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 2px 0 -1px var(--surface-2), 0 3px 0 -1px var(--line), 0 24px 34px -26px rgba(48, 36, 12, .6);
@@ -36,9 +36,9 @@
   --text: #EEEBE4;
   --muted: #A8A69F;
   --faint: #918F88;
-  --accent: #FF7456;
-  --accent-ink: #220C06;
-  --accent-text: #FF8B72;
+  --accent: #B8B8C8;
+  --accent-ink: #14172A;
+  --accent-text: #CDCEDB;
   --ok: #4CD08B; --warn: #F2B33D; --bad: #FF6B6B; --info: #5AA9FF;
   --mod-text: #B8B8C8;
   --paper: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 2px 0 -1px var(--surface-2), 0 3px 0 -1px var(--line), 0 26px 34px -24px rgba(0, 0, 0, .9);
@@ -583,7 +583,7 @@ body[data-ro="1"] [data-edita] { display: none; }
   .fila, .fila::before, .btn, .btn-imprimir, .bar-prog i { transition: none; }
 }
 
-/* ---------- v1.4.18: exportar, modo selección y eliminación (rojo vino, distinto del bermellón de acción) ---------- */
+/* ---------- v1.4.18: exportar, modo selección y eliminación (rojo vino, distinto del grafito de acción) ---------- */
 :root[data-theme="light"], :root:not([data-theme]) { --peligro: #7F1D2D; --peligro-ink: #FFFFFF; }
 :root[data-theme="dark"] { --peligro: #E8506A; --peligro-ink: #240509; }
 .btn-peligro { background: var(--peligro); border: 1.5px solid var(--peligro); color: var(--peligro-ink); }

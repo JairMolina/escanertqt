@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#090E10">
+    <meta name="theme-color" content="#10090B">
     <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
     <meta name="color-scheme" content="dark light">
     <meta name="robots" content="noindex">
@@ -18,22 +18,22 @@
     </script>
     <link rel="stylesheet" href="/static/css/app.css?v=1411">
     <style>
-        /* Acceso al módulo Caiquén: "vuelo de ave". Neutros con tinte azul sutil y azul acero #6C9BD9 como único
-           acento; la escena muestra una placa que emite un mensaje corto hacia una estación base. Rellenos azul aceros con tinta
-           #060B14 (5.03:1); texto azul acero #93B8E8 en oscuro (>=6.40:1) y #245A9E en claro (>=5.94:1). "ok" es verde (#5BD48A / #116B34). */
+        /* Acceso al módulo Caiquén: telemetría de tractocamión (lectura de la computadora del motor por J1939). Neutros con
+           tinte rojo y rojo #EF4444 como único acento. Rellenos rojos con tinta #140706 (5.3:1); texto rojo #F87171 en oscuro
+           y #B91C1C en claro. "ok" es verde (#5BD48A / #116B34). */
         :root[data-theme="dark"], :root:not([data-theme]) {
-            --bg: #0E1417; --bg-2: #090E10; --surface: #131A1F; --surface-2: #1A232A; --line: #283139; --line-2: #637480;
-            --text: #EAF0F4; --muted: #A7B4BE; --faint: #909EA9; --accent: #6C9BD9; --accent-fill: #6C9BD9; --accent-ink: #060B14; --accent-text: #93B8E8;
-            --ok: #5BD48A; --warn: #F2B33D; --bad: #FF6B6B; --mod-text: #93B8E8; --borde-btn: #3D6FB3;
-            --campo: #0A0F11; --dial: #06090B; --dial-line: #283139; --glow: 0 1px 2px rgba(0, 0, 0, .35);
+            --bg: #170E10; --bg-2: #10090B; --surface: #1F1315; --surface-2: #2A1A1C; --line: #39282A; --line-2: #806367;
+            --text: #F4EAEC; --muted: #BEA7AA; --faint: #A99093; --accent: #EF4444; --accent-fill: #EF4444; --accent-ink: #140706; --accent-text: #F87171;
+            --ok: #5BD48A; --warn: #F2B33D; --bad: #FF6B6B; --mod-text: #F87171; --borde-btn: #B91C1C;
+            --campo: #110A0C; --dial: #0B0607; --dial-line: #39282A; --glow: 0 1px 2px rgba(0, 0, 0, .35);
             --sombra: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 28px 40px -28px rgba(0, 0, 0, .9); color-scheme: dark;
         }
         :root[data-theme="light"] {
-            --bg: #E0E5EA; --bg-2: #D3DAE0; --surface: #FAFCFD; --surface-2: #EDF1F4; --line: #C3CCD4; --line-2: #707B86;
-            --text: #12191F; --muted: #475059; --faint: #4F5962; --accent: #245A9E; --accent-fill: #6C9BD9; --accent-ink: #060B14; --accent-text: #245A9E;
-            --ok: #116B34; --warn: #8A5200; --bad: #B42424; --mod-text: #245A9E; --borde-btn: #245A9E;
-            --campo: #FFFFFF; --dial: #0A0F11; --dial-line: #283139; --glow: 0 1px 2px rgba(6, 11, 20, .06);
-            --sombra: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 24px 34px -26px rgba(12, 21, 30, .4); color-scheme: light;
+            --bg: #EAE0E1; --bg-2: #E0D3D4; --surface: #FDFAFB; --surface-2: #F4EDEE; --line: #D4C3C5; --line-2: #867071;
+            --text: #1F1213; --muted: #594748; --faint: #624F51; --accent: #B91C1C; --accent-fill: #EF4444; --accent-ink: #140706; --accent-text: #B91C1C;
+            --ok: #116B34; --warn: #8A5200; --bad: #B42424; --mod-text: #B91C1C; --borde-btn: #B91C1C;
+            --campo: #FFFFFF; --dial: #110A0C; --dial-line: #39282A; --glow: 0 1px 2px rgba(20, 7, 6, .06);
+            --sombra: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 24px 34px -26px rgba(30, 12, 13, .4); color-scheme: light;
         }
         :root { --ease: cubic-bezier(.23, 1, .32, 1); --rad: 6px; }
         html { -webkit-font-smoothing: antialiased; }
@@ -62,22 +62,29 @@
         .tit b small { font-size: 15px; font-weight: 600; letter-spacing: .04em; color: var(--muted); }
         .titular { display: none; }
 
-        /* escena (SVG): placa con antena que manda un mensaje a la estación base; siempre sobre pantalla oscura */
+        /* escena (SVG): tractocamión rodando con el lector conectado al puerto de diagnóstico J1939; los datos del motor
+           viajan por el cable y el lector los muestra. Siempre sobre pantalla oscura. */
         .tablero { flex: none; width: 132px; }
         .tablero svg { display: block; width: 100%; height: auto; }
         .tablero .pant { fill: var(--dial); stroke: var(--dial-line); stroke-width: 1.5; }
-        .tablero .suelo { stroke: #343E48; stroke-width: 1.5; stroke-dasharray: 3 5; }
-        .tablero .placa { fill: #1A232A; stroke: #637480; stroke-width: 1.5; }
-        .tablero .chip { fill: #6C9BD9; }
-        .tablero .ant, .tablero .torre { fill: none; stroke: #EAF0F4; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .tablero .torre .cruz { stroke: #637480; stroke-width: 1.5; }
-        .tablero .onda { fill: none; stroke: #6C9BD9; stroke-width: 2; stroke-linecap: round; }
-        .tablero .onda.lejos { opacity: .45; }
-        .tablero .ruta { fill: none; stroke: #343E48; stroke-width: 1.5; stroke-dasharray: 2 6; stroke-linecap: round; }
-        .tablero .paq { fill: #6C9BD9; }
-        .tablero .num { fill: #909EA9; font: 500 11px/1 var(--font-mono); }
-        .tablero .lect { fill: #93B8E8; font: 600 13px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
-        .tablero .num, .tablero .lect { display: none; }
+        .tablero .camino { stroke: #483435; stroke-width: 2; stroke-dasharray: 14 10; }
+        .tablero .caja { fill: #2A1A1C; stroke: #806367; stroke-width: 1.5; }
+        .tablero .franja { fill: #EF4444; opacity: .85; }
+        .tablero .cabina { fill: #3A2426; stroke: #F4EAEC; stroke-width: 1.6; stroke-linejoin: round; }
+        .tablero .vidrio { fill: #10090B; stroke: #806367; stroke-width: 1.2; }
+        .tablero .faro { fill: #F2B33D; }
+        .tablero .llanta { fill: #0B0607; stroke: #BEA7AA; stroke-width: 1.6; }
+        .tablero .rin { fill: none; stroke: #806367; stroke-width: 1.4; stroke-dasharray: 3 3; transform-box: fill-box; transform-origin: center; }
+        .tablero .puerto { fill: #EF4444; }
+        .tablero .cable { fill: none; stroke: #806367; stroke-width: 2; stroke-linecap: round; }
+        .tablero .dato { fill: #F87171; }
+        .tablero .lector { fill: #1F1315; stroke: #F4EAEC; stroke-width: 1.6; }
+        .tablero .pantalla-l { fill: #0B0607; stroke: #39282A; }
+        .tablero .lect { fill: #F87171; font: 600 12px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+        .tablero .num { fill: #A99093; font: 500 9px/1 var(--font-mono); letter-spacing: .06em; }
+        .tablero .ok { fill: #5BD48A; }
+        .tablero .traza { fill: none; stroke: #EF4444; stroke-width: 1.4; stroke-linejoin: round; opacity: .9; }
+        .tablero .num, .tablero .lect, .tablero .detalle { display: none; }
         .leyenda { display: none; }
 
         /* ---------- hoja de acceso ---------- */
@@ -126,7 +133,7 @@
                             background-size: 50% auto, 100% auto; background-position: 100% 0, 0 0; background-repeat: repeat-y; }
             .sello { width: 50px; height: 50px; } .tit b { font-size: 34px; }
             .tablero { width: min(420px, 34vw); align-self: center; }
-            .tablero .num, .tablero .lect { display: block; }
+            .tablero .num, .tablero .lect, .tablero .detalle { display: block; }
             .leyenda { display: block; margin: 12px 0 0; text-align: center; color: var(--muted); font-size: 15px; font-weight: 500; }
             .titular { display: block; max-width: 540px; }
             .titular h1 { margin: 0 0 12px; font-size: clamp(36px, 3.4vw, 50px); line-height: 1.02; font-weight: 700; letter-spacing: .01em; text-wrap: balance; }
@@ -135,16 +142,22 @@
             .acceso { padding: 30px 30px 24px; gap: 22px; } .acceso::before { left: 30px; right: 30px; } .acceso h2 { font-size: 36px; }
         }
 
-        /* ---------- movimiento (solo si no se pidió reducirlo): el mensaje sube por la ruta hacia la estación base, sin prisa ---------- */
+        /* ---------- movimiento (solo si no se pidió reducirlo): el camino corre, las llantas giran, los datos viajan
+           del puerto al lector y la traza del bus CAN se desplaza. Solo transform/opacity/offset y dashoffset. ---------- */
         @media (prefers-reduced-motion: no-preference) {
-            .tablero .paq { animation: paq 3.6s linear infinite both; }
-            .tablero .paq.p2 { animation-delay: .25s; } .tablero .paq.p3 { animation-delay: .5s; }
-            .tablero .onda { animation: onda 3.6s ease-out infinite both; }
-            .tablero .onda.lejos { animation-delay: .2s; }
+            .tablero .camino { animation: camino .9s linear infinite; }
+            .tablero .rin { animation: gira .9s linear infinite; }
+            .tablero .camion { animation: rueda 2.4s ease-in-out infinite; }
+            .tablero .dato { animation: dato 1.8s linear infinite both; }
+            .tablero .dato.d2 { animation-delay: .6s; } .tablero .dato.d3 { animation-delay: 1.2s; }
+            .tablero .traza { stroke-dasharray: 6 4; animation: traza 1.2s linear infinite; }
             .acceso > *, .acceso form > * { animation: sube-suave .5s var(--ease) both; }
             .acceso > :nth-child(2) { animation-delay: .1s; } .acceso > :nth-child(3) { animation-delay: .2s; } .acceso > :nth-child(4) { animation-delay: .3s; }
-            @keyframes paq { 0%, 8% { offset-distance: 0%; opacity: 0; } 14% { opacity: 1; } 52% { opacity: 1; } 60%, 100% { offset-distance: 100%; opacity: 0; } }
-            @keyframes onda { 0% { opacity: 0; } 6% { opacity: 1; } 30%, 100% { opacity: .2; } }
+            @keyframes camino { to { stroke-dashoffset: 24; } }
+            @keyframes gira { to { transform: rotate(360deg); } }
+            @keyframes rueda { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
+            @keyframes dato { 0% { offset-distance: 0%; opacity: 0; } 10% { opacity: 1; } 85% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+            @keyframes traza { to { stroke-dashoffset: -20; } }
             @keyframes sube-suave { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         }
     </style>
@@ -160,44 +173,63 @@
     <header class="banco">
         <div class="marca">
             <span class="sello" aria-hidden="true">
-                <!-- escudo con antena y ondas de radio -->
-                <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4.5 33 9v10.2c0 8-5.5 13.6-13 16.3C12.5 32.8 7 27.2 7 19.2V9z"/><path d="M20 20.5v8"/><circle cx="20" cy="18.6" r="1.9" fill="currentColor" stroke="none"/><path d="M15.6 14.4a6 6 0 0 0 0 8.4M24.4 14.4a6 6 0 0 1 0 8.4" stroke-width="2"/></svg>
+                <!-- tractocamión de frente con el pulso de datos de su computadora -->
+                <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 27V12h17v15"/><path d="M23 16h6l5 6v5h-3"/><circle cx="12" cy="29" r="3"/><circle cx="28" cy="29" r="3"/><path d="M15 29h10M9 19h3l2-4 3 8 2-4h2" stroke-width="2"/></svg>
             </span>
-            <div class="tit"><span class="kick">Plataforma I+D</span><b>Caiquén</b></div>
+            <div class="tit"><span class="kick">Plataforma I+D</span><b>Caiquén<small>Telemetría de tractocamión</small></b></div>
         </div>
         <div class="tablero" aria-hidden="true">
-            <svg viewBox="0 0 240 150">
-                <rect class="pant" x="1" y="1" width="238" height="148" rx="8"/>
-                <path class="suelo" d="M14 124H226"/>
-                <!-- placa con antena -->
-                <rect class="placa" x="26" y="102" width="40" height="20" rx="3"/>
-                <rect class="chip" x="32" y="108" width="10" height="8" rx="1"/>
-                <path class="ant" d="M56 102V80"/>
-                <path class="onda" d="M61 72a9 9 0 0 1 0 14"/>
-                <path class="onda lejos" d="M65 66a16 16 0 0 1 0 26"/>
-                <!-- ruta del mensaje hacia la estación base -->
-                <path class="ruta" d="M58 76C92 30 140 22 180 38"/>
-                <rect class="paq" x="-4" y="-3" width="8" height="6" rx="1" style="offset-path: path('M58 76C92 30 140 22 180 38'); offset-distance: 52%"/>
-                <rect class="paq p2" x="-3" y="-2" width="6" height="4" rx="1" style="offset-path: path('M58 76C92 30 140 22 180 38'); offset-distance: 40%; opacity: .6"/>
-                <rect class="paq p3" x="-2" y="-2" width="4" height="4" rx="1" style="offset-path: path('M58 76C92 30 140 22 180 38'); offset-distance: 30%; opacity: .35"/>
-                <!-- estación base -->
-                <g class="torre"><path d="M178 124 190 44 202 124"/><path class="cruz" d="M182 98H198M180.5 112 196 90M199.5 112 184 90M185 72H195"/><circle cx="190" cy="40" r="3"/></g>
-                <path class="onda lejos" d="M182 32a12 12 0 0 1 16 0"/>
-                <text class="num" x="46" y="140" text-anchor="middle">placa</text>
-                <text class="lect" x="120" y="22" text-anchor="middle">QR</text>
-                <text class="num" x="190" y="140" text-anchor="middle">plataforma</text>
+            <svg viewBox="0 0 320 200">
+                <rect class="pant" x="1" y="1" width="318" height="198" rx="10"/>
+                <!-- lecturas del motor (el script las mueve si no se pidió reducir el movimiento) -->
+                <text class="num" x="18" y="24">RPM</text><text class="lect" id="vRpm" x="18" y="40">1450</text>
+                <text class="num" x="82" y="24">KM/H</text><text class="lect" id="vVel" x="82" y="40">82</text>
+                <text class="num" x="140" y="24">MOTOR °C</text><text class="lect" id="vTem" x="140" y="40">88</text>
+                <text class="num" x="218" y="24">DIÉSEL</text><text class="lect" id="vDie" x="218" y="40">64%</text>
+                <!-- traza del bus CAN -->
+                <path class="traza detalle" d="M18 58h14l4-8 4 16 4-8h14l4-8 4 16 4-8h14l4-8 4 16 4-8h14l4-8 4 16 4-8h14l4-8 4 16 4-8h14l4-8 4 16 4-8h12"/>
+                <!-- camino -->
+                <path class="camino" d="M0 172H320"/>
+                <g class="camion">
+                    <!-- remolque -->
+                    <rect class="caja" x="16" y="92" width="132" height="58" rx="3"/>
+                    <rect class="franja" x="16" y="138" width="132" height="4"/>
+                    <!-- tractor -->
+                    <path class="cabina" d="M152 150V104h26l4-18h22l14 26v38z"/>
+                    <path class="vidrio" d="M185 92h16l10 18h-30z"/>
+                    <rect class="faro" x="214" y="134" width="5" height="6" rx="1"/>
+                    <rect class="puerto" x="190" y="124" width="8" height="6" rx="1"/>
+                    <circle class="llanta" cx="44" cy="156" r="11"/><circle class="rin" cx="44" cy="156" r="6"/>
+                    <circle class="llanta" cx="72" cy="156" r="11"/><circle class="rin" cx="72" cy="156" r="6"/>
+                    <circle class="llanta" cx="128" cy="156" r="11"/><circle class="rin" cx="128" cy="156" r="6"/>
+                    <circle class="llanta" cx="168" cy="156" r="11"/><circle class="rin" cx="168" cy="156" r="6"/>
+                    <circle class="llanta" cx="204" cy="156" r="11"/><circle class="rin" cx="204" cy="156" r="6"/>
+                </g>
+                <!-- cable J1939 del puerto al lector y datos que viajan por él -->
+                <path class="cable" d="M198 127C232 127 236 104 258 104"/>
+                <circle class="dato" r="3" style="offset-path: path('M198 127C232 127 236 104 258 104'); offset-distance: 30%"/>
+                <circle class="dato d2" r="3" style="offset-path: path('M198 127C232 127 236 104 258 104'); offset-distance: 60%"/>
+                <circle class="dato d3" r="3" style="offset-path: path('M198 127C232 127 236 104 258 104'); offset-distance: 90%"/>
+                <!-- lector de diagnóstico -->
+                <rect class="lector" x="256" y="80" width="50" height="70" rx="6"/>
+                <rect class="pantalla-l" x="262" y="86" width="38" height="30" rx="2"/>
+                <text class="lect" id="vDtc" x="281" y="100" text-anchor="middle" style="font-size:9px">DTC 0</text>
+                <circle class="ok" cx="281" cy="108" r="3"/>
+                <text class="num" x="281" y="136" text-anchor="middle">J1939</text>
+                <text class="num" x="110" y="190" text-anchor="middle">tractocamión · ECM</text>
+                <text class="num" x="281" y="190" text-anchor="middle">lector</text>
             </svg>
-            <p class="leyenda">Cada placa se registra y se sigue por su QR</p>
+            <p class="leyenda">El lector toma los datos del motor por el puerto de diagnóstico</p>
         </div>
         <div class="titular">
-            <h1>Acceso al banco de placas Caiquén</h1>
-            <p>Escanea el QR de cada placa Caiquén para registrarla, programarla y darle seguimiento.</p>
+            <h1>Lectura de la computadora del tractocamión</h1>
+            <p>Conecta el lector al puerto de diagnóstico J1939 para leer motor, velocidad, temperaturas y códigos de falla de cada unidad y su remolque.</p>
         </div>
     </header>
     <main class="zona">
         <section class="acceso" aria-labelledby="tit">
             <div>
-                <span class="silk">Placas Caiquén</span>
+                <span class="silk">Telemetría Caiquén</span>
                 <h2 id="tit">Iniciar sesión</h2>
                 <p class="sub" id="sub">Entra con tu correo y tu contraseña.</p>
             </div>
@@ -272,6 +304,19 @@
             });
         }
         ver(); setInterval(ver, 20000);
+        /* Lecturas del motor en la escena: varían poco a poco como en una unidad en ruta (quietas si se pide menos movimiento). */
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            var v = { rpm: 1450, vel: 82, tem: 88, die: 64 };
+            var lim = function (x, a, b) { return Math.max(a, Math.min(b, x)); };
+            setInterval(function () {
+                if (document.hidden) return;
+                v.rpm = lim(v.rpm + Math.round((Math.random() - .5) * 120), 1200, 1750);
+                v.vel = lim(v.vel + Math.round((Math.random() - .5) * 4), 72, 95);
+                v.tem = lim(v.tem + Math.round((Math.random() - .45) * 2), 84, 94);
+                if (Math.random() < .08) v.die = lim(v.die - 1, 20, 100);
+                $('vRpm').textContent = v.rpm; $('vVel').textContent = v.vel; $('vTem').textContent = v.tem; $('vDie').textContent = v.die + '%';
+            }, 900);
+        }
     })();
 </script>
 <script>

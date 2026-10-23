@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.38 — 2026-10-23
+- **Nuevo módulo Neon City** (rosa #FF2E88, `/neoncity`): presentación cinematográfica de los proyectos de la Plataforma I+D, estilo página promocional de videojuego AAA con identidad propia. Hero «NEON CITY» letra por letra con «EXPLORE THE CITY», parallax con ratón y scroll, cifras animadas, ventana que se abre, mapa de los 7 distritos que se desliza en horizontal, un capítulo por proyecto (foto que se abre, texto que se arma, aura del color del módulo, botón «Abrir» y estado real desde /api/modulos), cinta de nombres y botón magnético que entra a la plataforma. GSAP 3.12.5 + ScrollTrigger servidos desde `/static/neoncity/vendor`; fotos de Unsplash. Respeta «reducir movimiento».
+- **Órbitas del portal más realistas:** una órbita por módulo, las interiores giran más rápido (3.ª ley de Kepler), profundidad por inclinación (detrás del núcleo la estrella es más chica y tenue, el trazo de la órbita se desvanece por detrás) y la etiqueta que queda atrás se atenúa al cruzarse.
+- **Acceso de Caiquén rediseñado:** ya no usa la escena de radio de Sigfox. Ahora muestra un tractocamión en ruta con el lector conectado al puerto de diagnóstico J1939, datos del motor en vivo (RPM, km/h, temperatura, diésel, códigos de falla) y la traza del bus CAN; logotipo de camión también en la consola.
+- **Colores:** Impresora pasa de sello bermellón a gris grafito (acento #4A4E5C en claro, plata #B8B8C8 en oscuro). Caiquén pasa de azul acero a **rojo #EF4444** (planeta del portal y todo su módulo, con neutros de tinte rojo). En el portal ahora se lee «Caiquén» con acento.
+
 ## v1.4.37 — 2026-10-23
 - **Nuevo módulo Caiquén** (azul acero #6C9BD9) en /caiquen y /caiquen/acceso, clon de Skudo Sigfox: recibir, programar, consultar, inventario, lotes, movimientos, Excel, botón de escaneo con celular, **Materiales** y **Costos** (una tarjeta por QR). API /api/caiquen y tablas propias.
 - QR PROVISIONAL `CQ-0001` → `CQ-V1-0001` (acepta también `CAIQUEN-…`/`CAIQUÉN-…`). Los seis módulos se rechazan entre sí.

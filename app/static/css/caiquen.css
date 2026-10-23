@@ -1,22 +1,22 @@
 /* caiquen.css - Módulo Caiquén: cabecera, cámara compartida y Recibir (vistas: caiquen_vistas.css).
-   Identidad "vuelo de ave": neutros con tinte azul sutil y azul acero #6C9BD9 como único acento.
-   Rellenos azul aceros con tinta casi negra (#060B14 sobre #6C9BD9, 5.03:1; blanco daría 3.96:1). Texto azul acero: #93B8E8 en oscuro
-   (7.23:1 sobre fondo, 6.40:1 sobre superficie-2) y #245A9E en claro (8.39:1 sobre superficie, 5.94:1 sobre el fondo más oscuro).
+   Identidad "vuelo de ave": neutros con tinte rojo sutil y rojo #EF4444 como único acento.
+   Rellenos rojos con tinta casi negra (#140706 sobre #EF4444, 5.3:1; blanco daría 3.8:1). Texto rojo: #F87171 en oscuro
+   (7.23:1 sobre fondo, 6.40:1 sobre superficie-2) y #B91C1C en claro (8.39:1 sobre superficie, 5.94:1 sobre el fondo más oscuro).
    "ok" es verde (#5BD48A / #116B34), distinto del acento.
    Se apoya en app.css y solo redefine tokens y lo propio de la pantalla. */
 
 :root[data-theme="dark"], :root:not([data-theme]) {
-  --bg: #0E1417; --bg-2: #090E10; --surface: #131A1F; --surface-2: #1A232A; --line: #283139; --line-2: #637480;
-  --text: #EAF0F4; --muted: #A7B4BE; --faint: #909EA9; --accent: #6C9BD9; --accent-fill: #6C9BD9; --accent-ink: #060B14; --accent-text: #93B8E8;
+  --bg: #170E10; --bg-2: #10090B; --surface: #1F1315; --surface-2: #2A1A1C; --line: #39282A; --line-2: #806367;
+  --text: #F4EAEC; --muted: #BEA7AA; --faint: #A99093; --accent: #EF4444; --accent-fill: #EF4444; --accent-ink: #140706; --accent-text: #F87171;
   --ok: #5BD48A; --warn: #F2B33D; --bad: #FF6B6B;
-  --campo: #0A0F11; --glow: 0 1px 2px rgba(0, 0, 0, .35); --glow-fuerte: 0 0 0 4px rgba(108, 217, 175, .16); --borde-btn: #3D6FB3;
+  --campo: #110A0C; --glow: 0 1px 2px rgba(0, 0, 0, .35); --glow-fuerte: 0 0 0 4px rgba(217, 108, 212, .16); --borde-btn: #B91C1C;
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --bg: #E0E5EA; --bg-2: #D3DAE0; --surface: #FAFCFD; --surface-2: #EDF1F4; --line: #C3CCD4; --line-2: #707B86;
-  --text: #12191F; --muted: #475059; --faint: #4F5962; --accent: #245A9E; --accent-fill: #6C9BD9; --accent-ink: #060B14; --accent-text: #245A9E;
+  --bg: #EAE0E1; --bg-2: #E0D3D4; --surface: #FDFAFB; --surface-2: #F4EDEE; --line: #D4C3C5; --line-2: #867071;
+  --text: #1F1213; --muted: #594748; --faint: #624F51; --accent: #B91C1C; --accent-fill: #EF4444; --accent-ink: #140706; --accent-text: #B91C1C;
   --ok: #116B34; --warn: #8A5200; --bad: #B42424;
-  --campo: #FFFFFF; --glow: 0 1px 2px rgba(6, 11, 20, .06); --glow-fuerte: 0 0 0 1px rgba(36, 158, 110, .25); --borde-btn: #245A9E;
+  --campo: #FFFFFF; --glow: 0 1px 2px rgba(20, 7, 6, .06); --glow-fuerte: 0 0 0 1px rgba(158, 36, 153, .25); --borde-btn: #B91C1C;
   color-scheme: light;
 }
 :root { --tp-rad: 6px; --tp-ease: cubic-bezier(.23, 1, .32, 1); --vp-wide: 1280px; --tab-h: 64px; }
@@ -62,26 +62,26 @@ body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text);
 .lado { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .tp h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .01em; }
 
-/* visor: el de app.css, con marco azul acero y más alto */
+/* visor: el de app.css, con marco rojo y más alto */
 .marco-cam { position: relative; border-radius: 10px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px var(--line); }
 .marco-cam[data-cam="on"] { box-shadow: 0 0 0 2px var(--accent), var(--glow-fuerte); }
 .marco-cam .visor { aspect-ratio: 3 / 4; max-height: 62dvh; min-height: 300px; clip-path: none; outline: 0; }
 .marco-cam .visor .frame { inset: 18% 14%; }
-.marco-cam .visor .frame i { width: 38px; height: 38px; border-color: #6C9BD9; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55)); }
+.marco-cam .visor .frame i { width: 38px; height: 38px; border-color: #EF4444; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55)); }
 .marco-cam .visor .frame i:nth-child(1) { border-top-left-radius: 10px; }
 .marco-cam .visor .frame i:nth-child(2) { border-top-right-radius: 10px; }
 .marco-cam .visor .frame i:nth-child(3) { border-bottom-left-radius: 10px; }
 .marco-cam .visor .frame i:nth-child(4) { border-bottom-right-radius: 10px; }
-.marco-cam .visor .frame::after { background: #6C9BD9; box-shadow: 0 0 0 1px rgba(6, 11, 20, .5); }
+.marco-cam .visor .frame::after { background: #EF4444; box-shadow: 0 0 0 1px rgba(20, 7, 6, .5); }
 .marco-cam .visor .tools .iconbtn.is-torch[aria-pressed="true"] { background: var(--accent-fill); color: var(--accent-ink); border-color: var(--borde-btn); }
 .marco-cam[data-cam="off"] .visor .status, .marco-cam[data-cam="off"] .visor .tools { visibility: hidden; }
 
 /* cámara apagada: capa encima del visor */
 .apagada { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center;
-           background: radial-gradient(70% 60% at 50% 45%, #1A232A 0%, #090E10 100%); color: #EAF0F4; }
-.apagada .ico-cam { width: 64px; height: 64px; color: #6C9BD9; margin-bottom: 6px; }
+           background: radial-gradient(70% 60% at 50% 45%, #2A1A1C 0%, #10090B 100%); color: #F4EAEC; }
+.apagada .ico-cam { width: 64px; height: 64px; color: #EF4444; margin-bottom: 6px; }
 .apagada .t { margin: 0; font-size: 20px; font-weight: 700; }
-.apagada .s { margin: 0; max-width: 30ch; color: #A7B4BE; font-size: 15px; text-wrap: pretty; }
+.apagada .s { margin: 0; max-width: 30ch; color: #BEA7AA; font-size: 15px; text-wrap: pretty; }
 .marco-cam:not([data-cam="off"]) .apagada { display: none; }
 
 .btn-cam { width: 100%; min-height: 56px; font-size: 18px; }

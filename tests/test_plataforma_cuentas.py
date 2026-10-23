@@ -37,7 +37,7 @@ class TestPlataformaCuentas(unittest.TestCase):
     def test_admin_lista_y_asigna_modulos_y_rol(self):
         c = self.entrar(ADMIN)
         d = c.get("/api/plataforma/cuentas").json()
-        self.assertEqual(len(d["modulos"]), 7)
+        self.assertEqual(len(d["modulos"]), 8)
         self.assertIn(OTRA, {x["email"] for x in d["cuentas"]})
         d = c.patch(f"/api/plataforma/cuentas/{OTRA}", json={"rol": "consultor", "modulos": ["tpms", "caiquen"]}).json()
         fila = next(x for x in d["cuentas"] if x["email"] == OTRA)

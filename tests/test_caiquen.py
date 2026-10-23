@@ -46,7 +46,7 @@ class TestCaiquen(unittest.TestCase):
 
     def test_modulo_y_paginas(self):
         m = next(x for x in MODULOS if x["id"] == CAIQUEN)
-        self.assertEqual((m["estado"], m["url"], m["login"], m["acento"]), ("disponible", "/caiquen", "/caiquen/acceso", "#6C9BD9"))
+        self.assertEqual((m["estado"], m["url"], m["login"], m["acento"]), ("disponible", "/caiquen", "/caiquen/acceso", "#EF4444"))
         for ruta in ("/caiquen", "/caiquen/acceso", "/api/caiquen/pcb", "/static/caiquen.html", "/static/js/caiquen.js",
                      "/static/css/caiquen.css"):
             self.assertEqual(modulo_de_ruta(ruta), CAIQUEN, ruta)
