@@ -13,7 +13,7 @@
 .c-zona { display: flex; flex-direction: column; gap: 20px; }
 .c-grupo-t { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 8px; font-size: 17px; font-weight: 700; }
 .c-grupo-t .mono { font-variant-numeric: tabular-nums; color: var(--accent-text); }
-.c-zona td.mono { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.c-zona td.mono, .mt-tabla td.mono { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .c-dlg { width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 20px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); color: var(--text); }
 .c-dlg::backdrop { background: rgb(0 0 0 / .5); }
 .c-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -25,3 +25,16 @@
   .c-campos { grid-template-columns: 1fr; }
   .c-tc { width: 100%; }
 }
+/* Materiales (v1.4.35) */
+.mt-aviso { margin-bottom: 16px; border-color: var(--accent); }
+.mt-alerta { border-color: var(--bad); }
+.mt-alerta strong { color: var(--bad); }
+.mt-min { width: 96px; min-height: 36px; }
+.mt-disp .badge { margin-left: 8px; }
+.i-tabla tr[data-bajo="1"] { background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.mt-lista { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mt-lista li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 14px; }
+.mt-asig { display: flex; gap: 6px; }
+.mt-hist { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+.mt-hist summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.mt-ancho { grid-column: 1 / -1; }

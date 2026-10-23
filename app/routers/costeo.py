@@ -1,4 +1,5 @@
-"""API de costeo por módulo (v1.4.34): /api/<modulo>/costos para cada módulo de `costeo.MODULOS_COSTEO`.
+"""API de costeo por módulo (v1.4.34): /api/<modulo>/costos para cada módulo de `costeo.MODULOS_COSTEO`, y desde v1.4.35
+/api/<modulo>/materiales (inventario de materiales que descuenta cada tarjeta programada).
 Va bajo el prefijo del módulo, así que el permiso por módulo (modulos.modulo_de_ruta) y el solo-lectura del consultor
 se aplican igual que al resto de su API. El Excel se sube como cuerpo binario (sin multipart)."""
 from datetime import datetime
@@ -8,7 +9,9 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
+from app.routers.auth import usuario_actual
 from app.services import costeo as svc
+from app.services import materiales as mat
 
 XLSX_MAX = 5 * 1024 * 1024
 
@@ -30,6 +33,27 @@ class ComponenteIn(BaseModel):
 
 class ParametrosIn(BaseModel):
     tipo_cambio: float
+
+
+class ActivarIn(BaseModel):
+    desde: Optional[str] = Field(None, max_length=10)
+
+
+class MovimientoIn(BaseModel):
+    descripcion: str = Field(..., max_length=300)
+    tipo: str = Field(..., max_length=10)
+    cantidad: float
+    nota: str = Field("", max_length=300)
+
+
+class MinimoIn(BaseModel):
+    descripcion: str = Field(..., max_length=300)
+    minimo: float
+
+
+class AsignarIn(BaseModel):
+    pcb_ids: List[int] = Field(..., min_length=1, max_length=5000)
+    tarjeta: str = Field(..., max_length=40)
 
 
 async def _ejecutar(fn, *args):
@@ -84,4 +108,34 @@ def _router(slug: str) -> APIRouter:
     return r
 
 
-routers: List[APIRouter] = [_router(s) for s in svc.MODULOS_COSTEO]
+def _router_materiales(slug: str) -> APIRouter:
+    r = APIRouter(prefix=f"/api/{slug}/materiales", tags=[f"Materiales {svc.MODULOS_COSTEO[slug]['nombre']}"])
+
+    @r.get("", summary="Existencias, consumo por tarjeta realizada, tarjetas posibles y placas por asignar")
+    async def ver():
+        return await _ejecutar(mat.estado, slug)
+
+    @r.post("/activar", summary="Empezar a descontar las tarjetas programadas desde una fecha (por omisión hoy)")
+    async def activar(body: ActivarIn):
+        return await _ejecutar(mat.activar, slug, body.desde)
+
+    @r.post("/movimientos", status_code=status.HTTP_201_CREATED, summary="Entrada, salida o ajuste de un material")
+    async def movimiento(body: MovimientoIn, request: Request):
+        return await _ejecutar(mat.registrar_movimiento, slug, body.model_dump(), usuario_actual(request).get("email") or "")
+
+    @r.delete("/movimientos/{mid}", summary="Eliminar un movimiento capturado por error")
+    async def borrar_movimiento(mid: int):
+        return await _ejecutar(mat.eliminar_movimiento, slug, mid)
+
+    @r.patch("/minimo", summary="Stock mínimo de un material")
+    async def minimo(body: MinimoIn):
+        return await _ejecutar(mat.fijar_minimo, slug, body.descripcion, body.minimo)
+
+    @r.post("/asignar", summary="Indicar qué tarjeta es cada placa (p. ej. RX o TX)")
+    async def asignar(body: AsignarIn):
+        return await _ejecutar(mat.asignar_tarjeta, slug, body.pcb_ids, body.tarjeta)
+
+    return r
+
+
+routers: List[APIRouter] = [f(s) for s in svc.MODULOS_COSTEO for f in (_router, _router_materiales)]

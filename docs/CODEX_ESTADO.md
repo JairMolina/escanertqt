@@ -3,7 +3,12 @@
 Actualizado: 2026-10-21 22:56 UTC
 Commit de referencia: `df5d11e6492d` (puede no incluir cambios pendientes)
 
-## v1.4.34 (2026-10-23, Claude Code, rama costeo-modulos)
+## v1.4.35 (2026-10-23, Claude Code, rama inventario-modulos → main)
+- Inventario de materiales por módulo (`services/materiales.py`, rutas `/api/<slug>/materiales` en `routers/costeo.py`, `js/materiales.js`, estilos en `css/costeo.css`). Placa realizada = `programada_en`; consumo por lista de materiales de Costos (snapshot), devuelto al desprogramar/eliminar; activación por fecha (`costeo_meta.consumo_desde`); AJ asigna RX/TX en `costeo_pcb_tarjeta`.
+- Evidencia: test_materiales (2) + test_costeo + qa_version OK.
+- Pendiente: alertas por correo de stock mínimo y pedidos (TQT los tiene); autoasignar RX/TX si el QR llega a distinguirlo.
+
+## v1.4.34 (2026-10-23, Claude Code, commit c52e5e0)
 - Costos por módulo (opción A, fase 1): pestaña «Costos» en AntiJammer y Sigfox con un solo motor (`services/costeo.py`, `routers/costeo.py` → `/api/<slug>/costos`, `js/costeo.js` con `data-ns`/`data-base`, `css/costeo.css`). Tablas `costeo_componentes`/`costeo_meta` con `modulo`: materiales y tipo de cambio propios por módulo. Costo por tarjeta (cada QR = una tarjeta; AJ RX/TX, Sigfox una), recurrentes (licencia) aparte. Importar Excel del cotizador (filas «RX y TX» repartidas) y exportar con fórmulas.
 - Evidencia: test_costeo (4) + sigfox + antijammer + qa_version OK; importando los Excel corregidos da RX 931.47 / TX 875.82 / AJ 1807.29 y Sigfox 1226.74 + licencia 92.50 (igual que Excel recalculado). Capturas 1440/390 sin desborde ni errores JS.
 - Pendiente: fase 2 (existencias, movimientos, stock mínimo, pedidos), fase 3 (consumo automático al programar una PCB; requiere saber si un QR AJ es RX o TX), extender a SpeedLocker/TPMS; cargar los cotizadores en producción tras desplegar.

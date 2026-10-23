@@ -14,10 +14,10 @@ from typing import Any, Dict, List, Optional
 
 from app.database import db
 
-# slug de la URL → id del módulo (app/modulos.py) y sus tarjetas
+# slug de la URL → id del módulo (app/modulos.py), sus tarjetas y la tabla de placas (para descontar materiales, v1.4.35)
 MODULOS_COSTEO: Dict[str, Dict[str, Any]] = {
-    "antijammer": {"modulo": "skudo-antijammer", "nombre": "Skudo AntiJammer", "tarjetas": ("RX", "TX")},
-    "sigfox": {"modulo": "skudo-sigfox", "nombre": "Skudo Sigfox", "tarjetas": ("Sigfox",)},
+    "antijammer": {"modulo": "skudo-antijammer", "nombre": "Skudo AntiJammer", "tarjetas": ("RX", "TX"), "tabla_pcb": "antijammer_pcb"},
+    "sigfox": {"modulo": "skudo-sigfox", "nombre": "Skudo Sigfox", "tarjetas": ("Sigfox",), "tabla_pcb": "sigfox_pcb"},
 }
 MONEDAS = ("MXN", "USD")
 TIPOS = ("produccion", "recurrente")

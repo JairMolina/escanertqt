@@ -1,5 +1,12 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.35 — 2026-10-23
+- **Inventario de materiales en Skudo AntiJammer y Skudo Sigfox** (pestaña «Materiales»; en celular, dentro de «Más»), con el criterio de Inventario TQTR: existencias = entradas − salidas − consumo, stock mínimo por material y «tarjetas posibles» con lo disponible (manda el material más escaso).
+- **Cada placa programada descuenta** la lista de materiales de su tarjeta (la de Costos). Desprogramar o eliminar la placa devuelve el material; reprogramar lo vuelve a descontar sin duplicar. El consumo guarda la cantidad del momento.
+- **Preparado sin inventario:** el descuento empieza al pulsar «Activar inventario» (fecha desde la que cuentan las placas; las anteriores no descuentan). Antes de eso la lista de materiales ya aparece con existencias en cero.
+- AntiJammer: cada QR es una tarjeta RX o TX; las placas programadas sin tarjeta aparecen «por asignar» (botones RX/TX, por placa o todas) y al corregir RX↔TX se rehace el consumo.
+- Entradas, salidas y ajustes (+/−) con nota y operador, eliminables por error; historial de movimientos y de consumo por placa. API `/api/<modulo>/materiales` (tablas `costeo_movimientos`, `costeo_consumos`, `costeo_pcb_tarjeta`, `costeo_minimos`).
+
 ## v1.4.34 — 2026-10-23
 - **Costos por módulo (cotizador dentro de su módulo):** nueva pestaña «Costos» en Skudo AntiJammer y Skudo Sigfox (en celular, dentro de «Más»). Un solo motor para todos los módulos (`app/services/costeo.py`, `app/routers/costeo.py`, `js/costeo.js`, `css/costeo.css`) con tablas `costeo_componentes` / `costeo_meta` y columna `modulo`: cada proyecto tiene sus propios materiales y su propio tipo de cambio.
 - Costo **por tarjeta** (cada QR es una tarjeta): AntiJammer RX y TX + equipo completo; Sigfox una tarjeta. Los costos **recurrentes** (licencia Sigfox anual) se muestran aparte y no suman a producción.

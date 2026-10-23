@@ -54,6 +54,7 @@
             <a href="#inventario" data-tab="inventario"><i class="svg-slot" data-i="list"></i><span>Inventario</span></a>
             <a href="#lotes" data-tab="lotes" data-mas><i class="svg-slot" data-i="layers"></i><span>Lotes</span></a>
             <a href="#movimientos" data-tab="movimientos" data-mas><i class="svg-slot" data-i="clock"></i><span>Movimientos</span></a>
+            <a href="#materiales" data-tab="materiales" data-mas><i class="svg-slot" data-i="box"></i><span>Materiales</span></a>
             <a href="#costos" data-tab="costos" data-mas><i class="svg-slot" data-i="tag"></i><span>Costos</span></a>
             <a href="#excel" data-tab="excel" data-mas><i class="svg-slot" data-i="excel"></i><span>Excel</span></a>
         </div>
@@ -191,6 +192,13 @@
             </div>
             <div id="xCuerpo"></div>
         </section>
+        <!-- ============================================================ MATERIALES (v1.4.35) -->
+        <section class="vista pag pag-ancha" id="v-materiales" data-vista="materiales" aria-labelledby="tMateriales" hidden>
+            <div class="inv-cab">
+                <h1 id="tMateriales" tabindex="-1">Inventario de materiales</h1>
+            </div>
+            <div id="mtCuerpo"></div>
+        </section>
         <!-- ============================================================ COSTOS (v1.4.34) -->
         <section class="vista pag pag-ancha" id="v-costos" data-vista="costos" aria-labelledby="tCostos" hidden>
             <div class="inv-cab">
@@ -223,6 +231,7 @@
 <script src="/static/js/sigfox_movimientos.js?v=1"></script>
 <script src="/static/js/sigfox_excel.js?v=1"></script>
 <script src="/static/js/costeo.js?v=1" data-ns="SF" data-base="/api/sigfox/costos"></script>
+<script src="/static/js/materiales.js?v=1" data-ns="SF" data-base="/api/sigfox/materiales" data-evento="sigfox:cambio"></script>
 <script src="/static/js/sigfox_escaner.js?v=1"></script>
 </body>
 </html>

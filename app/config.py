@@ -43,7 +43,7 @@ class Settings:
 
     # Nombre y versión
     APP_NAME: str = "Escaner TQT"
-    APP_VERSION: str = "1.4.34"
+    APP_VERSION: str = "1.4.35"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
     # Rutas base
