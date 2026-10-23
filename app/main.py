@@ -21,7 +21,7 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station, esp32, dymo_remoto, plataforma, activos, tpms, antijammer, speedlocker, sigfox
+from app.routers import test_station, esp32, dymo_remoto, plataforma, activos, tpms, antijammer, speedlocker, sigfox, costeo
 from app.ssl_cert import ensure_ssl_certificates
 from app import modulos as modulos_cat
 
@@ -273,6 +273,8 @@ app.include_router(tpms.router)         # v1.4.27: módulo TPMS
 app.include_router(antijammer.router)   # v1.4.31: módulo Skudo AntiJammer
 app.include_router(speedlocker.router)   # v1.4.32: módulo SpeedLocker
 app.include_router(sigfox.router)        # v1.4.33: módulo Skudo Sigfox
+for _r in costeo.routers:                # v1.4.34: Costos (cotizador) por módulo: /api/<modulo>/costos
+    app.include_router(_r)
 
 
 def _pagina_acceso(request: Request, archivo: str) -> HTMLResponse:

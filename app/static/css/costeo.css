@@ -1,0 +1,27 @@
+/* costeo.css - Pestaña «Costos» compartida por los módulos (v1.4.34). Usa los tokens del módulo (--accent, --surface…). */
+.c-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+.c-kpi { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.c-kpi strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.c-kpi-fuerte { border-color: var(--accent); }
+.c-kpi-fuerte strong { color: var(--accent-text); }
+.c-kpi-t { font-size: 13px; font-weight: 600; }
+.c-kpi-n { font-size: 12px; color: var(--muted); }
+.c-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 16px; }
+.c-tc { width: 200px; }
+.c-q { flex: 1 1 220px; }
+.c-barra .ban-acc { display: flex; flex-wrap: wrap; gap: 8px; }
+.c-zona { display: flex; flex-direction: column; gap: 20px; }
+.c-grupo-t { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 8px; font-size: 17px; font-weight: 700; }
+.c-grupo-t .mono { font-variant-numeric: tabular-nums; color: var(--accent-text); }
+.c-zona td.mono { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.c-dlg { width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 20px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); color: var(--text); }
+.c-dlg::backdrop { background: rgb(0 0 0 / .5); }
+.c-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.c-campos .field:first-child { grid-column: 1 / -1; }
+.c-err { min-height: 20px; margin: 12px 0 0; color: var(--bad); font-size: 14px; }
+.c-form-acc { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.c-form-acc .btn-danger { margin-right: auto; }
+@media (max-width: 560px) {
+  .c-campos { grid-template-columns: 1fr; }
+  .c-tc { width: 100%; }
+}

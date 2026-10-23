@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.34 — 2026-10-23
+- **Costos por módulo (cotizador dentro de su módulo):** nueva pestaña «Costos» en Skudo AntiJammer y Skudo Sigfox (en celular, dentro de «Más»). Un solo motor para todos los módulos (`app/services/costeo.py`, `app/routers/costeo.py`, `js/costeo.js`, `css/costeo.css`) con tablas `costeo_componentes` / `costeo_meta` y columna `modulo`: cada proyecto tiene sus propios materiales y su propio tipo de cambio.
+- Costo **por tarjeta** (cada QR es una tarjeta): AntiJammer RX y TX + equipo completo; Sigfox una tarjeta. Los costos **recurrentes** (licencia Sigfox anual) se muestran aparte y no suman a producción.
+- **Importar Excel** del cotizador (hoja «Componentes»; proveedores y tipo de cambio desde «Dashboard de costos»; las filas «RX y TX» se reparten entre las dos tarjetas) y **Descargar cotizador** con fórmulas vivas. Alta, edición y baja de materiales; el consultor solo lee. API `/api/antijammer/costos` y `/api/sigfox/costos`.
+- Para agregar costos a otro módulo basta con añadirlo a `costeo.MODULOS_COSTEO` y enganchar la pestaña en su HTML.
+
 ## v1.4.33 — 2026-10-22
 - **Nuevo módulo Skudo Sigfox** (morado #A855F7), disponible en el portal: consola en `/sigfox` y acceso propio en `/sigfox/acceso`, clon de SpeedLocker (pestañas, filtros, operaciones en masa, movimientos, Excel `SkudoSigfox_placas_AAAAMMDD.xlsx` y botón de escaneo). API `/api/sigfox/*` (misma forma que `/api/speedlocker/*`) y tablas propias `sigfox_pcb` / `sigfox_eventos`.
 - **QR de placa (provisional, falta foto del real):** `SF-0001` / `SF_0001` se registra como `SF-V1-0001` (sin versión = V1, `models.VERSION_SIGFOX`); acepta también `SKUDO-SIGFOX-…`, `SIGFOX-…`, espacios, minúsculas, prefijo PCB y solo la serie.
