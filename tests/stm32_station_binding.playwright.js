@@ -72,6 +72,9 @@ async (page) => {
   try {
     await x.p.getByRole('button').filter({hasText:'TQT-R1-V30-0054'}).click();
     const program=x.p.getByRole('button',{name:'Programar R1 0054 con J-Link',exact:true});await program.waitFor();
+    await x.select.selectOption(B);await x.p.waitForTimeout(180);
+    assert(await x.select.evaluate(e=>e.closest('.prog-panel').querySelector('.prog-estado').textContent.includes('J-Link prueba B')),'Resumen superior refleja agente manual B');
+    await x.select.selectOption(A);await x.p.waitForTimeout(180);
     x.state.agents=[two,{...one,online:false}];await x.refresh();
     assert(await program.isDisabled(),'No programar agente fijado offline');
     x.state.agents=[one,two];await x.refresh();assert(await program.isEnabled(),'A conectada permite programar');

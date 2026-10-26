@@ -38,7 +38,9 @@ window.TQTSTM32 = function (host, ctx) {
     // v1.3.73: semáforo de estado de programación junto al detalle de la tarjeta
     // v1.4.0: estado con la plantilla compartida TQTProgEstado (igual que R2); conexión = Agente J-Link, sin puerto serial
     const estadoBox = window.TQTProgEstado.crear();
+    let luzState = 'bad', luzExtra = {};
     function setLuz(k, extra) {
+        luzState = k; luzExtra = extra || {};
         const id = current?.identity;
         const opt = station.selectedOptions[0];
         window.TQTProgEstado.pintar(estadoBox, Object.assign({
@@ -66,6 +68,7 @@ window.TQTSTM32 = function (host, ctx) {
         sessionTxt.textContent = opt && opt.value
             ? 'Agente fijado: ' + (opt.dataset.name || stationChoiceName || opt.textContent) + ' · ' + (opt.dataset.online === 'true' ? 'conectado' : 'desconectado / no disponible') + (bindingStored ? '' : ' · solo esta sesión: no se pudo guardar la elección')
             : 'Elige el agente de esta laptop. No se selecciona otro automáticamente.';
+        if (current) setLuz(luzState, luzExtra);
     }
     function bindStation(id, name, notify = true) {
         if (busy || cancelling) { station.value = activeStation || stationChoice; return; }
