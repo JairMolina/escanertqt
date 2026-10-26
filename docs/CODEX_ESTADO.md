@@ -1,6 +1,6 @@
 # Avance actual — 2026-10-26
 
-Preparada web1.4.40 en codex/fw-beta-20261026 sobre produccion1.4.39/bfb6465. Catálogo STM32 beta/aprobado con aprobación manual de administrador y evidencia, excluyendo beta de predeterminado y vigencia. 48pruebasPython y Playwright locales correctos; sin despliegue. Firmware4.4 corregido y compilado para unidad0054 según inventario, sin publicar identidad personal ni programar hardware;74ARM+14HEX+8resultados protocolo correctos. Ver FIRMWARE_BETA_STM32.md. Pendiente autorizar despliegue web y registro de beta, y banco físico antes de promover firmware.
+Preparada web1.4.41 en codex/fw-beta-20261026 sobre produccion1.4.39/bfb6465. Catálogo STM32 beta/aprobado con aprobación manual de administrador y evidencia, excluyendo beta de predeterminado y vigencia. 48pruebasPython y Playwright locales correctos; sin despliegue. Firmware4.4 corregido y compilado para unidad0054 según inventario, sin publicar identidad personal ni programar hardware;74ARM+14HEX+8resultados protocolo correctos. Ver FIRMWARE_BETA_STM32.md. Pendiente autorizar despliegue web y registro de beta, y banco físico antes de promover firmware.
 
 ---
 
@@ -63,3 +63,5 @@ Revisar/integrar codex/comandos-r1-local a main cuando se solicite; despliegue d
 
 ## Evidencia
 52Python,9Node,16escenarios Playwright y enlace movil aprobados; clipboard real y capturas1440/1024/390 claro/oscuro sin desborde ni errores JS/HTTP. Compose/build OK, contenedor tqt-comandos-qa-web-1 healthy en127.0.0.1:18086. git pull --ff-only origin main: Already up to date. CM git push: Commits enviados codex/comandos-r1-local. Sin datos, capturas, contrasenas de QA ni bases en commit. CM, ui-ux-pro-max y ECC E2E/verificacion aplicados.
+
+Integración concurrente: producción avanzó a1.4.40/b90ee570 durante el ensayo. Se conserva íntegra su reducción de escrituras de presencia de agentes; versión final de esta tarea1.4.41.

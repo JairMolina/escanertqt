@@ -1,8 +1,12 @@
 # Historial de versiones — Escáner TQT
 
-## v1.4.40 — 2026-10-26
+## v1.4.41 — 2026-10-26
 - Catálogo STM32 R1/R3 con imágenes nuevas beta, selección manual para banco y promoción explícita por administrador con evidencia. Predeterminado y vigencia usan solo aprobadas; una grabación correcta no promociona el firmware.
 - Datos antiguos conservan estado aprobado; duplicados, hash y trabajos en curso mantienen su identidad. Correcciones FW4.4 y evidencia documentadas en FIRMWARE_BETA_STM32.md.
+- Integra también la mejora de presencia de agentes ya desplegada en 1.4.40.
+
+## v1.4.40 — 2026-10-26
+- **Menos escrituras en la microSD por los agentes Windows:** los sondeos `/api/stm32/agent/claim`, `/ble/claim` y `/r2/claim` llegan ~9 veces por segundo entre todas las laptops y cada uno reescribía la presencia (`stm32_stations.last_seen`, `r2_agent_presence`). Ahora solo se reescribe si tiene más de 5 s (o si cambia la disponibilidad R2). La ventana «en línea» sigue en 20 s, así que la web ve igual a las estaciones; baja el desgaste de la SD y los `database is locked`.
 
 ## v1.4.39 — 2026-10-26
 - **Manual de usuario interactivo** en `/documentacion/manual` (enlaces «Manual», «Abrir el manual» y «Ver guía» en cada proyecto de Documentación TEAM HW). Diez guías con capturas reales marcadas, pasos, ficha técnica, problemas frecuentes y buscador: Primeros pasos, Cuentas y permisos, Escáner TQT, TPMS, Skudo AntiJammer, SpeedLocker, Skudo Sigfox, Caiquén, Costos y Materiales e Impresora. Cada guía es un JSON en `static/documentacion/guias/` (índice en `indice.json`) y sus capturas van en `static/documentacion/capturas/<guía>/`.

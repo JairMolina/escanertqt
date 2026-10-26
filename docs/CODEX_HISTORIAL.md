@@ -170,4 +170,6 @@ Evidencia: 52Python,9Node,16escenarios Playwright y enlace movil aprobados; clip
 
 ## 2026-10-26 — Firmware4.4 y catálogo beta
 
-Corregidos comandos fijos y contadorBLE, identidad0054 solo local, Debug/Release sinadvertencias,74ARM14HEX8protocoloPASS. Web1.4.40 basadaenproduccion1.4.39;48tests yPlaywright beta->aprobaciónPASS sinhardware. No desplegada ni beta cargada enproduccion. Fuentes y detalles en FIRMWARE_BETA_STM32.md.
+Corregidos comandos fijos y contadorBLE, identidad0054 solo local, Debug/Release sinadvertencias,74ARM14HEX8protocoloPASS. Web1.4.41 basadaenproduccion1.4.39;48tests yPlaywright beta->aprobaciónPASS sinhardware. No desplegada ni beta cargada enproduccion. Fuentes y detalles en FIRMWARE_BETA_STM32.md.
+
+Integración concurrente: producción avanzó a1.4.40/b90ee570 durante el ensayo. Se conserva íntegra su reducción de escrituras de presencia de agentes; versión final de esta tarea1.4.41.

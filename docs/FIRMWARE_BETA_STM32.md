@@ -1,4 +1,4 @@
-# Firmware STM32 beta y aprobado — web 1.4.40
+# Firmware STM32 beta y aprobado — web 1.4.41
 
 Base integrada: producción 1.4.39, bfb646517ca5ad0892df1b4c654b39e781c82b06. No se mezclan ramas antiguas ni se modifica R2 OTA.
 
@@ -26,3 +26,5 @@ La identidad local de la unidad de ensayo se preparó a partir del inventario; s
 - Interfaz móvil comprobada; no se ejecutaron comandos de programación. El backend de producción permanece1.4.39 mientras no se autorice despliegue.
 
 Capacidades: ECC HW/FW, verificación y backend; UI existente y revisión responsive con ui-ux-pro-max. No se usaron subagentes ni se modificó infraestructura compartida.
+
+Integración concurrente: producción avanzó a1.4.40/b90ee570 durante el ensayo. Se conserva íntegra su reducción de escrituras de presencia de agentes; versión final de esta tarea1.4.41.
