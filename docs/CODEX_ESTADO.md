@@ -9,6 +9,10 @@ Preparada web1.4.41 en codex/fw-beta-20261026 sobre produccion1.4.39/bfb6465. Ca
 Actualizado: 2026-10-21 22:56 UTC
 Commit de referencia: `df5d11e6492d` (puede no incluir cambios pendientes)
 
+## v1.4.42 (2026-10-26, Claude Code, rama lote-elegido)
+- Lote de vista persistente por navegador: `T.loteVista(lotes)` / `T.guardarLoteVista(id)` en common.js (localStorage `tqt.lote.vista`). Lo usan escritorio.js (`cargarLotes`, `seleccionarLote`, evento `tqt:lote-cambiado`), `loteCambiado` de la hoja de lotes, dymo.js (`load` y `cargarLotesR3`) y admin.js (`tLote`; `vLote` sigue en el activo). El lote de la cuenta en el servidor (v1.4.24) no cambia.
+- Evidencia: node --check OK; test_lote_por_usuario + test_qa_version_hoy OK; prueba en navegador (ver CHANGELOG/commit).
+
 ## v1.4.39 (2026-10-26, Claude Code, rama manual-usuario, sin commit)
 - Manual de usuario `/documentacion/manual` (`documentacion/manual.html/.js/.css`; ruta en `main.py`, permitida a consultor). Guías JSON en `documentacion/guias/` (10, índice `indice.json`), capturas en `documentacion/capturas/<guía>/` (datos de demostración). Al agregar un módulo: su guía JSON + entrada en `indice.json`.
 - Tema claro/oscuro en el manual (`data-tema` en <html>, localStorage `tqt-manual-tema`, variables `--b/--n/--mezcla/--ok`). Portada: fondo PCB procedural (`img/pcb-hero.jpg`, `img/pcb-detalle.jpg`) en lugar de la ciudad; textos «ciudad» de la portada sin cambiar.

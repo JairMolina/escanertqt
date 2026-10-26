@@ -198,6 +198,14 @@
     // Del más reciente al más antiguo por fecha de inicio (los lotes viejos sin fecha usan el día 1 de su mes).
     function loteInicio(l) { return l.fecha_inicio || `${l.anio || 0}-${String(l.mes || 1).padStart(2, '0')}-01`; }
     function ordenarLotes(arr) { return (arr || []).slice().sort((a, b) => loteInicio(b).localeCompare(loteInicio(a)) || (b.id - a.id)); }
+    // v1.4.42: lote elegido en la consola (por navegador). Sobrevive a recargar y lo usan /dymo y /admin; sin elección, el lote activo.
+    const CLAVE_LOTE_VISTA = 'tqt.lote.vista';
+    function guardarLoteVista(id) { try { if (id) localStorage.setItem(CLAVE_LOTE_VISTA, String(id)); else localStorage.removeItem(CLAVE_LOTE_VISTA); } catch (e) { /* nada */ } }
+    /** El lote guardado si sigue en la lista; si no, null. */
+    function loteVista(lotes) {
+        let id = ''; try { id = localStorage.getItem(CLAVE_LOTE_VISTA) || ''; } catch (e) { /* nada */ }
+        return (id && (lotes || []).find((l) => String(l.id) === id)) || null;
+    }
     function debounce(fn, ms) { let t = null; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
     // Un solo Intl.DateTimeFormat: toLocaleTimeString() crea uno nuevo en cada llamada (con 300 filas son ~100 ms por repintado).
     let HORA_FMT = null;
@@ -479,7 +487,7 @@
     // ---------------------------------------------------------------- hoja "Lotes" (elegir, usar, crear)
     /** Cambio de lote hecho desde este celular: avisa a la pantalla (evento cancelable) y, si nadie lo atiende, recarga. */
     function loteCambiado(shell, lote) {
-        if (lote) shell.setSub('Lote ' + loteNombre(lote)); else shell.refresh();
+        if (lote) { shell.setSub('Lote ' + loteNombre(lote)); guardarLoteVista(lote.id); } else shell.refresh();
         const ev = new CustomEvent('tqt:lote-cambiado', { detail: { lote }, cancelable: true });
         if (document.dispatchEvent(ev)) setTimeout(() => location.reload(), 350);
     }
@@ -866,7 +874,7 @@
         versionP,
         hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, esTpms, esAntijammer, esSpeedlocker, esSigfox, esCaiquen, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
-        loteNombre, loteConteo, ordenarLotes, debounce, hora,
+        loteNombre, loteConteo, ordenarLotes, loteVista, guardarLoteVista, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,
         toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, irModulos, openLotes,
     };

@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.42 — 2026-10-26
+- **El lote elegido ya no se pierde:** en la consola (`/monitor`) el lote que eliges en la cabecera o con «Ver» vivía solo en la página; al recargar, o al abrir Etiquetas DYMO o Administración, volvía al lote activo (el más reciente). Ahora se recuerda en el navegador (`localStorage` `tqt.lote.vista`): la consola abre en ese lote, `/dymo` carga sus tarjetas y lo preselecciona en R3, y en `/admin` la lista de Tarjetas empieza en él. Cambiarlo en DYMO (R3) o en Admin (Tarjetas) también lo recuerda. Si el lote se borra, vuelve al activo. «Usar este lote» no cambia: sigue fijando el lote de tu cuenta, donde queda lo que recibes. «Vaciar lote» en Admin sigue proponiendo el lote activo.
+- La prueba de versión se había quedado en 1.4.39; ahora comprueba 1.4.42.
+
 ## v1.4.41 — 2026-10-26
 - Catálogo STM32 R1/R3 con imágenes nuevas beta, selección manual para banco y promoción explícita por administrador con evidencia. Predeterminado y vigencia usan solo aprobadas; una grabación correcta no promociona el firmware.
 - Datos antiguos conservan estado aprobado; duplicados, hash y trabajos en curso mantienen su identidad. Correcciones FW4.4 y evidencia documentadas en FIRMWARE_BETA_STM32.md.

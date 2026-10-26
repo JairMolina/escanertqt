@@ -166,13 +166,13 @@ document.addEventListener('DOMContentLoaded', () => {
     async function cargarLotes() {
         const r = await fetch('/api/lotes').then((x) => x.json()).catch(() => []);
         S.lotes = Array.isArray(r) ? r : [];
-        const fill = (sel, withAll) => {
+        const fill = (sel, withAll, vista) => {
             const keep = sel.value; sel.replaceChildren();
             if (withAll) sel.append(h('option', { value: '' }, 'Todos los lotes'));
             S.lotes.forEach((l) => sel.append(h('option', { value: String(l.id) }, T.loteNombre(l) + (l.activo ? ' · activo' : ''))));
-            if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep; else if (!withAll) { const a = S.lotes.find((l) => l.activo) || S.lotes[0]; if (a) sel.value = String(a.id); }
+            if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep; else if (!withAll) { const a = (vista && T.loteVista(S.lotes)) || S.lotes.find((l) => l.activo) || S.lotes[0]; if (a) sel.value = String(a.id); }
         };
-        fill($('tLote'), false); fill($('vLote'), false); fill($('mLote'), true);
+        fill($('tLote'), false, true); fill($('vLote'), false); fill($('mLote'), true);   // v1.4.42: Tarjetas abre en el lote de la consola; «Vaciar» sigue en el activo
     }
 
     async function cargarResumen() {
@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
         actTSel();
     }
     function actTSel() { const n = S.selT.size; $('tSel').textContent = `${n} seleccionada${n === 1 ? '' : 's'} de ${tVis().length} visibles`; $('tDel').disabled = !n; }
-    ['tLote'].forEach((id) => $(id).addEventListener('change', () => { S.selT.clear(); cargarTarjetas(); }));
+    ['tLote'].forEach((id) => $(id).addEventListener('change', () => { T.guardarLoteVista($(id).value); S.selT.clear(); cargarTarjetas(); }));
     $('tEstado').addEventListener('change', pintarTarjetas); $('tQ').addEventListener('input', T.debounce(pintarTarjetas, 200));
     $('tAllLote').addEventListener('click', () => { S.tarjetas.forEach((t) => S.selT.add(t.id)); pintarTarjetas(); });
     $('tNone').addEventListener('click', () => { S.selT.clear(); pintarTarjetas(); });
