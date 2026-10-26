@@ -4,7 +4,7 @@ window.TQTSTM32 = function (host, ctx) {
     const { h, api, T } = ctx;
     const K = ctx.tipo === 'R3' ? 'R3' : 'R1', ID = 'stm-' + K.toLowerCase();
     let alive = true, current = null, selectedPcb = null, busy = false, timer = null, requestN = 0, listN = 0;
-    let activeJob = null, activeFirmware = null, cancelling = false;
+    let activeJob = null, activeFirmware = null, activeStation = null, cancelling = false;
     let selectedFirmware = null, firmwareRequest = 0, uploadOpen = false;
     const firmwareSelect = h('select', { class: 'input', id: ID + '-fw', disabled: true });
     const firmwareHint = h('p', { class: 'hint', 'aria-live': 'polite' }, 'Cargando firmware…');
@@ -47,18 +47,42 @@ window.TQTSTM32 = function (host, ctx) {
         }, extra || {}));
     }
     const station = h('select', { class: 'input', id: ID + '-est' });
-    const SKEY = 'tqt.station.stm32';
+    const SKEY = 'tqt.station.stm32', STATION_EVENT = 'tqt:stm32-station-selected';
     const getSaved = () => { try { return localStorage.getItem(SKEY) || ''; } catch (e) { return ''; } };
-    const setSaved = id => { try { if (id) localStorage.setItem(SKEY, id); else localStorage.removeItem(SKEY); } catch (e) { /* sin storage */ } };
-    // v1.4.19: sin menú de estaciones; se usa solo el dispositivo de esta PC que está en uso (select oculto guarda su id)
-    station.hidden = true;
-    const sessionTxt = h('span', { class: 'prog-sesion-txt' });
+    const getSavedName = () => { try { return localStorage.getItem(SKEY + '.name') || ''; } catch (e) { return ''; } };
+    const setSaved = (id, name) => {
+        try {
+            if (id) { localStorage.setItem(SKEY, id); localStorage.setItem(SKEY + '.name', name || ''); }
+            else { localStorage.removeItem(SKEY); localStorage.removeItem(SKEY + '.name'); }
+            return true;
+        } catch (e) { return false; }
+    };
+    let stationChoice = getSaved(), stationChoiceName = getSavedName(), stationRequest = 0, stationSignature = '', bindingStored = true;
+    const sessionTxt = h('span', { class: 'prog-sesion-txt', role: 'status', 'aria-live': 'polite' });
     const sessionBox = h('div', { class: 'row wrap prog-sesion' }, sessionTxt,
         h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => stations() }, 'Actualizar'));
     function renderStation() {
         const opt = station.selectedOptions[0];
-        sessionTxt.textContent = opt && opt.value ? 'Dispositivo en uso: ' + (opt.dataset.name || opt.textContent) + ' · ' + (opt.dataset.online === 'true' ? 'conectado' : 'desconectado') : 'Ninguna estación J-Link conectada en esta PC';
+        sessionTxt.textContent = opt && opt.value
+            ? 'Agente fijado: ' + (opt.dataset.name || stationChoiceName || opt.textContent) + ' · ' + (opt.dataset.online === 'true' ? 'conectado' : 'desconectado / no disponible') + (bindingStored ? '' : ' · solo esta sesión: no se pudo guardar la elección')
+            : 'Elige el agente de esta laptop. No se selecciona otro automáticamente.';
     }
+    function bindStation(id, name, notify = true) {
+        if (busy || cancelling) { station.value = activeStation || stationChoice; return; }
+        stationChoice = id; stationChoiceName = name || ''; ++stationRequest; stationSignature = '';
+        bindingStored = setSaved(id, name);
+        if (id && ![...station.options].some(o => o.value === id)) station.append(h('option', { value: id, dataset: { online: 'false', name: name || 'Agente guardado' } }, (name || 'Agente guardado') + ' · esperando conexión'));
+        station.value = id;
+        renderStation(); enable();
+        if (notify) window.dispatchEvent(new CustomEvent(STATION_EVENT, { detail: { id, name, source: ID } }));
+        stations();
+    }
+    station.addEventListener('change', () => bindStation(station.value, station.selectedOptions[0]?.dataset.name || ''));
+    const stationChanged = e => {
+        if (e.detail?.source === ID || busy || cancelling) return;
+        if (e.detail && (e.detail.id === '' || /^[a-f0-9]{24}$/.test(e.detail.id))) bindStation(e.detail.id, e.detail.name, false);
+    };
+    window.addEventListener(STATION_EVENT, stationChanged);
     const stationName = h('input', { class: 'input', value: 'PC de programación', id: ID + '-est-nombre', maxlength: 60 });
     const btnProgram = h('button', { class: 'btn btn-primary', type: 'button', disabled: true, onclick: program }, 'Programar STM32 con J-Link');
     const btnCancel = h('button', { class: 'btn', type: 'button', disabled: true, onclick: cancelStation }, 'Detener y cancelar programación');
@@ -114,7 +138,7 @@ window.TQTSTM32 = function (host, ctx) {
         try {
             const fn = await download('/api/stm32/stations/installer', { name: stationName.value.trim() });
             const m = /^(?:Instalar|Agente)_TQT_(.+)\.(?:cmd|zip)$/i.exec(fn || '');
-            if (m) setSaved(m[1]);
+            if (m) bindStation(m[1], stationName.value.trim());
             await stations();
         }
         catch (e) { message(e.message, true); }
@@ -126,9 +150,9 @@ window.TQTSTM32 = function (host, ctx) {
         h('div', { class: 'prog-panel prog-panel-detalle' }, panel,
           h('div', { class: 'row wrap prog-acciones' }, btnProgram, ...(btnEsp ? [btnEsp] : []), btnSubir, btnCancel, hexIn), status,
           h('div', { class: 'field' }, h('label', { for: ID + '-fw' }, 'Firmware a programar'), firmwareSelect, firmwareHint, approveBtn),
-          h('div', { class: 'field' }, h('span', { class: 'label' }, 'Estación Windows conectada al J-Link'), sessionBox, station),
+          h('div', { class: 'field' }, h('label', { for: station.id }, 'Agente Windows conectado al J-Link'), station, sessionBox, h('p', { class: 'hint' }, 'Elige una vez el agente que tiene tu J-Link; se guarda en este navegador. La IP compartida no identifica una laptop con certeza. Si se desconecta, la elección se conserva.')),
           h('details', { class: 'prog-config' }, h('summary', null, 'Configurar esta computadora por primera vez'),
-            h('div', { class: 'field' }, h('label', { for: ID + '-est-nombre' }, 'Nombre de estación Windows'), stationName),
+            h('div', { class: 'field' }, h('label', { for: ID + '-est-nombre' }, 'Nombre para instalar un agente nuevo'), stationName, h('p', { class: 'hint' }, 'Este nombre se usa solo al instalar. El agente en uso se elige en el selector de arriba.')),
             h('div', { class: 'row wrap' }, bundleBtn),
             h('p', { class: 'hint' }, 'Abre el archivo Instalar_TQT descargado una sola vez: instala el agente y lo deja iniciando con Windows en segundo plano. Después, todas las grabaciones se controlan desde esta pantalla. Usa Python 3.10+ y J-Link de SEGGER o STM32CubeIDE ya instalados.')),
           h('p', { class: 'hint' }, K === 'R1' ? 'Orden de la pareja: 1) ESP32 de la R2 (da su MAC) · 2) STM32 de la R1 con la MAC y número de la R2 · 3) ESP32 de la R1 (da la MAC de la R1).' : 'La R3 lleva un firmware fijo (sin MAC ni identidad por unidad). Al verificarse queda registrada como programada.'))));
@@ -167,7 +191,7 @@ window.TQTSTM32 = function (host, ctx) {
         if (btnEsp) btnEsp.disabled = busy || !current;
         btnSubir.disabled = busy || uploadOpen;
         firmwareSelect.disabled = busy || uploadOpen || !firmwareSelect.options.length;
-        search.disabled = busy; lookup.disabled = busy; station.disabled = busy; bundleBtn.disabled = busy;
+        search.disabled = busy; lookup.disabled = busy; station.disabled = busy || cancelling; bundleBtn.disabled = busy;
         list.querySelectorAll('button').forEach(b => b.disabled = busy);
     }
 
@@ -192,22 +216,29 @@ window.TQTSTM32 = function (host, ctx) {
         if (selectedPcb) choose(selectedPcb, true);
     });
     async function stations() {
-        const r = await api('/api/stm32/stations'); if (!alive) return;
+        if (!alive || busy || cancelling) return;
+        const n = ++stationRequest, choice = stationChoice;
+        const r = await api('/api/stm32/stations');
+        if (!alive || n !== stationRequest || choice !== stationChoice || busy || cancelling) return;
         if (!r.ok) {
             [...station.options].forEach(o => o.dataset.online = 'false');
-            renderStation(); enable(); return;
+            stationSignature = ''; renderStation(); enable(); return;
         }
-        // v1.3.75: solo las estaciones que reportan desde la misma red que este navegador (la PC local)
-        // v1.4.19: de ellas, solo la que está en uso: la guardada si está conectada, si no la primera conectada
-        const locales = r.data.filter(s => s.local);
-        const saved = getSaved();
-        if (saved && !r.data.some(s => s.id === saved)) setSaved('');
-        const cur = locales.find(s => s.id === saved && s.online) || locales.find(s => s.online) || locales.find(s => s.id === saved) || null;
-        station.replaceChildren(cur ? h('option', { value: cur.id, dataset: { online: String(cur.online), name: cur.name } }, cur.name) : h('option', { value: '' }, 'Ninguna estación J-Link en esta PC'));
-        if (cur && cur.online) setSaved(cur.id);
-        renderStation();
-        enable();
-        if (!busy) await recover();
+        // Una IP pública puede representar varias laptops. Nunca sustituir una elección por otra.
+        const all = [...r.data].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+        const chosen = all.find(x => x.id === choice);
+        if (chosen) stationChoiceName = chosen.name;
+        const options = [{ id: '', name: 'Elige el agente de esta laptop', online: false, placeholder: true }, ...all];
+        if (choice && !chosen) options.push({ id: choice, name: stationChoiceName || 'Agente guardado', online: false, missing: true });
+        const signature = JSON.stringify(options.map(x => [x.id, x.name, !!x.online, !!x.local, !!x.missing]));
+        if (signature !== stationSignature) {
+            station.replaceChildren(...options.map(x => h('option', { value: x.id, dataset: { online: String(!!x.online), name: x.placeholder ? '' : x.name } },
+                x.placeholder ? x.name : x.name + ' · ' + x.id.slice(-6) + (x.online ? ' · conectado' : ' · desconectado') + (x.missing ? ' / no disponible' : x.local ? ' · misma red' : ''))));
+            stationSignature = signature;
+        }
+        station.value = choice;
+        renderStation(); enable();
+        await recover();
     }
 
     async function recover() {
@@ -215,26 +246,29 @@ window.TQTSTM32 = function (host, ctx) {
         if (!sid || busy) return;
         const r = await api('/api/stm32/stations/' + sid + '/jobs');
         if (!alive || station.value !== sid || busy) return;
-        if (r.ok && r.data.length) watchJob(r.data[0]);
+        const own = r.ok && r.data.find(j => (j.payload?.kind || 'R1') === K && (!j.station || j.station === sid));
+        if (own) watchJob(own);
     }
 
     async function cancelStation() {
-        if (!station.value || cancelling) return;
+        const sid = activeStation || station.value;
+        if (!sid || cancelling) return;
         cancelling = true; enable();
         try {
-            const r = await api('/api/stm32/stations/' + station.value + '/cancel', { method: 'POST', body: {} });
+            const r = await api('/api/stm32/stations/' + sid + '/cancel', { method: 'POST', body: {} });
             if (!r.ok) { message(r.error, true); return; }
             if (r.data.jobs.some(j => j.waiting)) {
                 message('Cancelación solicitada. Espera que el agente cierre J-Link; aún no desconectes la placa.');
                 if (!busy) await recover();
             } else {
-                clearTimeout(timer); activeJob = null; activeFirmware = null; busy = false;
+                clearTimeout(timer); activeJob = null; activeFirmware = null; activeStation = null; busy = false;
                 message('Trabajos pendientes cancelados. Puedes preparar otra programación.');
             }
         } finally { cancelling = false; enable(); }
     }
 
     function watchJob(j) {
+        activeStation = j.station || station.value;
         activeFirmware = j.payload?.firmware_id || null;
         if (activeFirmware) { selectedFirmware = activeFirmware; firmwareSelect.value = activeFirmware; }
         activeJob = j.id; busy = true; enable(); progress(j);
@@ -246,7 +280,7 @@ window.TQTSTM32 = function (host, ctx) {
             if (!r.ok) { message('Recuperando conexión. Puedes solicitar detener la programación; no desconectes la placa.', true); timer = setTimeout(poll, 3000); return; }
             const job = r.data;
             if (['queued', 'running'].includes(job.state)) { progress(job); timer = setTimeout(poll, 1000); return; }
-            activeJob = null; activeFirmware = null; busy = false; await stations(); loadList();
+            activeJob = null; activeFirmware = null; activeStation = null; busy = false; await stations(); loadList();
             if (selectedPcb) await choose(selectedPcb, true);
             enable();
             const okJob = job.state === 'verified', canc = !!job.payload?.cancel_requested || /cancel/i.test(job.state);
@@ -322,10 +356,13 @@ window.TQTSTM32 = function (host, ctx) {
     }
     async function program() {
         if (!current || busy) return;
+        const sid = station.value;
+        if (!sid || sid !== stationChoice || station.selectedOptions[0]?.dataset.online !== 'true') { message('El agente fijado no está conectado. Revisa esa laptop o elige otro agente expresamente.', true); return; }
+        activeStation = sid;
         busy = true; enable();
         progress({ state: 'queued' });
-        const r = await api('/api/stm32/jobs', { method: 'POST', body: { pcb_id: current.pcb_id, station_id: station.value, hex_sha256: current.hex_sha256, firmware_id: current.firmware_id, physical_confirmed: true } });
-        if (!r.ok) { busy = false; enable(); setLuz('err', { fase: 'No se pudo iniciar', error: r.error }); message(r.error, true); return; }
+        const r = await api('/api/stm32/jobs', { method: 'POST', body: { pcb_id: current.pcb_id, station_id: sid, hex_sha256: current.hex_sha256, firmware_id: current.firmware_id, physical_confirmed: true } });
+        if (!r.ok) { activeStation = null; busy = false; enable(); setLuz('err', { fase: 'No se pudo iniciar', error: r.error }); message(r.error, true); return; }
         watchJob(r.data);
     }
     function refresh() {
@@ -337,5 +374,5 @@ window.TQTSTM32 = function (host, ctx) {
     if (ws?.on) ['PCB_ACTUALIZADA', 'PCB_ELIMINADA', 'TARJETA_ACTUALIZADA', 'TARJETA_EMPAREJADA'].forEach(ev => unsubs.push(ws.on(ev, refresh)));
     loadFirmwares(true); loadList(); stations();
     const stationTimer = setInterval(() => { if (alive && !busy) stations(); }, 5000);
-    return { escaneo: scan, ocupada() { return busy; }, actualizar: refresh, desmontar() { alive = false; clearTimeout(timer); clearTimeout(debounce); clearInterval(stationTimer); unsubs.forEach(fn => fn()); } };
+    return { escaneo: scan, ocupada() { return busy; }, actualizar: refresh, desmontar() { alive = false; clearTimeout(timer); clearTimeout(debounce); clearInterval(stationTimer); ++stationRequest; window.removeEventListener(STATION_EVENT, stationChanged); unsubs.forEach(fn => fn()); } };
 };

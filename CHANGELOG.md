@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.42 — 2026-10-26
+- Programación STM32 R1/R3: selector de agente visible y elección persistida en el navegador. La desconexión o desaparición del agente fijado no selecciona otro ni borra la preferencia.
+- Misma IP es solo información de red, sin selección automática. R1/R3 comparten una elección explícita; el nombre del instalador se identifica como registro de agente nuevo.
+- Respuestas obsoletas se descartan y la estación de un trabajo permanece fija para programación y cancelación. Se conservan beta4.4 y estable predeterminado4.3.
+
 ## v1.4.41 — 2026-10-26
 - Catálogo STM32 R1/R3 con imágenes nuevas beta, selección manual para banco y promoción explícita por administrador con evidencia. Predeterminado y vigencia usan solo aprobadas; una grabación correcta no promociona el firmware.
 - Datos antiguos conservan estado aprobado; duplicados, hash y trabajos en curso mantienen su identidad. Correcciones FW4.4 y evidencia documentadas en FIRMWARE_BETA_STM32.md.
