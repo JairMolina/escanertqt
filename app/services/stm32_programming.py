@@ -35,12 +35,18 @@ def huella(mem):
 
 
 def init():
+    # Close the schema read before acquiring a write transaction. A deferred read
+    # upgraded to ALTER can fail with SQLITE_BUSY_SNAPSHOT while agents poll.
     with db.get_db() as c:
-        c.execute('CREATE TABLE IF NOT EXISTS stm32_stations (id TEXT PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT NOT NULL, owner TEXT NOT NULL, last_seen REAL NOT NULL DEFAULT 0)')
         cols = {r[1] for r in c.execute('PRAGMA table_info(stm32_stations)')}
-        for name, kind in (('revoked_at', 'REAL'), ('revoked_by', 'TEXT')):
-            if name not in cols:
-                c.execute(f'ALTER TABLE stm32_stations ADD COLUMN {name} {kind}')
+    if cols and not {'revoked_at', 'revoked_by'} <= cols:
+        with db.transaction() as c:
+            cols = {r[1] for r in c.execute('PRAGMA table_info(stm32_stations)')}
+            for name, kind in (('revoked_at', 'REAL'), ('revoked_by', 'TEXT')):
+                if name not in cols:
+                    c.execute(f'ALTER TABLE stm32_stations ADD COLUMN {name} {kind}')
+    with db.get_db() as c:
+        c.execute('CREATE TABLE IF NOT EXISTS stm32_stations (id TEXT PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT NOT NULL, owner TEXT NOT NULL, last_seen REAL NOT NULL DEFAULT 0, revoked_at REAL, revoked_by TEXT)')
         c.execute('CREATE TABLE IF NOT EXISTS stm32_jobs (id TEXT PRIMARY KEY, station TEXT NOT NULL, pcb INTEGER NOT NULL, state TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL, operator TEXT NOT NULL, payload TEXT NOT NULL, image TEXT NOT NULL, result TEXT)')
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS stm32_pcb_busy ON stm32_jobs(pcb) WHERE state IN ('queued','running')")
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS stm32_station_busy ON stm32_jobs(station) WHERE state IN ('queued','running')")

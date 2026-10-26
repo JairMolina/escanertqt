@@ -164,3 +164,33 @@ class RemovalTests(unittest.TestCase):
             with self.assertRaises(agent.StationRevokedError): agent.api_response(None)
         with patch.object(agent.urllib.request, 'urlopen', side_effect=urllib.error.HTTPError('https://testserver', 503, 'Unavailable', {}, None)):
             with self.assertRaises(urllib.error.HTTPError): agent.api_response(None)
+
+
+class MigrationTests(unittest.TestCase):
+    def test_legacy_migration_waits_for_writer_and_is_repeatable(self):
+        import sqlite3, tempfile, threading
+        from pathlib import Path
+        original = db.get_db
+        transaction = db.transaction
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/'legacy.db'
+            with sqlite3.connect(path) as c:
+                c.execute('PRAGMA journal_mode=WAL')
+                c.execute('CREATE TABLE stm32_stations(id TEXT PRIMARY KEY,name TEXT NOT NULL,token_hash TEXT NOT NULL,owner TEXT NOT NULL,last_seen REAL NOT NULL DEFAULT 0)')
+                c.execute('INSERT INTO stm32_stations VALUES(?,?,?,?,?)', ('a'*24, 'Legacy', 'hash', 'owner@test.mx', 0))
+            writer = sqlite3.connect(path, check_same_thread=False)
+            writer.execute('BEGIN IMMEDIATE')
+            writer.execute('UPDATE stm32_stations SET last_seen=1')
+            release = threading.Timer(0.2, writer.commit)
+            release.start()
+            try:
+                with patch.object(db, 'get_db', side_effect=lambda: original(path)), patch.object(db, 'transaction', side_effect=lambda: transaction(path)), patch.object(stm.catalogue, 'ensure'):
+                    stm.init()
+                    stm.init()
+                with sqlite3.connect(path) as c:
+                    cols = {r[1] for r in c.execute('PRAGMA table_info(stm32_stations)')}
+                    self.assertTrue({'revoked_at', 'revoked_by'} <= cols)
+                    self.assertEqual(c.execute('SELECT last_seen,revoked_at FROM stm32_stations').fetchone(), (1, None))
+            finally:
+                release.join()
+                writer.close()

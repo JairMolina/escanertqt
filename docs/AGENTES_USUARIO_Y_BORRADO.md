@@ -13,7 +13,7 @@ Solicitud: limpiar todos los agentes físicos existentes, retirar las instalacio
 
 ## Evidencia local
 
-121 pruebas Python aprobadas, con bases temporales aisladas. Incluyen permisos, revocación de tokens, operaciones activas, reserva BLE entre comandos, conservación de referencias, retirada atómica, actor de operación distinto del propietario y configuración del instalador. Actualizada la prueba de versión visible que todavía esperaba 1.4.39.
+122 pruebas Python aprobadas (incluida migración de una base antigua mientras otro escritor mantiene el bloqueo), con bases temporales aisladas. Incluyen permisos, revocación de tokens, operaciones activas, reserva BLE entre comandos, conservación de referencias, retirada atómica, actor de operación distinto del propietario y configuración del instalador. Actualizada la prueba de versión visible que todavía esperaba 1.4.39.
 
 Playwright: cuatro grupos nuevos de borrado y once grupos de regresión (agente fijo y estado histórico) aprobados. Sin errores JS; móvil 390 sin desborde. Agentes y trabajos simulados; ninguna tarjeta programada ni movimientos físicos. Configuración Compose QA, sintaxis JS y revisión de diff correctas. Capacidades usadas: ECC backend, seguridad y verificación para transacciones, permisos y comprobaciones; continuidad documental CM.
 
