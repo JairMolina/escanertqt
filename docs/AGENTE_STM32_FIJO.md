@@ -22,3 +22,12 @@ En la captura original se observa DEV6 elegido y error J-Link de conexión al pr
 Capacidades aplicadas: ui-ux-pro-max para claridad del selector, ECCverification para regresión Playwright. CMadjuntar para el original, únicamente después de autorización expresa adicional de la captura y su destino tras el rechazo de revisión automática.
 
 El usuario autorizó el despliegue de esta corrección sin programar tarjetas y el respaldo de la captura en la Mini PC. Ver CODEX_ESTADO/HISTORIAL para resultado real del despliegue.
+
+
+## Despliegue verificado 2026-10-26
+
+Web1.4.42 desplegada y saludable, código c1113ea0d98299f847675754a4ecea08e0a711d5. Respaldo previo /backups/predeploy_1.4.42_20261026_155549.db; sin trabajos activos al recrear solo web. El ajuste final estático del resumen de conexión se aplicó sin otro reinicio. Login público y apihealth correctos; SHA256JS local/servidor coinciden (352f999cdf8ba1eacb2be45d050575d0e6fe52f5712fbd19e6a83aaf3347d81e). Cache1442b. Firmware4.4 siguebeta; sin nuevas grabaciones por esta tarea.
+
+El usuario autorizó explícitamente captura y destino tras rechazo automático. Original respaldado y verificado enMiniPC, SHA256prefijof00308f7f1f3; nota técnica remota y0adjuntos pendientes. Captura fuera deGit.
+
+Usuario: recargar Ctrl+F5 cuando no haya grabación y seleccionar UNA vez el agente que tiene suJLink en AgenteWindows conectadoalJLink. El campo de instalación de abajo no cambia esa elección. Si aparece desconectado se conserva el vínculo; solo el operador puede elegir otro. Prueba física real pendiente si persiste error deprobeconelagentecorrecto.
