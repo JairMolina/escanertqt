@@ -100,9 +100,7 @@ def generar() -> dict:
 def diferencias(esperado: dict) -> list:
     actuales = {p.name for p in SALIDA.glob("*.md")} if SALIDA.exists() else set()
     def leer(n):   # sin importar CRLF/LF (git en Windows puede convertirlos)
-        return (SALIDA / n).read_text(encoding="utf-8").replace("
-", "
-")
+        return (SALIDA / n).read_text(encoding="utf-8").replace(chr(13) + chr(10), chr(10))
     malos = [n for n, c in esperado.items() if not (SALIDA / n).exists() or leer(n) != c]
     return sorted(malos + [f"{n} (sobra)" for n in actuales - set(esperado)])
 
