@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.43 — 2026-10-26
+- Programación STM32 R1/R3 separa los datos preparados (izquierda) del estado histórico independiente (derecha). Cambiar el firmware elegido no cambia el instalado/registrado.
+- Nuevo endpoint de estado por PCB con última programación verificada por lectura, UID, identidad archivada y fecha, o inventario claramente indicado si no hay lectura. Nunca se infiere un firmware desde el selector.
+- Un intento posterior sin verificar advierte que el contenido actual no está confirmado; se conserva el registro histórico. No se realizan lecturas físicas automáticas.
+
 ## v1.4.42 — 2026-10-26
 - Programación STM32 R1/R3: selector de agente visible y elección persistida en el navegador. La desconexión o desaparición del agente fijado no selecciona otro ni borra la preferencia.
 - Misma IP es solo información de red, sin selección automática. R1/R3 comparten una elección explícita; el nombre del instalador se identifica como registro de agente nuevo.

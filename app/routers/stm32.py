@@ -97,6 +97,11 @@ def analizar_hex(body: HexSubido):
         raise HTTPException(400, 'El archivo no es un Intel HEX de texto.')
 
 
+@router.get('/estado/{pcb_id}')
+def estado_stm32(pcb_id: int):
+    return run(svc.observed_state,pcb_id)
+
+
 @router.get('/preview/{pcb_id}')
 def preview(pcb_id: int, firmware_id: str | None = None):
     return run(svc.preview, pcb_id, None, firmware_id)[0]

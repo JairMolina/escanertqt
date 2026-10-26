@@ -136,6 +136,55 @@ def preview(pcb_id, conn=None, firmware_id=None):
         return read(c)
 
 
+def observed_state(pcb_id):
+    """Historical evidence only. Does not read hardware or depend on the selected firmware."""
+    init()
+    with db.get_db() as c:
+        p=inv.get_pcb(pcb_id,conn=c)
+        if not p or p['tipo'] not in ('R1','R3'):
+            raise ValueError('Selecciona una PCB R1 o R3 registrada.')
+        hw=str(p.get('version') or '')
+        if re.fullmatch(r'[0-9]{2,}',hw): hw=hw[0]+'.'+hw[1:]
+        fw=p.get('firmware') or None
+        event=c.execute("SELECT creado_en FROM escaneos WHERE evento='FIRMWARE_GUARDADO' AND valor=? AND detalle=? ORDER BY id DESC LIMIT 1",
+                        (p['nombre'],'FW '+fw)).fetchone() if fw else None
+        data=dict(pcb_id=p['id'],kind=p['tipo'],source='inventory' if fw else 'none',
+                  firmware=fw,hardware=hw,nombre=p['nombre'],id_r=None,mac_r=None,
+                  recorded_at=event['creado_en'] if event else None,verified_at=None,
+                  job_id=None,uid=None,current_unconfirmed=False,
+                  note='Dato de inventario; el contenido actual del STM32 no se ha leído.' if fw else 'No hay una programación verificada ni un firmware registrado.')
+        attempts=c.execute('SELECT id,state,created,updated,payload,result FROM stm32_jobs WHERE pcb=? ORDER BY created DESC,id DESC',(p['id'],)).fetchall()
+        verified=[]
+        for row in attempts:
+            if row['state']!='verified': continue
+            try:
+                payload=json.loads(row['payload']); result=json.loads(row['result'] or '{}')
+                identity=payload['identity']; uid=result.get('uid','')
+                valid=(result.get('verified') is True and re.fullmatch(r'[a-f0-9]{64}',payload['hex_sha256']) is not None
+                       and re.fullmatch(r'[a-f0-9]{64}',payload['identity_sha256']) is not None
+                       and result.get('hex_sha256')==payload['hex_sha256']
+                       and result.get('identity_sha256')==payload['identity_sha256']
+                       and re.fullmatch(r'[A-Fa-f0-9]{24}',uid) is not None
+                       and uid.upper() not in ('0'*24,'F'*24)
+                       and payload.get('kind','R1')==p['tipo'] and identity.get('fw') and identity.get('hw'))
+                if valid: verified.append((row,payload,result))
+            except (KeyError,TypeError,ValueError,AttributeError): continue
+        if verified:
+            row,payload,result=max(verified,key=lambda item:(item[0]['updated'],item[0]['created']))
+            identity=payload['identity']
+            data.update(source='verified_programming',firmware=identity['fw'],hardware=identity['hw'],
+                        nombre=identity.get('nombre'),id_r=identity.get('id_r'),mac_r=identity.get('mac_r'),
+                        verified_at=row['updated'],job_id=row['id'],uid=result['uid'],
+                        note='Última Flash verificada por lectura J-Link; no es una lectura en vivo ni de EEPROM.')
+        if attempts:
+            last=attempts[0]
+            data['last_attempt']=dict(id=last['id'],state=last['state'])
+            if last['id']!=data['job_id'] and last['state']!='queued':
+                data['current_unconfirmed']=True
+                data['note']='Hay un intento posterior sin verificar: el contenido actual puede no coincidir con el último registro.'
+        return data
+
+
 def station_create(name, owner):
     init()
     sid, token = secrets.token_hex(12), secrets.token_urlsafe(32)

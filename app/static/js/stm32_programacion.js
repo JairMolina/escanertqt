@@ -5,7 +5,7 @@ window.TQTSTM32 = function (host, ctx) {
     const K = ctx.tipo === 'R3' ? 'R3' : 'R1', ID = 'stm-' + K.toLowerCase();
     let alive = true, current = null, selectedPcb = null, busy = false, timer = null, requestN = 0, listN = 0;
     let activeJob = null, activeFirmware = null, activeStation = null, cancelling = false;
-    let selectedFirmware = null, firmwareRequest = 0, uploadOpen = false;
+    let selectedFirmware = null, firmwareRequest = 0, uploadOpen = false, observed = null;
     const firmwareSelect = h('select', { class: 'input', id: ID + '-fw', disabled: true });
     const firmwareHint = h('p', { class: 'hint', 'aria-live': 'polite' }, 'Cargando firmware…');
     let firmwareItems = [];
@@ -41,13 +41,27 @@ window.TQTSTM32 = function (host, ctx) {
     let luzState = 'bad', luzExtra = {};
     function setLuz(k, extra) {
         luzState = k; luzExtra = extra || {};
-        const id = current?.identity;
+        const actual = observed;
         const opt = station.selectedOptions[0];
+        const verified = actual?.source === 'verified_programming';
+        const hasRecord = !!actual?.firmware;
+        const unconfirmed = !!actual?.current_unconfirmed;
+        const baseLabel = unconfirmed ? 'Sin verificación actual' : verified ? 'Última programación verificada' : hasRecord ? 'Último registrado' : 'Sin verificar';
+        const colour = k === 'err' ? 'err' : busy ? 'warn' : verified && !unconfirmed ? 'ok' : hasRecord || unconfirmed ? 'warn' : 'bad';
+        const date = actual?.verified_at ? new Date(actual.verified_at * 1000).toLocaleString('es-MX') : actual?.recorded_at || 'No disponible';
         window.TQTProgEstado.pintar(estadoBox, Object.assign({
-            estado: k, conexion: 'Agente J-Link' + (opt && opt.value ? ' · ' + (opt.dataset.name || opt.textContent) + (opt.dataset.online === 'true' ? ' (conectado)' : ' (desconectado)') : ' · sin estación elegida'),
-            fw: id?.fw || '', hw: id?.hw || ''
-        }, extra || {}));
+            estado: colour, etiqueta: busy ? 'Programando · ' + baseLabel.toLowerCase() : baseLabel,
+            conexion: 'Agente J-Link' + (opt && opt.value ? ' · ' + (opt.dataset.name || opt.textContent) + (opt.dataset.online === 'true' ? ' (conectado)' : ' (desconectado)') : ' · sin estación elegida')
+        }, extra || {}, {
+            fw: actual?.firmware || 'sin verificar', hw: actual?.hardware || '',
+            firmwareLabel: verified ? 'Último FW verificado' : 'FW / HW registrados',
+            nombre: actual?.nombre || '', nombreLabel: verified ? 'Nombre en Flash verificada' : 'Nombre registrado',
+            id_r: actual?.id_r || '', mac_r: actual?.mac_r || '', uid: actual?.uid || '',
+            origen: verified ? 'Lectura J-Link tras programar' : hasRecord ? 'Inventario; sin lectura del STM32' : 'Sin datos confirmados',
+            fecha: date, nota: actual?.note || 'No se pudo consultar el estado registrado.'
+        }));
     }
+
     const station = h('select', { class: 'input', id: ID + '-est' });
     const SKEY = 'tqt.station.stm32', STATION_EVENT = 'tqt:stm32-station-selected';
     const getSaved = () => { try { return localStorage.getItem(SKEY) || ''; } catch (e) { return ''; } };
@@ -295,20 +309,23 @@ window.TQTSTM32 = function (host, ctx) {
     }
     async function choose(pcb, quiet = false) {
         if (busy) return { ok: false, texto: 'Hay una programación en curso.' };
+        if (selectedPcb?.id !== pcb.id) { observed = null; setLuz('bad', { fase: 'Consultando el registro de la tarjeta…' }); }
         selectedPcb = pcb;
-        const n = ++requestN; current = null; enable(); panel.replaceChildren(h('p', { class: 'hint' }, K === 'R1' ? 'Cargando R1 y su R2…' : 'Cargando R3…')); markSel();
+        const n = ++requestN; current = null; enable(); panel.replaceChildren(h('div', { class: 'prog-split' }, h('p', { class: 'hint' }, K === 'R1' ? 'Cargando R1 y su R2…' : 'Cargando R3…'), estadoBox)); markSel();
         await loadFirmwares();
         if (!alive || n !== requestN) return { ok: false, texto: 'Selección cambiada.' };
-        const [r, fresca] = await Promise.all([api('/api/stm32/preview/' + pcb.id + (selectedFirmware ? '?firmware_id=' + encodeURIComponent(selectedFirmware) : '')), api('/api/pcb/' + pcb.id)]);
+        const [r, state] = await Promise.all([api('/api/stm32/preview/' + pcb.id + (selectedFirmware ? '?firmware_id=' + encodeURIComponent(selectedFirmware) : '')), api('/api/stm32/estado/' + pcb.id)]);
         if (!alive || n !== requestN) return { ok: false, texto: 'Selección cambiada.' };
-        if (!r.ok) { panel.replaceChildren(T.banner('bad', 'alert', r.error)); return { ok: false, texto: r.error }; }
+        if (state.ok && state.data?.pcb_id === pcb.id) observed = state.data;
+        else if (observed?.pcb_id !== pcb.id) observed = null;
+        if (!r.ok) { setLuz('bad', { fase: 'No se pudo preparar la grabación' }); panel.replaceChildren(h('div', { class: 'prog-split' }, T.banner('bad', 'alert', r.error), estadoBox)); return { ok: false, texto: r.error }; }
         current = r.data;
         const d = current.identity;
         const filas = K === 'R1'
             ? [['Nombre R1', d.nombre], ['R2 vinculada', current.r2], ['ID R2', d.id_r], ['MAC R2', d.mac_r], ['HW', d.hw], ['Firmware', d.fw], ['CRC32', current.crc32]]
             : [['Nombre R3', d.nombre], ['HW', d.hw], ['Firmware', d.fw], ['Imagen', (current.bytes / 1024).toFixed(1) + ' KB']];
-        setLuz((fresca.ok && fresca.data ? fresca.data : pcb).firmware ? 'ok' : 'bad', { fase: 'Lista para programar' });
-        panel.replaceChildren(h('div', { class: 'prog-split' }, h('div', { class: 'prog-datos' }, h('div', { class: 'prog-cab' }, T.tipoChip(K), h('span', { class: 'prog-nm' }, current.nombre || current.r1),
+        setLuz(observed?.firmware ? 'ok' : 'bad', { fase: 'Lista para programar' });
+        panel.replaceChildren(h('div', { class: 'prog-split' }, h('div', { class: 'prog-datos' }, h('p', { class: 'label' }, 'Datos que se van a programar'), h('div', { class: 'prog-cab' }, T.tipoChip(K), h('span', { class: 'prog-nm' }, current.nombre || current.r1),
             h('span', { class: 'dim' }, K === 'R1' ? 'R2 ' + current.r2 : (pcb.id_tarjeta_num ? 'Tarjeta #' + String(pcb.id_tarjeta_num).padStart(4, '0') : 'Suelta'))),
             h('dl', { class: 'prog-dl' }, ...filas.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
             h('p', { class: 'hint' }, 'Al pulsar Programar confirmas que esta ' + K + ' es la conectada al J-Link. La grabación empieza directamente y el resultado aparece aquí.'),

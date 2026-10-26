@@ -84,3 +84,7 @@ Web1.4.42 desplegada y saludable, código c1113ea0d98299f847675754a4ecea08e0a711
 El usuario autorizó explícitamente captura y destino tras rechazo automático. Original respaldado y verificado enMiniPC, SHA256prefijof00308f7f1f3; nota técnica remota y0adjuntos pendientes. Captura fuera deGit.
 
 Usuario: recargar Ctrl+F5 cuando no haya grabación y seleccionar UNA vez el agente que tiene suJLink en AgenteWindows conectadoalJLink. El campo de instalación de abajo no cambia esa elección. Si aparece desconectado se conserva el vínculo; solo el operador puede elegir otro. Prueba física real pendiente si persiste error deprobeconelagentecorrecto.
+
+## 2026-10-26 — Estado STM32 independiente,1.4.43
+
+Preparados izq/registro der separados; nuevoendpointestado sinfirmwareseleccionado y sinhardware, identidadarchivada/fechaUID o inventario rotulado; falloposterior noacreditaFWnuevo.54PythonPASS,5gruposUIestado y6regresionagentefijoPASS,0JSerrors,móvil390. Usuarioautorizódespliegue/memoria; noautorizaunagrabaciónfísica. Ver STM32_ESTADO_PREPARADO_Y_REGISTRADO.md.
