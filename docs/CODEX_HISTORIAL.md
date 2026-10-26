@@ -187,7 +187,7 @@ Corregida sustitución automática porIP/primeronline; selección manual visible
 
 ## Despliegue verificado 2026-10-26
 
-Web1.4.42 desplegada y saludable, código c1113ea0d98299f847675754a4ecea08e0a711d5. Respaldo previo /backups/predeploy_1.4.42_20261026_155549.db; sin trabajos activos al recrear solo web. El ajuste final estático del resumen de conexión se aplicó sin otro reinicio. Login público y apihealth correctos; SHA256JS local/servidor coinciden (352f999cdf8ba1eacb2be45d050575d0e6fe52f5712fbd19e6a83aaf3347d81e). Cache1442b. Firmware4.4 siguebeta; sin nuevas grabaciones por esta tarea.
+Web1.4.42 desplegada y saludable, código c1113ea0d98299f847675754a4ecea08e0a711d5. Respaldo previo /backups/predeploy_1.4.42_20261026_155549.db; sin trabajos activos al recrear solo web. El ajuste final estático del resumen de conexión se aplicó sin otro reinicio. Login público y apihealth correctos; SHA256 del contenido Git normalizado y del JS servido coinciden (352f999cdf8ba1eacb2be45d050575d0e6fe52f5712fbd19e6a83aaf3347d81e). Cache1442b. Firmware4.4 siguebeta; sin nuevas grabaciones por esta tarea.
 
 El usuario autorizó explícitamente captura y destino tras rechazo automático. Original respaldado y verificado enMiniPC, SHA256prefijof00308f7f1f3; nota técnica remota y0adjuntos pendientes. Captura fuera deGit.
 
