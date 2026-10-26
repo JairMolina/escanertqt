@@ -1,5 +1,15 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.45 — 2026-10-26
+- Une las dos versiones que salieron como 1.4.44: la de `main` (`3ac4fdd`: README nuevo y lote persistente, descrita abajo) y la de `codex/gestionar-agentes-20261026` (`9eda711`, ya desplegada, más el arreglo `0ca9d86`). No cambia funciones: junta ambas para que producción avance por fast-forward desde `9eda711`.
+- **Agentes de programación (de `codex/gestionar-agentes-20261026`):** retiro seguro de agentes y la cuenta web queda identificada (Programación STM32, `station/agent.py`, `station/test_station/agent.py`; detalle en docs/AGENTES_USUARIO_Y_BORRADO.md). `0ca9d86`: la migración que revoca estaciones es segura mientras los agentes consultan.
+- `test_station_removal`: cierra sus conexiones SQLite (`contextlib.closing`). `with sqlite3.connect()` solo confirma; en Windows la conexión abierta impedía borrar la carpeta temporal y la prueba fallaba (en Linux pasaba).
+
+## v1.4.44 — 2026-10-26 (main)
+- **El lote elegido ya no se pierde:** en la consola (`/monitor`) el lote que eliges en la cabecera o con «Ver» vivía solo en la página; al recargar, o al abrir Etiquetas DYMO o Administración, volvía al lote activo (el más reciente). Ahora se recuerda en el navegador (`localStorage` `tqt.lote.vista`): la consola abre en ese lote, `/dymo` carga sus tarjetas y lo preselecciona en R3, y en `/admin` la lista de Tarjetas empieza en él. Cambiarlo en DYMO (R3) o en Admin (Tarjetas) también lo recuerda. Si el lote se borra, vuelve al activo. «Usar este lote» no cambia: sigue fijando el lote de tu cuenta, donde queda lo que recibes. «Vaciar lote» en Admin sigue proponiendo el lote activo.
+- Une `main` (README nuevo y este cambio, publicado antes en `main` como «1.4.42», `77cabc0`) con la rama desplegada `codex/stm32-estado-actual-20261026` (1.4.42–1.4.43 de STM32). El número 1.4.42 de `main` chocaba con el de STM32, por eso este cambio queda como 1.4.44. La rama `codex/gestionar-agentes-20261026` no va incluida.
+- La prueba de versión se había quedado en 1.4.39; ahora comprueba 1.4.44.
+
 ## v1.4.43 — 2026-10-26
 - Programación STM32 R1/R3 separa los datos preparados (izquierda) del estado histórico independiente (derecha). Cambiar el firmware elegido no cambia el instalado/registrado.
 - Nuevo endpoint de estado por PCB con última programación verificada por lectura, UID, identidad archivada y fecha, o inventario claramente indicado si no hay lectura. Nunca se infiere un firmware desde el selector.

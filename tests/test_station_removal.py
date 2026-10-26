@@ -169,12 +169,14 @@ class RemovalTests(unittest.TestCase):
 class MigrationTests(unittest.TestCase):
     def test_legacy_migration_waits_for_writer_and_is_repeatable(self):
         import sqlite3, tempfile, threading
+        from contextlib import closing
         from pathlib import Path
         original = db.get_db
         transaction = db.transaction
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)/'legacy.db'
-            with sqlite3.connect(path) as c:
+            # closing(): `with sqlite3.connect()` solo confirma; sin cerrar, Windows no deja borrar la carpeta temporal
+            with closing(sqlite3.connect(path)) as c, c:
                 c.execute('PRAGMA journal_mode=WAL')
                 c.execute('CREATE TABLE stm32_stations(id TEXT PRIMARY KEY,name TEXT NOT NULL,token_hash TEXT NOT NULL,owner TEXT NOT NULL,last_seen REAL NOT NULL DEFAULT 0)')
                 c.execute('INSERT INTO stm32_stations VALUES(?,?,?,?,?)', ('a'*24, 'Legacy', 'hash', 'owner@test.mx', 0))
@@ -187,7 +189,7 @@ class MigrationTests(unittest.TestCase):
                 with patch.object(db, 'get_db', side_effect=lambda: original(path)), patch.object(db, 'transaction', side_effect=lambda: transaction(path)), patch.object(stm.catalogue, 'ensure'):
                     stm.init()
                     stm.init()
-                with sqlite3.connect(path) as c:
+                with closing(sqlite3.connect(path)) as c:
                     cols = {r[1] for r in c.execute('PRAGMA table_info(stm32_stations)')}
                     self.assertTrue({'revoked_at', 'revoked_by'} <= cols)
                     self.assertEqual(c.execute('SELECT last_seen,revoked_at FROM stm32_stations').fetchone(), (1, None))

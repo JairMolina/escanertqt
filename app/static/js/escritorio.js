@@ -228,7 +228,7 @@
         S.activoId = activo ? activo.id : null;
         if (!S.lote) {
             const q = +new URLSearchParams(location.search).get('lote');
-            S.lote = (q && S.lotes.find((l) => l.id === q)) || activo;
+            S.lote = (q && S.lotes.find((l) => l.id === q)) || T.loteVista(S.lotes) || activo;   // v1.4.42: recargar no pierde el lote elegido
         } else S.lote = S.lotes.find((l) => l.id === S.lote.id) || activo;
         pintarLote();
         return true;
@@ -241,7 +241,8 @@
         refs.loteBtn.setAttribute('aria-label', `Lote: ${T.loteNombre(S.lote)}${S.lote && S.lote.activo ? ', activo' : ''}. Cambiar de lote`);
     }
     function seleccionarLote(id) {
-        const l = S.lotes.find((x) => x.id === id); if (!l || (S.lote && S.lote.id === id)) return;
+        const l = S.lotes.find((x) => x.id === id); if (!l) return;
+        T.guardarLoteVista(id); if (S.lote && S.lote.id === id) return;
         S.lote = l; pintarLote(); invalidar();
         if (S.cur) { S.cur.alLote.forEach((fn) => { try { fn(l); } catch (e) { console.error(e); } }); if (S.cur.inst && S.cur.inst.actualizar) S.cur.inst.actualizar(); }
     }
@@ -736,7 +737,7 @@
         T.ws('monitor');
         document.addEventListener('tqt:lote-cambiado', (e) => {   // la hoja de lotes de common.js avisa; aquí no se recarga la página
             e.preventDefault(); const l = e.detail && e.detail.lote;
-            cargarLotes().then(() => { if (l) { S.lote = S.lotes.find((x) => x.id === l.id) || S.lote; pintarLote(); } invalidar(); if (S.cur) { S.cur.alLote.forEach((fn) => fn(S.lote)); if (S.cur.inst && S.cur.inst.actualizar) S.cur.inst.actualizar(); } });
+            cargarLotes().then(() => { if (l) { S.lote = S.lotes.find((x) => x.id === l.id) || S.lote; T.guardarLoteVista(S.lote && S.lote.id); pintarLote(); } invalidar(); if (S.cur) { S.cur.alLote.forEach((fn) => fn(S.lote)); if (S.cur.inst && S.cur.inst.actualizar) S.cur.inst.actualizar(); } });
         });
         pushFeed('info', 'Consola conectada');
         tiempoReal();

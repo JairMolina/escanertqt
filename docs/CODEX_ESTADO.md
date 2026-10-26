@@ -9,6 +9,16 @@ Preparada web1.4.41 en codex/fw-beta-20261026 sobre produccion1.4.39/bfb6465. Ca
 Actualizado: 2026-10-21 22:56 UTC
 Commit de referencia: `df5d11e6492d` (puede no incluir cambios pendientes)
 
+## v1.4.45 (2026-10-26, Claude Code, rama integrar-1.4.45 → main)
+- Une main 1.4.44 (`3ac4fdd`) con `codex/gestionar-agentes-20261026` hasta `0ca9d86` (su 1.4.44 `9eda711` era la que corría en producción). Producción avanza por fast-forward desde `9eda711`. Siguiente versión: 1.4.46, partiendo de `origin/main`.
+
+## v1.4.44 (2026-10-26, Claude Code, rama integrar-1.4.44 → main)
+- Une main (README nuevo + lote persistente, publicado en main como «1.4.42», `77cabc0`) con `codex/stm32-estado-actual-20261026` (1.4.42–1.4.43 STM32, la que corre en producción). NO incluye `codex/gestionar-agentes-20261026`: esa rama también se numeró 1.4.44 y debe rebasarse sobre `origin/main` como 1.4.45. Sesiones: partir siempre de `origin/main` y cerrar ahí.
+
+## Lote persistente (publicado en main como 1.4.42, rama lote-elegido)
+- Lote de vista persistente por navegador: `T.loteVista(lotes)` / `T.guardarLoteVista(id)` en common.js (localStorage `tqt.lote.vista`). Lo usan escritorio.js (`cargarLotes`, `seleccionarLote`, evento `tqt:lote-cambiado`), `loteCambiado` de la hoja de lotes, dymo.js (`load` y `cargarLotesR3`) y admin.js (`tLote`; `vLote` sigue en el activo). El lote de la cuenta en el servidor (v1.4.24) no cambia.
+- Evidencia: node --check OK; test_lote_por_usuario + test_qa_version_hoy OK; prueba en navegador (ver CHANGELOG/commit).
+
 ## v1.4.39 (2026-10-26, Claude Code, rama manual-usuario, sin commit)
 - Manual de usuario `/documentacion/manual` (`documentacion/manual.html/.js/.css`; ruta en `main.py`, permitida a consultor). Guías JSON en `documentacion/guias/` (10, índice `indice.json`), capturas en `documentacion/capturas/<guía>/` (datos de demostración). Al agregar un módulo: su guía JSON + entrada en `indice.json`.
 - Tema claro/oscuro en el manual (`data-tema` en <html>, localStorage `tqt-manual-tema`, variables `--b/--n/--mezcla/--ok`). Portada: fondo PCB procedural (`img/pcb-hero.jpg`, `img/pcb-detalle.jpg`) en lugar de la ciudad; textos «ciudad» de la portada sin cambiar.

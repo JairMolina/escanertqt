@@ -389,7 +389,9 @@ html, body { margin: 0; padding: 0; background: #fff; }
     // ------------------------------------------------------------------ carga
     async function load() {
         const p = new URLSearchParams(location.search);
-        const st = await api('/api/status'); const lote = p.get('lote_id') || (st.ok && st.data && st.data.active_lote ? st.data.active_lote.id : '');
+        const [st, rl] = await Promise.all([api('/api/status'), api('/api/lotes')]);
+        const vista = rl.ok ? T.loteVista(rl.data) : null;   // v1.4.42: el lote elegido en la consola, no siempre el activo
+        const lote = p.get('lote_id') || (vista ? vista.id : '') || (st.ok && st.data && st.data.active_lote ? st.data.active_lote.id : '');
         const r = await api(`/api/tarjetas?limit=500${lote ? `&lote_id=${encodeURIComponent(lote)}` : ''}`);
         if (!r.ok) { $('aviso').append(T.banner('bad', 'alert', 'No se pudieron cargar las tarjetas: ', r.error)); return; }
         state.tarjetas = (r.data && r.data.items) || [];
@@ -464,8 +466,9 @@ html, body { margin: 0; padding: 0; background: #fff; }
         const [rl, st] = await Promise.all([api('/api/lotes'), api('/api/status')]);
         const sel = $('r3Lote');
         if (!rl.ok) { sel.replaceChildren(h('option', { value: '' }, 'No se pudieron cargar los lotes')); return; }
-        const activo = st.ok && st.data && st.data.active_lote ? st.data.active_lote.id : null;
         const lotes = T.ordenarLotes ? T.ordenarLotes(rl.data || []) : (rl.data || []);
+        const vista = T.loteVista(lotes);
+        const activo = vista ? vista.id : (st.ok && st.data && st.data.active_lote ? st.data.active_lote.id : null);
         sel.replaceChildren(...lotes.map((l) => h('option', { value: String(l.id), selected: l.id === activo ? '' : null }, T.loteNombre(l) + (l.activo ? ' (activo)' : ''))));
         if (!lotes.length) sel.replaceChildren(h('option', { value: '' }, 'Todavía no hay lotes'));
         await cargarR3Lote();
@@ -492,7 +495,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         r3Vista();
     }
     $('r3Origen').addEventListener('change', r3Vista);
-    $('r3Lote').addEventListener('change', cargarR3Lote);
+    $('r3Lote').addEventListener('change', () => { T.guardarLoteVista($('r3Lote').value); cargarR3Lote(); });
     ['r3Ver', 'r3Desde', 'r3Hasta', 'r3Copias'].forEach((id) => $(id).addEventListener('input', (e) => { soloDig(e); r3Vista(); }));
     $('selZoom').addEventListener('change', r3Vista);
     const qsR3 = (par) => par.map((n) => `nombre=${encodeURIComponent(n)}`).join('&');
