@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.44 — 2026-10-26
+- **El lote elegido ya no se pierde:** en la consola (`/monitor`) el lote que eliges en la cabecera o con «Ver» vivía solo en la página; al recargar, o al abrir Etiquetas DYMO o Administración, volvía al lote activo (el más reciente). Ahora se recuerda en el navegador (`localStorage` `tqt.lote.vista`): la consola abre en ese lote, `/dymo` carga sus tarjetas y lo preselecciona en R3, y en `/admin` la lista de Tarjetas empieza en él. Cambiarlo en DYMO (R3) o en Admin (Tarjetas) también lo recuerda. Si el lote se borra, vuelve al activo. «Usar este lote» no cambia: sigue fijando el lote de tu cuenta, donde queda lo que recibes. «Vaciar lote» en Admin sigue proponiendo el lote activo.
+- Une `main` (README nuevo y este cambio, publicado antes en `main` como «1.4.42», `77cabc0`) con la rama desplegada `codex/stm32-estado-actual-20261026` (1.4.42–1.4.43 de STM32). El número 1.4.42 de `main` chocaba con el de STM32, por eso este cambio queda como 1.4.44. La rama `codex/gestionar-agentes-20261026` no va incluida.
+- La prueba de versión se había quedado en 1.4.39; ahora comprueba 1.4.44.
+
 ## v1.4.43 — 2026-10-26
 - Programación STM32 R1/R3 separa los datos preparados (izquierda) del estado histórico independiente (derecha). Cambiar el firmware elegido no cambia el instalado/registrado.
 - Nuevo endpoint de estado por PCB con última programación verificada por lectura, UID, identidad archivada y fecha, o inventario claramente indicado si no hay lectura. Nunca se infiere un firmware desde el selector.
