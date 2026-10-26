@@ -22,7 +22,7 @@
         llanta: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.2"/><path d="M12 3v4.8M12 16.2V21M3 12h4.8M16.2 12H21"/>',
         antena: '<circle cx="12" cy="10" r="1.6"/><path d="M12 11.6V21M9 21h6M8.2 6.2a5.4 5.4 0 0 0 0 7.6M15.8 6.2a5.4 5.4 0 0 1 0 7.6M5.4 3.6a9.4 9.4 0 0 0 0 12.8M18.6 3.6a9.4 9.4 0 0 1 0 12.8"/>',
         ave: '<path d="M2.5 9.5c3-4.5 6.5-4.5 9.5 1 3-5.5 6.5-5.5 9.5-1"/><path d="M12 10.5v5.2M12 15.7l-2.6 4.3M12 15.7l2.6 4.3"/>',
-        ciudad: '<path d="M3 21h18"/><path d="M5 21V10l4-2v13M9 21V5l6-2v18M15 21v-9l4 2v7"/><path d="M12 8v.01M12 12v.01M12 16v.01"/>',
+        ciudad: '<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 7V3M14 7V3M10 21v-4M14 21v-4M7 10H3M7 14H3M21 10h-4M21 14h-4"/><circle cx="12" cy="12" r="1.5"/>',   // v1.4.39: chip (antes edificios)
         impresora: '<path d="M7 9V4h10v5"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14h10v6H7z"/><path d="M16.5 12h.01"/>',
         sol: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
         luna: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>'
@@ -373,7 +373,7 @@
         if (it.sin) { avisar('Tu cuenta no tiene acceso a ' + m.nombre + '. Pídelo a un administrador.'); return; }
         var url = destino(m.url);
         if (!url) { avisar('No se pudo abrir ' + m.nombre + '.'); return; }
-        if (sesionInfo) { location.href = url; return; }       // con sesión y permiso: directo
+        if (sesionInfo || m.publico) { location.href = url; return; }       // con sesión y permiso, o módulo público (v1.4.39): directo
         if (entrando) return;
         entrando = true; it.btn.setAttribute('data-cargando', ''); avisar('Comprobando tu sesión…');
         var acceso = (destino(m.login) || '/login') + '?next=' + encodeURIComponent(url);   // v1.4.17: cada módulo con su pantalla de acceso

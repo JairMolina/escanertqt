@@ -1,0 +1,20 @@
+{
+  "titulo": "Manual de usuario · Plataforma I+D",
+  "grupos": [
+    {"id": "empezar", "titulo": "Empieza aquí"},
+    {"id": "modulos", "titulo": "Módulos de placas"},
+    {"id": "herramientas", "titulo": "Herramientas"}
+  ],
+  "guias": [
+    {"id": "primeros-pasos", "titulo": "Primeros pasos", "subtitulo": "Portal, acceso y navegación", "color": "#FF2E88", "grupo": "empezar", "icono": "brujula"},
+    {"id": "cuentas", "titulo": "Cuentas y permisos", "subtitulo": "Roles, módulos e invitaciones", "color": "#8B5CF6", "grupo": "empezar", "icono": "llave"},
+    {"id": "escaner-tqt", "titulo": "Escáner TQT", "subtitulo": "Tarjetas R1, R2 y R3", "color": "#D9A441", "grupo": "modulos", "icono": "chip"},
+    {"id": "tpms", "titulo": "TPMS", "subtitulo": "Sensores de presión de llantas", "color": "#FF6A00", "grupo": "modulos", "icono": "llanta"},
+    {"id": "skudo-antijammer", "titulo": "Skudo AntiJammer", "subtitulo": "Tarjetas RX y TX", "color": "#39FF14", "grupo": "modulos", "icono": "escudo"},
+    {"id": "speedlocker", "titulo": "SpeedLocker", "subtitulo": "Limitador de velocidad", "color": "#38BDF8", "grupo": "modulos", "icono": "candado"},
+    {"id": "skudo-sigfox", "titulo": "Skudo Sigfox", "subtitulo": "Equipos con red Sigfox", "color": "#A855F7", "grupo": "modulos", "icono": "antena"},
+    {"id": "caiquen", "titulo": "Caiquén", "subtitulo": "Telemetría de tractocamión", "color": "#EF4444", "grupo": "modulos", "icono": "camion"},
+    {"id": "costos-materiales", "titulo": "Costos y Materiales", "subtitulo": "Cotizador e inventario por módulo", "color": "#FF7A1A", "grupo": "herramientas", "icono": "caja"},
+    {"id": "impresora", "titulo": "Impresora", "subtitulo": "Activos con etiqueta DYMO y QR", "color": "#B8B8C8", "grupo": "herramientas", "icono": "impresora"}
+  ]
+}

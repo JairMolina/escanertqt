@@ -1,5 +1,5 @@
 /* documentacion.js — Documentación TEAM HW: presentación cinematográfica de los proyectos de la Plataforma I+D (GSAP 3.12.5 + ScrollTrigger,
- * servidos desde /static/documentacion/vendor). Cada módulo es un «distrito» con su color: mapa que se desliza en horizontal,
+ * servidos desde /static/documentacion/vendor). Cada módulo es un «circuito» de la placa con su color: mapa que se desliza en horizontal,
  * un capítulo por proyecto (foto que se abre, texto que se arma, aura del color del distrito) y botón magnético final.
  * El estado de cada módulo (disponible / sin acceso) sale de /api/modulos. Con «reducir movimiento» (o sin GSAP) la página
  * queda completa y quieta: solo funcionan el menú, los enlaces y el botón. */
@@ -13,31 +13,31 @@
 
     // ---------- los proyectos (id = el de app/modulos.py) ----------
     const PROYECTOS = [
-        { id: 'escaner-tqt', nombre: 'Escáner TQT', color: '#D9A441', url: '/', img: 'tqt.jpg', distrito: 'Distrito Ámbar', lema: 'El taller de las tarjetas',
+        { id: 'escaner-tqt', nombre: 'Escáner TQT', color: '#D9A441', url: '/', img: 'tqt.jpg', distrito: 'Circuito Ámbar', lema: 'El taller de las tarjetas',
           desc: 'Recepción por QR, emparejado de MAC, programación de tarjetas R1, R2 y R3 con J-Link y entrega con etiqueta DYMO.',
           puntos: ['Recibir y emparejar por QR', 'Programar R1, R2 y R3', 'Inventario TQTR con consumo y pedidos'],
           alt: 'Tarjeta electrónica con chips y pistas de cobre' },
-        { id: 'tpms', nombre: 'TPMS', color: '#FF6A00', url: '/tpms', img: 'tpms.jpg', distrito: 'Distrito Naranja', lema: 'La presión bajo control',
+        { id: 'tpms', nombre: 'TPMS', color: '#FF6A00', url: '/tpms', img: 'tpms.jpg', distrito: 'Circuito Naranja', lema: 'La presión bajo control',
           desc: 'Sensores de presión de llantas: alta de cada placa por QR, firmware, lotes, inventario y costo por tarjeta.',
           puntos: ['Alta de placas por QR', 'Firmware y estado por placa', 'Costos e inventario de materiales'],
           alt: 'Auto deportivo gris al atardecer con la llanta en primer plano' },
-        { id: 'skudo-antijammer', nombre: 'Skudo AntiJammer', color: '#39FF14', url: '/antijammer', img: 'garage.jpg', distrito: 'Distrito Verde', lema: 'Nadie apaga la señal',
+        { id: 'skudo-antijammer', nombre: 'Skudo AntiJammer', color: '#39FF14', url: '/antijammer', img: 'garage.jpg', distrito: 'Circuito Verde', lema: 'Nadie apaga la señal',
           desc: 'Equipos contra inhibidores de señal: tarjetas RX y TX, cada una con su costo, sus materiales y su historial.',
           puntos: ['Tarjetas RX y TX por separado', 'Lotes, movimientos y Excel', 'Materiales que se descuentan al programar'],
           alt: 'Auto deportivo con faros encendidos en un estacionamiento con luz de neón' },
-        { id: 'speedlocker', nombre: 'SpeedLocker', color: '#38BDF8', url: '/speedlocker', img: 'speed.jpg', distrito: 'Distrito Celeste', lema: 'La velocidad tiene límite',
+        { id: 'speedlocker', nombre: 'SpeedLocker', color: '#38BDF8', url: '/speedlocker', img: 'speed.jpg', distrito: 'Circuito Celeste', lema: 'La velocidad tiene límite',
           desc: 'Control y seguimiento de equipos SpeedLocker, desde el QR de la placa hasta su programación y su costo.',
           puntos: ['QR de placa a nombre único', 'Programación con firmware', 'Costo por tarjeta'],
           alt: 'Conductor al volante con la ciudad iluminada al fondo' },
-        { id: 'skudo-sigfox', nombre: 'Skudo Sigfox', color: '#A855F7', url: '/sigfox', img: 'sigfox.jpg', distrito: 'Distrito Violeta', lema: 'Mensajes cortos, alcance largo',
+        { id: 'skudo-sigfox', nombre: 'Skudo Sigfox', color: '#A855F7', url: '/sigfox', img: 'sigfox.jpg', distrito: 'Circuito Violeta', lema: 'Mensajes cortos, alcance largo',
           desc: 'Equipos Skudo con red Sigfox: alta, validación y la licencia anual separada del costo de producción.',
           puntos: ['Alta y validación de placas', 'Licencia anual aparte', 'Inventario de materiales'],
           alt: 'Circuito con pistas iluminadas en la oscuridad' },
-        { id: 'caiquen', nombre: 'Caiquén', color: '#EF4444', url: '/caiquen', img: 'caiquen.jpg', distrito: 'Distrito Rojo', lema: 'La computadora del tractocamión',
+        { id: 'caiquen', nombre: 'Caiquén', color: '#EF4444', url: '/caiquen', img: 'caiquen.jpg', distrito: 'Circuito Rojo', lema: 'La computadora del tractocamión',
           desc: 'Lectura de datos del motor por J1939: RPM, velocidad, temperaturas y códigos de falla de cada unidad y su remolque.',
           puntos: ['Puerto de diagnóstico J1939', 'Motor, velocidad y temperaturas', 'Códigos de falla por unidad'],
           alt: 'Tractocamión con remolque en una carretera al atardecer' },
-        { id: 'impresora', nombre: 'Impresora', color: '#B8B8C8', url: '/impresora', img: 'impresora.jpg', distrito: 'Distrito Plata', lema: 'Cada activo con su etiqueta',
+        { id: 'impresora', nombre: 'Impresora', color: '#B8B8C8', url: '/impresora', img: 'impresora.jpg', distrito: 'Circuito Plata', lema: 'Cada activo con su etiqueta',
           desc: 'Libro de activos con etiqueta DYMO y QR: cualquiera lo escanea con el celular y ve su ficha.',
           puntos: ['Etiqueta DYMO con QR', 'Importar desde Excel', 'Impresión individual y por lote'],
           alt: 'Pasillo de almacén con estantes llenos de cajas' },
@@ -59,7 +59,7 @@
                 <p class="d-lema d-l">${esc(p.lema)}</p>
                 <p class="d-desc d-l">${esc(p.desc)}</p>
                 <ul class="d-puntos">${p.puntos.map((x) => `<li class="d-l">${esc(x)}</li>`).join('')}</ul>
-                <p class="d-acc d-l"><a class="d-btn" href="${p.url}">Abrir ${esc(p.nombre)} <span aria-hidden="true">→</span></a><span class="d-est" data-id="${p.id}"></span></p>
+                <p class="d-acc d-l"><a class="d-btn" href="${p.url}">Abrir ${esc(p.nombre)} <span aria-hidden="true">→</span></a><a class="d-guia" href="/documentacion/manual#${p.id}">Ver guía<span class="sr"> de ${esc(p.nombre)}</span> <span aria-hidden="true">→</span></a><span class="d-est" data-id="${p.id}"></span></p>
             </div>
         </section>`).join('');
     const nombres = PROYECTOS.map((p) => p.nombre.toUpperCase());

@@ -1,0 +1,330 @@
+{
+  "id": "tpms",
+  "titulo": "TPMS",
+  "subtitulo": "Sensores de presión de llantas",
+  "color": "#FF6A00",
+  "ruta": "/tpms",
+  "resumen": "Registra cada placa TPMS por su QR, anota con qué firmware la programaste y sigue su estado, su lote y su historial. La misma consola tiene el cotizador (Costos) y el inventario de componentes (Materiales) del proyecto.",
+  "roles": {
+    "administrador": "Todo: recibir, programar, editar, cambios en masa, eliminar, renombrar lotes, costos y materiales.",
+    "general": "Lo mismo que el administrador dentro de TPMS, si su cuenta tiene asignado el módulo TPMS.",
+    "consultor": "Solo consulta: ve el Dashboard, Consultar, Inventario, Lotes, Movimientos, Costos y Materiales y descarga los Excel. No puede registrar, programar, editar ni borrar."
+  },
+  "tiempo_lectura": 9,
+  "secciones": [
+    {
+      "id": "que-es",
+      "tipo": "texto",
+      "titulo": "¿Qué es?",
+      "parrafos": [
+        "TPMS es el banco de las placas de sensor de presión de llantas. Cada placa entra con su QR (Recibir), se programa y se anota su firmware (Programar), y desde ahí puedes ver su ficha, su lote y todo lo que le ha pasado.",
+        "Las placas TPMS tienen tablas propias: no cuentan en los tableros de Escáner TQT y Escáner TQT rechaza sus QR. Lo mismo al revés: si lees aquí el QR de una placa de otro módulo, TPMS te dice a qué módulo pertenece y no la registra.",
+        "Si no tienes la sesión iniciada, al abrir /tpms llegas a la pantalla de acceso del módulo (/tpms/acceso). Entra con tu correo y tu contraseña. El botón «Módulos» te regresa al portal."
+      ],
+      "captura": {
+        "src": "capturas/tpms/acceso.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Pantalla de acceso de TPMS con el manómetro a la izquierda y el formulario de inicio de sesión a la derecha",
+        "marcas": [
+          {"n": 1, "x": 64.9, "y": 36, "w": 26.3, "h": 5.8, "texto": "Correo"},
+          {"n": 2, "x": 64.9, "y": 45.9, "w": 20.7, "h": 5.8, "texto": "Contraseña"},
+          {"n": 3, "x": 64.9, "y": 53.4, "w": 26.3, "h": 5.8, "texto": "Entrar"},
+          {"n": 4, "x": 0.8, "y": 1.1, "w": 6.2, "h": 4.9, "texto": "Volver al portal de módulos"}
+        ]
+      }
+    },
+    {
+      "id": "recorrido",
+      "tipo": "texto",
+      "titulo": "Recorrido de la consola",
+      "parrafos": [
+        "En computadora (1024 px de ancho o más) la consola abre en el Dashboard. A la izquierda está el riel con dos grupos: Operación (Dashboard, Recibir, Programar, Consultar) y Gestión (Inventario, Lotes, Movimientos, Materiales, Costos, Excel). Cada pestaña tiene su dirección: /tpms#recibir, /tpms#costos, etc.",
+        "El Dashboard muestra las placas por estado (total, recibidas hoy, sin programar, programadas, con falla y de baja), la actividad de los últimos 14 días y los últimos movimientos. Las cifras por estado y las barras de hardware y firmware abren el Inventario ya filtrado. «Actualizar» vuelve a leer los datos.",
+        "Arriba a la derecha están tu correo y tu rol, el «Botón de escaneo» (para usar tu celular como lector), el cambio de tema claro/oscuro y cerrar sesión."
+      ],
+      "captura": {
+        "src": "capturas/tpms/dashboard.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Dashboard de TPMS con seis tarjetas de conteo, la gráfica de actividad de 14 días y la lista de últimos movimientos",
+        "marcas": [
+          {"n": 1, "x": 0, "y": 6.8, "w": 15, "h": 93.2, "texto": "Riel de pestañas: Operación y Gestión"},
+          {"n": 2, "x": 16.1, "y": 16.3, "w": 82.8, "h": 12.4, "texto": "Placas por estado (abren el Inventario filtrado)"},
+          {"n": 3, "x": 16.1, "y": 28.7, "w": 50.3, "h": 32.7, "texto": "Actividad de 14 días: recibidas y programadas por día"},
+          {"n": 4, "x": 67.4, "y": 28.7, "w": 31.5, "h": 71.3, "texto": "Últimos movimientos"},
+          {"n": 5, "x": 78.8, "y": 0.9, "w": 12.9, "h": 4.9, "texto": "Botón de escaneo (celular como lector)"}
+        ]
+      }
+    },
+    {
+      "id": "recibir",
+      "tipo": "pasos",
+      "titulo": "Recibir placas",
+      "intro": "Recibir da de alta las placas nuevas. Puedes leer el QR con la cámara del equipo, con un lector USB o escribir el código a mano.",
+      "pasos": [
+        {
+          "titulo": "Escribe el lote (opcional)",
+          "texto": "Abre Recibir y escribe el lote en el campo «Lote» (por ejemplo «Marzo 2026»). Las placas que registres desde ese dispositivo quedan en ese lote; el valor se recuerda en el dispositivo. Déjalo vacío si no aplica.",
+          "captura": {
+            "src": "capturas/tpms/recibir.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pestaña Recibir con la cámara apagada a la izquierda y, a la derecha, el contador de recibidas hoy, el último código registrado, el lote y el campo para escribir el código",
+            "marcas": [
+              {"n": 1, "x": 16.1, "y": 65.1, "w": 44.9, "h": 6.2, "texto": "Iniciar cámara"},
+              {"n": 2, "x": 63, "y": 43.9, "w": 35.9, "h": 5.3, "texto": "Lote"},
+              {"n": 3, "x": 63, "y": 57.1, "w": 29.6, "h": 5.8, "texto": "Escribir código (o lector USB)"},
+              {"n": 4, "x": 63, "y": 16.8, "w": 35.9, "h": 22.1, "texto": "Último código y su resultado"},
+              {"n": 5, "x": 63, "y": 70.8, "w": 35.9, "h": 12.4, "texto": "Lecturas de esta sesión"}
+            ]
+          }
+        },
+        {
+          "titulo": "Lee el QR",
+          "texto": "Pulsa «Iniciar cámara» y apunta al QR de la placa, o enfoca el campo «Escribir código» y usa el lector USB. Si el QR está dañado, teclea la serie impresa (por ejemplo 0004, se toma como TPMS V1) o el código completo y pulsa «Añadir».",
+          "nota": "Necesitas permiso de cámara en el navegador para leer con la cámara del equipo."
+        },
+        {
+          "titulo": "Revisa el resultado",
+          "texto": "En «Último código» aparece el nombre de la placa y el resultado: «registrada» (verde) si es nueva, «ya estaba registrada» (amarillo) si ya existía, o en rojo el motivo por el que no se aceptó. El contador «recibidas hoy» sube con cada placa nueva. «Copiar código» copia el texto leído."
+        },
+        {
+          "titulo": "Si el QR es de otro módulo",
+          "texto": "Si lees por error una placa de otro módulo, no se registra y te dice dónde va (por ejemplo «SJ-V1-0052 es una placa Skudo AntiJammer: regístrala en el módulo Skudo AntiJammer.»).",
+          "captura": {
+            "src": "capturas/tpms/recibir-rechazo.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Recibir de TPMS mostrando en rojo que SJ_0052 es una placa Skudo AntiJammer",
+            "marcas": [
+              {"n": 1, "x": 64.1, "y": 28.3, "w": 33.6, "h": 4.7, "texto": "Motivo del rechazo y módulo correcto"}
+            ]
+          },
+          "nota": "«Lecturas de esta sesión» guarda las últimas 12 lecturas solo en este dispositivo; «Vaciar» las borra. Se borran también al cerrar sesión."
+        }
+      ]
+    },
+    {
+      "id": "celular",
+      "tipo": "pasos",
+      "titulo": "Usar el celular",
+      "intro": "Hay dos formas: abrir la consola en el celular, o vincular el celular como lector de la consola de la computadora con el «Botón de escaneo».",
+      "pasos": [
+        {
+          "titulo": "Consola en el celular",
+          "texto": "En pantallas angostas las pestañas pasan a una barra inferior: Recibir, Programar, Consultar, Inventario y «Más». La consola abre en Recibir (en Consultar si tu rol es de consulta).",
+          "captura": {
+            "src": "capturas/tpms/movil-recibir.jpg", "ancho": 390, "alto": 844,
+            "alt": "TPMS en un celular: cámara arriba, botón Iniciar cámara y barra inferior con Recibir, Programar, Consultar, Inventario y Más",
+            "marcas": [
+              {"n": 1, "x": 4.1, "y": 67.8, "w": 91.8, "h": 6.6, "texto": "Iniciar cámara"},
+              {"n": 2, "x": 0, "y": 92.3, "w": 80, "h": 7.7, "texto": "Barra inferior"},
+              {"n": 3, "x": 80, "y": 92.4, "w": 20, "h": 7.6, "texto": "Más"}
+            ]
+          }
+        },
+        {
+          "titulo": "Menú «Más»",
+          "texto": "«Más» abre una hoja con el resto de secciones: Dashboard, Lotes, Movimientos, Materiales, Costos y Excel.",
+          "captura": {
+            "src": "capturas/tpms/movil-mas.jpg", "ancho": 390, "alto": 844,
+            "alt": "Hoja Más secciones con Dashboard, Lotes, Movimientos, Materiales, Costos y Excel",
+            "marcas": [
+              {"n": 1, "x": 4.4, "y": 57.1, "w": 91.3, "h": 40.5, "texto": "Más secciones"}
+            ]
+          }
+        },
+        {
+          "titulo": "Vincular el celular como lector",
+          "texto": "En la computadora pulsa «Botón de escaneo». Aparece un QR: escanéalo con la cámara del celular (o en la app: Más opciones › Escáner para la consola) e inicia sesión si te lo pide. Cuando diga «Celular vinculado», lo que escanees llega a la pestaña abierta: en Recibir se registra, en Consultar se abre su ficha y desde otra pestaña se abre en Consultar. «Desvincular» corta el enlace.",
+          "captura": {
+            "src": "capturas/tpms/escaneo.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Hoja Botón de escaneo con el QR de vinculación, los tres pasos y el estado Esperando al celular",
+            "marcas": [
+              {"n": 1, "x": 20.6, "y": 32.5, "w": 16.7, "h": 26.7, "texto": "QR para el celular"},
+              {"n": 2, "x": 38.5, "y": 32.5, "w": 40.8, "h": 13.8, "texto": "Pasos"},
+              {"n": 3, "x": 38.5, "y": 55.6, "w": 40.8, "h": 4.8, "texto": "Estado de la vinculación"}
+            ]
+          },
+          "nota": "Si abriste la consola como «localhost», el celular no puede llegar a esa dirección: ábrela con la IP de la PC y vuelve a generar el QR (la hoja lo avisa). La vinculación con un celular real no se probó para este manual."
+        }
+      ]
+    },
+    {
+      "id": "programar",
+      "tipo": "pasos",
+      "titulo": "Programar y anotar el firmware",
+      "intro": "La programación física se hace con tu herramienta habitual; en esta pestaña anotas con qué firmware quedó cada placa.",
+      "pasos": [
+        {
+          "titulo": "Busca la placa",
+          "texto": "En Programar escanea el QR o escribe en «Placa» el QR, el nombre (TPMS-V1-0004) o solo la serie, y pulsa «Buscar». Si no está registrada te ofrece «Ir a Recibir».",
+          "captura": {
+            "src": "capturas/tpms/programar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pestaña Programar con la placa TPMS-V1-0008 cargada, el firmware escrito y los botones Guardar firmware y Marcar falla",
+            "marcas": [
+              {"n": 1, "x": 63, "y": 12.7, "w": 27.5, "h": 5.8, "texto": "Placa: QR, nombre o serie"},
+              {"n": 2, "x": 64.1, "y": 26.1, "w": 33.6, "h": 10.1, "texto": "Placa seleccionada y su estado"},
+              {"n": 3, "x": 63, "y": 47.7, "w": 35.9, "h": 5.8, "texto": "Firmware"},
+              {"n": 4, "x": 63, "y": 58.5, "w": 35.9, "h": 7.2, "texto": "Programar en lote"},
+              {"n": 5, "x": 63, "y": 68, "w": 35.9, "h": 5.8, "texto": "Guardar firmware / Marcar falla"}
+            ]
+          }
+        },
+        {
+          "titulo": "Escribe el firmware y guarda",
+          "texto": "Escribe el firmware y pulsa «Guardar firmware». Una placa RECIBIDA pasa a PROGRAMADA. El último firmware que guardaste se recuerda en el dispositivo y la lista «Programadas en esta sesión» muestra lo que llevas."
+        },
+        {
+          "titulo": "Modo lote",
+          "texto": "Activa «Programar en lote» para guardar sin confirmar: cada placa que leas se guarda con el firmware escrito. Útil para series grandes con el mismo firmware."
+        },
+        {
+          "titulo": "Marcar o quitar una falla",
+          "texto": "«Marcar falla» abre una hoja donde puedes anotar qué falló (opcional) y la pasa a FALLA. Si la placa ya está en falla, el botón dice «Quitar falla» y la regresa a PROGRAMADA (si tiene firmware) o a RECIBIDA.",
+          "nota": "Si el inventario de Materiales está activo, guardar el firmware descuenta los materiales de la placa. Ver la guía Costos y Materiales."
+        }
+      ]
+    },
+    {
+      "id": "consultar",
+      "tipo": "pasos",
+      "titulo": "Consultar una placa",
+      "intro": "Consultar es de solo lectura y sirve a todos los roles.",
+      "pasos": [
+        {
+          "titulo": "Busca y lee la ficha",
+          "texto": "Escanea el QR o escribe el QR, el nombre o la serie y pulsa «Consultar». La ficha muestra hardware, firmware, serie, lote, fechas de recepción y programación, última actualización, operador, nota y el código leído tal cual. Abajo está el historial de la placa. «Programar esta placa» la abre en Programar.",
+          "captura": {
+            "src": "capturas/tpms/consultar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ficha de la placa TPMS-V1-0004 buscada solo con la serie 4, con sus datos e historial",
+            "marcas": [
+              {"n": 1, "x": 63, "y": 12.7, "w": 26.3, "h": 5.8, "texto": "Búsqueda (aquí solo la serie: 4)"},
+              {"n": 2, "x": 63, "y": 24.2, "w": 35.9, "h": 46.8, "texto": "Ficha de la placa"},
+              {"n": 3, "x": 64.4, "y": 63.6, "w": 33.4, "h": 5.3, "texto": "Programar esta placa"},
+              {"n": 4, "x": 63, "y": 73.2, "w": 35.9, "h": 19.5, "texto": "Historial"}
+            ]
+          },
+          "nota": "En la captura, el «Código leído» es PCB_TQT-R3_V2_0_TIMER-0004: las primeras placas TPMS V1 traen impresa por error la plantilla de la R3 Timer, y TPMS la reconoce como TPMS-V1-0004."
+        }
+      ]
+    },
+    {
+      "id": "inventario",
+      "tipo": "pasos",
+      "titulo": "Inventario: filtrar, editar y cambios en masa",
+      "intro": "El Inventario lista todas las placas con filtros por texto, estado, hardware, firmware y lote.",
+      "pasos": [
+        {
+          "titulo": "Filtra y selecciona",
+          "texto": "Usa «Buscar» (nombre, serie, firmware o nota) y los filtros. Marca las casillas de las placas: abajo aparece la barra de acciones con Firmware, Hardware, Lote, Estado, Eliminar y Quitar selección. El nombre de cada placa abre su ficha en Consultar.",
+          "captura": {
+            "src": "capturas/tpms/inventario.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Inventario de TPMS con filtros, la tabla de placas, dos placas seleccionadas y la barra de acciones en masa",
+            "marcas": [
+              {"n": 1, "x": 16.1, "y": 16.3, "w": 82.8, "h": 7.9, "texto": "Buscar y filtros"},
+              {"n": 2, "x": 89.3, "y": 9.2, "w": 9.6, "h": 5.3, "texto": "Dar de alta (placa sin QR legible)"},
+              {"n": 3, "x": 87.4, "y": 30.7, "w": 11.4, "h": 6.3, "texto": "Editar una placa"},
+              {"n": 4, "x": 16.1, "y": 91.6, "w": 82.8, "h": 7.3, "texto": "Acciones con la selección"}
+            ]
+          },
+          "nota": "Los cambios en masa son todo o nada: si una placa falla (por ejemplo, un nombre que ya existe al cambiar el hardware), no se cambia ninguna."
+        },
+        {
+          "titulo": "Edita una placa",
+          "texto": "«Editar» abre una hoja con hardware (versión), serie, firmware, estado, lote y nota. «Guardar cambios» aplica; «Eliminar TPMS-V1-…» la borra. Si cambias hardware o serie y ya existe otra placa con ese nombre, no se guarda.",
+          "captura": {
+            "src": "capturas/tpms/inventario-editar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Hoja Editar TPMS-V1-0015 con campos de hardware, serie, firmware, estado, lote y nota",
+            "marcas": [
+              {"n": 1, "x": 31.3, "y": 24.3, "w": 37.5, "h": 51.5, "texto": "Hoja de edición"}
+            ]
+          }
+        },
+        {
+          "titulo": "Alta manual",
+          "texto": "«Dar de alta» es para placas cuyo QR no se puede leer: escribe hardware (versión) y serie. La placa queda como RECIBIDA."
+        }
+      ]
+    },
+    {
+      "id": "lotes-movimientos",
+      "tipo": "pasos",
+      "titulo": "Lotes, Movimientos y Excel",
+      "pasos": [
+        {
+          "titulo": "Lotes",
+          "texto": "Cada lote muestra sus placas por estado (programadas, sin programar, falla, baja) y el rango de fechas. «Ver en Inventario» abre sus placas; «Renombrar» cambia el lote de todas sus placas (si escribes un lote que ya existe, se juntan). Las placas sin lote salen en «Sin lote» con el botón «Asignar lote».",
+          "captura": {
+            "src": "capturas/tpms/lotes.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pestaña Lotes con las tarjetas Abril 2026, Marzo 2026 y Sin lote",
+            "marcas": [
+              {"n": 1, "x": 16.1, "y": 14.9, "w": 27, "h": 25.2, "texto": "Un lote con su conteo por estado"},
+              {"n": 2, "x": 17.3, "y": 33.3, "w": 24.7, "h": 4.9, "texto": "Ver en Inventario / Renombrar"}
+            ]
+          }
+        },
+        {
+          "titulo": "Movimientos",
+          "texto": "Bitácora de cada placa recibida, programada, editada, eliminada o cambiada en masa, con detalle, operador y fecha. Filtra por texto, acción y rango de fechas. Muestra 50 por página.",
+          "captura": {
+            "src": "capturas/tpms/movimientos.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pestaña Movimientos con filtros y la tabla de eventos",
+            "marcas": [
+              {"n": 1, "x": 16.1, "y": 14.9, "w": 82.8, "h": 7.9, "texto": "Buscar, Acción, Desde y Hasta"},
+              {"n": 2, "x": 16.1, "y": 22.8, "w": 82.8, "h": 77.2, "texto": "Placa, acción, detalle, operador y fecha"}
+            ]
+          }
+        },
+        {
+          "titulo": "Exportar a Excel",
+          "texto": "Elige los filtros (parte de los que tengas en Inventario), revisa cuántas placas saldrán y pulsa «Descargar Excel». El archivo TPMS_placas_AAAAMMDD.xlsx trae la hoja Placas y la hoja Movimientos (los últimos 2000). El rol de consulta también puede descargarlo.",
+          "captura": {
+            "src": "capturas/tpms/excel.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pestaña Exportar a Excel con filtros, el conteo de placas y el botón Descargar Excel",
+            "marcas": [
+              {"n": 1, "x": 17.3, "y": 24.1, "w": 65.7, "h": 7.9, "texto": "Qué placas exportar"},
+              {"n": 2, "x": 17.3, "y": 35.4, "w": 65.7, "h": 2.4, "texto": "Cuántas saldrán"},
+              {"n": 3, "x": 17.3, "y": 39, "w": 12.2, "h": 5.3, "texto": "Descargar Excel"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "costos-materiales",
+      "tipo": "texto",
+      "titulo": "Costos y Materiales",
+      "parrafos": [
+        "Las pestañas Costos (cotizador: lista de materiales y costo por tarjeta) y Materiales (existencias que se descuentan al programar) funcionan igual en TPMS, SpeedLocker, Skudo AntiJammer, Skudo Sigfox y Caiquén. En TPMS cada placa es una tarjeta «TPMS». Consulta la guía «Costos y Materiales»."
+      ]
+    },
+    {
+      "id": "ficha",
+      "tipo": "ficha",
+      "titulo": "Ficha técnica",
+      "filas": [
+        ["Rutas", "/tpms (consola) · /tpms/acceso (inicio de sesión) · pestañas con #dashboard, #recibir, #programar, #consultar, #inventario, #lotes, #movimientos, #materiales, #costos, #excel"],
+        ["Formato del QR", "TPMS_V1_0004 o PCB_TPMS-V1-0004 → TPMS-V1-0004. La versión es opcional (sin versión = V1) y admite decimal (V1_1 → V1.1). Acepta guion, guion bajo o espacio y mayúsculas o minúsculas."],
+        ["QR de las primeras V1", "PCB_TQT-R3_V2_0_TIMER-0004 (plantilla de la R3 con guiones) → TPMS-V1-0004. La R3 Timer real usa guiones bajos (PCB_TQT_R3_V2_0_TIMER_0073) y sigue siendo de Escáner TQT."],
+        ["Solo la serie", "Escribir 4 o 0004 en Recibir, Programar o Consultar se toma como TPMS-V1-0004."],
+        ["No válidos", "Versión 0 o serie 0000. QR de SpeedLocker, Skudo AntiJammer, Skudo Sigfox o Caiquén: se rechazan diciendo a qué módulo van."],
+        ["Estados", "RECIBIDA → PROGRAMADA (al guardar firmware). También FALLA y BAJA. Quitar el firmware a una PROGRAMADA la regresa a RECIBIDA."],
+        ["Acciones en la bitácora", "Recibida, Programada, Editada, Eliminada, Cambio en masa"],
+        ["Qué se guarda por placa", "Nombre, hardware, serie, código leído, lote, firmware, estado, nota, operador, fecha de recepción, de programación y de última actualización"],
+        ["Exportación", "TPMS_placas_AAAAMMDD.xlsx con hojas Placas y Movimientos (últimos 2000)"],
+        ["Guardado en el dispositivo", "Lote de Recibir, último firmware y modo lote de Programar (navegador). Las lecturas de la sesión se borran al cerrar sesión."],
+        ["Permiso", "La cuenta necesita el módulo TPMS asignado; si no, vuelve al portal de módulos."]
+      ]
+    },
+    {
+      "id": "problemas",
+      "tipo": "faq",
+      "titulo": "Problemas frecuentes",
+      "items": [
+        {"p": "Leí una placa y dice «ya estaba registrada».", "r": "Esa placa ya existe; no se duplica. Ábrela en Consultar para ver su lote y su historial."},
+        {"p": "Dice que es una placa de otro módulo.", "r": "El QR pertenece a SpeedLocker, Skudo AntiJammer, Skudo Sigfox o Caiquén. Regístrala en ese módulo."},
+        {"p": "«no es un QR de placa TPMS».", "r": "El texto no tiene el formato TPMS. Revisa que el QR sea de una placa TPMS o escribe la serie impresa."},
+        {"p": "En Programar dice «no está registrada».", "r": "Primero regístrala en Recibir (o con «Dar de alta» en Inventario) y vuelve a buscarla."},
+        {"p": "No puedo guardar ni registrar nada y veo un aviso de rol de consulta.", "r": "Tu cuenta es de consulta. Pide a un administrador que cambie tu rol si necesitas operar."},
+        {"p": "El cambio en masa no se aplicó a ninguna placa.", "r": "Es todo o nada: si una placa no se puede cambiar (por ejemplo, el nombre nuevo ya existe), no cambia ninguna. Revisa el mensaje, corrige la selección y vuelve a aplicar."},
+        {"p": "El celular no se vincula.", "r": "Abre la consola con la IP de la PC (no «localhost»), genera el QR otra vez y comprueba que el celular esté en la misma red."},
+        {"p": "La cámara no enciende.", "r": "Da permiso de cámara al sitio en el navegador. Mientras tanto, usa un lector USB o escribe la serie."}
+      ]
+    }
+  ],
+  "relacionadas": ["costos-materiales", "speedlocker", "skudo-antijammer", "cuentas"]
+}

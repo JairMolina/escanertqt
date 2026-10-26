@@ -3,6 +3,13 @@
 Actualizado: 2026-10-21 22:56 UTC
 Commit de referencia: `df5d11e6492d` (puede no incluir cambios pendientes)
 
+## v1.4.39 (2026-10-26, Claude Code, rama manual-usuario, sin commit)
+- Manual de usuario `/documentacion/manual` (`documentacion/manual.html/.js/.css`; ruta en `main.py`, permitida a consultor). Guías JSON en `documentacion/guias/` (10, índice `indice.json`), capturas en `documentacion/capturas/<guía>/` (datos de demostración). Al agregar un módulo: su guía JSON + entrada en `indice.json`.
+- Tema claro/oscuro en el manual (`data-tema` en <html>, localStorage `tqt-manual-tema`, variables `--b/--n/--mezcla/--ok`). Portada: fondo PCB procedural (`img/pcb-hero.jpg`, `img/pcb-detalle.jpg`) en lugar de la ciudad; textos «ciudad» de la portada sin cambiar.
+- Markdown: `scripts/generar_manual_md.py` → `docs/manual/` (fuente = guías JSON; correr tras agregar/editar/borrar una guía o módulo). `tests/test_manual_guias.py` (módulo sin guía, capturas, .md al día).
+- Documentación pública: `RUTAS_PUBLICAS` += /documentacion, /documentacion/manual; `PREFIJOS_PUBLICOS` += /static/documentacion/; `modulos.PUBLICOS` (puede() True, permitido True sin sesión, campo `publico`); inicio.js entra directo. Todo lo que se ponga en `static/documentacion/` queda público: nada de datos reales ni secretos ahí.
+- Evidencia: test_manual_guias (6, incluye público/cerrado) + test_portal_modulos + test_auth_seguridad + test_invitaciones_modulo + qa_version = 46 OK; capturas CDP 390/768/1440 en claro y oscuro sin errores JS ni desborde (320 px: 1–3 px en primeros-pasos/cuentas).
+
 ## v1.4.38 (2026-10-23, Claude Code, rama colores-impresora-caiquen)
 - Impresora: acento gris grafito (`css/impresora.css`, `impresora_acceso.html`). Caiquén: rojo #EF4444 (`modulos.py` acento, `css/caiquen*.css`, `caiquen*.html`; neutros rotados a tinte rojo). v1.4.37 confirmada en producción.
 - Documentación TEAM HW (`modulos.DOCUMENTACION` = `documentacion-hw`, ruta `/documentacion` → `static/documentacion/index.html`, prefijo `/static/documentacion`, icono `ciudad` en inicio.js; entra con /login general). Contenido en `documentacion.js` (`PROYECTOS`: un capítulo por módulo; al agregar un módulo, agregarlo ahí y su foto en `documentacion/img`). Acceso Caiquén: escena J1939 de tractocamión. Portal: `inicio.js` con una órbita por módulo (`it.ang`, `o.w` ∝ k^-1.5, `--p` profundidad, `data-tapada`).

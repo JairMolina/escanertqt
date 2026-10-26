@@ -1,0 +1,139 @@
+{
+  "id": "caiquen",
+  "titulo": "Caiquén",
+  "subtitulo": "Telemetría de tractocamión",
+  "color": "#EF4444",
+  "ruta": "/caiquen",
+  "resumen": "Banco de las placas Caiquén, el lector que se conecta al puerto de diagnóstico J1939 del tractocamión: se registran por su QR (CQ-0001), se anota su firmware y se sigue su estado, lote e historial. Usa la misma consola que TPMS y Skudo Sigfox.",
+  "roles": {
+    "administrador": "Todo: recibir, programar, editar, cambios en masa, eliminar, renombrar lotes, costos y materiales.",
+    "general": "Lo mismo que el administrador dentro de Caiquén, si su cuenta tiene asignado el módulo.",
+    "consultor": "Solo consulta y descarga de Excel; no registra, programa, edita ni borra."
+  },
+  "tiempo_lectura": 3,
+  "secciones": [
+    {
+      "id": "que-es",
+      "tipo": "texto",
+      "titulo": "¿Qué es?",
+      "parrafos": [
+        "Caiquén es el lector que toma los datos de la computadora del tractocamión (motor, velocidad, temperaturas y códigos de falla) por el puerto de diagnóstico J1939. Este módulo lleva el control de sus placas en el banco de pruebas.",
+        "Sin sesión, /caiquen te lleva a su pantalla de acceso, /caiquen/acceso. Entra con la misma cuenta de la plataforma; tu cuenta necesita tener asignado el módulo Caiquén."
+      ],
+      "captura": {
+        "src": "capturas/caiquen/acceso.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Pantalla de acceso de Caiquén con el tractocamión conectado al lector J1939 y el formulario de inicio de sesión",
+        "marcas": [
+          {"n": 1, "x": 64.5, "y": 35.5, "w": 27, "h": 6, "texto": "Correo"},
+          {"n": 2, "x": 64.5, "y": 45.5, "w": 27, "h": 6, "texto": "Contraseña"},
+          {"n": 3, "x": 64.5, "y": 53, "w": 27, "h": 6, "texto": "Entrar"}
+        ]
+      }
+    },
+    {
+      "id": "consola",
+      "tipo": "texto",
+      "titulo": "La consola",
+      "parrafos": [
+        "Las pestañas son las mismas que en TPMS: Dashboard, Recibir, Programar, Consultar, Inventario, Lotes, Movimientos, Materiales, Costos y Excel, más el «Botón de escaneo». El uso de cada una está explicado en las guías de TPMS y Skudo Sigfox; aquí va lo propio de Caiquén."
+      ],
+      "captura": {
+        "src": "capturas/caiquen/inventario.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Inventario de Caiquén con sus placas CQ-V1"
+      }
+    },
+    {
+      "id": "recibir",
+      "tipo": "pasos",
+      "titulo": "Recibir y consultar placas Caiquén",
+      "pasos": [
+        {
+          "titulo": "Lee el QR",
+          "texto": "El QR provisional es CQ- seguido de la serie, por ejemplo CQ-0001; se registra como CQ-V1-0001. Si el QR está dañado, escribe la serie impresa (0004) y se toma como Caiquén V1. Un QR de otro módulo se rechaza: en la captura, SF-0002 es una placa Skudo Sigfox.",
+          "captura": {
+            "src": "capturas/caiquen/recibir.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Recibir de Caiquén: SF-0002 rechazado por ser Skudo Sigfox, lote Pruebas de campo",
+            "marcas": [
+              {"n": 1, "x": 61.5, "y": 18, "w": 37.5, "h": 15, "texto": "Rechazo: va en Skudo Sigfox"},
+              {"n": 2, "x": 61.5, "y": 43, "w": 37.5, "h": 7, "texto": "Lote"},
+              {"n": 3, "x": 61.5, "y": 57, "w": 37.5, "h": 7, "texto": "Escribir código"},
+              {"n": 4, "x": 15.5, "y": 63, "w": 45, "h": 7, "texto": "Iniciar cámara"}
+            ]
+          },
+          "nota": "El formato CQ-0001 es provisional: cuando se conozca el QR real de la placa, se ajustará."
+        },
+        {
+          "titulo": "Programar",
+          "texto": "Busca la placa, escribe el firmware y pulsa «Guardar firmware»: pasa de RECIBIDA a PROGRAMADA.",
+          "captura": {"src": "capturas/caiquen/programar.jpg", "ancho": 1440, "alto": 900, "alt": "Programar de Caiquén"}
+        },
+        {
+          "titulo": "Consultar",
+          "texto": "La ficha muestra hardware, firmware, serie, lote, fechas, operador, nota y el código leído; abajo, el historial.",
+          "captura": {
+            "src": "capturas/caiquen/consultar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ficha de CQ-V1-0009 dada de baja por una placa dañada, con su historial",
+            "marcas": [
+              {"n": 1, "x": 62.5, "y": 10.5, "w": 36.5, "h": 6, "texto": "Placa o serie"},
+              {"n": 2, "x": 62.5, "y": 23, "w": 36.5, "h": 46, "texto": "Ficha"},
+              {"n": 3, "x": 62.5, "y": 71.5, "w": 36.5, "h": 27, "texto": "Historial"}
+            ]
+          }
+        },
+        {
+          "titulo": "Lotes",
+          "texto": "Agrupa las placas por entrega o prueba (por ejemplo «Pruebas de campo») y muestra su avance.",
+          "captura": {"src": "capturas/caiquen/lotes.jpg", "ancho": 1440, "alto": 900, "alt": "Lotes de Caiquén"}
+        }
+      ]
+    },
+    {
+      "id": "costos",
+      "tipo": "texto",
+      "titulo": "Costos",
+      "parrafos": [
+        "Cada placa es una «Tarjeta Caiquén». Su lista de materiales (transceptor CAN, PCB, conector de diagnóstico…) da el costo por QR. Ver la guía Costos y Materiales."
+      ],
+      "captura": {
+        "src": "capturas/caiquen/costos.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Costos de Caiquén: tarjeta de 208.30 MXN con tres materiales de demostración",
+        "marcas": [
+          {"n": 1, "x": 15.5, "y": 15.5, "w": 83.5, "h": 9.5, "texto": "Costo por tarjeta"},
+          {"n": 2, "x": 59.5, "y": 34, "w": 39.5, "h": 6, "texto": "Descargar, importar o agregar"},
+          {"n": 3, "x": 15.5, "y": 40, "w": 83.5, "h": 26, "texto": "Lista de materiales"}
+        ]
+      }
+    },
+    {
+      "id": "celular",
+      "tipo": "texto",
+      "titulo": "En el celular",
+      "parrafos": ["El menú baja a la barra inferior y el resto de pestañas está en «Más»."],
+      "captura": {"src": "capturas/caiquen/celular.jpg", "ancho": 390, "alto": 844, "alt": "Caiquén en un celular"}
+    },
+    {
+      "id": "ficha",
+      "tipo": "ficha",
+      "titulo": "Ficha técnica",
+      "filas": [
+        ["Rutas", "/caiquen (consola) · /caiquen/acceso (inicio de sesión)"],
+        ["Formato del QR", "PROVISIONAL: CQ-0001 → CQ-V1-0001. También acepta CAIQUEN-0001 o CAIQUÉN, prefijo PCB, guion bajo o espacio, minúsculas y versión explícita (CQ-V2-0001). Solo la serie (4) → CQ-V1-0004."],
+        ["No válidos", "QR de Skudo Sigfox, SpeedLocker, Skudo AntiJammer, TPMS o Escáner TQT: se rechazan diciendo a qué módulo van."],
+        ["Estados", "RECIBIDA → PROGRAMADA (al guardar firmware) · FALLA · BAJA"],
+        ["Exportación", "Excel con hojas Placas y Movimientos"],
+        ["Tarjetas en Costos/Materiales", "Una: Tarjeta Caiquén"]
+      ]
+    },
+    {
+      "id": "problemas",
+      "tipo": "faq",
+      "titulo": "Problemas frecuentes",
+      "items": [
+        {"p": "No veo Caiquén en el portal o me manda a /inicio.", "r": "Tu cuenta no tiene asignado el módulo. Pide a un administrador que lo active en «Cuentas y módulos»."},
+        {"p": "Leí una placa y dice que es de Skudo Sigfox u otro módulo.", "r": "El QR no es de Caiquén. Regístrala en el módulo que indica el mensaje."},
+        {"p": "El QR real de mi placa no se reconoce.", "r": "El formato CQ-0001 es provisional. Escribe la serie impresa y avisa al equipo para ajustar el formato."}
+      ]
+    }
+  ],
+  "relacionadas": ["skudo-sigfox", "tpms", "costos-materiales"]
+}

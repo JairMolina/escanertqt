@@ -1,0 +1,196 @@
+{
+  "id": "skudo-sigfox",
+  "titulo": "Skudo Sigfox",
+  "subtitulo": "Equipos con red Sigfox",
+  "color": "#A855F7",
+  "ruta": "/sigfox",
+  "resumen": "Banco de las placas Skudo Sigfox: se registran por su QR (SF-0001), se anota su firmware y se sigue su estado, lote e historial. Usa la misma consola que TPMS y SpeedLocker; en Costos la licencia Sigfox va aparte como costo recurrente.",
+  "roles": {
+    "administrador": "Todo: recibir, programar, editar, cambios en masa, eliminar, renombrar lotes, costos y materiales.",
+    "general": "Lo mismo que el administrador dentro de Skudo Sigfox, si su cuenta tiene asignado el módulo.",
+    "consultor": "Solo consulta y descarga de Excel; no registra, programa, edita ni borra."
+  },
+  "tiempo_lectura": 4,
+  "secciones": [
+    {
+      "id": "que-es",
+      "tipo": "texto",
+      "titulo": "¿Qué es?",
+      "parrafos": [
+        "Skudo Sigfox es el módulo de las placas que transmiten por la red Sigfox. Su consola es la misma que la de TPMS: Dashboard, Recibir, Programar, Consultar, Inventario, Lotes, Movimientos, Materiales, Costos y Excel, con el «Botón de escaneo» para usar el celular como lector. El detalle de cada pestaña está en la guía de TPMS; aquí va lo propio de Sigfox.",
+        "Sus placas tienen tablas propias y no se mezclan con los demás módulos. Sin sesión, /sigfox te lleva a su pantalla de acceso, /sigfox/acceso."
+      ],
+      "captura": {
+        "src": "capturas/skudo-sigfox/portada.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Dashboard de Skudo Sigfox con 15 placas, 6 programadas y 1 con falla, la gráfica de actividad y los últimos movimientos",
+        "marcas": [
+          {"n": 1, "x": 0, "y": 8.5, "w": 14.5, "h": 57, "texto": "Pestañas (iguales a TPMS)"},
+          {"n": 2, "x": 15.5, "y": 15.5, "w": 83.5, "h": 13.5, "texto": "Placas por estado"},
+          {"n": 3, "x": 67.5, "y": 30, "w": 31.5, "h": 68, "texto": "Últimos movimientos"},
+          {"n": 4, "x": 78.5, "y": 0.5, "w": 13.5, "h": 4.5, "texto": "Botón de escaneo"}
+        ]
+      }
+    },
+    {
+      "id": "recibir",
+      "tipo": "pasos",
+      "titulo": "Recibir placas Sigfox",
+      "intro": "Lote opcional, cámara, lector USB o código escrito, igual que en TPMS.",
+      "pasos": [
+        {
+          "titulo": "Lee el QR",
+          "texto": "El QR provisional es SF- seguido de la serie, por ejemplo SF-0001; se registra como SF-V1-0001. Si el QR está dañado, escribe solo la serie impresa (0004) y se toma como Skudo Sigfox V1.",
+          "captura": {
+            "src": "capturas/skudo-sigfox/recibir.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Recibir de Skudo Sigfox con el lote Lote Nov 2026 y las lecturas de la sesión",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 63, "w": 45, "h": 7, "texto": "Iniciar cámara"},
+              {"n": 2, "x": 61.5, "y": 43, "w": 37.5, "h": 7, "texto": "Lote"},
+              {"n": 3, "x": 61.5, "y": 57, "w": 37.5, "h": 7, "texto": "Escribir código"},
+              {"n": 4, "x": 61.5, "y": 71.5, "w": 37.5, "h": 18.5, "texto": "Lecturas de esta sesión"}
+            ]
+          },
+          "nota": "El formato SF-0001 es provisional: cuando se conozca el QR real de la placa, se ajustará."
+        },
+        {
+          "titulo": "QR de otros módulos",
+          "texto": "Si el código es de otro módulo, Sigfox lo rechaza y dice dónde va. En la captura, CQ-0002 es una placa Caiquén.",
+          "captura": {
+            "src": "capturas/skudo-sigfox/recibir.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Último código CQ-0002 rechazado: es una placa Caiquén",
+            "marcas": [
+              {"n": 1, "x": 61.5, "y": 18, "w": 37.5, "h": 15, "texto": "Rechazo: va en Caiquén"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "programar-consultar",
+      "tipo": "pasos",
+      "titulo": "Programar y consultar",
+      "pasos": [
+        {
+          "titulo": "Programar",
+          "texto": "Busca la placa (o léela con la cámara), escribe el firmware y pulsa «Guardar firmware»: pasa de RECIBIDA a PROGRAMADA. «Programar en lote» guarda el mismo firmware en cada placa que leas, sin pedir confirmación. «Marcar falla» la deja en FALLA con una nota.",
+          "captura": {
+            "src": "capturas/skudo-sigfox/programar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Programar de Skudo Sigfox con la placa SF-V1-0008 recibida y sin firmware",
+            "marcas": [
+              {"n": 1, "x": 62.5, "y": 10.5, "w": 36.5, "h": 6, "texto": "Placa"},
+              {"n": 2, "x": 62.5, "y": 23.5, "w": 36.5, "h": 15, "texto": "Placa encontrada"},
+              {"n": 3, "x": 62.5, "y": 46, "w": 36.5, "h": 6, "texto": "Firmware"},
+              {"n": 4, "x": 62.5, "y": 54.5, "w": 36.5, "h": 7, "texto": "Programar en lote"},
+              {"n": 5, "x": 62.5, "y": 64.5, "w": 36.5, "h": 6.5, "texto": "Guardar firmware · Marcar falla"}
+            ]
+          }
+        },
+        {
+          "titulo": "Consultar",
+          "texto": "Muestra la ficha (hardware, firmware, serie, lote, fechas, operador, nota y código leído) y el historial. Desde aquí puedes ir a «Programar esta placa».",
+          "captura": {
+            "src": "capturas/skudo-sigfox/consultar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ficha de SF-V1-0007 en estado FALLA con su nota y su historial",
+            "marcas": [
+              {"n": 1, "x": 62.5, "y": 23, "w": 36.5, "h": 46, "texto": "Ficha"},
+              {"n": 2, "x": 62.5, "y": 71.5, "w": 36.5, "h": 27, "texto": "Historial"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "gestion",
+      "tipo": "pasos",
+      "titulo": "Inventario, Lotes y Movimientos",
+      "pasos": [
+        {
+          "titulo": "Inventario",
+          "texto": "Filtra por estado, hardware, firmware o lote. Marca varias placas para cambiarles firmware, hardware, lote o estado de una vez, o eliminarlas.",
+          "captura": {
+            "src": "capturas/skudo-sigfox/inventario.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Inventario de Skudo Sigfox con 16 placas y una seleccionada",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 15.5, "w": 83.5, "h": 9, "texto": "Buscar y filtros"},
+              {"n": 2, "x": 88.5, "y": 8.5, "w": 10.5, "h": 6, "texto": "Dar de alta"},
+              {"n": 3, "x": 15.5, "y": 90.5, "w": 83.5, "h": 7, "texto": "Cambios en masa"}
+            ]
+          }
+        },
+        {
+          "titulo": "Lotes",
+          "texto": "Cada lote muestra cuántas placas hay programadas, sin programar, con falla y de baja. «Ver en Inventario» filtra por el lote y «Renombrar» le cambia el nombre.",
+          "captura": {
+            "src": "capturas/skudo-sigfox/lotes.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Lotes de Skudo Sigfox: Lote Nov 2026 y Piloto Oct 2026, con 8 placas cada uno",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 15.5, "w": 27.5, "h": 22, "texto": "Lote y su avance"}
+            ]
+          }
+        },
+        {
+          "titulo": "Movimientos",
+          "texto": "La bitácora de todo lo que pasó: altas, programaciones, ediciones y cambios en masa, con fecha y operador. Filtra por texto, acción y fechas.",
+          "captura": {
+            "src": "capturas/skudo-sigfox/movimientos.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Movimientos de Skudo Sigfox con 22 registros",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 14, "w": 83.5, "h": 9.5, "texto": "Filtros"},
+              {"n": 2, "x": 15.5, "y": 24.5, "w": 83.5, "h": 74, "texto": "Bitácora"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "costos",
+      "tipo": "texto",
+      "titulo": "Costos: la licencia va aparte",
+      "parrafos": [
+        "En Skudo Sigfox cada placa es una tarjeta «Tarjeta Sigfox». La licencia de la red Sigfox es un costo recurrente: se muestra aparte y no se suma al costo de producción de la tarjeta.",
+        "Materiales descuenta los componentes de la tarjeta cada vez que una placa se programa (cuando el inventario está activo). Ver la guía Costos y Materiales."
+      ],
+      "captura": {
+        "src": "capturas/skudo-sigfox/costos.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Costos de Skudo Sigfox: tarjeta de 197.25 MXN y recurrente aparte de 222.00 MXN",
+        "marcas": [
+          {"n": 1, "x": 15.5, "y": 15.5, "w": 41, "h": 9.5, "texto": "Costo por tarjeta"},
+          {"n": 2, "x": 57.5, "y": 15.5, "w": 41.5, "h": 9.5, "texto": "Recurrente (aparte)"},
+          {"n": 3, "x": 15.5, "y": 40, "w": 83.5, "h": 26, "texto": "Lista de la tarjeta"},
+          {"n": 4, "x": 15.5, "y": 67.5, "w": 83.5, "h": 13, "texto": "Costos recurrentes"}
+        ]
+      }
+    },
+    {
+      "id": "celular",
+      "tipo": "texto",
+      "titulo": "En el celular",
+      "parrafos": ["El menú baja a la barra inferior y el resto de pestañas está en «Más»."],
+      "captura": {"src": "capturas/skudo-sigfox/celular.jpg", "ancho": 390, "alto": 844, "alt": "Skudo Sigfox en un celular"}
+    },
+    {
+      "id": "ficha",
+      "tipo": "ficha",
+      "titulo": "Ficha técnica",
+      "filas": [
+        ["Rutas", "/sigfox (consola) · /sigfox/acceso (inicio de sesión)"],
+        ["Formato del QR", "PROVISIONAL: SF-0001 → SF-V1-0001. También acepta SIGFOX-0001, SKUDO SIGFOX 0001, prefijo PCB, guion bajo o espacio, minúsculas y versión explícita (SF-V2-0001). Solo la serie (4) → SF-V1-0004."],
+        ["No válidos", "QR de Caiquén, SpeedLocker, Skudo AntiJammer, TPMS o Escáner TQT: se rechazan diciendo a qué módulo van."],
+        ["Estados", "RECIBIDA → PROGRAMADA (al guardar firmware) · FALLA · BAJA"],
+        ["Exportación", "Excel con hojas Placas y Movimientos"],
+        ["Tarjetas en Costos/Materiales", "Una: Tarjeta Sigfox · licencia como recurrente"]
+      ]
+    },
+    {
+      "id": "problemas",
+      "tipo": "faq",
+      "titulo": "Problemas frecuentes",
+      "items": [
+        {"p": "Leí una placa y dice que es de Caiquén u otro módulo.", "r": "El QR no es de Sigfox. Regístrala en el módulo que indica el mensaje."},
+        {"p": "El QR real de mi placa no se reconoce.", "r": "El formato SF-0001 es provisional. Escribe la serie impresa y avisa al equipo para ajustar el formato."},
+        {"p": "¿Por qué la licencia no se suma al costo de la tarjeta?", "r": "Es un pago recurrente por equipo, no un material de producción; se muestra aparte."}
+      ]
+    }
+  ],
+  "relacionadas": ["tpms", "costos-materiales", "caiquen"]
+}

@@ -1,0 +1,316 @@
+{
+  "id": "cuentas",
+  "titulo": "Cuentas y permisos",
+  "subtitulo": "Roles, módulos e invitaciones",
+  "color": "#8B5CF6",
+  "ruta": "/inicio",
+  "resumen": "Quién puede entrar a cada módulo y qué puede hacer ahí. Cada cuenta tiene un rol (Administrador, General o Consultor) y una lista de módulos. Los administradores los asignan desde el núcleo «I+D» del portal e invitan a personas nuevas por correo.",
+  "roles": {
+    "administrador": "Entra a todos los módulos, abre el panel «Cuentas y módulos», cambia roles y módulos, invita cuentas y entra a Administración del Escáner TQT.",
+    "general": "Trabaja normalmente en los módulos asignados (registrar, editar, programar…). No entra a Administración ni al panel de cuentas.",
+    "consultor": "Solo consulta en los módulos asignados: ve y escanea, pero no crea, edita, mueve, envía ni borra datos."
+  },
+  "tiempo_lectura": 9,
+  "secciones": [
+    {
+      "id": "como-funciona",
+      "tipo": "texto",
+      "titulo": "Cómo funcionan los permisos",
+      "parrafos": [
+        "Para entrar a una pantalla, el servidor revisa dos cosas: primero que tu cuenta tenga asignado el módulo de esa pantalla, y después que tu rol permita la acción.",
+        "Los administradores tienen todos los módulos siempre, aunque no estén marcados. Las cuentas General y Consultor solo entran a los módulos que un administrador les marcó.",
+        "Los permisos se aplican en el servidor, no solo en la pantalla: aunque escribas la dirección a mano o llames a la API, una cuenta sin permiso recibe el rechazo."
+      ]
+    },
+    {
+      "id": "roles",
+      "tipo": "ficha",
+      "titulo": "Qué hace cada rol",
+      "filas": [
+        ["Acción", "Administrador · General · Consultor"],
+        ["Entrar a un módulo", "Todos · Solo los asignados · Solo los asignados"],
+        ["Ver datos, consultar y escanear", "Sí · Sí · Sí"],
+        ["Crear, editar, mover, enviar o borrar datos", "Sí · Sí · No"],
+        ["Descargar Excel", "Sí · Sí · Sí (donde el módulo lo ofrece)"],
+        ["Escáner TQT: Recibir, Emparejar, Programar, Etiquetas DYMO", "Sí · Sí · No (va a Consultar)"],
+        ["Escáner TQT: consola de escritorio /monitor", "Completa · Completa · Solo Dashboard, Tarjetas, Inventario de PCB, Consultar y Excel"],
+        ["Administración del Escáner TQT (/admin)", "Sí · No · No"],
+        ["Panel «Cuentas y módulos» del portal", "Sí · No · No"],
+        ["Aprobar solicitudes de contraseña", "De cualquier cuenta · De General y Consultor · No"],
+        ["Cambiar su propia contraseña y cerrar sesión", "Sí · Sí · Sí"]
+      ]
+    },
+    {
+      "id": "sin-acceso",
+      "tipo": "pasos",
+      "titulo": "Qué ve una cuenta sin permiso",
+      "intro": "La plataforma siempre explica por qué no puedes entrar y qué hacer.",
+      "pasos": [
+        {
+          "titulo": "Módulo no asignado",
+          "texto": "En el portal la estrella aparece con candado y «Sin acceso». Si abres la dirección del módulo, el servidor te regresa al portal (`/inicio?denegado=…`). Para Escáner TQT aparece arriba el aviso «Tu cuenta no tiene acceso a Escáner TQT. Pide a un administrador que te lo asigne.», que cierras con la ×.",
+          "captura": {
+            "src": "capturas/cuentas/denegado.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Portal de la cuenta pedro.tpms@demo.mx, que solo tiene TPMS, con el aviso de que no tiene acceso a Escáner TQT.",
+            "marcas": [
+              {"n": 1, "x": 1.1, "y": 9.9, "w": 97.8, "h": 6, "texto": "Aviso de acceso denegado"},
+              {"n": 2, "x": 95.5, "y": 10.4, "w": 3.1, "h": 4.9, "texto": "Descartar el aviso"},
+              {"n": 3, "x": 64.5, "y": 63, "w": 1.7, "h": 2.7, "texto": "Escáner TQT: «Sin acceso» para esta cuenta"}
+            ]
+          },
+          "nota": "Para los demás módulos el portal no muestra este aviso: solo verás la estrella del módulo con «Sin acceso»."
+        },
+        {
+          "titulo": "Acción que tu rol no permite",
+          "texto": "Si un Consultor intenta abrir Recibir, Emparejar o Programar, o guardar algo, aparece la ventana «Acceso restringido» con lo que intentó, lo que sí puede hacer su rol y a quién pedir el cambio. Las pestañas que no puede usar llevan un candado.",
+          "captura": {
+            "src": "capturas/cuentas/consultor-aviso.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ventana Acceso restringido: «Tu cuenta (Consultor) no tiene acceso a Emparejar», sobre la página Consultar del Escáner TQT.",
+            "marcas": [
+              {"n": 1, "x": 32.4, "y": 36.3, "w": 35.1, "h": 6.9, "texto": "Qué intentaste y por qué no se puede"},
+              {"n": 2, "x": 32.4, "y": 61.8, "w": 35.1, "h": 5.3, "texto": "«Entendido» cierra la ventana"},
+              {"n": 3, "x": 5.6, "y": 93, "w": 22.2, "h": 7, "texto": "Pestaña con candado: sin permiso"},
+              {"n": 4, "x": 72.2, "y": 93, "w": 22.2, "h": 7, "texto": "Consultar: la página de inicio del Consultor"}
+            ]
+          }
+        },
+        {
+          "titulo": "Consola de escritorio para un Consultor",
+          "texto": "En la computadora, el Consultor entra a la consola del Escáner TQT con menos secciones: Dashboard, Tarjetas, Consultar, Inventario de PCB y Excel (además de Comandos).",
+          "captura": {
+            "src": "capturas/cuentas/consultor-consola.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Consola de escritorio del Escáner TQT vista por un Consultor, con el menú lateral reducido.",
+            "marcas": [
+              {"n": 1, "x": 0.7, "y": 12.7, "w": 14.7, "h": 77.1, "texto": "Menú reducido del Consultor"},
+              {"n": 2, "x": 0.8, "y": 6.9, "w": 5.9, "h": 4, "texto": "«Módulos»: volver al portal"},
+              {"n": 3, "x": 83.3, "y": 1.3, "w": 2.5, "h": 4, "texto": "Cerrar sesión"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "acceso-admin",
+      "tipo": "pasos",
+      "titulo": "Entrar como administrador desde el núcleo",
+      "intro": "El panel de cuentas se abre desde el núcleo «I+D», en el centro del portal (botón «Administrar»).",
+      "pasos": [
+        {
+          "titulo": "Pulsa el núcleo «I+D»",
+          "texto": "Si ya tienes sesión de administrador, se abre directo el panel «Cuentas y módulos». Si no, aparece el formulario «Acceso de administrador».",
+          "captura": {
+            "src": "capturas/cuentas/acceso-admin.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Formulario Acceso de administrador abierto sobre el portal, con Correo, Contraseña y Entrar.",
+            "marcas": [
+              {"n": 1, "x": 36.9, "y": 33.8, "w": 23.1, "h": 2.8, "texto": "«Acceso de administrador»"},
+              {"n": 2, "x": 36.9, "y": 44.1, "w": 26.3, "h": 5.3, "texto": "Correo de una cuenta Administrador"},
+              {"n": 3, "x": 36.9, "y": 53.3, "w": 26.3, "h": 5.3, "texto": "Contraseña (con «Ver»)"},
+              {"n": 4, "x": 36.9, "y": 60.2, "w": 26.3, "h": 5.3, "texto": "«Entrar»"},
+              {"n": 5, "x": 60.8, "y": 33.8, "w": 3.1, "h": 4.9, "texto": "Cerrar el panel (también con Escape)"}
+            ]
+          }
+        },
+        {
+          "titulo": "Entra con una cuenta de administrador",
+          "texto": "Si tu sesión actual no es de administrador, el formulario lo indica. Al entrar con una cuenta Administrador, tu sesión pasa a ser la de esa cuenta y el mismo panel cambia a «Cuentas y módulos».",
+          "captura": {
+            "src": "capturas/cuentas/acceso-no-admin.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Formulario de acceso de administrador con la nota «Tu sesión (ana.general@demo.mx · General) no es de administrador».",
+            "marcas": [
+              {"n": 1, "x": 36.9, "y": 37.7, "w": 26.3, "h": 6.6, "texto": "Tu sesión actual no es de administrador"},
+              {"n": 2, "x": 36.9, "y": 48.1, "w": 26.3, "h": 5.3, "texto": "Escribe aquí la cuenta de administrador"},
+              {"n": 3, "x": 36.9, "y": 64.2, "w": 26.3, "h": 5.3, "texto": "«Entrar»"}
+            ]
+          },
+          "nota": "Con una cuenta General o Consultor verás «Esta cuenta no es de administrador…» y no se abre ninguna sesión. Si la cuenta debe cambiar su contraseña inicial, aparece «Ir a iniciar sesión»: cámbiala primero ahí."
+        }
+      ]
+    },
+    {
+      "id": "panel",
+      "tipo": "pasos",
+      "titulo": "El panel «Cuentas y módulos»",
+      "intro": "Es una tabla: una fila por cuenta y una columna por módulo. Los cambios se guardan al instante y verás «Guardado» al pie del panel.",
+      "pasos": [
+        {
+          "titulo": "Asigna módulos y cambia el rol",
+          "texto": "Marca o desmarca la casilla del módulo en la fila de la cuenta. La casilla «Todos» marca o quita todos los módulos de esa cuenta; si tiene algunos, se ve a medias. Cambia el rol con la lista «Rol». Las cuentas Administrador tienen todo marcado y bloqueado («Todos (administrador)»).",
+          "captura": {
+            "src": "capturas/cuentas/matriz.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Panel Cuentas y módulos con 9 cuentas de demostración, sus roles y las casillas por módulo.",
+            "marcas": [
+              {"n": 1, "x": 18.1, "y": 18.4, "w": 25, "h": 4.9, "texto": "Buscar por correo"},
+              {"n": 2, "x": 31.3, "y": 34.9, "w": 9.4, "h": 5.3, "texto": "Rol de la cuenta"},
+              {"n": 3, "x": 42.4, "y": 36.3, "w": 1.5, "h": 2.4, "texto": "«Todos»: a medias si tiene algunos módulos"},
+              {"n": 4, "x": 59.9, "y": 27.2, "w": 3.9, "h": 6.5, "texto": "Encabezado del módulo: abre su menú"},
+              {"n": 5, "x": 18.1, "y": 43.7, "w": 12.4, "h": 1.9, "texto": "Administrador: todos los módulos siempre"}
+            ]
+          },
+          "nota": "Siempre debe quedar al menos un administrador activo: el panel no te deja quitarle el rol al último. Si un cambio falla, la casilla vuelve a su estado y aparece el motivo en rojo."
+        },
+        {
+          "titulo": "Da o quita un módulo a todos",
+          "texto": "Pulsa el nombre de un módulo en el encabezado. El menú ofrece «Dar a todos», «Quitar a todos» e «Invitar a este módulo». Afecta solo a las cuentas que no son administradoras.",
+          "captura": {
+            "src": "capturas/cuentas/menu-columna.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Menú del encabezado TPMS con las opciones Dar a todos, Quitar a todos e Invitar a este módulo.",
+            "marcas": [
+              {"n": 1, "x": 59.9, "y": 27.2, "w": 3.9, "h": 6.5, "texto": "Encabezado TPMS"},
+              {"n": 2, "x": 56.4, "y": 34.7, "w": 11, "h": 4.9, "texto": "«Dar a todos»"},
+              {"n": 3, "x": 56.4, "y": 39.5, "w": 11, "h": 4.9, "texto": "«Quitar a todos»"},
+              {"n": 4, "x": 56.4, "y": 44.4, "w": 11, "h": 4.9, "texto": "«Invitar a este módulo»: abre la invitación con el módulo ya marcado"}
+            ]
+          }
+        },
+        {
+          "titulo": "Confirma el cambio masivo",
+          "texto": "Antes de aplicar, el panel pregunta, por ejemplo, «¿Dar «TPMS» a todas las cuentas que no son administradoras?». Pulsa «Dar a todos» (o «Quitar a todos») para aplicar o «Cancelar».",
+          "captura": {
+            "src": "capturas/cuentas/confirmar-todos.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Confirmación en línea para dar TPMS a todas las cuentas que no son administradoras.",
+            "marcas": [
+              {"n": 1, "x": 19.2, "y": 26.9, "w": 48.8, "h": 2.2, "texto": "Pregunta de confirmación"},
+              {"n": 2, "x": 68.7, "y": 25.6, "w": 6.5, "h": 4.9, "texto": "Aplicar"},
+              {"n": 3, "x": 75.8, "y": 25.6, "w": 5.4, "h": 4.9, "texto": "«Cancelar»"}
+            ]
+          }
+        },
+        {
+          "titulo": "Desde el celular",
+          "texto": "En pantallas angostas cada cuenta se muestra como una tarjeta: rol, «Todos» y un botón por módulo. Arriba, la fila «Dar o quitar a todos» reemplaza a los encabezados de columna.",
+          "captura": {
+            "src": "capturas/cuentas/matriz-movil.jpg", "ancho": 390, "alto": 844,
+            "alt": "Panel de cuentas en el celular, filtrado por «luis», con la tarjeta de luis.consulta@demo.mx.",
+            "marcas": [
+              {"n": 1, "x": 3.1, "y": 27.5, "w": 93.8, "h": 43.6, "texto": "Tarjeta de una cuenta"},
+              {"n": 2, "x": 12.9, "y": 32.8, "w": 55.7, "h": 5.7, "texto": "Rol"},
+              {"n": 3, "x": 71.2, "y": 33, "w": 22.4, "h": 5.2, "texto": "«Todos»"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "invitar",
+      "tipo": "pasos",
+      "titulo": "Invitar a una persona nueva",
+      "intro": "No hay registro libre: las cuentas nuevas entran por invitación. La invitación ya lleva el rol y los módulos.",
+      "pasos": [
+        {
+          "titulo": "Llena la invitación",
+          "texto": "Pulsa «Invitar». Escribe el correo, elige el rol (por defecto General) y marca los módulos. Con rol Administrador se marcan todos y quedan bloqueados. Pulsa «Enviar invitación».",
+          "captura": {
+            "src": "capturas/cuentas/invitar-form.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Formulario Invitar por correo con el correo carlos.nuevo@demo.mx, rol General y los módulos Escáner TQT y TPMS marcados.",
+            "marcas": [
+              {"n": 1, "x": 19.2, "y": 32, "w": 47.6, "h": 4.9, "texto": "Correo de la persona"},
+              {"n": 2, "x": 67.6, "y": 32, "w": 13.2, "h": 4.9, "texto": "Rol"},
+              {"n": 3, "x": 19.2, "y": 41, "w": 61.7, "h": 10.7, "texto": "Módulos a los que tendrá acceso"},
+              {"n": 4, "x": 19.2, "y": 53, "w": 61.7, "h": 4.4, "texto": "Aviso: este servidor no envía correo"},
+              {"n": 5, "x": 19.2, "y": 58.7, "w": 10.5, "h": 4.9, "texto": "«Enviar invitación»"}
+            ]
+          },
+          "nota": "Debes elegir al menos un módulo (salvo para Administrador). Si el correo ya tiene cuenta, verás «Ya existe una cuenta con ese correo.»"
+        },
+        {
+          "titulo": "Comparte el enlace si el correo no salió",
+          "texto": "Si el servidor tiene correo configurado, verás «Invitación enviada a …». Si no, aparece una tarjeta con el enlace de invitación y el motivo. Pulsa «Copiar enlace» y mándalo por otro medio (chat, mensaje).",
+          "captura": {
+            "src": "capturas/cuentas/invitar-enlace.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Tarjeta con el enlace de invitación para carlos.nuevo@demo.mx y el botón Copiar enlace.",
+            "marcas": [
+              {"n": 1, "x": 19.2, "y": 26.2, "w": 61.7, "h": 2.3, "texto": "Para quién es la invitación"},
+              {"n": 2, "x": 19.2, "y": 29.4, "w": 61.7, "h": 2.2, "texto": "Por qué no se envió el correo"},
+              {"n": 3, "x": 19.2, "y": 32.4, "w": 45.9, "h": 4.9, "texto": "Enlace /invitacion#…"},
+              {"n": 4, "x": 65.6, "y": 32.4, "w": 9, "h": 4.9, "texto": "«Copiar enlace»"}
+            ]
+          },
+          "nota": "El enlace da acceso a la cuenta: compártelo solo con esa persona. Vale 48 horas y se usa una sola vez."
+        },
+        {
+          "titulo": "Sigue las invitaciones pendientes",
+          "texto": "Mientras la persona no active su cuenta, su fila lleva la etiqueta «Pendiente» y dos enlaces: «Reenviar» (crea un enlace nuevo; el anterior deja de servir) y «Cancelar invitación» (borra la cuenta que nunca se activó, tras confirmar con «Cancelar invitación» o «Conservar»). Puedes cambiarle rol y módulos aunque esté pendiente.",
+          "captura": {
+            "src": "capturas/cuentas/pendiente.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Panel filtrado por «demo.mx» con dos invitaciones pendientes y sus enlaces Reenviar y Cancelar invitación.",
+            "marcas": [
+              {"n": 1, "x": 18.1, "y": 25.7, "w": 25, "h": 4.9, "texto": "Búsqueda por correo"},
+              {"n": 2, "x": 75.5, "y": 27, "w": 6.3, "h": 2.3, "texto": "Cuántas cuentas coinciden"},
+              {"n": 3, "x": 18.1, "y": 50.4, "w": 4.8, "h": 2.4, "texto": "Etiqueta «Pendiente»"},
+              {"n": 4, "x": 18.1, "y": 53.2, "w": 3.5, "h": 3.1, "texto": "«Reenviar»"},
+              {"n": 5, "x": 22.5, "y": 53.2, "w": 7.3, "h": 3.1, "texto": "«Cancelar invitación»"}
+            ]
+          }
+        },
+        {
+          "titulo": "La persona activa su cuenta",
+          "texto": "Al abrir el enlace ve «Activa tu cuenta» con su correo y su rol. Elige una contraseña (mínimo 10 caracteres), la repite y pulsa «Activar y entrar». Entra con sesión abierta al portal, donde ve sus módulos.",
+          "captura": {
+            "src": "capturas/cuentas/invitacion.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Página Activa tu cuenta para sofia.nueva@demo.mx con rol general.",
+            "marcas": [
+              {"n": 1, "x": 37.2, "y": 32.9, "w": 25.7, "h": 4.6, "texto": "Cuenta y rol de la invitación"},
+              {"n": 2, "x": 37.2, "y": 42, "w": 25.7, "h": 5.3, "texto": "Contraseña nueva"},
+              {"n": 3, "x": 37.2, "y": 51.2, "w": 25.7, "h": 5.3, "texto": "Repite la contraseña"},
+              {"n": 4, "x": 37.2, "y": 61.6, "w": 25.7, "h": 5.3, "texto": "«Activar y entrar»"}
+            ]
+          },
+          "nota": "Si el enlace venció o ya se usó, la página dice «La invitación no es válida o ya caducó. Pide al administrador que te la reenvíe.»"
+        }
+      ]
+    },
+    {
+      "id": "solicitudes",
+      "tipo": "texto",
+      "titulo": "Solicitudes de cambio de contraseña",
+      "parrafos": [
+        "Cuando alguien usa «¿Olvidaste tu contraseña?», la solicitud aparece en la consola de escritorio del Escáner TQT (`/monitor`) de las cuentas que pueden aprobarla: un botón con escudo y el número de pendientes, «Solicitudes de contraseña».",
+        "Aprueba solo si la persona está contigo y la reconoces. Al pulsar «Aprobar» obtienes un código de 6 dígitos, válido 10 minutos, que se muestra una sola vez: díctalo en persona. «Rechazar» cancela la solicitud.",
+        "Reglas: nadie aprueba su propia solicitud; nadie aprueba la de una cuenta con más permisos que la suya; un Consultor no aprueba ninguna. El paso a paso completo está en «Primeros pasos»."
+      ]
+    },
+    {
+      "id": "otras",
+      "tipo": "texto",
+      "titulo": "Desactivar o eliminar cuentas",
+      "parrafos": [
+        "El panel del portal asigna roles y módulos e invita, pero no desactiva ni elimina cuentas activas. Eso se hace en Administración del Escáner TQT (`/admin`, pestaña «Cuentas»), solo para administradores. Ahí cada cuenta tiene «Desactivar»/«Activar» y «Eliminar» (pide un segundo clic para confirmar).",
+        "Desactivar una cuenta cierra sus sesiones. Tampoco ahí se puede desactivar ni eliminar al último administrador activo."
+      ]
+    },
+    {
+      "id": "ficha",
+      "tipo": "ficha",
+      "titulo": "Ficha técnica",
+      "filas": [
+        ["Roles", "administrador · general · consultor"],
+        ["Dónde se administran", "Núcleo «I+D» del portal /inicio → «Cuentas y módulos»"],
+        ["Ingreso de administrador", "Formulario «Acceso de administrador» en el núcleo; solo abre sesión si la cuenta es Administrador"],
+        ["Módulos asignables", "Escáner TQT · SpeedLocker · Skudo AntiJammer · TPMS · Skudo Sigfox · Caiquén · Impresora (Documentación TEAM HW es pública y no necesita asignarse)"],
+        ["Cambios masivos", "«Dar a todos» / «Quitar a todos» por módulo; no tocan a los administradores"],
+        ["Invitación", "Enlace /invitacion#… · vale 48 h · un solo uso · «Reenviar» invalida el anterior"],
+        ["Contraseña al activar", "Mínimo 10 caracteres"],
+        ["Sin módulo asignado", "Página: vuelve a /inicio?denegado=<módulo> · API: error 403 «Tu cuenta no tiene acceso al módulo…»"],
+        ["Rol sin permiso", "Página: va a una zona permitida con ?denegado=<zona> y muestra «Acceso restringido» · API: error 403"],
+        ["Lo único que un Consultor puede enviar", "Cerrar sesión, cambiar su contraseña y el escáner del celular"],
+        ["Regla de seguridad", "Siempre queda al menos un administrador activo"],
+        ["Registro", "Invitaciones, cambios de rol y módulos y aprobaciones quedan en Movimientos con quién los hizo"]
+      ]
+    },
+    {
+      "id": "problemas",
+      "tipo": "faq",
+      "titulo": "Problemas frecuentes",
+      "items": [
+        {"p": "Le di un módulo a alguien y todavía ve «Sin acceso».", "r": "Pídele que recargue el portal. El permiso se revisa en cada página, así que al recargar ya aparece Disponible."},
+        {"p": "No me deja quitarle el rol de Administrador a una cuenta.", "r": "Es el último administrador activo. Primero haz administradora a otra cuenta."},
+        {"p": "Las casillas de un administrador están grises.", "r": "Un Administrador tiene todos los módulos por su rol. Para limitarlo, cámbiale el rol a General y marca sus módulos."},
+        {"p": "La persona invitada no recibió el correo.", "r": "Revisa si el panel mostró la tarjeta con el enlace: el servidor no tiene correo configurado. Copia el enlace y envíaselo. Si ya pasaron 48 horas, usa «Reenviar»."},
+        {"p": "Abrí el núcleo y me pide correo y contraseña aunque ya tengo sesión.", "r": "Tu sesión no es de administrador. Entra con una cuenta Administrador; tu sesión pasará a ser esa."},
+        {"p": "Un Consultor necesita registrar placas.", "r": "Cámbiale el rol a General en el panel. Los Consultores no pueden crear ni editar datos en ningún módulo."},
+        {"p": "Dice «Esta cuenta debe cambiar su contraseña».", "r": "Pulsa «Ir a iniciar sesión», cambia la contraseña inicial y vuelve a abrir el núcleo."}
+      ]
+    }
+  ],
+  "relacionadas": ["primeros-pasos", "escaner-tqt"]
+}

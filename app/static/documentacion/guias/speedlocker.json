@@ -1,0 +1,158 @@
+{
+  "id": "speedlocker",
+  "titulo": "SpeedLocker",
+  "subtitulo": "Limitador de velocidad",
+  "color": "#38BDF8",
+  "ruta": "/speedlocker",
+  "resumen": "Banco de las placas SpeedLocker: se registran por su QR (SL-0024), se anota su firmware y se sigue su estado, lote e historial. Usa la misma consola que TPMS.",
+  "roles": {
+    "administrador": "Todo: recibir, programar, editar, cambios en masa, eliminar, renombrar lotes, costos y materiales.",
+    "general": "Lo mismo que el administrador dentro de SpeedLocker, si su cuenta tiene asignado el módulo.",
+    "consultor": "Solo consulta y descarga de Excel; no registra, programa, edita ni borra."
+  },
+  "tiempo_lectura": 4,
+  "secciones": [
+    {
+      "id": "que-es",
+      "tipo": "texto",
+      "titulo": "¿Qué es?",
+      "parrafos": [
+        "SpeedLocker es el módulo de las placas del limitador de velocidad. Su consola es la misma que la de TPMS: Dashboard, Recibir, Programar, Consultar, Inventario, Lotes, Movimientos, Materiales, Costos y Excel, con barra inferior y «Más» en el celular y el «Botón de escaneo» para usar el celular como lector. El uso de cada pestaña está explicado en la guía de TPMS; aquí solo va lo propio de SpeedLocker.",
+        "Las placas SpeedLocker tienen tablas propias (no se mezclan con TPMS, AntiJammer ni Escáner TQT). Sin sesión, /speedlocker te lleva a su pantalla de acceso, /speedlocker/acceso."
+      ],
+      "captura": {
+        "src": "capturas/speedlocker/acceso.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Pantalla de acceso de SpeedLocker con el velocímetro limitado a 100 km/h y el formulario de inicio de sesión",
+        "marcas": [
+          {"n": 1, "x": 64.9, "y": 36, "w": 26.3, "h": 5.8, "texto": "Correo"},
+          {"n": 2, "x": 64.9, "y": 53.4, "w": 26.3, "h": 5.8, "texto": "Entrar"}
+        ]
+      }
+    },
+    {
+      "id": "recorrido",
+      "tipo": "texto",
+      "titulo": "La consola",
+      "parrafos": [
+        "En computadora abre en el Dashboard: placas por estado, actividad de 14 días y últimos movimientos. Las placas se nombran SL-V2-0001, SL-V2-0002…"
+      ],
+      "captura": {
+        "src": "capturas/speedlocker/dashboard.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Dashboard de SpeedLocker con 8 placas, 5 programadas, la gráfica de actividad y los últimos movimientos",
+        "marcas": [
+          {"n": 1, "x": 0, "y": 6.8, "w": 15, "h": 93.2, "texto": "Pestañas (iguales a TPMS)"},
+          {"n": 2, "x": 16.1, "y": 16.3, "w": 82.8, "h": 12.4, "texto": "Placas por estado"},
+          {"n": 3, "x": 78.8, "y": 0.9, "w": 12.9, "h": 4.9, "texto": "Botón de escaneo"}
+        ]
+      }
+    },
+    {
+      "id": "recibir",
+      "tipo": "pasos",
+      "titulo": "Recibir placas SpeedLocker",
+      "intro": "Igual que en TPMS: lote opcional, cámara, lector USB o código escrito.",
+      "pasos": [
+        {
+          "titulo": "Lee el QR",
+          "texto": "El QR de la placa es SL- seguido de la serie, por ejemplo SL-0024. No trae versión: se registra como hardware V2, así que SL-0009 queda como SL-V2-0009.",
+          "captura": {
+            "src": "capturas/speedlocker/recibir.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Recibir de SpeedLocker: el código SL-0009 quedó registrado como SL-V2-0009",
+            "marcas": [
+              {"n": 1, "x": 63, "y": 16.8, "w": 35.9, "h": 22.1, "texto": "SL-0009 → SL-V2-0009 · registrada"},
+              {"n": 2, "x": 63, "y": 43.9, "w": 35.9, "h": 5.3, "texto": "Lote"},
+              {"n": 3, "x": 63, "y": 57.1, "w": 29.6, "h": 5.8, "texto": "Escribir código"}
+            ]
+          }
+        },
+        {
+          "titulo": "QR de otros módulos",
+          "texto": "Antes de enviarlo, SpeedLocker revisa si el código es de otro módulo (Caiquén, Skudo Sigfox, Skudo AntiJammer, TPMS o una tarjeta de Escáner TQT) y lo rechaza diciendo dónde va.",
+          "captura": {
+            "src": "capturas/speedlocker/recibir-rechazo.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Recibir de SpeedLocker mostrando que SJ_0052 es una placa Skudo AntiJammer",
+            "marcas": [
+              {"n": 1, "x": 64.1, "y": 28.3, "w": 33.6, "h": 4.7, "texto": "Rechazo: va en AntiJammer"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "serie",
+      "tipo": "pasos",
+      "titulo": "Buscar solo con la serie",
+      "intro": "En Recibir, Programar y Consultar puedes escribir solo la serie.",
+      "pasos": [
+        {
+          "titulo": "La serie se toma como V2",
+          "texto": "Si escribes solo números, SpeedLocker busca SL-V2-<serie>. En la captura, «24» se buscó como SL-V2-0024; como no está registrada, ofrece «Ir a Recibir».",
+          "captura": {
+            "src": "capturas/speedlocker/consultar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Consultar de SpeedLocker: la serie 24 se busca como SL-V2-0024 y aparece que no está registrada",
+            "marcas": [
+              {"n": 1, "x": 63, "y": 12.7, "w": 26.3, "h": 5.8, "texto": "Solo la serie"},
+              {"n": 2, "x": 63, "y": 24.2, "w": 35.9, "h": 23.9, "texto": "Se busca como SL-V2-0024"}
+            ]
+          },
+          "nota": "El texto de ayuda de Recibir dice «se toma como SpeedLocker V1», pero la aplicación usa V2 (lo que ves en la captura)."
+        },
+        {
+          "titulo": "Ficha de una placa",
+          "texto": "Con una placa registrada, Consultar muestra hardware V2, firmware, serie, lote, fechas, operador, el código leído y el historial.",
+          "captura": {
+            "src": "capturas/speedlocker/consultar-ok.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ficha de SL-V2-0001 programada con SL_FW_DEMO_2.0.1 y su historial",
+            "marcas": [
+              {"n": 1, "x": 63, "y": 24.2, "w": 35.9, "h": 44.6, "texto": "Ficha"},
+              {"n": 2, "x": 63, "y": 71, "w": 35.9, "h": 19.5, "texto": "Historial"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "inventario",
+      "tipo": "texto",
+      "titulo": "Inventario y el resto de pestañas",
+      "parrafos": [
+        "Inventario, Lotes, Movimientos y Excel funcionan igual que en TPMS (filtros, edición, cambios en masa todo o nada, renombrar lotes, bitácora y exportación). Programar anota el firmware y pasa la placa de RECIBIDA a PROGRAMADA.",
+        "Costos y Materiales: en SpeedLocker cada placa es una tarjeta «SpeedLocker». Mientras el inventario de materiales no se active, la pestaña Materiales muestra «Inventario preparado, sin activar». Ver la guía Costos y Materiales."
+      ],
+      "captura": {
+        "src": "capturas/speedlocker/inventario.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Inventario de SpeedLocker con nueve placas SL-V2, cinco programadas con SL_FW_DEMO_2.0.1",
+        "marcas": [
+          {"n": 1, "x": 16.1, "y": 16.3, "w": 82.8, "h": 7.9, "texto": "Buscar y filtros"},
+          {"n": 2, "x": 16.1, "y": 26, "w": 82.8, "h": 61.7, "texto": "Placas SL-V2-…"}
+        ]
+      }
+    },
+    {
+      "id": "ficha",
+      "tipo": "ficha",
+      "titulo": "Ficha técnica",
+      "filas": [
+        ["Rutas", "/speedlocker (consola) · /speedlocker/acceso (inicio de sesión) · mismas pestañas que TPMS (#recibir, #costos…)"],
+        ["Formato del QR", "SL-0024 → SL-V2-0024. También acepta SPEEDLOCKER-0024, prefijo PCB, guion bajo o espacio, minúsculas y versión explícita (SL-V2-0024, SL_V2_1_0024 → V2.1)."],
+        ["Versión por omisión", "V2 (las placas son hardware V2.0 y el QR no trae versión). Solo la serie (24) → SL-V2-0024."],
+        ["No válidos", "Versión 0 o serie 0000. QR de Caiquén, Skudo Sigfox, Skudo AntiJammer, TPMS o Escáner TQT: se rechazan diciendo a qué módulo van."],
+        ["Estados", "RECIBIDA → PROGRAMADA (al guardar firmware) · FALLA · BAJA"],
+        ["Exportación", "SpeedLocker_placas_AAAAMMDD.xlsx con hojas Placas y Movimientos (últimos 2000)"],
+        ["Tarjetas en Costos/Materiales", "Una: SpeedLocker"]
+      ]
+    },
+    {
+      "id": "problemas",
+      "tipo": "faq",
+      "titulo": "Problemas frecuentes",
+      "items": [
+        {"p": "Escribí la serie y busca SL-V2 aunque la ayuda dice V1.", "r": "Es correcto: sin versión, SpeedLocker usa V2. Si tu placa es de otra versión, escribe el nombre completo (por ejemplo SL-V3-0024)."},
+        {"p": "Leí una placa y dice que es de AntiJammer, TPMS u otro módulo.", "r": "El QR no es de SpeedLocker. Regístrala en el módulo que indica el mensaje."},
+        {"p": "«no es un QR de placa SpeedLocker (ej. SL-0024)».", "r": "El texto no tiene el formato SL-serie. Revisa el QR o escribe la serie impresa."},
+        {"p": "Materiales dice «Inventario preparado, sin activar».", "r": "Falta registrar las entradas y activar el inventario. Ver la guía Costos y Materiales."}
+      ]
+    }
+  ],
+  "relacionadas": ["tpms", "costos-materiales", "skudo-antijammer"]
+}

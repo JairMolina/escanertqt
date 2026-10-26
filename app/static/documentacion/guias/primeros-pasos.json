@@ -1,0 +1,356 @@
+{
+  "id": "primeros-pasos",
+  "titulo": "Primeros pasos",
+  "subtitulo": "Portal, acceso y navegación",
+  "color": "#FF2E88",
+  "ruta": "/inicio",
+  "resumen": "Cómo moverte por la Plataforma I+D: el portal de módulos, cómo entrar a cada módulo con tu cuenta, qué hacer si olvidas tu contraseña y cómo volver al portal o cerrar sesión.",
+  "roles": {
+    "administrador": "Ve todos los módulos como Disponibles y, desde el núcleo «I+D», administra cuentas y módulos.",
+    "general": "Entra a los módulos que tiene asignados; los demás aparecen como «Sin acceso».",
+    "consultor": "Entra a sus módulos asignados para consultar y escanear; no puede crear, editar ni borrar datos."
+  },
+  "tiempo_lectura": 8,
+  "secciones": [
+    {
+      "id": "que-es",
+      "tipo": "texto",
+      "titulo": "¿Qué es la Plataforma I+D?",
+      "parrafos": [
+        "Es la web del equipo de hardware. Reúne varios módulos: Escáner TQT, TPMS, Skudo AntiJammer, SpeedLocker, Skudo Sigfox, Caiquén, Impresora y Documentación TEAM HW. Cada módulo es una aplicación con su propio permiso.",
+        "Todo empieza en el portal `/inicio`. Si abres la dirección principal `/` sin sesión, también llegas al portal.",
+        "Usas una sola cuenta (tu correo y tu contraseña) para todos los módulos. Un administrador decide a qué módulos entras y con qué rol. Los roles y permisos están en la guía «Cuentas y permisos»."
+      ]
+    },
+    {
+      "id": "portal",
+      "tipo": "texto",
+      "titulo": "El portal de módulos",
+      "parrafos": [
+        "El portal muestra los módulos como estrellas que giran alrededor del núcleo «I+D». Cada estrella tiene el nombre del módulo y su estado debajo.",
+        "En la cabecera ves el saludo y la fecha, tu correo y tu rol (si iniciaste sesión), la hora, el estado del servidor («Servidor en línea»), la versión de la plataforma y el botón de tema claro/oscuro."
+      ],
+      "captura": {
+        "src": "capturas/primeros-pasos/portal-sesion.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Portal /inicio con sesión de una cuenta General: TPMS, Escáner TQT y Documentación disponibles; los demás módulos con candado y «Sin acceso».",
+        "marcas": [
+          {"n": 1, "x": 24.8, "y": 3.8, "w": 21, "h": 3.6, "texto": "Tu correo, tu rol y el enlace «Cerrar sesión»"},
+          {"n": 2, "x": 46.1, "y": 51.9, "w": 7.8, "h": 12.4, "texto": "Núcleo «I+D»: el botón «Administrar» (solo sirve a administradores)"},
+          {"n": 3, "x": 53.4, "y": 77.8, "w": 1.8, "h": 2.9, "texto": "Módulo Disponible: puedes entrar"},
+          {"n": 4, "x": 27.5, "y": 66.3, "w": 1.6, "h": 2.5, "texto": "Módulo con candado y «Sin acceso»: tu cuenta no lo tiene asignado"}
+        ]
+      }
+    },
+    {
+      "id": "estados",
+      "tipo": "pasos",
+      "titulo": "Ver la ficha de un módulo",
+      "intro": "Antes de entrar puedes ver para qué sirve cada módulo y si tienes acceso.",
+      "pasos": [
+        {
+          "titulo": "Pasa el cursor sobre una estrella",
+          "texto": "Las órbitas se detienen y aparece una ficha con el nombre, el estado y la descripción del módulo. También puedes usar las flechas del teclado para recorrer los módulos: Enter entra y Escape cierra la ficha.",
+          "captura": {
+            "src": "capturas/primeros-pasos/portal-ficha.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ficha del módulo TPMS abierta al pasar el cursor sobre su estrella, con el estado Disponible y el botón Entrar.",
+            "marcas": [
+              {"n": 1, "x": 53.5, "y": 77.5, "w": 1.8, "h": 2.9, "texto": "Estrella bajo el cursor"},
+              {"n": 2, "x": 62.3, "y": 73.7, "w": 4, "h": 2.1, "texto": "Estado del módulo"},
+              {"n": 3, "x": 61.2, "y": 82.8, "w": 18.8, "h": 5.3, "texto": "Botón «Entrar»"}
+            ]
+          }
+        },
+        {
+          "titulo": "Lee el estado",
+          "texto": "«Disponible»: el módulo funciona y tu cuenta puede entrar. «Sin acceso»: el módulo funciona, pero no lo tienes asignado; la ficha no muestra «Entrar» y te pide solicitarlo a un administrador. «Próximamente» y «En mantenimiento» indican que el módulo aún no se puede usar; al pulsarlo verás un aviso en lugar de entrar.",
+          "captura": {
+            "src": "capturas/primeros-pasos/ficha-sin-acceso.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ficha de SpeedLocker con el estado Sin acceso y el aviso «Tu cuenta no tiene acceso a este módulo. Pídelo a un administrador.»",
+            "marcas": [
+              {"n": 1, "x": 27.5, "y": 66.3, "w": 1.6, "h": 2.5, "texto": "La estrella lleva un candado"},
+              {"n": 2, "x": 3.9, "y": 63, "w": 4.2, "h": 2.1, "texto": "Estado «Sin acceso»"},
+              {"n": 3, "x": 2.8, "y": 71.5, "w": 18.8, "h": 4.5, "texto": "Qué hacer: pedir el módulo a un administrador"}
+            ]
+          },
+          "nota": "Sin sesión, todas las estrellas aparecen como «Disponible»: el permiso se revisa cuando inicias sesión."
+        }
+      ]
+    },
+    {
+      "id": "tema-celular",
+      "tipo": "pasos",
+      "titulo": "Tema claro/oscuro y uso en celular",
+      "intro": "El portal se adapta a tu pantalla y recuerda el tema que elijas.",
+      "pasos": [
+        {
+          "titulo": "Cambia el tema",
+          "texto": "Pulsa el botón del sol o la luna, arriba a la derecha. El icono muestra el tema al que vas a cambiar. Tu elección se guarda en el navegador y la usan también los demás módulos.",
+          "captura": {
+            "src": "capturas/primeros-pasos/portal-claro.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Portal en tema claro, con fondo gris claro y cuadrícula técnica.",
+            "marcas": [
+              {"n": 1, "x": 95.8, "y": 1.8, "w": 3.1, "h": 4.9, "texto": "Botón de tema: en claro muestra una luna (para volver a oscuro)"},
+              {"n": 2, "x": 24.8, "y": 3.8, "w": 21, "h": 3.6, "texto": "Tu sesión se mantiene al cambiar de tema"}
+            ]
+          }
+        },
+        {
+          "titulo": "Usa el portal en el celular",
+          "texto": "En pantallas angostas (hasta 640 px de ancho) o muy bajas, los módulos se muestran como una lista vertical, sin órbitas, para ahorrar batería. Cada tarjeta trae nombre, estado, descripción y «Entrar» si tienes acceso. Un solo toque abre el módulo. En una tableta con la vista de órbitas, el primer toque muestra la ficha y el segundo entra.",
+          "captura": {
+            "src": "capturas/primeros-pasos/portal-movil.jpg", "ancho": 390, "alto": 844,
+            "alt": "Portal en un celular: lista vertical de módulos; Escáner TQT Disponible y SpeedLocker y Skudo AntiJammer Sin acceso.",
+            "marcas": [
+              {"n": 1, "x": 3.6, "y": 8.5, "w": 92.8, "h": 5.2, "texto": "Tu cuenta, tu rol y «Cerrar sesión»"},
+              {"n": 2, "x": 3.6, "y": 38.6, "w": 92.8, "h": 14.6, "texto": "Módulo disponible: un toque para entrar"},
+              {"n": 3, "x": 3.6, "y": 54.3, "w": 92.8, "h": 14.6, "texto": "Módulo sin acceso, con candado"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "entrar",
+      "tipo": "pasos",
+      "titulo": "Entrar a un módulo e iniciar sesión",
+      "intro": "Cada módulo tiene su propia pantalla de acceso (por ejemplo `/tpms/acceso`, `/caiquen/acceso`). Escáner TQT usa la pantalla general `/login`. Todas aceptan la misma cuenta. Documentación TEAM HW no pide iniciar sesión.",
+      "pasos": [
+        {
+          "titulo": "Elige el módulo en el portal",
+          "texto": "Pulsa la estrella o «Entrar» en la ficha. Si ya iniciaste sesión y tienes el módulo, entras directo. Si no, el portal muestra «Comprobando tu sesión…» y te lleva a la pantalla de acceso de ese módulo."
+        },
+        {
+          "titulo": "Escribe tu correo y tu contraseña",
+          "texto": "Usa «Ver» para mostrar la contraseña mientras la escribes. Si tienes Bloq Mayús activado, aparece un aviso. Pulsa «Entrar». Al terminar vuelves al módulo que habías elegido.",
+          "captura": {
+            "src": "capturas/primeros-pasos/acceso-tpms.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pantalla de acceso del módulo TPMS con los campos Correo y Contraseña y el botón Entrar.",
+            "marcas": [
+              {"n": 1, "x": 64.9, "y": 36, "w": 26.3, "h": 5.8, "texto": "Tu correo"},
+              {"n": 2, "x": 64.9, "y": 45.9, "w": 20.7, "h": 5.8, "texto": "Tu contraseña (con «Ver» para mostrarla)"},
+              {"n": 3, "x": 64.9, "y": 53.4, "w": 26.3, "h": 5.8, "texto": "«Entrar»"},
+              {"n": 4, "x": 64.9, "y": 61.7, "w": 12, "h": 4.9, "texto": "«¿Olvidaste tu contraseña?»"},
+              {"n": 5, "x": 0.8, "y": 1.1, "w": 6.2, "h": 4.9, "texto": "«Módulos»: regresa al portal"}
+            ]
+          },
+          "nota": "Si te equivocas varias veces seguidas, el acceso se bloquea unos minutos. Espera y vuelve a intentarlo."
+        },
+        {
+          "titulo": "La pantalla general /login",
+          "texto": "Es la de Escáner TQT y la que se usa cuando un módulo no tiene pantalla propia. Funciona igual: correo, contraseña y «Entrar». Si ya tienes sesión abierta, te lleva directo a donde ibas.",
+          "captura": {
+            "src": "capturas/primeros-pasos/login.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pantalla general de inicio de sesión /login de Escáner TQT.",
+            "marcas": [
+              {"n": 1, "x": 64.1, "y": 32.4, "w": 27.8, "h": 22.4, "texto": "Formulario de correo y contraseña"},
+              {"n": 2, "x": 64.1, "y": 56.8, "w": 15.6, "h": 6, "texto": "«¿Olvidaste tu contraseña?»"},
+              {"n": 3, "x": 0.8, "y": 0.9, "w": 6.2, "h": 4.4, "texto": "«Módulos»: vuelve al portal sin iniciar sesión"}
+            ]
+          },
+          "nota": "¿No tienes cuenta? No hay registro libre: un administrador te envía una invitación (ver «Cuentas y permisos»)."
+        }
+      ]
+    },
+    {
+      "id": "cambio-obligatorio",
+      "tipo": "pasos",
+      "titulo": "Cambiar tu contraseña inicial",
+      "intro": "Si tu cuenta aún tiene la contraseña inicial, al iniciar sesión la pantalla te pide cambiarla.",
+      "pasos": [
+        {
+          "titulo": "Llena el formulario de cambio",
+          "texto": "Escribe tu «Contraseña actual», la «Contraseña nueva» (mínimo 10 caracteres y distinta de la actual) y repítela. Pulsa «Guardar contraseña». Verás «Contraseña cambiada.» y entrarás al módulo.",
+          "captura": {
+            "src": "capturas/primeros-pasos/cambio-obligatorio.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pantalla de acceso de TPMS mostrando el formulario «Tu contraseña es la inicial. Cámbiala ahora».",
+            "marcas": [
+              {"n": 1, "x": 64.9, "y": 33.3, "w": 26.3, "h": 4.8, "texto": "Aviso: tu contraseña es la inicial"},
+              {"n": 2, "x": 64.9, "y": 42.1, "w": 26.3, "h": 5.8, "texto": "Contraseña actual"},
+              {"n": 3, "x": 64.9, "y": 52, "w": 26.3, "h": 5.8, "texto": "Nueva (mínimo 10 caracteres) y su repetición abajo"},
+              {"n": 4, "x": 64.9, "y": 69.4, "w": 18.5, "h": 5.8, "texto": "«Guardar contraseña»"},
+              {"n": 5, "x": 83.9, "y": 69.4, "w": 7.2, "h": 5.8, "texto": "«Más tarde»: entras sin cambiarla"}
+            ]
+          },
+          "nota": "Al cambiar la contraseña se cierran tus sesiones en otros equipos. «Más tarde» te deja entrar, pero el aviso volverá en tu próximo inicio de sesión."
+        },
+        {
+          "titulo": "Cámbiala cuando quieras",
+          "texto": "En la consola de escritorio del Escáner TQT, el botón del candado («Cambiar mi contraseña») abre este mismo formulario (`/login?cambiar=1`)."
+        }
+      ]
+    },
+    {
+      "id": "olvide",
+      "tipo": "pasos",
+      "titulo": "¿Olvidaste tu contraseña?",
+      "intro": "No hay correo de recuperación automático: otra persona con sesión abierta aprueba tu solicitud y te dicta un código de 6 dígitos. Hazlo con esa persona a tu lado.",
+      "pasos": [
+        {
+          "titulo": "Pide ayuda",
+          "texto": "En cualquier pantalla de acceso pulsa «¿Olvidaste tu contraseña?», escribe tu correo y pulsa «Pedir ayuda». La pantalla queda esperando y avanza sola cuando aprueban la solicitud. La solicitud vence a los 15 minutos.",
+          "captura": {
+            "src": "capturas/primeros-pasos/olvide-2.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pantalla «Recuperar acceso» con el mensaje Solicitud enviada, esperando la aprobación.",
+            "marcas": [
+              {"n": 1, "x": 64.1, "y": 39.8, "w": 27.8, "h": 7.9, "texto": "Solicitud enviada: espera la aprobación"},
+              {"n": 2, "x": 64.1, "y": 49.4, "w": 5.8, "h": 6, "texto": "«Volver» cancela la espera"}
+            ]
+          }
+        },
+        {
+          "titulo": "La otra persona aprueba la solicitud",
+          "texto": "Quien te ayuda abre la consola de escritorio del Escáner TQT (`/monitor`). Cuando hay solicitudes aparece un botón con un escudo y un número arriba a la derecha («Solicitudes de contraseña»). Ahí ve tu correo y pulsa «Aprobar» (o «Rechazar»).",
+          "captura": {
+            "src": "capturas/primeros-pasos/aprobar-1.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Consola de escritorio con la ventana Solicitudes de contraseña y la solicitud de pedro.tpms@demo.mx.",
+            "marcas": [
+              {"n": 1, "x": 77.2, "y": 1.3, "w": 2.5, "h": 4, "texto": "Botón «Solicitudes de contraseña» con el número de pendientes"},
+              {"n": 2, "x": 32.4, "y": 47.7, "w": 35.1, "h": 7.4, "texto": "Quién pide ayuda y hace cuánto"},
+              {"n": 3, "x": 61.5, "y": 48.9, "w": 5.1, "h": 4.9, "texto": "«Aprobar»"},
+              {"n": 4, "x": 55.4, "y": 48.9, "w": 5.6, "h": 4.9, "texto": "«Rechazar»"}
+            ]
+          },
+          "nota": "Solo aprueba quien tenga un rol igual o mayor que el tuyo: una cuenta General aprueba a otra General o a un Consultor; la de un administrador solo la aprueba otro administrador. Un Consultor no aprueba solicitudes. Nadie aprueba la suya."
+        },
+        {
+          "titulo": "Te dictan el código",
+          "texto": "Al aprobar aparece un código de 6 dígitos, válido 10 minutos. Se muestra una sola vez: la otra persona te lo dicta en persona.",
+          "captura": {
+            "src": "capturas/primeros-pasos/aprobar-2.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ventana con el código de 6 dígitos para pedro.tpms@demo.mx, válido 10 minutos.",
+            "marcas": [
+              {"n": 1, "x": 42.6, "y": 45.9, "w": 14.8, "h": 4.9, "texto": "Código de 6 dígitos"},
+              {"n": 2, "x": 32.4, "y": 40.5, "w": 35.1, "h": 15.7, "texto": "Para quién es y cuánto dura"}
+            ]
+          }
+        },
+        {
+          "titulo": "Escribe el código y tu contraseña nueva",
+          "texto": "Tu pantalla ya avanzó sola. Escribe el «Código de 6 dígitos», la «Contraseña nueva» (mínimo 10 caracteres) y «Repite la nueva». Pulsa «Guardar contraseña». Verás «Contraseña cambiada. Entra con la nueva.» y vuelves al formulario de acceso.",
+          "captura": {
+            "src": "capturas/primeros-pasos/olvide-3.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Pantalla de recuperar acceso con la solicitud aprobada: campos de código, contraseña nueva y repetición.",
+            "marcas": [
+              {"n": 1, "x": 64.1, "y": 36.8, "w": 27.8, "h": 6.4, "texto": "Código de 6 dígitos que te dictaron"},
+              {"n": 2, "x": 64.1, "y": 43.2, "w": 27.8, "h": 6.4, "texto": "Contraseña nueva"},
+              {"n": 3, "x": 64.1, "y": 49.6, "w": 27.8, "h": 6.4, "texto": "Repite la nueva"},
+              {"n": 4, "x": 64.1, "y": 57.9, "w": 21.5, "h": 6, "texto": "«Guardar contraseña»"}
+            ]
+          },
+          "nota": "Si se rechaza, se reemplaza o vence la solicitud, la pantalla vuelve al primer paso con el motivo. Pídela de nuevo."
+        }
+      ]
+    },
+    {
+      "id": "navegar",
+      "tipo": "pasos",
+      "titulo": "Volver al portal y cerrar sesión",
+      "intro": "Desde cualquier módulo puedes regresar al portal o salir de tu cuenta.",
+      "pasos": [
+        {
+          "titulo": "Usa el botón «Módulos»",
+          "texto": "Todos los módulos y pantallas de acceso tienen arriba a la izquierda el botón «← Módulos». Te lleva al portal `/inicio` sin cerrar tu sesión.",
+          "captura": {
+            "src": "capturas/primeros-pasos/modulo-tpms.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Módulo TPMS abierto con la sesión de ana.general@demo.mx; arriba a la izquierda el botón Módulos y a la derecha el botón de cerrar sesión.",
+            "marcas": [
+              {"n": 1, "x": 0.8, "y": 0.9, "w": 6.2, "h": 4.9, "texto": "«Módulos»: volver al portal"},
+              {"n": 2, "x": 96.1, "y": 0.9, "w": 3.1, "h": 4.9, "texto": "Cerrar sesión"}
+            ]
+          }
+        },
+        {
+          "titulo": "Cierra sesión",
+          "texto": "En un módulo pulsa el icono de «Cerrar sesión» (la puerta con flecha): sales de tu cuenta y vuelves a la pantalla de acceso de ese módulo. En el portal usa el enlace «Cerrar sesión» junto a tu correo. La sesión es una sola para toda la plataforma: al cerrarla en un módulo, se cierra en todos.",
+          "nota": "En una computadora compartida, cierra sesión siempre al terminar. Si no, la sesión vence sola (por defecto a las 12 horas)."
+        }
+      ]
+    },
+    {
+      "id": "documentacion",
+      "tipo": "texto",
+      "titulo": "El módulo Documentación TEAM HW",
+      "parrafos": [
+        "Es la estrella rosa del portal (`/documentacion`). Presenta los proyectos del equipo de hardware como «circuitos» de una misma placa (PCB). Es pública: cualquier persona la puede ver, con o sin cuenta, igual que este manual.",
+        "Arriba tienes el menú: «La placa», «El mapa», «Proyectos», «Entrar» y «Manual», y el botón «Módulos» para volver al portal. Cada proyecto tiene un botón «Abrir …» que te lleva a su módulo y muestra si para ti está Disponible o Sin acceso. Al final, «ENTRAR A LA PLATAFORMA» te lleva al portal."
+      ],
+      "captura": {
+        "src": "capturas/primeros-pasos/documentacion.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Portada del módulo Documentación TEAM HW con el título grande sobre una placa de circuito y el menú superior.",
+        "marcas": [
+          {"n": 1, "x": 70, "y": 1.5, "w": 7, "h": 4, "texto": "«Proyectos»: salta a la lista de proyectos"},
+          {"n": 2, "x": 91.5, "y": 1.5, "w": 7.5, "h": 4, "texto": "«Módulos»: volver al portal"},
+          {"n": 3, "x": 29.5, "y": 73.5, "w": 20.5, "h": 7.5, "texto": "Empieza el recorrido por la placa"},
+          {"n": 4, "x": 50.5, "y": 73.5, "w": 20, "h": 7.5, "texto": "Abre este manual"}
+        ]
+      }
+    },
+    {
+      "id": "manual",
+      "tipo": "texto",
+      "titulo": "Cómo usar este manual",
+      "parrafos": [
+        "El manual vive dentro de Documentación TEAM HW, en `/documentacion/manual`. Las guías se agrupan en «Empieza aquí» (esta guía y «Cuentas y permisos»), «Módulos de placas» (Escáner TQT, TPMS, Skudo AntiJammer, SpeedLocker, Skudo Sigfox, Caiquén) y «Herramientas» (Costos y Materiales, Impresora).",
+        "Las capturas son de la aplicación real con datos de demostración (correos @demo.mx). Los círculos numerados sobre cada captura corresponden a la lista de su pie: busca el número para saber qué señala.",
+        "Cada guía de módulo trae: qué es y para quién, un recorrido de la pantalla, los pasos de cada tarea, una ficha técnica (rutas, formatos de QR, estados, roles) y problemas frecuentes. Si algo de la pantalla no coincide con la guía, la versión de la app puede ser más nueva: avisa al equipo."
+      ]
+    },
+    {
+      "id": "ficha",
+      "tipo": "ficha",
+      "titulo": "Ficha técnica",
+      "filas": [
+        ["Portal", "/inicio (también / sin sesión)"],
+        ["Pantalla de acceso general", "/login (Escáner TQT) · Documentación TEAM HW y el manual no piden sesión"],
+        ["Pantallas de acceso por módulo", "/tpms/acceso · /antijammer/acceso · /speedlocker/acceso · /sigfox/acceso · /caiquen/acceso · /impresora/acceso"],
+        ["Rutas de los módulos", "Escáner TQT / · SpeedLocker /speedlocker · Skudo AntiJammer /antijammer · TPMS /tpms · Skudo Sigfox /sigfox · Caiquén /caiquen · Documentación TEAM HW /documentacion · Impresora /impresora"],
+        ["Estados de un módulo", "Disponible · Sin acceso (con sesión, no asignado) · Próximamente · En mantenimiento"],
+        ["Contraseña", "Mínimo 10 caracteres; la nueva debe ser distinta de la actual"],
+        ["Recuperar contraseña", "Solicitud válida 15 min → aprobación de otra cuenta → código de 6 dígitos válido 10 min"],
+        ["Duración de la sesión", "12 horas por defecto; una sola sesión para todos los módulos"],
+        ["Tema", "Claro u oscuro; se guarda en el navegador y lo comparten todos los módulos"],
+        ["Vista de lista", "Pantallas de hasta 640 px de ancho o de poca altura"]
+      ]
+    },
+    {
+      "id": "problemas",
+      "tipo": "faq",
+      "titulo": "Problemas frecuentes",
+      "items": [
+        {"p": "Un módulo aparece como «Sin acceso».", "r": "Tu cuenta no lo tiene asignado. Pide a un administrador que te lo dé en el panel «Cuentas y módulos» del portal. Después recarga el portal."},
+        {"p": "Entré a la dirección de un módulo y me regresó al portal.", "r": "Pasa lo mismo: no tienes ese módulo. Para Escáner TQT el portal muestra el aviso «Tu cuenta no tiene acceso a Escáner TQT»; para los demás módulos solo verás su estrella con «Sin acceso»."},
+        {"p": "Dice «Correo o contraseña incorrectos.»", "r": "Revisa el correo y que no esté activado Bloq Mayús. Si no la recuerdas, usa «¿Olvidaste tu contraseña?». Tras varios intentos fallidos el acceso se bloquea unos minutos."},
+        {"p": "Pedí ayuda con mi contraseña y nadie ve la solicitud.", "r": "La solicitud se ve solo en la consola de escritorio del Escáner TQT (`/monitor`), con una cuenta General o Administrador. Si tu cuenta es de administrador, solo otro administrador la ve. Vence a los 15 minutos."},
+        {"p": "El código de 6 dígitos no funciona.", "r": "Vale 10 minutos y solo para la solicitud abierta en esa pantalla. Si pediste ayuda otra vez, el código anterior ya no sirve: pide que aprueben la nueva."},
+        {"p": "El indicador dice «Sin conexión con el servidor».", "r": "La página no alcanza al servidor. Revisa tu red. El portal lo vuelve a comprobar cada 30 segundos."},
+        {"p": "Quiero ver las órbitas en el celular.", "r": "En pantallas angostas el portal usa la lista a propósito. Gira a horizontal en una tableta o usa una computadora."}
+      ]
+    },
+    {
+      "id": "glosario",
+      "tipo": "glosario",
+      "titulo": "Glosario general",
+      "terminos": [
+        {"t": "Módulo", "d": "Cada aplicación de la plataforma (Escáner TQT, TPMS, Caiquén…). Tiene su propia ruta, su pantalla de acceso y su permiso."},
+        {"t": "Portal", "d": "La página /inicio con todos los módulos. Desde ahí entras a cada uno."},
+        {"t": "Núcleo I+D", "d": "El círculo del centro del portal. Es el botón «Administrar», que abre el panel de cuentas para los administradores."},
+        {"t": "Cuenta", "d": "Tu correo y tu contraseña. Sirve para todos los módulos que tengas asignados."},
+        {"t": "Rol", "d": "Lo que tu cuenta puede hacer: Administrador, General o Consultor."},
+        {"t": "Consultor", "d": "Rol de solo consulta: puede ver y escanear, pero no crear, editar, mover, enviar ni borrar datos."},
+        {"t": "Sesión", "d": "El tiempo en que tu navegador queda identificado después de iniciar sesión. Es una sola para todos los módulos."},
+        {"t": "Invitación", "d": "Enlace que envía un administrador para activar una cuenta nueva. Vale 48 horas y se usa una vez."},
+        {"t": "Placa / PCB", "d": "Placa de circuito impreso. Cada placa trae una etiqueta con QR que la identifica, por ejemplo PCB_TQT-R3_V2_0_TIMER-0004."},
+        {"t": "QR", "d": "Código cuadrado de la etiqueta. Al escanearlo con la cámara o con el celular, la plataforma sabe qué placa, tarjeta o activo es."},
+        {"t": "Tarjeta", "d": "En Escáner TQT, el equipo armado con sus placas R1, R2 y R3, identificado por un número (por ejemplo 0021). Se sigue desde la recepción de las placas hasta la entrega."},
+        {"t": "Lote", "d": "Grupo de producción con el que se trabaja, por ejemplo «Octubre 2026». Las placas y tarjetas se registran en el lote activo."},
+        {"t": "Recibir", "d": "Registrar en la plataforma las placas que llegan, normalmente escaneando su QR."},
+        {"t": "Firmware", "d": "Programa que se carga en el microcontrolador de la placa."},
+        {"t": "Programada", "d": "Estado de una placa a la que ya se le cargó el firmware."},
+        {"t": "MAC", "d": "Identificador único de radio de una placa, con formato 70:4b:ca:5b:9f:6e."},
+        {"t": "DYMO", "d": "Impresora de etiquetas que usa la plataforma para imprimir etiquetas con QR."},
+        {"t": "Botón de escaneo", "d": "Función de los módulos para usar el celular como lector de QR vinculado a la computadora."}
+      ]
+    }
+  ],
+  "relacionadas": ["cuentas", "escaner-tqt", "tpms"]
+}

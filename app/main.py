@@ -123,11 +123,12 @@ CABECERAS_SEGURIDAD = {
 
 # Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
-RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/antijammer/acceso", "/speedlocker/acceso", "/sigfox/acceso", "/caiquen/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico"}
-PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js")
+RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/antijammer/acceso", "/speedlocker/acceso", "/sigfox/acceso", "/caiquen/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico",
+                  "/documentacion", "/documentacion/manual"}   # v1.4.39: Documentación TEAM HW es pública (sin datos ni API)
+PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js", "/static/documentacion/")
 
 
-PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms", "/antijammer", "/speedlocker", "/sigfox", "/caiquen", "/documentacion"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo); v1.4.31: AntiJammer; v1.4.32: SpeedLocker; v1.4.33: Skudo Sigfox
+PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms", "/antijammer", "/speedlocker", "/sigfox", "/caiquen", "/documentacion", "/documentacion/manual"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo); v1.4.31: AntiJammer; v1.4.32: SpeedLocker; v1.4.33: Skudo Sigfox
 ROL_NOMBRE = {"general": "General", "consultor": "Consultor"}
 # Páginas (y sus copias bajo /static) → zona que se nombra en el aviso "sin acceso" (v1.3.42)
 ZONA_PAGINA = {"/": "recibir", "/static/index.html": "recibir", "/emparejar": "emparejar", "/static/emparejar.html": "emparejar",
@@ -195,6 +196,9 @@ def _sin_modulo(ruta: str, metodo: str, mod: Optional[str] = None):
 async def _exigir_sesion(request: Request):
     """None si puede pasar; si no, la respuesta de rechazo (401 JSON para la API, redirección a /login para las páginas)."""
     ruta = request.url.path
+    # v1.4.39: '..' o '\' permitían salir de un prefijo público (/static/css/../js/x.js) y leer /static sin sesión
+    if ".." in ruta or "\\" in ruta:
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
     if ruta in RUTAS_PUBLICAS or ruta.startswith(PREFIJOS_PUBLICOS) or ruta.startswith(('/api/stm32/agent/', '/api/dymo/remoto/agente/')):
         return None
     if request.scope.get("type") == "websocket":
@@ -333,6 +337,12 @@ async def serve_speedlocker():
 async def serve_documentacion():
     """v1.4.38: módulo Documentación TEAM HW, presentación cinematográfica de los proyectos (GSAP + ScrollTrigger en /static/documentacion)."""
     return _serve_file(settings.STATIC_DIR / "documentacion" / "index.html")
+
+
+@app.get("/documentacion/manual", include_in_schema=False)
+async def serve_documentacion_manual():
+    """v1.4.39: Manual de usuario interactivo (guías en /static/documentacion/guias/*.json, una por módulo)."""
+    return _serve_file(settings.STATIC_DIR / "documentacion" / "manual.html")
 
 
 @app.get("/caiquen/acceso", include_in_schema=False)

@@ -1,0 +1,244 @@
+{
+  "id": "impresora",
+  "titulo": "Impresora",
+  "subtitulo": "Activos con etiqueta DYMO y QR",
+  "color": "#B8B8C8",
+  "ruta": "/impresora",
+  "resumen": "Libro de activos de la empresa: cada equipo recibe un número ACT 0000 y una etiqueta DYMO con su QR. Al escanear la etiqueta se abre la ficha del equipo con sus datos, características e historial.",
+  "roles": {
+    "administrador": "Todo: registrar, editar, importar, imprimir, exportar y eliminar activos.",
+    "general": "Lo mismo, si su cuenta tiene asignado el módulo Impresora.",
+    "consultor": "Solo lectura: consulta y escanea fichas; no registra, edita, imprime ni elimina."
+  },
+  "tiempo_lectura": 6,
+  "secciones": [
+    {
+      "id": "que-es",
+      "tipo": "texto",
+      "titulo": "¿Qué es?",
+      "parrafos": [
+        "Impresora lleva el registro de activos: computadoras, herramientas, instrumentos y mobiliario. Cada uno tiene un código ACT con número consecutivo, departamento, ubicación, responsable, estado y una etiqueta DYMO 30334 con QR.",
+        "Sin sesión, /impresora te lleva a su pantalla de acceso, /impresora/acceso."
+      ],
+      "captura": {
+        "src": "capturas/impresora/acceso.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Pantalla de acceso al registro de activos con una etiqueta ACT 0042 saliendo de la impresora",
+        "marcas": [
+          {"n": 1, "x": 64.5, "y": 34, "w": 27, "h": 18, "texto": "Correo y contraseña"},
+          {"n": 2, "x": 64.5, "y": 53, "w": 27, "h": 6, "texto": "Entrar"}
+        ]
+      }
+    },
+    {
+      "id": "libro",
+      "tipo": "texto",
+      "titulo": "El libro de activos",
+      "parrafos": [
+        "A la izquierda está la lista de activos; a la derecha, la ficha del que elijas. Arriba puedes buscar por código, nombre o serie y filtrar por estado, departamento y categoría. La columna «Impr.» cuenta cuántas veces se imprimió la etiqueta.",
+        "El aviso «Impresora sin conexión» indica que la DYMO compartida de la oficina no está disponible en ese momento."
+      ],
+      "captura": {
+        "src": "capturas/impresora/libro.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Libro de activos con 12 activos y la ficha vacía a la derecha",
+        "marcas": [
+          {"n": 1, "x": 0.5, "y": 8.5, "w": 49.5, "h": 6, "texto": "Buscar y filtros"},
+          {"n": 2, "x": 59.5, "y": 8.5, "w": 39.5, "h": 6, "texto": "Exportar · Importar · Imprimir lote · Nuevo activo"},
+          {"n": 3, "x": 0.5, "y": 22, "w": 65, "h": 72, "texto": "Lista de activos"},
+          {"n": 4, "x": 66.5, "y": 15, "w": 32.5, "h": 82, "texto": "Ficha del activo"},
+          {"n": 5, "x": 47.5, "y": 1, "w": 15.5, "h": 4.5, "texto": "Estado de la impresora"}
+        ]
+      }
+    },
+    {
+      "id": "registrar",
+      "tipo": "pasos",
+      "titulo": "Registrar un activo e imprimir su etiqueta",
+      "pasos": [
+        {
+          "titulo": "Nuevo activo",
+          "texto": "Pulsa «Nuevo activo» y llena estado, marca, modelo, número de serie, ubicación, responsable, fecha de adquisición, valor y notas. En «Características» agrega datos extra (procesador, memoria…), cada uno con nombre y valor. Pulsa «Guardar activo».",
+          "captura": {
+            "src": "capturas/impresora/nuevo.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Formulario Registrar activo",
+            "marcas": [
+              {"n": 1, "x": 80.5, "y": 6.5, "w": 19, "h": 49, "texto": "Datos del activo"},
+              {"n": 2, "x": 80.5, "y": 59, "w": 19, "h": 30, "texto": "Características"},
+              {"n": 3, "x": 93, "y": 92.5, "w": 6.5, "h": 6, "texto": "Guardar activo"}
+            ]
+          }
+        },
+        {
+          "titulo": "Imprime la etiqueta",
+          "texto": "Al guardar se asigna el siguiente número (ACT 0013) y se muestra la etiqueta. Elige cómo imprimirla: DYMO compartida (la de la oficina, desde cualquier equipo), DYMO Connect (una DYMO conectada por USB a esta computadora), descargar el archivo .dymo, o imprimir desde el navegador.",
+          "captura": {
+            "src": "capturas/impresora/registrado.jpg", "ancho": 1440, "alto": 900,
+            "alt": "ACT 0013 registrado con su etiqueta y las cuatro formas de imprimir",
+            "marcas": [
+              {"n": 1, "x": 61, "y": 10.5, "w": 34, "h": 42.5, "texto": "Etiqueta ACT 0013"},
+              {"n": 2, "x": 61, "y": 53.5, "w": 38, "h": 30, "texto": "Formas de imprimir"},
+              {"n": 3, "x": 72.5, "y": 91, "w": 26.5, "h": 6, "texto": "Registrar otro · imprimir después"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ficha-activo",
+      "tipo": "pasos",
+      "titulo": "La ficha del activo",
+      "pasos": [
+        {
+          "titulo": "Abre la ficha",
+          "texto": "Toca un activo de la lista o escanea su etiqueta. La ficha muestra el código, el nombre, la etiqueta y los botones «Imprimir etiqueta», «Otras vías» (DYMO Connect, .dymo o navegador) y «Editar».",
+          "captura": {
+            "src": "capturas/impresora/ficha.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ficha de ACT 0004 Laptop de ingeniería con su etiqueta y el botón Imprimir etiqueta",
+            "marcas": [
+              {"n": 1, "x": 66.5, "y": 17, "w": 32.5, "h": 10, "texto": "Código y nombre"},
+              {"n": 2, "x": 66.5, "y": 66.5, "w": 32.5, "h": 7, "texto": "Imprimir etiqueta"},
+              {"n": 3, "x": 66.5, "y": 74, "w": 32.5, "h": 4.5, "texto": "Otras vías · Editar"}
+            ]
+          }
+        },
+        {
+          "titulo": "Datos e historial",
+          "texto": "Más abajo: departamento, categoría, ubicación, responsable, serie, fecha de adquisición, valor, notas, características y el historial (alta, ediciones e impresiones, con fecha y usuario).",
+          "captura": {
+            "src": "capturas/impresora/ficha-historial.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Ficha de ACT 0004 con sus datos, características e historial",
+            "marcas": [
+              {"n": 1, "x": 66.5, "y": 10.5, "w": 32.5, "h": 39, "texto": "Datos"},
+              {"n": 2, "x": 66.5, "y": 51, "w": 32.5, "h": 11, "texto": "Características"},
+              {"n": 3, "x": 66.5, "y": 66, "w": 32.5, "h": 32, "texto": "Historial"}
+            ]
+          }
+        },
+        {
+          "titulo": "En el celular",
+          "texto": "La ficha ocupa toda la pantalla y «Imprimir etiqueta» queda abajo. Es lo que ves al escanear una etiqueta con la cámara del celular.",
+          "captura": {
+            "src": "capturas/impresora/celular.jpg", "ancho": 390, "alto": 844,
+            "alt": "Ficha de ACT 0004 en un celular",
+            "marcas": [
+              {"n": 1, "x": 3, "y": 9.5, "w": 94, "h": 13, "texto": "Código y nombre"},
+              {"n": 2, "x": 3, "y": 91.5, "w": 94, "h": 7.5, "texto": "Imprimir etiqueta · más · editar"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "masivo",
+      "tipo": "pasos",
+      "titulo": "Varios activos a la vez",
+      "pasos": [
+        {
+          "titulo": "Seleccionar",
+          "texto": "«Seleccionar» agrega casillas a la lista. Con varios activos marcados puedes exportarlos, imprimir sus etiquetas o eliminarlos.",
+          "captura": {
+            "src": "capturas/impresora/seleccion.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Lista con 2 de 13 activos seleccionados y la barra de acciones",
+            "marcas": [
+              {"n": 1, "x": 1, "y": 15, "w": 64.5, "h": 6, "texto": "Acciones de la selección"},
+              {"n": 2, "x": 75.5, "y": 16.5, "w": 9.5, "h": 4.5, "texto": "Salir de selección"}
+            ]
+          }
+        },
+        {
+          "titulo": "Imprimir lote",
+          "texto": "«Imprimir lote» deja elegir etiquetas por fecha de alta (todas, hoy, ayer, un día o un rango), departamento o búsqueda; «Solo sin imprimir» oculta las que ya salieron. Envíalas a la impresora o descárgalas en un .zip. Si la DYMO compartida no está disponible, el aviso lo dice y puedes volver a comprobar.",
+          "captura": {
+            "src": "capturas/impresora/lote.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Elegir etiquetas: 11 de 11 seleccionadas y aviso de impresora compartida no disponible",
+            "marcas": [
+              {"n": 1, "x": 25.5, "y": 10.5, "w": 20, "h": 37, "texto": "Filtros"},
+              {"n": 2, "x": 47, "y": 9.5, "w": 52, "h": 12, "texto": "Estado de la impresora"},
+              {"n": 3, "x": 66, "y": 92.5, "w": 33, "h": 6, "texto": "Descargar .zip · Enviar a la impresora"}
+            ]
+          }
+        },
+        {
+          "titulo": "Importar desde Excel",
+          "texto": "«Importar» carga un Excel con activos. Antes de guardar te muestra cuántos son nuevos, cuántos se actualizan y cuántos se omiten, por hoja, y una muestra. Al terminar puedes imprimir todas las etiquetas nuevas.",
+          "captura": {
+            "src": "capturas/impresora/importar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Revisa antes de importar: 3 nuevos, 1 a actualizar y 1 omitido",
+            "marcas": [
+              {"n": 1, "x": 73, "y": 13, "w": 26, "h": 8, "texto": "Nuevos · actualizar · omitidos"},
+              {"n": 2, "x": 73, "y": 26, "w": 26, "h": 15, "texto": "Por hoja"},
+              {"n": 3, "x": 92, "y": 92.5, "w": 7.5, "h": 6, "texto": "Importar"}
+            ]
+          }
+        },
+        {
+          "titulo": "Importación terminada",
+          "texto": "Al final puedes imprimir todas las etiquetas en la DYMO compartida, descargarlas (.zip) o ver los activos importados.",
+          "captura": {
+            "src": "capturas/impresora/importar-listo.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Importación terminada: 3 nuevos y 1 actualizado",
+            "marcas": [{"n": 1, "x": 46.5, "y": 18, "w": 52.5, "h": 18, "texto": "Imprimir · descargar · ver"}]
+          }
+        },
+        {
+          "titulo": "Eliminar",
+          "texto": "Eliminar borra los activos para siempre, con su historial. Para confirmar, escribe tu contraseña.",
+          "captura": {
+            "src": "capturas/impresora/eliminar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Eliminar 2 activos: pide la contraseña para confirmar",
+            "marcas": [
+              {"n": 1, "x": 80.5, "y": 10.5, "w": 19, "h": 8, "texto": "Aviso"},
+              {"n": 2, "x": 80.5, "y": 23, "w": 19, "h": 6, "texto": "Tu contraseña"},
+              {"n": 3, "x": 93, "y": 92.5, "w": 6.5, "h": 6, "texto": "Eliminar"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "celular-lector",
+      "tipo": "pasos",
+      "titulo": "El celular como lector",
+      "pasos": [
+        {
+          "titulo": "Vincular celular",
+          "texto": "«Vincular celular» muestra un QR. Escanéalo con la cámara del celular e inicia sesión si te lo pide: el celular queda como escáner de este módulo. Cada etiqueta que escanees abre su ficha aquí y en el celular. «Desvincular» termina el enlace.",
+          "captura": {
+            "src": "capturas/impresora/vincular.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Vincular celular: QR y pasos para usar el celular como escáner",
+            "marcas": [
+              {"n": 1, "x": 78, "y": 10, "w": 18, "h": 29, "texto": "QR para el celular"},
+              {"n": 2, "x": 87, "y": 10, "w": 12.5, "h": 33, "texto": "Pasos"},
+              {"n": 3, "x": 87, "y": 92.5, "w": 6, "h": 6, "texto": "Desvincular"}
+            ]
+          },
+          "nota": "Si abriste la página como «localhost», el celular no puede llegar a esa dirección: entra con la IP de la PC (por ejemplo https://192.168.x.x:8443/impresora)."
+        }
+      ]
+    },
+    {
+      "id": "ficha",
+      "tipo": "ficha",
+      "titulo": "Ficha técnica",
+      "filas": [
+        ["Rutas", "/impresora (libro) · /impresora/acceso (inicio de sesión)"],
+        ["Código", "ACT 0000, consecutivo; el siguiente número aparece junto al título del libro"],
+        ["Etiqueta", "DYMO 30334 con el código ACT y su QR"],
+        ["Formas de imprimir", "DYMO compartida (oficina) · DYMO Connect (USB) · archivo .dymo · navegador (SVG)"],
+        ["Estados", "Activo · Baja · En reparación · En resguardo"],
+        ["Importar / exportar", "Excel (.xlsx)"]
+      ]
+    },
+    {
+      "id": "problemas",
+      "tipo": "faq",
+      "titulo": "Problemas frecuentes",
+      "items": [
+        {"p": "Dice «Impresora sin conexión».", "r": "La DYMO compartida de la oficina no responde. Usa «Otras vías» (DYMO Connect, .dymo o navegador) o vuelve a comprobar más tarde."},
+        {"p": "El celular no abre el QR de «Vincular celular».", "r": "Entra a la plataforma con la IP de la computadora, no con «localhost», y vuelve a generar el QR."},
+        {"p": "No veo «Nuevo activo» ni «Editar».", "r": "Tu cuenta es de consulta (solo lectura)."},
+        {"p": "Eliminé un activo por error.", "r": "La eliminación no se puede deshacer. Regístralo de nuevo; tendrá otro número ACT."}
+      ]
+    }
+  ],
+  "relacionadas": ["primeros-pasos", "cuentas"]
+}

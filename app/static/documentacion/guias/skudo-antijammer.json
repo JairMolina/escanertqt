@@ -1,0 +1,172 @@
+{
+  "id": "skudo-antijammer",
+  "titulo": "Skudo AntiJammer",
+  "subtitulo": "Tarjetas RX y TX",
+  "color": "#39FF14",
+  "ruta": "/antijammer",
+  "resumen": "Banco de las placas Skudo AntiJammer: se registran por su QR (SJ_0052), se anota su firmware y se sigue su estado. Cada equipo lleva dos tarjetas, RX y TX, con su propio costo y su propia lista de materiales.",
+  "roles": {
+    "administrador": "Todo: recibir, programar, editar, cambios en masa, eliminar, asignar RX/TX, costos y materiales.",
+    "general": "Lo mismo que el administrador dentro de AntiJammer, si su cuenta tiene asignado el módulo.",
+    "consultor": "Solo consulta y descarga de Excel; no registra, programa, asigna RX/TX ni edita."
+  },
+  "tiempo_lectura": 5,
+  "secciones": [
+    {
+      "id": "que-es",
+      "tipo": "texto",
+      "titulo": "¿Qué es?",
+      "parrafos": [
+        "Skudo AntiJammer es el módulo de las placas del equipo AntiJammer. Usa la misma consola que TPMS (Dashboard, Recibir, Programar, Consultar, Inventario, Lotes, Movimientos, Materiales, Costos y Excel, con «Más» en el celular y el «Botón de escaneo»); el manejo de cada pestaña está en la guía de TPMS.",
+        "Lo propio de AntiJammer: el formato del QR (SJ_0052) y que el proyecto tiene dos tarjetas, RX y TX. El QR no dice si una placa es RX o TX; eso se indica en Materiales para descontar la lista correcta. Sin sesión, /antijammer te lleva a /antijammer/acceso."
+      ],
+      "captura": {
+        "src": "capturas/skudo-antijammer/acceso.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Pantalla de acceso de Skudo AntiJammer con la gráfica de la banda GPS y el formulario de inicio de sesión",
+        "marcas": [
+          {"n": 1, "x": 64.9, "y": 36, "w": 26.3, "h": 5.8, "texto": "Correo"},
+          {"n": 2, "x": 64.9, "y": 53.4, "w": 26.3, "h": 5.8, "texto": "Entrar"}
+        ]
+      }
+    },
+    {
+      "id": "recorrido",
+      "tipo": "texto",
+      "titulo": "La consola",
+      "parrafos": [
+        "En computadora abre en el Dashboard: placas por estado, actividad de 14 días y últimos movimientos. Las placas se nombran SJ-V1-0001, SJ-V1-0002…"
+      ],
+      "captura": {
+        "src": "capturas/skudo-antijammer/dashboard.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Dashboard de Skudo AntiJammer con 10 placas, 7 programadas, la gráfica de actividad y los últimos movimientos",
+        "marcas": [
+          {"n": 1, "x": 0, "y": 6.8, "w": 15, "h": 93.2, "texto": "Pestañas (iguales a TPMS)"},
+          {"n": 2, "x": 16.1, "y": 16.3, "w": 82.8, "h": 12.4, "texto": "Placas por estado"},
+          {"n": 3, "x": 78.8, "y": 0.9, "w": 12.9, "h": 4.9, "texto": "Botón de escaneo"}
+        ]
+      }
+    },
+    {
+      "id": "recibir",
+      "tipo": "pasos",
+      "titulo": "Recibir y programar",
+      "pasos": [
+        {
+          "titulo": "Lee el QR",
+          "texto": "El QR de la placa es SJ_ seguido de la serie, por ejemplo SJ_0052. Sin versión se registra como V1: SJ_0011 queda como SJ-V1-0011. Escribir solo la serie (11) también se toma como SJ-V1-0011.",
+          "captura": {
+            "src": "capturas/skudo-antijammer/recibir.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Recibir de Skudo AntiJammer: SJ_0011 registrada como SJ-V1-0011",
+            "marcas": [
+              {"n": 1, "x": 63, "y": 16.8, "w": 35.9, "h": 22.1, "texto": "SJ_0011 → SJ-V1-0011 · registrada"},
+              {"n": 2, "x": 63, "y": 43.9, "w": 35.9, "h": 5.3, "texto": "Lote"},
+              {"n": 3, "x": 63, "y": 57.1, "w": 29.6, "h": 5.8, "texto": "Escribir código"}
+            ]
+          }
+        },
+        {
+          "titulo": "QR de otros módulos",
+          "texto": "Un QR de Caiquén, Skudo Sigfox, SpeedLocker, TPMS o de una tarjeta de Escáner TQT se rechaza diciendo a qué módulo va.",
+          "captura": {
+            "src": "capturas/skudo-antijammer/recibir-rechazo.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Recibir de AntiJammer mostrando que SL-0024 es una placa SpeedLocker",
+            "marcas": [
+              {"n": 1, "x": 64.1, "y": 28.3, "w": 33.6, "h": 4.7, "texto": "Rechazo: va en SpeedLocker"}
+            ]
+          }
+        },
+        {
+          "titulo": "Anota el firmware",
+          "texto": "En Programar busca la placa (QR, nombre SJ-V1-0004 o solo la serie), escribe el firmware y pulsa «Guardar firmware». La placa pasa de RECIBIDA a PROGRAMADA. Aquí no se elige RX o TX.",
+          "captura": {
+            "src": "capturas/skudo-antijammer/programar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Programar de AntiJammer con la placa SJ-V1-0008 buscada por la serie 8 y el firmware escrito",
+            "marcas": [
+              {"n": 1, "x": 63, "y": 12.7, "w": 27.5, "h": 5.8, "texto": "Placa (aquí la serie 8)"},
+              {"n": 2, "x": 64.1, "y": 26.1, "w": 33.6, "h": 10.1, "texto": "SJ-V1-0008"},
+              {"n": 3, "x": 63, "y": 47.7, "w": 35.9, "h": 5.8, "texto": "Firmware"},
+              {"n": 4, "x": 63, "y": 68, "w": 35.9, "h": 5.8, "texto": "Guardar firmware / Marcar falla"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rx-tx",
+      "tipo": "pasos",
+      "titulo": "Tarjetas RX y TX",
+      "intro": "Cada QR es una sola tarjeta. En Costos hay una lista de materiales para RX y otra para TX; en Materiales indicas cuál es cada placa programada.",
+      "pasos": [
+        {
+          "titulo": "Costo por tarjeta",
+          "texto": "En Costos verás «Tarjeta RX», «Tarjeta TX» y «Equipo completo» (RX + TX), con la tabla de materiales de cada tarjeta. Al importar el Excel del cotizador, una fila marcada «Tarjeta RX y TX» reparte su cantidad a partes iguales entre las dos.",
+          "captura": {
+            "src": "capturas/skudo-antijammer/costos.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Costos de AntiJammer con Tarjeta RX, Tarjeta TX y Equipo completo, y la tabla de materiales de la tarjeta RX",
+            "marcas": [
+              {"n": 1, "x": 16.1, "y": 16.7, "w": 82.8, "h": 11.3, "texto": "RX, TX y equipo completo"},
+              {"n": 2, "x": 16.1, "y": 42.1, "w": 82.8, "h": 32.3, "texto": "Materiales de la tarjeta RX"}
+            ]
+          }
+        },
+        {
+          "titulo": "Asigna las placas «por asignar»",
+          "texto": "Con el inventario de materiales activo, cada placa programada sin tarjeta aparece en «Placas programadas sin tarjeta». Pulsa RX o TX en cada una, o «Todas RX» / «Todas TX» para la lista completa. Al asignarla se descuentan los materiales de esa tarjeta.",
+          "captura": {
+            "src": "capturas/skudo-antijammer/materiales.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Materiales de AntiJammer con cuatro placas programadas sin tarjeta y botones RX y TX",
+            "marcas": [
+              {"n": 1, "x": 16.1, "y": 16.7, "w": 82.8, "h": 11.3, "texto": "Posibles y descontadas por tarjeta"},
+              {"n": 2, "x": 16.1, "y": 29.7, "w": 68.1, "h": 46.2, "texto": "Placas por asignar"},
+              {"n": 3, "x": 68.7, "y": 31.8, "w": 14.3, "h": 5.3, "texto": "Todas RX / Todas TX"},
+              {"n": 4, "x": 75.9, "y": 45.3, "w": 6.2, "h": 4.9, "texto": "RX o TX por placa"}
+            ]
+          },
+          "nota": "Mientras una placa no tenga tarjeta, no descuenta nada. Si te equivocas, la corrección RX↔TX se hace por la API de Materiales (/api/antijammer/materiales/asignar): el consumo se rehace con la lista de la otra tarjeta. En la pantalla solo aparecen las placas aún sin asignar."
+        }
+      ]
+    },
+    {
+      "id": "inventario",
+      "tipo": "texto",
+      "titulo": "Inventario y el resto de pestañas",
+      "parrafos": [
+        "Inventario, Lotes, Movimientos y Excel funcionan igual que en TPMS. El Inventario no tiene columna RX/TX: esa asignación vive en Materiales."
+      ],
+      "captura": {
+        "src": "capturas/skudo-antijammer/inventario.jpg", "ancho": 1440, "alto": 900,
+        "alt": "Inventario de AntiJammer con placas SJ-V1, siete programadas con AJ_FW_DEMO_1.0.3",
+        "marcas": [
+          {"n": 1, "x": 16.1, "y": 16.3, "w": 82.8, "h": 7.9, "texto": "Buscar y filtros"},
+          {"n": 2, "x": 16.1, "y": 26, "w": 82.8, "h": 74, "texto": "Placas SJ-V1-…"}
+        ]
+      }
+    },
+    {
+      "id": "ficha",
+      "tipo": "ficha",
+      "titulo": "Ficha técnica",
+      "filas": [
+        ["Rutas", "/antijammer (consola) · /antijammer/acceso (inicio de sesión) · mismas pestañas que TPMS"],
+        ["Formato del QR", "SJ_0052 → SJ-V1-0052. También acepta SKUDO-AJ-0052, prefijo PCB, guion o espacio, minúsculas y versión explícita (SJ_V2_0003 → SJ-V2-0003)."],
+        ["Versión por omisión", "V1. Solo la serie (52) → SJ-V1-0052."],
+        ["No válidos", "Versión 0 o serie 0000. QR de Caiquén, Skudo Sigfox, SpeedLocker, TPMS o Escáner TQT: se rechazan diciendo a qué módulo van."],
+        ["Estados", "RECIBIDA → PROGRAMADA (al guardar firmware) · FALLA · BAJA"],
+        ["Tarjetas", "RX y TX. El QR no las distingue: se asignan en Materiales a las placas programadas desde la activación del inventario."],
+        ["Exportación", "SkudoAntiJammer_placas_AAAAMMDD.xlsx con hojas Placas y Movimientos (últimos 2000) · Cotizador_SkudoAntiJammer_AAAAMMDD.xlsx desde Costos"]
+      ]
+    },
+    {
+      "id": "problemas",
+      "tipo": "faq",
+      "titulo": "Problemas frecuentes",
+      "items": [
+        {"p": "Programé placas y Materiales no descontó nada.", "r": "Revisa que el inventario esté activo y que la placa se haya programado desde la fecha de activación. Si aparece en «Placas programadas sin tarjeta», indícale RX o TX."},
+        {"p": "Asigné una placa con la tarjeta equivocada.", "r": "En la pantalla ya no aparece para reasignar. Un administrador puede corregirla por la API de Materiales (asignar con la otra tarjeta): el consumo se rehace con la lista correcta."},
+        {"p": "Dice que el QR es de SpeedLocker u otro módulo.", "r": "No es una placa AntiJammer. Regístrala en el módulo que indica el mensaje."},
+        {"p": "«no es un QR de placa Skudo AntiJammer (ej. SJ-V1-0001)».", "r": "El texto no tiene el formato SJ-serie. Revisa el QR o escribe la serie impresa."}
+      ]
+    }
+  ],
+  "relacionadas": ["tpms", "costos-materiales", "speedlocker"]
+}

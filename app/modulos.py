@@ -22,7 +22,7 @@ MODULOS: List[Dict[str, Any]] = [
     {"id": "caiquen", "nombre": "Caiquén", "descripcion": "Producción y control de equipos Caiquén.",
      "icono": "ave", "url": "/caiquen", "login": "/caiquen/acceso", "estado": "disponible", "acento": "#EF4444"},   # v1.4.37
     {"id": "documentacion-hw", "nombre": "Documentación TEAM HW", "descripcion": "Presentación de los proyectos del equipo de hardware.",
-     "icono": "ciudad", "url": "/documentacion", "estado": "disponible", "acento": "#FF2E88"},   # v1.4.38
+     "icono": "ciudad", "url": "/documentacion", "estado": "disponible", "acento": "#FF2E88", "publico": True},   # v1.4.39: sin login   # v1.4.38
     {"id": "impresora", "nombre": "Impresora", "descripcion": "Registro de activos con etiqueta DYMO y QR para consultarlos con el celular.",
      "icono": "impresora", "url": "/impresora", "login": "/impresora/acceso", "estado": "disponible", "acento": "#B8B8C8"},
 ]
@@ -49,6 +49,7 @@ SPEEDLOCKER = "speedlocker"
 SIGFOX = "skudo-sigfox"
 CAIQUEN = "caiquen"
 DOCUMENTACION = "documentacion-hw"
+PUBLICOS = {DOCUMENTACION}   # v1.4.39: cualquiera puede verlo, con o sin cuenta
 
 # v1.4.14: cada ruta pertenece a un módulo. Las compartidas (celular escáner, WebSocket, sesión, estilos) bastan con
 # tener CUALQUIER módulo; lo demás que no es de otro módulo es de Escáner TQT (la app original).
@@ -89,6 +90,8 @@ def alguno(usuario: Optional[Dict[str, Any]]) -> bool:
 
 
 def puede(usuario: Optional[Dict[str, Any]], modulo_id: str) -> bool:
+    if modulo_id in PUBLICOS:
+        return True
     if not usuario:
         return False
     return usuario.get("rol") == "administrador" or modulo_id in (usuario.get("modulos") or [])
@@ -96,4 +99,4 @@ def puede(usuario: Optional[Dict[str, Any]], modulo_id: str) -> bool:
 
 def para_portal(usuario: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Catálogo con `permitido` por módulo: None sin sesión (el login decide), True/False con sesión."""
-    return [dict(m, permitido=(puede(usuario, m["id"]) if usuario else None)) for m in MODULOS]
+    return [dict(m, permitido=(puede(usuario, m["id"]) if usuario or m["id"] in PUBLICOS else None)) for m in MODULOS]

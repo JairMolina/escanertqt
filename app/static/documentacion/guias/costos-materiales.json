@@ -1,0 +1,181 @@
+{
+  "id": "costos-materiales",
+  "titulo": "Costos y Materiales",
+  "subtitulo": "Cotizador e inventario por módulo",
+  "color": "#FF7A1A",
+  "ruta": "/tpms#costos",
+  "resumen": "Dos pestañas que tienen TPMS, Skudo AntiJammer, SpeedLocker, Skudo Sigfox y Caiquén. Costos es el cotizador: la lista de materiales de cada tarjeta y su costo por QR. Materiales es el inventario: entradas, salidas y lo que consume cada placa programada.",
+  "roles": {
+    "administrador": "Edita costos, importa el cotizador, registra movimientos y activa el inventario en todos los módulos.",
+    "general": "Lo mismo, en los módulos que tiene asignados.",
+    "consultor": "Solo consulta; no edita costos ni registra movimientos."
+  },
+  "tiempo_lectura": 6,
+  "secciones": [
+    {
+      "id": "que-es",
+      "tipo": "texto",
+      "titulo": "¿Cómo se relacionan?",
+      "parrafos": [
+        "Cada módulo tiene su propia lista de materiales y su propio tipo de cambio: lo que cambies en TPMS no afecta a SpeedLocker. Cada QR es una tarjeta: en AntiJammer la tarjeta RX y la TX se cuentan por separado; en los demás módulos hay una sola tarjeta.",
+        "Costos dice qué lleva cada tarjeta. Materiales usa esa misma lista: cuando una placa pasa a PROGRAMADA, descuenta sus materiales de las existencias. Si la desprogramas o la eliminas, los devuelve."
+      ]
+    },
+    {
+      "id": "costos",
+      "tipo": "pasos",
+      "titulo": "Costos: el cotizador",
+      "pasos": [
+        {
+          "titulo": "Lee el resumen",
+          "texto": "Arriba ves el costo por QR de cada tarjeta y los costos recurrentes (licencias, herramientas), que se muestran aparte y no se suman a la producción. El tipo de cambio (MXN por USD) solo afecta a este módulo.",
+          "captura": {
+            "src": "capturas/costos-materiales/costos.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Costos de TPMS: tarjeta de 110.02 MXN y recurrente aparte de 2,184.00 MXN",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 8, "w": 41.5, "h": 13, "texto": "Costo por tarjeta"},
+              {"n": 2, "x": 57.5, "y": 8, "w": 41.5, "h": 13, "texto": "Recurrente (aparte)"},
+              {"n": 3, "x": 15.5, "y": 29, "w": 14, "h": 6.5, "texto": "Tipo de cambio"},
+              {"n": 4, "x": 15.5, "y": 44.5, "w": 83.5, "h": 36, "texto": "Materiales de la tarjeta"},
+              {"n": 5, "x": 15.5, "y": 82.5, "w": 83.5, "h": 13, "texto": "Costos recurrentes"}
+            ]
+          }
+        },
+        {
+          "titulo": "Agrega o edita un material",
+          "texto": "«Agregar material» (o el lápiz de una fila) abre el editor: descripción, tarjeta, categoría, proveedor, cantidad por tarjeta, cantidad por caja/bobina, unidad, costo unitario y moneda. En «Tipo de costo» eliges si es de producción (suma al costo de la tarjeta) o recurrente.",
+          "captura": {
+            "src": "capturas/costos-materiales/costos-editor.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Editor «Agregar material» con sus campos",
+            "marcas": [
+              {"n": 1, "x": 30, "y": 25, "w": 41, "h": 12, "texto": "Tarjeta y categoría"},
+              {"n": 2, "x": 30, "y": 55, "w": 41, "h": 9, "texto": "Costo unitario y moneda"},
+              {"n": 3, "x": 30, "y": 64.5, "w": 41, "h": 9, "texto": "Tipo de costo"},
+              {"n": 4, "x": 77, "y": 78.5, "w": 9.5, "h": 6, "texto": "Agregar"}
+            ]
+          }
+        },
+        {
+          "titulo": "Importa o descarga el cotizador",
+          "texto": "«Descargar cotizador» baja un Excel con fórmulas. «Importar Excel» carga un cotizador: reemplaza toda la lista del módulo. Las filas marcadas «RX y TX» se reparten entre ambas tarjetas.",
+          "captura": {
+            "src": "capturas/costos-materiales/costos-recurrente.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Botones Descargar cotizador, Importar Excel y Agregar material",
+            "marcas": [
+              {"n": 1, "x": 59.5, "y": 27.5, "w": 39.5, "h": 6, "texto": "Descargar · Importar · Agregar"}
+            ]
+          },
+          "nota": "Antes de importar, descarga el cotizador actual como respaldo."
+        },
+        {
+          "titulo": "AntiJammer: RX, TX y equipo completo",
+          "texto": "En Skudo AntiJammer hay dos tarjetas. El resumen muestra el costo de la RX, el de la TX y el del equipo completo (RX + TX).",
+          "captura": {
+            "src": "capturas/costos-materiales/costos-rxtx.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Costos de AntiJammer: RX 207.53, TX 105.58 y equipo completo 313.11 MXN",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 15.5, "w": 83.5, "h": 12, "texto": "RX · TX · Equipo completo"},
+              {"n": 2, "x": 15.5, "y": 41.5, "w": 83.5, "h": 30, "texto": "Tarjeta RX"},
+              {"n": 3, "x": 15.5, "y": 75.5, "w": 83.5, "h": 24, "texto": "Tarjeta TX"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "materiales",
+      "tipo": "pasos",
+      "titulo": "Materiales: el inventario",
+      "pasos": [
+        {
+          "titulo": "Activa el inventario",
+          "texto": "Al principio la pestaña dice «Inventario preparado, sin activar»: la lista ya existe (sale de Costos) pero no hay existencias. Registra las entradas y elige la fecha en «Descontar desde»: desde ese día, cada placa programada descuenta sus materiales; las programadas antes no.",
+          "captura": {
+            "src": "capturas/costos-materiales/materiales-sin-activar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Materiales de SpeedLocker sin activar, con la fecha y el botón Activar inventario",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 14.5, "w": 69, "h": 26.5, "texto": "Aviso y fecha de inicio"},
+              {"n": 2, "x": 31.5, "y": 31.5, "w": 13.5, "h": 6, "texto": "Activar inventario"}
+            ]
+          }
+        },
+        {
+          "titulo": "Revisa existencias",
+          "texto": "Arriba: cuántas tarjetas puedes armar con lo disponible, cuántas se han descontado y cuántos materiales están bajo el mínimo. En la tabla, disponible = entradas − salidas − consumo. Escribe el «Mínimo» de cada material para que se marque «BAJO MÍNIMO».",
+          "captura": {
+            "src": "capturas/costos-materiales/materiales.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Materiales de TPMS: 4 tarjetas posibles, 8 descontadas y 1 material bajo mínimo",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 8, "w": 83.5, "h": 20, "texto": "Resumen"},
+              {"n": 2, "x": 15.5, "y": 32, "w": 83.5, "h": 36, "texto": "Existencias"},
+              {"n": 3, "x": 74, "y": 60.5, "w": 10, "h": 4.5, "texto": "Bajo mínimo"},
+              {"n": 4, "x": 92.5, "y": 36, "w": 6.5, "h": 31, "texto": "Movimiento"}
+            ]
+          }
+        },
+        {
+          "titulo": "Registra un movimiento",
+          "texto": "«Movimiento» abre un formulario: elige si es una entrada (llegó material) o una salida (merma, préstamo…), la cantidad y una nota, y pulsa «Registrar».",
+          "captura": {
+            "src": "capturas/costos-materiales/materiales-movimiento.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Formulario de movimiento: entrada de 100 piezas de PCB TPMS con nota Factura demo 001",
+            "marcas": [
+              {"n": 1, "x": 28, "y": 27, "w": 43, "h": 6, "texto": "Tipo: entrada o salida"},
+              {"n": 2, "x": 28, "y": 36, "w": 21.5, "h": 6, "texto": "Cantidad"},
+              {"n": 3, "x": 61, "y": 63, "w": 10, "h": 6, "texto": "Registrar"}
+            ]
+          }
+        },
+        {
+          "titulo": "Historial y consumo por placa",
+          "texto": "«Movimientos recientes» lista entradas y salidas (puedes borrar una con el bote). «Consumo por placa» muestra qué placa descontó materiales y cuándo.",
+          "captura": {
+            "src": "capturas/costos-materiales/materiales-historial.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Movimientos recientes y consumo por placa de TPMS",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 2, "w": 83.5, "h": 46, "texto": "Movimientos recientes"},
+              {"n": 2, "x": 15.5, "y": 50, "w": 83.5, "h": 48, "texto": "Consumo por placa"}
+            ]
+          }
+        },
+        {
+          "titulo": "AntiJammer: indica RX o TX",
+          "texto": "El QR de AntiJammer no dice si la placa es RX o TX. Las placas programadas sin tarjeta aparecen en «Placas programadas sin tarjeta»: pulsa RX o TX en cada una (o «Todas RX» / «Todas TX») para que descuente sus materiales.",
+          "captura": {
+            "src": "capturas/costos-materiales/materiales-por-asignar.jpg", "ancho": 1440, "alto": 900,
+            "alt": "Materiales de AntiJammer con cuatro placas programadas sin tarjeta asignada",
+            "marcas": [
+              {"n": 1, "x": 15.5, "y": 31, "w": 68.5, "h": 30, "texto": "Placas sin tarjeta"},
+              {"n": 2, "x": 68.5, "y": 34, "w": 15, "h": 5, "texto": "Todas RX · Todas TX"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ficha",
+      "tipo": "ficha",
+      "titulo": "Ficha técnica",
+      "filas": [
+        ["Dónde", "Pestañas «Costos» y «Materiales» de TPMS, Skudo AntiJammer, SpeedLocker, Skudo Sigfox y Caiquén (por ejemplo /tpms#costos)"],
+        ["Tarjetas", "TPMS · AntiJammer RX y TX · SpeedLocker · Tarjeta Sigfox (licencia recurrente) · Tarjeta Caiquén"],
+        ["Costo por tarjeta", "Suma de (cantidad × costo unitario en MXN) de los materiales de producción; USD se convierte con el tipo de cambio del módulo"],
+        ["Importar Excel", "Reemplaza la lista completa del módulo; filas «RX y TX» se reparten"],
+        ["Disponible", "Entradas − salidas − consumo"],
+        ["Consumo", "Al pasar una placa a PROGRAMADA (desde la fecha de activación); se devuelve al desprogramar o eliminar"]
+      ]
+    },
+    {
+      "id": "problemas",
+      "tipo": "faq",
+      "titulo": "Problemas frecuentes",
+      "items": [
+        {"p": "Importé un Excel y desapareció un material que agregué a mano.", "r": "Importar reemplaza toda la lista del módulo. Agrega de nuevo el material o inclúyelo en el cotizador antes de importar."},
+        {"p": "Programé placas y no se descontó nada.", "r": "El inventario no está activo, o las placas se programaron antes de la fecha «Descontar desde». En AntiJammer revisa también que tengan RX o TX asignada."},
+        {"p": "El costo cambió sin que tocara los materiales.", "r": "Cambió el tipo de cambio del módulo; afecta a los materiales en USD."},
+        {"p": "No puedo editar ni registrar movimientos.", "r": "Tu cuenta es de consulta. Pide a un administrador el rol general o administrador."}
+      ]
+    }
+  ],
+  "relacionadas": ["tpms", "skudo-antijammer", "skudo-sigfox"]
+}

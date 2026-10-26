@@ -115,7 +115,8 @@ class TestAccesoPorModulo(unittest.TestCase):
     def test_sin_sesion_permitido_es_nulo(self):
         d = cliente_sin_sesion(app).get("/api/modulos").json()
         self.assertIsNone(d["sesion"])
-        self.assertTrue(all(m["permitido"] is None for m in d["modulos"]))
+        # v1.4.39: Documentación TEAM HW es pública (permitido=True); el resto lo decide el login
+        self.assertTrue(all(m["permitido"] is (True if m.get("publico") else None) for m in d["modulos"]))
 
 
 if __name__ == "__main__":
