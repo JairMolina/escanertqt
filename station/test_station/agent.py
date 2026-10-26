@@ -1,6 +1,7 @@
 """Outbound Windows bridge. The original 0.6.3 engine owns serial/BLE timing."""
 
 import argparse, json, sqlite3, threading, time, urllib.request, urllib.parse, ssl
+import urllib.error
 from pathlib import Path
 from dataclasses import asdict
 from tqtstation.engine import TestStation, NoVerification
@@ -12,6 +13,10 @@ from tqtstation.protocol import serial_action, normalize_mac
 
 def norm(x):
     return "".join(c for c in str(x or "").upper() if c.isalnum())
+
+
+class StationRevokedError(RuntimeError):
+    pass
 
 
 class Bridge:
@@ -118,8 +123,13 @@ class Bridge:
                 "User-Agent": "TQT-Test-Station/0.6.3-web",
             },
         )
-        with urllib.request.urlopen(request, timeout=10) as r:
-            return json.load(r)
+        try:
+            with urllib.request.urlopen(request, timeout=10) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code == 410:
+                raise StationRevokedError('Agente eliminado desde la web; se detiene sin borrar su historial.') from e
+            raise
 
     def flush(self):
         # Persistent ordered retries never repeat a command or a test run.
@@ -264,6 +274,11 @@ class Bridge:
                         target=self.execute, args=(job["command"],), daemon=True
                     )
                     self.command_thread.start()
+            except StationRevokedError as e:
+                print(str(e), flush=True)
+                self.serial.disconnect()
+                self.ble.disconnect()
+                return
             except KeyboardInterrupt:
                 if self.engine.running:
                     self.engine.stop()

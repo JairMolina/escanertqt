@@ -111,7 +111,7 @@ def stations():
                 **json.loads(r["state"]),
             )
             for r in c.execute(
-                "SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station"
+                "SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.revoked_at IS NULL"
             )
         ]
 
@@ -151,13 +151,13 @@ def start(body: Start, req: Request):
 def history(tarjeta_id: int | None = None):
     svc.init()
     with db.get_db() as c:
-        where = " WHERE requested_card=?" if tarjeta_id else ""
+        where = " WHERE r.requested_card=?" if tarjeta_id else ""
         return [
             dict(r)
             for r in c.execute(
-                "SELECT id,requested_card,tarjeta_id,operator,state,created,updated,result,origin FROM tqt_test_runs"
+                "SELECT r.id,r.requested_card,r.tarjeta_id,r.operator,r.state,r.created,r.updated,r.result,r.origin,r.station,s.name station_name,s.owner station_owner FROM tqt_test_runs r JOIN stm32_stations s ON s.id=r.station"
                 + where
-                + " ORDER BY created DESC LIMIT 500",
+                + " ORDER BY r.created DESC LIMIT 500",
                 (tarjeta_id,) if tarjeta_id else (),
             )
         ]

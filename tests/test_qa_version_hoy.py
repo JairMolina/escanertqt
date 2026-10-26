@@ -23,10 +23,10 @@ class TestVersion(unittest.TestCase):
         db.init_db()
         cls.c = TestClient(app, base_url="https://testserver")
 
-    def test_la_version_es_1_1_4_y_sale_del_servidor(self):
-        self.assertEqual(settings.APP_VERSION, "1.4.39")
-        self.assertEqual(self.c.get("/api/config").json()["version"], "1.4.39")
-        self.assertEqual(self.c.get("/api/status").json()["version"], "1.4.39")
+    def test_la_version_actual_sale_del_servidor(self):
+        self.assertEqual(settings.APP_VERSION, "1.4.44")
+        self.assertEqual(self.c.get("/api/config").json()["version"], settings.APP_VERSION)
+        self.assertEqual(self.c.get("/api/status").json()["version"], settings.APP_VERSION)
 
     def test_la_version_tiene_un_lugar_visible_en_cada_vista(self):
         common = (ESTATICO / "js" / "common.js").read_text(encoding="utf-8")

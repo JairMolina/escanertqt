@@ -117,11 +117,21 @@ def image(pcb_id: int, firmware_id: str | None = None):
 
 @router.get('/stations')
 def stations(req: Request):
-    return svc.stations(req.client.host if req.client else None)
+    user = usuarios.validar_sesion(req.cookies.get(usuarios.COOKIE))
+    return svc.stations(req.client.host if req.client else None, user['email'] if user.get('rol') != 'consultor' else None, user.get('rol') == 'administrador')
+
+
+@router.delete('/stations/{sid}')
+def delete_station(sid: str, req: Request):
+    user = usuarios.validar_sesion(req.cookies.get(usuarios.COOKIE))
+    try:
+        return svc.revoke_stations([sid], user['email'], user.get('rol') == 'administrador')
+    except svc.StationRemovalError as e:
+        raise HTTPException(e.status, str(e))
 
 
 def station_archive(st, server):
-    config = dict(server=server, station_id=st['id'], token=st['token'])
+    config = dict(server=server, station_id=st['id'], token=st['token'], name=st['name'], registered_by=st['owner'])
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as z:
         z.writestr('config.json', json.dumps(config, indent=2))
@@ -189,6 +199,8 @@ def station_token(req: Request, authorization: str = Header(default='')):
         if req.client:
             svc.STATION_IP[st['id']] = req.client.host
         return st
+    except svc.StationRevokedError as e:
+        raise HTTPException(410, str(e))
     except ValueError:
         raise HTTPException(401, 'Credencial de estación inválida.')
 

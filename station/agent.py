@@ -11,6 +11,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+import urllib.error
 import tqt_hex as hx
 
 USER_AGENT = 'TQT-Station/1.3.81'
@@ -19,6 +20,20 @@ _control = threading.local()
 
 class ProgrammingCancelled(ValueError):
     pass
+
+
+class StationRevokedError(RuntimeError):
+    pass
+
+
+def api_response(request, **kwargs):
+    try:
+        with urllib.request.urlopen(request, **kwargs) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as e:
+        if e.code == 410:
+            raise StationRevokedError('Este agente fue eliminado desde la web. Se detiene; su historial se conserva.') from e
+        raise
 
 
 class ProgramControl:
@@ -477,8 +492,7 @@ def main():
     def api(path, body):
         req = urllib.request.Request(server+'/api/stm32/agent/'+path,
               data=json.dumps(body).encode(), headers={'Authorization': 'Bearer '+cfg['token'], 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': USER_AGENT})
-        with urllib.request.urlopen(req, timeout=20, context=ctx) as response:
-            return json.load(response)
+        return api_response(req, timeout=20, context=ctx)
     # v1.3.63: J-Link es opcional; una laptop solo para pruebas Bluetooth también queda conectada.
     try:
         exe = cfg.get('jlink') or find_jlink()
@@ -486,7 +500,7 @@ def main():
         exe = None
         print('Sin J-Link:', e)
     serial = cfg.get('jlink_serial', '')
-    print('Estación:', cfg['station_id'], '\nServidor:', server, '\nJ-Link:', exe)
+    print('Estación:', cfg.get('name', cfg['station_id']), '\nUsuario web que registró el agente:', cfg.get('registered_by', 'Consultar en la web'), '\nServidor:', server, '\nJ-Link:', exe)
     if args.check:
         # Health is public. Do not claim a pending hardware job during diagnostics.
         request = urllib.request.Request(server+'/api/health', headers={'User-Agent': USER_AGENT, 'Accept': 'application/json'})
@@ -547,6 +561,9 @@ def main():
                 saved.mkdir(exist_ok=True)
                 (saved/(work['id']+'.json')).write_text(json.dumps(result, indent=2), encoding='utf-8')
         except KeyboardInterrupt:
+            break
+        except StationRevokedError as e:
+            print(str(e))
             break
         except Exception as e:
             print('Conexión/reporte pendiente:', str(e)[:300])

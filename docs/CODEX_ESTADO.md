@@ -97,3 +97,7 @@ Web1.4.43 desplegada, código38e1746d0627b82fe98d9bd7875e947c4eaecafa. Respaldo 
 Comprobación de producción solo en software: se generaron previews4.3/4.4 para la unidad de laboratorio y el objeto de estado independiente fue idéntico antes/después. Se conserva última Flash4.4 verificada, origenlecturaJLink, sin intento posterior incierto. No se hizo lectura física nueva. Catálogo mantiene beta4.4 y predeterminado4.3.
 
 Quedan pendientes únicamente banco físico y aprobación del FWbeta por el operador. La actualización de esta tarea no realiza movimientos, grabación, aprobación ni lectura física. El selector de agente fijado se conserva.
+
+## 2026-10-26 — Agentes vinculados al usuario y borrado, 1.4.44 preparada
+
+Cuenta web como propietario automático y actor de cada operación separado; borrado con permisos, revocación 410 y protección de trabajos activos, conservando historiales. 121 Python y 15 grupos Playwright PASS sin hardware, Compose QA/JS/diff correctos. Ver AGENTES_USUARIO_Y_BORRADO.md. Pendiente autorización expresa de despliegue, retirada de 19 agentes físicos y cuarentena de instalaciones locales; aún sin aplicar en producción. Rama codex/gestionar-agentes-20261026.

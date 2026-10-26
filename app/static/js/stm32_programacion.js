@@ -73,10 +73,11 @@ window.TQTSTM32 = function (host, ctx) {
             return true;
         } catch (e) { return false; }
     };
-    let stationChoice = getSaved(), stationChoiceName = getSavedName(), stationRequest = 0, stationSignature = '', bindingStored = true;
+    let stationChoice = getSaved(), stationChoiceName = getSavedName(), stationRequest = 0, stationSignature = '', bindingStored = true, removingStation = false;
+    const deleteStationBtn = h('button', { class: 'btn btn-sm btn-ghost', type: 'button', disabled: true, onclick: deleteStation }, 'Borrar agente');
     const sessionTxt = h('span', { class: 'prog-sesion-txt', role: 'status', 'aria-live': 'polite' });
     const sessionBox = h('div', { class: 'row wrap prog-sesion' }, sessionTxt,
-        h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => stations() }, 'Actualizar'));
+        h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => stations() }, 'Actualizar'), deleteStationBtn);
     function renderStation() {
         const opt = station.selectedOptions[0];
         sessionTxt.textContent = opt && opt.value
@@ -85,7 +86,7 @@ window.TQTSTM32 = function (host, ctx) {
         if (current) setLuz(luzState, luzExtra);
     }
     function bindStation(id, name, notify = true) {
-        if (busy || cancelling) { station.value = activeStation || stationChoice; return; }
+        if (busy || cancelling || removingStation) { station.value = activeStation || stationChoice; return; }
         stationChoice = id; stationChoiceName = name || ''; ++stationRequest; stationSignature = '';
         bindingStored = setSaved(id, name);
         if (id && ![...station.options].some(o => o.value === id)) station.append(h('option', { value: id, dataset: { online: 'false', name: name || 'Agente guardado' } }, (name || 'Agente guardado') + ' · esperando conexión'));
@@ -96,11 +97,12 @@ window.TQTSTM32 = function (host, ctx) {
     }
     station.addEventListener('change', () => bindStation(station.value, station.selectedOptions[0]?.dataset.name || ''));
     const stationChanged = e => {
-        if (e.detail?.source === ID || busy || cancelling) return;
+        if (e.detail?.source === ID || busy || cancelling || removingStation) return;
         if (e.detail && (e.detail.id === '' || /^[a-f0-9]{24}$/.test(e.detail.id))) bindStation(e.detail.id, e.detail.name, false);
     };
     window.addEventListener(STATION_EVENT, stationChanged);
-    const stationName = h('input', { class: 'input', value: 'PC de programación', id: ID + '-est-nombre', maxlength: 60 });
+    const stationName = h('input', { class: 'input', value: 'PC de programación', id: ID + '-est-nombre', maxlength: 29 });
+    const stationAccount = h('p', { class: 'hint', role: 'status' }, 'Se vinculará automáticamente a tu cuenta de la web TQT.');
     const btnProgram = h('button', { class: 'btn btn-primary', type: 'button', disabled: true, onclick: program }, 'Programar STM32 con J-Link');
     const btnCancel = h('button', { class: 'btn', type: 'button', disabled: true, onclick: cancelStation }, 'Detener y cancelar programación');
     // v1.3.54: orden de programación de la pareja: ESP32 de R2 (MAC) → STM32 de R1 → ESP32 de R1 (MAC de R1)
@@ -169,7 +171,8 @@ window.TQTSTM32 = function (host, ctx) {
           h('div', { class: 'field' }, h('label', { for: ID + '-fw' }, 'Firmware a programar'), firmwareSelect, firmwareHint, approveBtn),
           h('div', { class: 'field' }, h('label', { for: station.id }, 'Agente Windows conectado al J-Link'), station, sessionBox, h('p', { class: 'hint' }, 'Elige una vez el agente que tiene tu J-Link; se guarda en este navegador. La IP compartida no identifica una laptop con certeza. Si se desconecta, la elección se conserva.')),
           h('details', { class: 'prog-config' }, h('summary', null, 'Configurar esta computadora por primera vez'),
-            h('div', { class: 'field' }, h('label', { for: ID + '-est-nombre' }, 'Nombre para instalar un agente nuevo'), stationName, h('p', { class: 'hint' }, 'Este nombre se usa solo al instalar. El agente en uso se elige en el selector de arriba.')),
+            stationAccount,
+            h('div', { class: 'field' }, h('label', { for: ID + '-est-nombre' }, 'Nombre del equipo para el agente nuevo'), stationName, h('p', { class: 'hint' }, 'Se añadirá tu usuario automáticamente. Si ya instalaste un agente en este equipo, selecciónalo arriba. El historial registra la cuenta que inicia cada operación.')),
             h('div', { class: 'row wrap' }, bundleBtn),
             h('p', { class: 'hint' }, 'Abre el archivo Instalar_TQT descargado una sola vez: instala el agente y lo deja iniciando con Windows en segundo plano. Después, todas las grabaciones se controlan desde esta pantalla. Usa Python 3.10+ y J-Link de SEGGER o STM32CubeIDE ya instalados.')),
           h('p', { class: 'hint' }, K === 'R1' ? 'Orden de la pareja: 1) ESP32 de la R2 (da su MAC) · 2) STM32 de la R1 con la MAC y número de la R2 · 3) ESP32 de la R1 (da la MAC de la R1).' : 'La R3 lleva un firmware fijo (sin MAC ni identidad por unidad). Al verificarse queda registrada como programada.'))));
@@ -202,13 +205,14 @@ window.TQTSTM32 = function (host, ctx) {
         const chosenFw = firmwareItems.find(x => x.id === selectedFirmware);
         approveBtn.hidden = !chosenFw || chosenFw.release_status !== 'beta';
         approveBtn.disabled = busy || uploadOpen;
-        btnCancel.disabled = !station.value || cancelling;
+        btnCancel.disabled = !station.value || cancelling || removingStation;
+        deleteStationBtn.disabled = busy || cancelling || removingStation || station.selectedOptions[0]?.dataset.canDelete !== 'true';
         btnProgram.textContent = busy ? 'Programando…' : current ? 'Programar ' + K + ' ' + current.identity.nombre.slice(-4) + ' con J-Link' : 'Programar STM32 con J-Link';
-        btnProgram.disabled = busy || uploadOpen || !current || !firmwareSelect.value || !station.value || station.selectedOptions[0]?.dataset.online !== 'true';
+        btnProgram.disabled = busy || removingStation || uploadOpen || !current || !firmwareSelect.value || !station.value || station.selectedOptions[0]?.dataset.online !== 'true';
         if (btnEsp) btnEsp.disabled = busy || !current;
         btnSubir.disabled = busy || uploadOpen;
         firmwareSelect.disabled = busy || uploadOpen || !firmwareSelect.options.length;
-        search.disabled = busy; lookup.disabled = busy; station.disabled = busy || cancelling; bundleBtn.disabled = busy;
+        search.disabled = busy; lookup.disabled = busy; station.disabled = busy || cancelling || removingStation; bundleBtn.disabled = busy || removingStation;
         list.querySelectorAll('button').forEach(b => b.disabled = busy);
     }
 
@@ -233,10 +237,10 @@ window.TQTSTM32 = function (host, ctx) {
         if (selectedPcb) choose(selectedPcb, true);
     });
     async function stations() {
-        if (!alive || busy || cancelling) return;
+        if (!alive || busy || cancelling || removingStation) return;
         const n = ++stationRequest, choice = stationChoice;
         const r = await api('/api/stm32/stations');
-        if (!alive || n !== stationRequest || choice !== stationChoice || busy || cancelling) return;
+        if (!alive || n !== stationRequest || choice !== stationChoice || busy || cancelling || removingStation) return;
         if (!r.ok) {
             [...station.options].forEach(o => o.dataset.online = 'false');
             stationSignature = ''; renderStation(); enable(); return;
@@ -247,15 +251,35 @@ window.TQTSTM32 = function (host, ctx) {
         if (chosen) stationChoiceName = chosen.name;
         const options = [{ id: '', name: 'Elige el agente de esta laptop', online: false, placeholder: true }, ...all];
         if (choice && !chosen) options.push({ id: choice, name: stationChoiceName || 'Agente guardado', online: false, missing: true });
-        const signature = JSON.stringify(options.map(x => [x.id, x.name, !!x.online, !!x.local, !!x.missing]));
+        const signature = JSON.stringify(options.map(x => [x.id, x.name, x.owner, !!x.can_delete, !!x.online, !!x.local, !!x.missing]));
         if (signature !== stationSignature) {
-            station.replaceChildren(...options.map(x => h('option', { value: x.id, dataset: { online: String(!!x.online), name: x.placeholder ? '' : x.name } },
-                x.placeholder ? x.name : x.name + ' · ' + x.id.slice(-6) + (x.online ? ' · conectado' : ' · desconectado') + (x.missing ? ' / no disponible' : x.local ? ' · misma red' : ''))));
+            station.replaceChildren(...options.map(x => h('option', { value: x.id, dataset: { online: String(!!x.online), name: x.placeholder ? '' : x.name, canDelete: String(!!x.can_delete) } },
+                x.placeholder ? x.name : x.name + (x.owner ? ' · ' + x.owner : '') + ' · ' + x.id.slice(-6) + (x.online ? ' · conectado' : ' · desconectado') + (x.missing ? ' / no disponible' : x.local ? ' · misma red' : ''))));
             stationSignature = signature;
         }
         station.value = choice;
         renderStation(); enable();
         await recover();
+    }
+
+    function deleteStation() {
+        const sid = stationChoice, name = stationChoiceName;
+        if (!sid || busy || cancelling || removingStation) return;
+        const error = h('div', { role: 'alert' });
+        T.sheet({ title: 'Borrar agente',
+            body: h('div', { class: 'stack' }, h('p', null, name + ' · ' + sid),
+                h('p', null, 'Se retirará de la lista y su credencial dejará de funcionar. Se conservarán los historiales de pruebas y programación. No se desinstalan archivos de otras computadoras.'), error),
+            actions: [{ label: 'Borrar agente', kind: 'primary', onClick: async () => {
+                if (busy || cancelling || removingStation || stationChoice !== sid) { error.textContent = 'Cambió la selección o hay una operación en curso. Cierra este diálogo y revisa el agente.'; return false; }
+                removingStation = true; ++stationRequest; enable();
+                let r;
+                try { r = await api('/api/stm32/stations/' + sid, { method: 'DELETE' }); }
+                catch (e) { r = { ok: false, error: e.message }; }
+                finally { removingStation = false; }
+                if (!alive) return true;
+                if (!r.ok) { error.replaceChildren(T.banner('bad', 'alert', r.error)); enable(); return false; }
+                bindStation('', ''); message('Agente eliminado. Sus historiales se conservaron.'); return true;
+            } }, { label: 'Conservar agente', kind: 'ghost', onClick: () => true }] });
     }
 
     async function recover() {
@@ -375,7 +399,7 @@ window.TQTSTM32 = function (host, ctx) {
         return filename;
     }
     async function program() {
-        if (!current || busy) return;
+        if (!current || busy || cancelling || removingStation) return;
         const sid = station.value;
         if (!sid || sid !== stationChoice || station.selectedOptions[0]?.dataset.online !== 'true') { message('El agente fijado no está conectado. Revisa esa laptop o elige otro agente expresamente.', true); return; }
         activeStation = sid;
@@ -392,6 +416,7 @@ window.TQTSTM32 = function (host, ctx) {
     }
     const ws = ctx.ws || (T.ws && T.ws());
     if (ws?.on) ['PCB_ACTUALIZADA', 'PCB_ELIMINADA', 'TARJETA_ACTUALIZADA', 'TARJETA_EMPAREJADA'].forEach(ev => unsubs.push(ws.on(ev, refresh)));
+    api('/api/auth/yo').then(r => { if (alive && r.ok && r.data?.email) stationAccount.textContent = 'Usuario web asociado: ' + r.data.email; });
     loadFirmwares(true); loadList(); stations();
     const stationTimer = setInterval(() => { if (alive && !busy) stations(); }, 5000);
     return { escaneo: scan, ocupada() { return busy; }, actualizar: refresh, desmontar() { alive = false; clearTimeout(timer); clearTimeout(debounce); clearInterval(stationTimer); ++stationRequest; window.removeEventListener(STATION_EVENT, stationChanged); unsubs.forEach(fn => fn()); } };

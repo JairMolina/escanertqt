@@ -37,6 +37,10 @@ def huella(mem):
 def init():
     with db.get_db() as c:
         c.execute('CREATE TABLE IF NOT EXISTS stm32_stations (id TEXT PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT NOT NULL, owner TEXT NOT NULL, last_seen REAL NOT NULL DEFAULT 0)')
+        cols = {r[1] for r in c.execute('PRAGMA table_info(stm32_stations)')}
+        for name, kind in (('revoked_at', 'REAL'), ('revoked_by', 'TEXT')):
+            if name not in cols:
+                c.execute(f'ALTER TABLE stm32_stations ADD COLUMN {name} {kind}')
         c.execute('CREATE TABLE IF NOT EXISTS stm32_jobs (id TEXT PRIMARY KEY, station TEXT NOT NULL, pcb INTEGER NOT NULL, state TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL, operator TEXT NOT NULL, payload TEXT NOT NULL, image TEXT NOT NULL, result TEXT)')
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS stm32_pcb_busy ON stm32_jobs(pcb) WHERE state IN ('queued','running')")
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS stm32_station_busy ON stm32_jobs(station) WHERE state IN ('queued','running')")
@@ -187,11 +191,14 @@ def observed_state(pcb_id):
 
 def station_create(name, owner):
     init()
+    # Owner is supplied by the authenticated server session, never the installer body.
+    label = str(owner).split('@', 1)[0][:28]
+    name = label + ' · ' + (str(name).strip() or 'Equipo de programación')[:29]
     sid, token = secrets.token_hex(12), secrets.token_urlsafe(32)
     with db.get_db() as c:
         c.execute('INSERT INTO stm32_stations(id,name,token_hash,owner) VALUES(?,?,?,?)',
                   (sid, name, hashlib.sha256(token.encode()).hexdigest(), owner))
-    return dict(id=sid, token=token, name=name)
+    return dict(id=sid, token=token, name=name, owner=owner)
 
 
 def station_auth(token):
@@ -201,6 +208,8 @@ def station_auth(token):
                         (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
     if not row:
         raise ValueError('Credencial de estación inválida.')
+    if row['revoked_at'] is not None:
+        raise StationRevokedError('Agente eliminado. Su credencial ya no permite recibir trabajos.')
     return dict(row)
 
 
@@ -208,12 +217,67 @@ def station_auth(token):
 STATION_IP = {}
 
 
-def stations(client_ip=None):
+class StationRevokedError(ValueError):
+    pass
+
+
+class StationRemovalError(ValueError):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+
+
+def require_station(c, sid):
+    row = c.execute('SELECT * FROM stm32_stations WHERE id=? AND revoked_at IS NULL', (sid,)).fetchone()
+    if not row:
+        raise StationRevokedError('Agente eliminado o inexistente. Registra y selecciona un agente vigente.')
+    return row
+
+
+def revoke_stations(ids, operator, administrator=False):
+    """Atomic logical removal. Historical FK references and results are retained."""
+    init()
+    ids = list(dict.fromkeys(ids))
+    if not ids or any(not re.fullmatch('[a-f0-9]{24}', sid) for sid in ids):
+        raise StationRemovalError(400, 'Selecciona agentes físicos válidos; los bancos del navegador se conservan.')
+    with db.transaction() as c:
+        tables = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        now = time.time()
+        for sid in ids:
+            row = c.execute('SELECT * FROM stm32_stations WHERE id=?', (sid,)).fetchone()
+            if not row:
+                raise StationRemovalError(404, 'Agente no encontrado.')
+            if row['owner'] != operator and not administrator:
+                raise StationRemovalError(403, 'Solo el usuario que registró el agente o un administrador puede borrarlo.')
+            checks = [('stm32_jobs', "station=? AND state IN ('queued','running')", (sid,)),
+                      ('tqt_test_runs', "station=? AND state IN ('queued','running')", (sid,)),
+                      ('tqt_test_commands', "station=? AND state IN ('queued','running') AND created>?", (sid, now-180)),
+                      ('r2_programming_attempts', "station=? AND state IN ('queued','running','flashing') AND created>?", (sid, now-600))]
+            for table, where, params in checks:
+                if table in tables and c.execute('SELECT 1 FROM '+table+' WHERE '+where, params).fetchone():
+                    raise StationRemovalError(409, 'El agente tiene un trabajo o una prueba en curso. Espera a que termine o detenlo antes de borrarlo.')
+            if {'tqt_ble_leases', 'tqt_test_runs'} <= tables and c.execute(
+                "SELECT 1 FROM tqt_ble_leases l JOIN tqt_test_runs r ON r.id=l.run WHERE l.station=? AND r.state IN ('queued','running')", (sid,)).fetchone():
+                raise StationRemovalError(409, 'El agente está reservado para Bluetooth en una prueba en curso.')
+        for sid in ids:
+            c.execute('UPDATE stm32_stations SET revoked_at=?,revoked_by=? WHERE id=? AND revoked_at IS NULL', (now, operator, sid))
+            if 'tqt_test_commands' in tables:
+                c.execute("UPDATE tqt_test_commands SET state='error',result=? WHERE station=? AND state IN ('queued','running')",
+                          (json.dumps({'error': 'Agente eliminado; comando caducado, no ejecutado de nuevo.'}), sid))
+            for table in ('tqt_test_presence', 'r2_agent_presence', 'tqt_ble_leases'):
+                if table in tables:
+                    c.execute('DELETE FROM '+table+' WHERE station=?', (sid,))
+    for sid in ids:
+        STATION_IP.pop(sid, None)
+    return dict(removed=ids, history_preserved=True)
+
+
+def stations(client_ip=None, operator=None, administrator=False):
     init()
     with db.get_db() as c:
-        return [dict(id=r['id'], name=r['name'], online=time.time()-r['last_seen']<20,
+        return [dict(id=r['id'], name=r['name'], owner=r['owner'], can_delete=administrator or r['owner']==operator, online=time.time()-r['last_seen']<20,
                      local=bool(client_ip) and STATION_IP.get(r['id']) == client_ip)
-                for r in c.execute("SELECT * FROM stm32_stations WHERE id NOT LIKE 'web-%' ORDER BY name")]  # v1.4.0: sin bancos lógicos del navegador
+                for r in c.execute("SELECT * FROM stm32_stations WHERE id NOT LIKE 'web-%' AND revoked_at IS NULL ORDER BY name")]
 
 
 def create_job(pcb, station, expected, operator, physical_confirmed=False, firmware_id=None):
@@ -222,7 +286,7 @@ def create_job(pcb, station, expected, operator, physical_confirmed=False, firmw
     init()
     active_jobs(station)
     with db.transaction() as c:
-        st = c.execute('SELECT * FROM stm32_stations WHERE id=?', (station,)).fetchone()
+        st = require_station(c, station)
         if not st or time.time()-st['last_seen'] > 20:
             raise ValueError('La estación Windows está desconectada. Inicia el agente.')
         data, image = preview(pcb, c, firmware_id)
@@ -239,6 +303,7 @@ def create_job(pcb, station, expected, operator, physical_confirmed=False, firmw
         jid, now = secrets.token_hex(16), time.time()
         data['confirmation'] = dict(source='web', operator=operator, pcb_id=pcb,
                                     nombre=data['identity']['nombre'], at=now)
+        data['agent'] = dict(id=st['id'], name=st['name'], registered_by=st['owner'])
         c.execute('INSERT INTO stm32_jobs VALUES(?,?,?,?,?,?,?,?,?,NULL)',
                   (jid, station, pcb, 'queued', now, now, operator, json.dumps(data), image))
     return job(jid)
@@ -264,6 +329,7 @@ def job(jid):
 
 def claim(sid):
     with db.transaction() as c:
+        require_station(c, sid)
         now = time.time()
         # Agents poll every ~1 s; refresh at most every LAST_SEEN_S so idle polls do not write to the SD card.
         c.execute('UPDATE stm32_stations SET last_seen=? WHERE id=? AND last_seen<?', (now, sid, now-LAST_SEEN_S))

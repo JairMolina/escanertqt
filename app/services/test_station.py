@@ -112,7 +112,7 @@ def read(jid):
             "UPDATE tqt_test_runs SET state='interrupted',result='no_verificado',updated=? WHERE id=? AND state IN ('queued','running') AND updated<?",
             (now, jid, now - 120),
         )
-        r = c.execute("SELECT * FROM tqt_test_runs WHERE id=?", (jid,)).fetchone()
+        r = c.execute("SELECT r.*,s.name station_name,s.owner station_owner FROM tqt_test_runs r JOIN stm32_stations s ON s.id=r.station WHERE r.id=?", (jid,)).fetchone()
     if not r:
         raise ValueError("Prueba no encontrada.")
     d = dict(r)
@@ -129,6 +129,7 @@ def create(sid, tid, operator, confirmed):
             "Confirma la tarjeta física y el banco libre antes de iniciar; la secuencia restablece ajustes y mueve el perno."
         )
     with db.transaction() as c:
+        stm.require_station(c, sid)
         p = c.execute(
             "SELECT seen,state FROM tqt_test_presence WHERE station=?", (sid,)
         ).fetchone()
@@ -178,6 +179,7 @@ def command(sid, action, body):
     ):
         raise ValueError("Acción no permitida.")
     with db.transaction() as c:
+        stm.require_station(c, sid)
         p = c.execute(
             "SELECT seen FROM tqt_test_presence WHERE station=?", (sid,)
         ).fetchone()
@@ -214,6 +216,7 @@ def command(sid, action, body):
 def claim(sid, state):
     init()
     with db.transaction() as c:
+        stm.require_station(c, sid)
         now = time.time()
         c.execute(
             "INSERT INTO tqt_test_presence VALUES(?,?,?) ON CONFLICT(station) DO UPDATE SET seen=excluded.seen,state=excluded.state",
