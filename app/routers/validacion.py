@@ -162,6 +162,7 @@ agent_router = APIRouter(prefix="/api/stm32/agent/ble", tags=["Agente BLE"])
 JOB_TTL = 60          # s: un trabajo que nadie toma caduca
 RESULT_TTL = 300      # s: el resultado se conserva
 ONLINE = 20           # s: ventana de estación conectada
+LAST_SEEN = 5         # s: el claim solo reescribe last_seen si es más viejo (evita ~1 escritura/s por agente)
 _lock = threading.Lock()
 _jobs: Dict[str, Dict[str, Any]] = {}
 _estados: Dict[str, Dict[str, Any]] = {}
@@ -285,8 +286,9 @@ async def _registrar(comando: str, ok: bool, nombre, address, detalle=None, resp
 
 
 def _tocar(sid: str) -> None:
+    ahora = time.time()
     with db.get_db() as c:
-        c.execute("UPDATE stm32_stations SET last_seen=? WHERE id=?", (time.time(), sid))
+        c.execute("UPDATE stm32_stations SET last_seen=? WHERE id=? AND last_seen<?", (ahora, sid, ahora - LAST_SEEN))
 
 
 @agent_router.post("/claim")

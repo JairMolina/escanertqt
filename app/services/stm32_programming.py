@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 BASE = ROOT / 'firmware/stm32_r1/fw43_base.hex'
 # v1.3.55: la R3 (STM32F103RET6 «TIMER») lleva una imagen fija, sin identidad por unidad.
 R3_BASE = ROOT / 'firmware/stm32_r3/r3_fw10.hex'
+# v1.4.40: claims refresh last_seen at most every 5 s (online window is 20 s).
+LAST_SEEN_S = 5
 
 
 def firmware_r3():
@@ -214,7 +216,8 @@ def job(jid):
 def claim(sid):
     with db.transaction() as c:
         now = time.time()
-        c.execute('UPDATE stm32_stations SET last_seen=? WHERE id=?', (now, sid))
+        # Agents poll every ~1 s; refresh at most every LAST_SEEN_S so idle polls do not write to the SD card.
+        c.execute('UPDATE stm32_stations SET last_seen=? WHERE id=? AND last_seen<?', (now, sid, now-LAST_SEEN_S))
         # Never automatically repeat an interrupted flash operation.
         c.execute("UPDATE stm32_jobs SET state='unknown',updated=?,result=? WHERE station=? AND state='running' AND updated<?",
                   (now, json.dumps({'error': 'Agente interrumpido; comprobar la tarjeta antes de repetir.'}), sid, now-600))

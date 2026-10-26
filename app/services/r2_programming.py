@@ -8,6 +8,7 @@ from app.services import esp32_firmware as fw
 
 ACTIVE = ('flashing','queued','running')
 TTL = 600
+SEEN_S = 5  # v1.4.40: presence is rewritten only if older than this or availability changed
 
 def ensure(c):
     fw.ensure(c)
@@ -135,7 +136,9 @@ def fail(identifier,operator,error):
 def claim(station,available):
     with db.transaction() as c:
         ensure(c)
-        c.execute('INSERT OR REPLACE INTO r2_agent_presence VALUES(?,?,?)',(station,time.time(),int(available)))
+        now=time.time()
+        c.execute('INSERT INTO r2_agent_presence VALUES(?,?,?) ON CONFLICT(station) DO UPDATE SET seen=excluded.seen,available=excluded.available '
+                  'WHERE r2_agent_presence.seen<? OR r2_agent_presence.available<>excluded.available',(station,now,int(available),now-SEEN_S))
         if not available: return None
         r=c.execute("SELECT * FROM r2_programming_attempts WHERE station=? AND state='queued' ORDER BY created LIMIT 1",(station,)).fetchone()
         if not r: return None
