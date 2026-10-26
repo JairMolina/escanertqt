@@ -173,3 +173,9 @@ Evidencia: 52Python,9Node,16escenarios Playwright y enlace movil aprobados; clip
 Corregidos comandos fijos y contadorBLE, identidad0054 solo local, Debug/Release sinadvertencias,74ARM14HEX8protocoloPASS. Web1.4.41 basadaenproduccion1.4.39;48tests yPlaywright beta->aprobaciónPASS sinhardware. No desplegada ni beta cargada enproduccion. Fuentes y detalles en FIRMWARE_BETA_STM32.md.
 
 Integración concurrente: producción avanzó a1.4.40/b90ee570 durante el ensayo. Se conserva íntegra su reducción de escrituras de presencia de agentes; versión final de esta tarea1.4.41.
+
+## Despliegue comprobado — 2026-10-26
+
+Con autorización expresa, desplegada web1.4.41, commit a1b90f9ec18fa859fdf22940fe96006211aea475. Conserva también producción1.4.40/b90ee570 y sus cambios de agentes. Respaldo previo /backups/predeploy_1.4.41_20261026_153233.db; sin trabajos activos al desplegar. Solo servicio web recreado; túnel y volúmenes conservados.
+
+FW4.4 Debug corregido registrado como beta cb734913f0b8fcfc98dffd15, SHA256 a5d121ef5c5087237c2dbe15683f3cdb9d0d51a1c31d01e35a2b84fa36bbc2aa. Se verificó estado beta y default base-R1/FW4.3 sin cambios. No se aprobó firmware ni se programó hardware. Integración final:67pruebasPythonPASS, además74ARM+14HEX+8resultadosprotocolo y QAPlaywright previos. Falta banco físico de la unidad preparada antes de solicitar su aprobación.
