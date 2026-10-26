@@ -196,3 +196,12 @@ Usuario: recargar Ctrl+F5 cuando no haya grabación y seleccionar UNA vez el age
 ## 2026-10-26 — Estado STM32 independiente,1.4.43
 
 Preparados izq/registro der separados; nuevoendpointestado sinfirmwareseleccionado y sinhardware, identidadarchivada/fechaUID o inventario rotulado; falloposterior noacreditaFWnuevo.54PythonPASS,5gruposUIestado y6regresionagentefijoPASS,0JSerrors,móvil390. Usuarioautorizódespliegue/memoria; noautorizaunagrabaciónfísica. Ver STM32_ESTADO_PREPARADO_Y_REGISTRADO.md.
+
+
+## Despliegue verificado — 2026-10-26
+
+Web1.4.43 desplegada, código38e1746d0627b82fe98d9bd7875e947c4eaecafa. Respaldo /backups/predeploy_1.4.43_20261026_162708.db; sin trabajos activos al actualizar. Solo servicio web recreado, túnel/volúmenes conservados. APIhealth pública y login1.4.43 correctos; contenedorhealthy.
+
+Comprobación de producción solo en software: se generaron previews4.3/4.4 para la unidad de laboratorio y el objeto de estado independiente fue idéntico antes/después. Se conserva última Flash4.4 verificada, origenlecturaJLink, sin intento posterior incierto. No se hizo lectura física nueva. Catálogo mantiene beta4.4 y predeterminado4.3.
+
+Quedan pendientes únicamente banco físico y aprobación del FWbeta por el operador. La actualización de esta tarea no realiza movimientos, grabación, aprobación ni lectura física. El selector de agente fijado se conserva.

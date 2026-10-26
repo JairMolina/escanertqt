@@ -23,3 +23,12 @@ Playwright QA aislada:5 grupos del estado (alternar4.3/4.4 sin grabar; sin datos
 No se programó ni se leyó hardware. FW4.4 sigue beta y4.3 sigue la opción aprobada predeterminada. Usuario autorizó ajustes, despliegue y actualización de memoria. La transferencia de las tres capturas queda pendiente de la respuesta específica; no se transfieren sin ella.
 
 Capacidades: ECC backend/verificación y reutilización de UI existente con criterios de ui-ux-pro-max. Sin agentes auxiliares ni cambios de infraestructura.
+
+
+## Despliegue verificado — 2026-10-26
+
+Web1.4.43 desplegada, código38e1746d0627b82fe98d9bd7875e947c4eaecafa. Respaldo /backups/predeploy_1.4.43_20261026_162708.db; sin trabajos activos al actualizar. Solo servicio web recreado, túnel/volúmenes conservados. APIhealth pública y login1.4.43 correctos; contenedorhealthy.
+
+Comprobación de producción solo en software: se generaron previews4.3/4.4 para la unidad de laboratorio y el objeto de estado independiente fue idéntico antes/después. Se conserva última Flash4.4 verificada, origenlecturaJLink, sin intento posterior incierto. No se hizo lectura física nueva. Catálogo mantiene beta4.4 y predeterminado4.3.
+
+Quedan pendientes únicamente banco físico y aprobación del FWbeta por el operador. La actualización de esta tarea no realiza movimientos, grabación, aprobación ni lectura física. El selector de agente fijado se conserva.
