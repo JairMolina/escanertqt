@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.40 — 2026-10-26
+- Catálogo STM32 R1/R3 con imágenes nuevas beta, selección manual para banco y promoción explícita por administrador con evidencia. Predeterminado y vigencia usan solo aprobadas; una grabación correcta no promociona el firmware.
+- Datos antiguos conservan estado aprobado; duplicados, hash y trabajos en curso mantienen su identidad. Correcciones FW4.4 y evidencia documentadas en FIRMWARE_BETA_STM32.md.
+
 ## v1.4.39 — 2026-10-26
 - **Manual de usuario interactivo** en `/documentacion/manual` (enlaces «Manual», «Abrir el manual» y «Ver guía» en cada proyecto de Documentación TEAM HW). Diez guías con capturas reales marcadas, pasos, ficha técnica, problemas frecuentes y buscador: Primeros pasos, Cuentas y permisos, Escáner TQT, TPMS, Skudo AntiJammer, SpeedLocker, Skudo Sigfox, Caiquén, Costos y Materiales e Impresora. Cada guía es un JSON en `static/documentacion/guias/` (índice en `indice.json`) y sus capturas van en `static/documentacion/capturas/<guía>/`.
 - **Tema claro y oscuro en el manual:** botón sol/luna en la barra; sin elección sigue al sistema y la recuerda en este navegador. Celular revisado a 390 y 320 px (barra compacta, botones de pasos, URLs largas y globos de marcas ya no ensanchan la página).

@@ -96,7 +96,7 @@ def ensure(c):
 
 def public(r):
     d=json.loads(r['metadata'])
-    return dict(d, id=r['id'],filename=r['filename'],created=r['created'],operator=r['operator'])
+    return dict(d, release_status=d.get('release_status','aprobado'), id=r['id'],filename=r['filename'],created=r['created'],operator=r['operator'])
 
 
 def order(r):
@@ -117,13 +117,16 @@ def catalogue(kind,hw=''):
     with db.get_db() as c:
         ensure(c)
         found=rows(c,kind,hw)
-    return dict(items=[public(r) for r in found],default_id=found[0]['id'] if found else None)
+        approved=[r for r in found if public(r)['release_status']=='aprobado']
+        found=approved+[r for r in found if public(r)['release_status']!='aprobado']
+    return dict(items=[public(r) for r in found],default_id=approved[0]['id'] if approved else None)
 
 
 def selected(c,kind,hw,identifier=None):
     ensure(c)
     found=rows(c,kind,hw)
-    r=next((r for r in found if r['id']==identifier),None) if identifier else (found[0] if found else None)
+    approved=[r for r in found if public(r)['release_status']=='aprobado']
+    r=next((r for r in found if r['id']==identifier),None) if identifier else (approved[0] if approved else None)
     if r is None:
         raise ValueError('No hay firmware compatible con el tipo/HW de la placa seleccionada.')
     meta=public(r)
@@ -134,6 +137,7 @@ def selected(c,kind,hw,identifier=None):
 
 def save(text,kind,filename,hw,fw,operator):
     meta,image=inspect(text,kind,hw,fw)
+    meta['release_status']='beta'
     filename=filename.replace('\\','/').split('/')[-1].strip()
     if not filename.lower().endswith('.hex') or not 1<=len(filename)<=180 or any(ord(ch)<32 for ch in filename):
         raise ValueError('El nombre debe ser un archivo .hex válido (máximo 180 caracteres).')
@@ -149,3 +153,25 @@ def save(text,kind,filename,hw,fw,operator):
                   (identifier,kind,meta['hw'],meta['fw'],filename,meta['sha256'],meta['source_sha256'],json.dumps(meta),image,time.time(),operator))
         db.log_evento('STM32_FIRMWARE_GUARDADO',None,None,f'{kind} HW {meta["hw"]} FW {meta["fw"]}; sha256={meta["sha256"]}',operator,conn=c)
         return dict(meta,id=identifier,filename=filename,existing=False)
+
+
+def approve(identifier,operator,evidence):
+    evidence=str(evidence or '').strip()
+    if not 10 <= len(evidence) <= 2000:
+        raise ValueError('Describe las pruebas realizadas y su resultado (10 a 2000 caracteres).')
+    with db.transaction() as c:
+        ensure(c)
+        r=c.execute('SELECT * FROM stm32_firmwares WHERE id=?',(identifier,)).fetchone()
+        if not r: raise ValueError('Firmware no encontrado.')
+        if hashlib.sha256(r['image'].encode('ascii')).hexdigest()!=r['sha256']:
+            raise ValueError('La imagen guardada no coincide con su hash; no se aprueba.')
+        meta=public(r)
+        if meta['release_status']=='aprobado': return meta
+        stored=json.loads(r['metadata'])
+        stored.update(release_status='aprobado',approved_by=operator,approved_at=time.time(),approval_evidence=evidence)
+        c.execute('UPDATE stm32_firmwares SET metadata=? WHERE id=?',(json.dumps(stored),identifier))
+        from app.database import inventario
+        inventario.agregar_firmware(r['kind'],r['fw'],conn=c)
+        db.log_evento('STM32_FIRMWARE_APROBADO',None,None,
+            f'{identifier}; {r["kind"]} FW {r["fw"]}; sha256={r["sha256"]}; pruebas: {evidence}',operator,conn=c)
+        return dict(meta,**{k:stored[k] for k in ('approved_by','approved_at','approval_evidence')},release_status='aprobado')

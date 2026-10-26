@@ -1,0 +1,141 @@
+--- a/Core/Src/main.c
++++ b/Core/Src/main.c
+@@ -1469,6 +1469,16 @@
+     RS_485_Leer;
+ }
+ 
++uint8_t ComandoExacto(const char *comando, const char *esperado)
++{
++    size_t n = strlen(esperado);
++    if (strncmp(comando, esperado, n) != 0) { return 0; }
++    const char *fin = comando + n;
++    if (*fin == '\r') { ++fin; }
++    if (*fin == '\n') { ++fin; }
++    return *fin == '\0';
++}
++
+ uint8_t FinComandoValido(char c)
+ {
+     return (c == '\r' || c == '\n' || c == '\0');
+@@ -1764,9 +1774,9 @@
+     // Verifica si el comando comienza con el prefijo correcto - $SMSG=Nombre:
+ 	if (strncmp(comando, "$SMSG=Nombre:", 13) == 0) 		{ TQT_Nombre (comando);	}			// OK
+ /// --------------------------- Comando Para abrir el translock
+-    else if (strncmp(comando, "$SMSG=ON", 8) == 0) 			{ TQT_ON_GPS(); }					// OK
++    else if (ComandoExacto(comando, "$SMSG=ON")) 			{ TQT_ON_GPS(); }					// OK
+ /// --------------------------- Comando Para cerrar el translock
+-    else if (strncmp(comando, "$SMSG=OFF", 9) == 0) 		{ TQT_OFF_GPS(); }					// OK
++    else if (ComandoExacto(comando, "$SMSG=OFF")) 		{ TQT_OFF_GPS(); }					// OK
+ /// --------------------------- Comando para activar/desactivar sensores del motor
+     else if (strncmp(comando, "$SMSG=MAP", 9) == 0) { TQT_Map(comando); }
+     else if (strncmp(comando, "$SMSG=Sensores:", 15) == 0)	{ TQT_Sensores(comando); }			// OK
+@@ -1784,11 +1794,11 @@
+ /// --------------------------- Comando de bloqueo $SMSG=Bloqueo:
+     else if (strncmp(comando, "$SMSG=Bloqueo:", 14) == 0)	{ TQT_Bloqueo (comando); }			// OK
+ /// --------------------------- Comando de Reset de fabrica
+-	else if (strncmp(comando, "$SMSG=Reset_44", 14) == 0) 	{ TQT_Reset_General(); }			// OK
++	else if (ComandoExacto(comando, "$SMSG=Reset_44")) 	{ TQT_Reset_General(); }			// OK
+ /// --------------------------- Comando de Reset del ble
+-    else if (strncmp(comando, "$SMSG=Reset_BLE", 15) == 0)	{ TQT_Reset_Ble (); }				// OK
++    else if (ComandoExacto(comando, "$SMSG=Reset_BLE"))	{ TQT_Reset_Ble (); }				// OK
+ /// --------------------------- Comando de Reset de la tarjeta
+-	else if (strncmp(comando, "$SMSG=Reset", 11) == 0) 		{ Reset_gps(0); }					// OK
++	else if (ComandoExacto(comando, "$SMSG=Reset")) 		{ Reset_gps(0); }					// OK
+ 	/// --------------------------- Comando para Activar y desactivar salida 1
+ 	else if (strncmp(comando, "$SMSG=OUT_1:", 12) == 0) 		{ TQT_Out_1(comando); }			// OK
+ /// --------------------------- Comando para Activar y desactivar salida 2
+@@ -1800,9 +1810,9 @@
+ /// --------------------------- Comando para Activar y desactivar Entrada 2
+ 	else if (strncmp(comando, "$SMSG=INT_3:", 12) == 0) 		{ TQT_Int_3(comando); }			//
+ /// --------------------------- Comando de Status
+-	else if (strncmp(comando, "$SMSG=Status_Motor", 18) == 0)	{ TQTR_Status_Motor(); }		//
++	else if (ComandoExacto(comando, "$SMSG=Status_Motor"))	{ TQTR_Status_Motor(); }		//
+ /// --------------------------- Comando Para solicitar el MAC del BLE
+-    else if (strncmp(comando, "$SMSG=MAC", 9) == 0) 											// OK
++    else if (ComandoExacto(comando, "$SMSG=MAC")) 											// OK
+     {
+         Debug("OK - $SMSG=MAC\r\n");
+         BT_DELAY();
+@@ -1813,7 +1823,7 @@
+         EnviarParoCorrienteConfig();
+     }
+ /// --------------------------- Comando de Status
+-	else if (strncmp(comando, "$SMSG=Status", 12) == 0)											// OK
++	else if (ComandoExacto(comando, "$SMSG=Status"))											// OK
+ 	{
+ 		BT_DELAY();
+ 		BLE_MAC();
+@@ -1822,7 +1832,7 @@
+ 		EnviarSeparadoresConfig();
+ 		EnviarParoCorrienteConfig();
+ 	}
+-	else if (strncmp(comando, "$OK", 3) == 0 || strncmp(comando, "OK", 2) == 0) { GPS_MensajeConfirmado(); Debug("Comando OK");
++	else if (ComandoExacto(comando, "$OK") || ComandoExacto(comando, "OK")) { GPS_MensajeConfirmado(); Debug("Comando OK");
+ 	}
+ /// --------------------------- Error de comando
+     else { ActualizarError(1); GuardarConfig(); EnviarEstadoConfig(); Debug("Comando no valido"); }
+@@ -1917,7 +1927,7 @@
+             {
+                 for (int i = 0; i < idx; i++) {  if (respuesta[i] == '\r' || respuesta[i] == '\n') respuesta[i] = '\0'; }
+                 // Comparar respuesta
+-                if (strcmp(respuesta, "SIMON") == 0) { Debug("BLE OK"); return 1; }
++                if (strcmp(respuesta, "SIMON") == 0) { errorCount = 0; Debug("BLE OK"); return 1; }
+                 else
+                 {
+                 	errorCount++;
+@@ -1949,45 +1959,45 @@
+ 
+ void MENSAJE_BLUETOOTH  ( char *comando )
+ {
+-	if (strncmp(comando, "PPON", 4) == 0)
++	if (ComandoExacto(comando, "PPON"))
+ 	{
+ 		if (Config.DebugTqt) { MENSAJE_GPS(OPEN_1, NombreOrigenMensaje(BLUE)); }
+ 		APERTURA(BLUE);                           // Se llama a la funcion de apertura de translock
+ 	}
+-	else if (strncmp(comando, "POFF", 4) == 0)
++	else if (ComandoExacto(comando, "POFF"))
+ 	{
+ 		if (Config.DebugTqt) { MENSAJE_GPS(CLOSED_1, NombreOrigenMensaje(BLUE)); }
+ 		CIERRE(BLUE);                             // Se manda a llamar la funcion de cierre
+ 	}
+-	else if (strncmp(comando, "RST4", 4) == 0)
++	else if (ComandoExacto(comando, "RST4"))
+ 	{
+ 		TQT_Reset_General();                             // Se manda a llamar la funcion de cierre
+ 	}
+-	else if (strncmp(comando, "I1_1", 4) == 0)
++	else if (ComandoExacto(comando, "I1_1"))
+ 	{
+ 		TQT_Int_1("$SMSG=INT_1:2\r\n");                     // Se manda a llamar la funcion para activar la entrada 1
+ 	}
+-	else if (strncmp(comando, "I1_0", 4) == 0)
++	else if (ComandoExacto(comando, "I1_0"))
+ 	{
+ 		TQT_Int_1("$SMSG=INT_1:0\r\n");                     // Se manda a llamar la funcion para activar la entrada 1
+ 	}
+-	else if (strncmp(comando, "I2_1", 4) == 0)
++	else if (ComandoExacto(comando, "I2_1"))
+ 	{
+ 		TQT_Int_2("$SMSG=INT_2:2\r\n");                     // Se manda a llamar la funcion para activar la entrada 1
+ 	}
+-	else if (strncmp(comando, "I2_0", 4) == 0)
++	else if (ComandoExacto(comando, "I2_0"))
+ 	{
+ 		TQT_Int_2("$SMSG=INT_2:0\r\n");                     // Se manda a llamar la funcion para activar la entrada 1
+ 	}
+-	else if (strncmp(comando, "PC_1", 4) == 0)
++	else if (ComandoExacto(comando, "PC_1"))
+ 	{
+ 		TQT_ParoCorriente("$SMSG=PARO_C:1\r\n");
+ 	}
+-	else if (strncmp(comando, "PC_0", 4) == 0)
++	else if (ComandoExacto(comando, "PC_0"))
+ 	{
+ 		TQT_ParoCorriente("$SMSG=PARO_C:0\r\n");
+ 	}
+-	else if (strncmp(comando, "PC_?", 4) == 0)
++	else if (ComandoExacto(comando, "PC_?"))
+ 	{
+ 		EnviarParoCorrienteConfig();
+ 	}

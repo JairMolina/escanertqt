@@ -33,7 +33,9 @@ class FirmwareCatalogueTests(unittest.TestCase):
         return hx.emitir_hex(mem)
 
     def save(self,fw='1.1',delta=1,hw='3.0'):
-        return f.save(self.simulated(delta),'R3','SIMULADO_NO_PROGRAMAR.hex',hw,fw,self.operator)
+        saved=f.save(self.simulated(delta),'R3','SIMULADO_NO_PROGRAMAR.hex',hw,fw,self.operator)
+        f.approve(saved['id'],self.operator,'Pruebas simuladas de catalogo; no hardware.')
+        return saved
 
     def test_seed_legacy_and_no_image_in_list(self):
         d=f.catalogue('R3')
@@ -112,3 +114,46 @@ class FirmwareCatalogueTests(unittest.TestCase):
             self.assertEqual(downloaded.text,body['contenido'])
             body.update(station_id=self.station['id'],pcb_id=self.r3['id'],firmware_id=identifier,hex_sha256=preview['hex_sha256'],physical_confirmed=True)
             self.assertEqual(client.post('/api/stm32/jobs',json=body).status_code,200)
+
+
+class BetaCatalogueTests(FirmwareCatalogueTests):
+    def beta(self,fw='9.8',delta=18):
+        return f.save(self.simulated(delta),'R3','BETA_NO_PROGRAMAR.hex','3.0',fw,self.operator)
+
+    def test_beta_never_default_or_latest_even_after_inventory_recorded(self):
+        before=f.catalogue('R3','30')['default_id']
+        beta=self.beta()
+        cat=f.catalogue('R3','30')
+        self.assertEqual(cat['default_id'],before)
+        self.assertEqual(next(x for x in cat['items'] if x['id']==beta['id'])['release_status'],'beta')
+        self.assertEqual(s.preview(self.r3['id'],firmware_id=beta['id'])[0]['identity']['fw'],'9.8')
+        inv.set_firmware(self.r3['id'],'9.8',self.operator)
+        self.assertNotIn('9.8',inv.listar_firmware()['R3'])
+        approved=f.approve(beta['id'],self.operator,'Tarjeta simulada: prueba de promocion, sin hardware.')
+        self.assertEqual(approved['release_status'],'aprobado')
+        self.assertEqual(f.catalogue('R3','30')['default_id'],beta['id'])
+        self.assertIn('9.8',inv.listar_firmware()['R3'])
+        self.assertEqual(f.approve(beta['id'],self.operator,'Segunda aprobacion idempotente')['approved_at'],approved['approved_at'])
+
+    def test_duplicate_beta_does_not_approve_and_approval_preserves_image(self):
+        a=self.beta(); b=self.beta()
+        self.assertEqual(a['id'],b['id']); self.assertEqual(b['release_status'],'beta')
+        with db.get_db() as c:
+            before=c.execute('SELECT image,sha256 FROM stm32_firmwares WHERE id=?',(a['id'],)).fetchone()
+        with self.assertRaises(ValueError):f.approve(a['id'],self.operator,'')
+        f.approve(a['id'],self.operator,'Pruebas simuladas de promocion correctas.')
+        with db.get_db() as c:
+            after=c.execute('SELECT image,sha256 FROM stm32_firmwares WHERE id=?',(a['id'],)).fetchone()
+        self.assertEqual(tuple(before),tuple(after))
+
+    def test_approval_rejects_tampered_image_and_non_admin(self):
+        from app.routers.stm32 import approve_firmware,FirmwareApproval
+        from fastapi import HTTPException
+        from types import SimpleNamespace
+        a=self.beta();req=SimpleNamespace(cookies={})
+        body=FirmwareApproval(evidence='Pruebas realizadas y aprobadas por operador.')
+        with patch('app.routers.stm32.usuarios.validar_sesion',return_value={'email':self.operator,'rol':'general'}):
+            with self.assertRaises(HTTPException) as ex:approve_firmware(a['id'],body,req)
+            self.assertEqual(ex.exception.status_code,403)
+        with db.get_db() as c:c.execute('UPDATE stm32_firmwares SET image=? WHERE id=?',('corrupto',a['id']))
+        with self.assertRaises(ValueError):f.approve(a['id'],self.operator,body.evidence)

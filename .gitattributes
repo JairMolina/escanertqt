@@ -7,3 +7,6 @@
 *.ico binary
 *.hex binary
 *.cmd text eol=crlf
+
+# Los parches preservan el espacio exacto del codigo de origen.
+docs/*.patch -whitespace

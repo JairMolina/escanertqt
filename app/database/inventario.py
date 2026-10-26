@@ -871,6 +871,15 @@ def listar_firmware(conn: Optional[sqlite3.Connection] = None, db_path: Optional
         r: Dict[str, List[str]] = {"R1": [], "R2": [], "R3": []}
         for f in c.execute("SELECT rol, version FROM firmware_catalogo ORDER BY rol, orden, id"):
             r[f["rol"]].append(f["version"])
+        # Una beta instalada se registra en su tarjeta, pero no pasa a versiones vigentes.
+        if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='stm32_firmwares'").fetchone():
+            import json
+            beta=set(); approved=set()
+            for row in c.execute('SELECT kind,fw,metadata FROM stm32_firmwares'):
+                key=(row['kind'],row['fw'])
+                (beta if json.loads(row['metadata']).get('release_status','aprobado')=='beta' else approved).add(key)
+            for kind,fw in beta-approved:
+                r[kind]=[v for v in r[kind] if v!=fw]
         return r
     return db._con_conn(conn, db_path, _q)
 

@@ -73,6 +73,18 @@ def upload_firmware(body: FirmwareUpload, req: Request):
     return run(catalogue.save, body.contenido, body.tipo, body.filename, body.hw, body.fw, operator(req))
 
 
+class FirmwareApproval(BaseModel):
+    evidence: str = Field(min_length=10,max_length=2000)
+
+
+@router.post('/firmwares/{identifier}/aprobar')
+def approve_firmware(identifier: str,body: FirmwareApproval,req: Request):
+    user=usuarios.validar_sesion(req.cookies.get(usuarios.COOKIE))
+    if user.get('rol')!='administrador':
+        raise HTTPException(403,'Solo un administrador puede aprobar un firmware beta.')
+    return run(catalogue.approve,identifier,user['email'],body.evidence)
+
+
 class Progress(BaseModel):
     stage: str = Field(pattern='^(preparing|writing|reading|restarting|reporting)$')
 

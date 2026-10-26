@@ -1,3 +1,9 @@
+# Avance actual — 2026-10-26
+
+Preparada web1.4.40 en codex/fw-beta-20261026 sobre produccion1.4.39/bfb6465. Catálogo STM32 beta/aprobado con aprobación manual de administrador y evidencia, excluyendo beta de predeterminado y vigencia. 48pruebasPython y Playwright locales correctos; sin despliegue. Firmware4.4 corregido y compilado para unidad0054 según inventario, sin publicar identidad personal ni programar hardware;74ARM+14HEX+8resultados protocolo correctos. Ver FIRMWARE_BETA_STM32.md. Pendiente autorizar despliegue web y registro de beta, y banco físico antes de promover firmware.
+
+---
+
 # Estado de Codex: TQT-Web
 
 Actualizado: 2026-10-21 22:56 UTC

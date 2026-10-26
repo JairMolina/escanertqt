@@ -8,6 +8,27 @@ window.TQTSTM32 = function (host, ctx) {
     let selectedFirmware = null, firmwareRequest = 0, uploadOpen = false;
     const firmwareSelect = h('select', { class: 'input', id: ID + '-fw', disabled: true });
     const firmwareHint = h('p', { class: 'hint', 'aria-live': 'polite' }, 'Cargando firmware…');
+    let firmwareItems = [];
+    const approveBtn = h('button', { class: 'btn', type: 'button', hidden: true, onclick: () => {
+        const f = firmwareItems.find(x => x.id === selectedFirmware);
+        if (!f || f.release_status !== 'beta' || busy) return;
+        const evidence = h('textarea', { class: 'input', id: ID + '-evidence', minlength: 10, maxlength: 2000, required: true });
+        const error = h('div', { role: 'alert' });
+        T.sheet({ title: 'Aprobar FW ' + f.fw + ' · ' + f.sha256.slice(0, 8),
+            body: h('div', { class: 'stack' },
+                h('p', null, 'Aprueba solo después de probar esta imagen en una tarjeta. La lectura J-Link correcta por sí sola no valida su funcionamiento.'),
+                h('label', { for: evidence.id }, 'Tarjeta, pruebas realizadas y resultado'), evidence,
+                h('p', { class: 'hint' }, 'La aprobación es una declaración del administrador y queda registrada. Si es la versión aprobada más alta, será la predeterminada.'), error),
+            actions: [{ label: 'Aprobar firmware', kind: 'primary', onClick: async () => {
+                if (!evidence.reportValidity()) return false;
+                const r = await api('/api/stm32/firmwares/' + f.id + '/aprobar', { method: 'POST', body: { evidence: evidence.value.trim() } });
+                if (!r.ok) { error.replaceChildren(T.banner('bad', 'alert', r.error)); return false; }
+                await loadFirmwares(true); await loadList();
+                if (selectedPcb) await choose(selectedPcb, true);
+                message('Firmware aprobado. La selección automática considera solo versiones aprobadas.');
+                return true;
+            } }, { label: 'Cancelar', kind: 'ghost', onClick: () => true }] });
+    } }, 'Aprobar firmware beta');
     const unsubs = [];
     const search = h('input', { class: 'input', type: 'search', id: ID + '-q', autocomplete: 'off', placeholder: 'Número, nombre o QR de la tarjeta' });
     const list = h('div', { class: 'prog-lista' });
@@ -68,20 +89,20 @@ window.TQTSTM32 = function (host, ctx) {
             const hw = h('input', { class: 'input', id: ID + '-upload-hw', value: K === 'R1' ? d.hw : d.hw !== '?' ? d.hw : '3.0', maxlength: 7, required: true, readonly: K === 'R1' });
             const fw = h('input', { class: 'input', id: ID + '-upload-fw', value: K === 'R1' ? d.fw : d.fw !== 'desconocida' ? d.fw : suggested, maxlength: 7, required: true, readonly: K === 'R1' });
             const error = h('div', { role: 'alert' });
-            T.sheet({ title: 'Guardar firmware ' + K,
+            T.sheet({ title: 'Guardar firmware beta ' + K,
                 body: h('div', { class: 'stack' }, h('p', null, f.name),
                     h('p', { class: 'hint' }, d.mcu + ' · ' + (d.bytes / 1024).toFixed(1) + ' KB'),
                     h('div', { class: 'field' }, h('label', { for: hw.id }, 'Versión de hardware (HW)'), hw),
                     h('div', { class: 'field' }, h('label', { for: fw.id }, 'Versión de firmware (FW)'), fw),
                     h('p', { class: 'hint' }, K === 'R3' ? 'Este HEX no contiene su versión. Comprueba HW y FW antes de guardarlo; el nombre del archivo solo propone una versión.' : 'La versión se obtiene del perfil interno. La identidad individual se retira para preparar cada tarjeta con sus datos del inventario.'), error),
                 onClose: () => { uploadOpen = false; enable(); },
-                actions: [{ label: 'Guardar firmware', kind: 'primary', onClick: async () => {
+                actions: [{ label: 'Guardar como beta', kind: 'primary', onClick: async () => {
                     if (!hw.reportValidity() || !fw.reportValidity()) return false;
                     const saved = await api('/api/stm32/firmwares', { method: 'POST', body: { tipo: K, contenido, filename: f.name, hw: hw.value.trim(), fw: fw.value.trim() } });
                     if (!saved.ok) { error.replaceChildren(T.banner('bad', 'alert', saved.error)); return false; }
                     await loadFirmwares(true);
                     if (selectedPcb) await choose(selectedPcb, true);
-                    message(saved.data.existing ? 'Este firmware ya estaba guardado. Puedes seleccionarlo para programar.' : 'Firmware guardado. Se seleccionó la versión más reciente compatible.');
+                    message(saved.data.existing ? 'Este firmware ya estaba guardado. Puedes seleccionarlo para programar.' : 'Firmware beta guardado. Elígelo en la lista para probarlo; la versión aprobada sigue como predeterminada.');
                     return true;
                 } }, { label: 'Cancelar', kind: 'ghost', onClick: () => true }] });
             opened = true;
@@ -104,7 +125,7 @@ window.TQTSTM32 = function (host, ctx) {
           h('div', { class: 'row wrap' }, lookup), list),
         h('div', { class: 'prog-panel prog-panel-detalle' }, panel,
           h('div', { class: 'row wrap prog-acciones' }, btnProgram, ...(btnEsp ? [btnEsp] : []), btnSubir, btnCancel, hexIn), status,
-          h('div', { class: 'field' }, h('label', { for: ID + '-fw' }, 'Firmware a programar'), firmwareSelect, firmwareHint),
+          h('div', { class: 'field' }, h('label', { for: ID + '-fw' }, 'Firmware a programar'), firmwareSelect, firmwareHint, approveBtn),
           h('div', { class: 'field' }, h('span', { class: 'label' }, 'Estación Windows conectada al J-Link'), sessionBox, station),
           h('details', { class: 'prog-config' }, h('summary', null, 'Configurar esta computadora por primera vez'),
             h('div', { class: 'field' }, h('label', { for: ID + '-est-nombre' }, 'Nombre de estación Windows'), stationName),
@@ -137,6 +158,9 @@ window.TQTSTM32 = function (host, ctx) {
             h('p', { class: 'hint' }, 'No desconectes la ' + K + ' hasta que termine la verificación.')));
     }
     function enable() {
+        const chosenFw = firmwareItems.find(x => x.id === selectedFirmware);
+        approveBtn.hidden = !chosenFw || chosenFw.release_status !== 'beta';
+        approveBtn.disabled = busy || uploadOpen;
         btnCancel.disabled = !station.value || cancelling;
         btnProgram.textContent = busy ? 'Programando…' : current ? 'Programar ' + K + ' ' + current.identity.nombre.slice(-4) + ' con J-Link' : 'Programar STM32 con J-Link';
         btnProgram.disabled = busy || uploadOpen || !current || !firmwareSelect.value || !station.value || station.selectedOptions[0]?.dataset.online !== 'true';
@@ -154,15 +178,17 @@ window.TQTSTM32 = function (host, ctx) {
         if (!alive || n !== firmwareRequest) return;
         if (!r.ok) { firmwareHint.textContent = r.error; firmwareSelect.replaceChildren(); enable(); return; }
         const d = r.data;
+        firmwareItems = d.items;
         if (busy && activeFirmware) selectedFirmware = activeFirmware;
         else if (reset || !d.items.some(f => f.id === selectedFirmware)) selectedFirmware = d.default_id;
-        firmwareSelect.replaceChildren(...d.items.map(f => h('option', { value: f.id }, 'FW ' + f.fw + ' · HW ' + f.hw + ' · ' + f.sha256.slice(0, 8) + (f.id === d.default_id ? ' · más reciente' : ''))));
+        firmwareSelect.replaceChildren(...d.items.map(f => h('option', { value: f.id }, 'FW ' + f.fw + ' · HW ' + f.hw + ' · ' + f.sha256.slice(0, 8) + (f.release_status === 'beta' ? ' · BETA · solo pruebas' : ' · Aprobado') + (f.id === d.default_id ? ' · más reciente aprobado' : ''))));
         firmwareSelect.value = selectedFirmware || '';
-        firmwareHint.textContent = d.items.length ? 'Por defecto se usa la versión más alta compatible; puedes elegir una anterior.' : 'No hay firmware compatible con esta placa. Sube un HEX para su hardware.';
+        firmwareHint.textContent = d.items.length ? 'Por defecto se usa la versión aprobada más alta compatible. Las BETA se eligen manualmente y no cuentan como actualización pendiente.' : 'No hay firmware compatible con esta placa. Sube un HEX para su hardware.';
         enable();
     }
     firmwareSelect.addEventListener('change', () => {
         selectedFirmware = firmwareSelect.value;
+        enable();
         if (selectedPcb) choose(selectedPcb, true);
     });
     async function stations() {
@@ -272,9 +298,9 @@ window.TQTSTM32 = function (host, ctx) {
         const vnum = v => String(v || '').split('.').map(x => parseInt(x, 10) || 0);
         const mayor = (a, b) => { const x = vnum(a), y = vnum(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
         const ultimo = {};
-        (cat.ok ? cat.data.items : []).forEach(f => { if (!ultimo[f.hw] || mayor(f.fw, ultimo[f.hw])) ultimo[f.hw] = f.fw; });
+        (cat.ok ? cat.data.items : []).forEach(f => { if (f.release_status === 'beta') return; const hw = String(f.hw).replace(/\./g, ''); if (!ultimo[hw] || mayor(f.fw, ultimo[hw])) ultimo[hw] = f.fw; });
         const badge = p => {
-            const vig = ultimo[p.version], s = !p.firmware ? 'unprogrammed' : vig && mayor(vig, p.firmware) ? 'outdated' : 'updated';
+            const vig = ultimo[String(p.version).replace(/\./g, '')], s = !p.firmware ? 'unprogrammed' : vig && mayor(vig, p.firmware) ? 'outdated' : 'updated';
             return h('span', { class: 'prog-r2-state', dataset: { s }, title: 'Instalado: ' + (p.firmware || 'sin firmware') + ' · vigente: ' + (vig || '—') }, { unprogrammed: 'Sin programar', outdated: 'Desactualizada', updated: 'Actualizada' }[s]);
         };
         list.replaceChildren(...r.data.items.map(p => h('button', { class: 'prog-item', type: 'button', onclick: () => choose(p), disabled: busy,
