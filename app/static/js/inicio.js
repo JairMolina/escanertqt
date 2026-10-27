@@ -177,12 +177,13 @@
     var CANDADO = '<svg class="cand" viewBox="0 0 24 24" focusable="false"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>';
 
     /* Lunas: submódulos que orbitan su estrella (fuera del botón). Con `url` y acceso al módulo son enlaces. */
+    var LUNA_ICO = '<svg class="luna-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></svg>';   // ciclo: pruebas que se repiten
     function lunasHtml(ls, entra) {
         if (!Array.isArray(ls) || !ls.length) return '';
         return '<span class="lunas">' + ls.slice(0, 3).map(function (l, j, a) {
             return '<span class="luna-sis" style="--j:' + (j / a.length) + '"><span class="luna"><i class="luna-esf" aria-hidden="true"></i>' +
-                (entra && destino(l && l.url) ? '<a class="luna-nom" href="' + esc(l.url) + '">' + esc(l.nombre) + '</a>'
-                    : '<span class="luna-nom">' + esc(l && l.nombre) + '</span>') + '</span></span>';
+                (entra && destino(l && l.url) ? '<a class="luna-nom" href="' + esc(l.url) + '">' + LUNA_ICO + esc(l.nombre) + '</a>'
+                    : '<span class="luna-nom">' + LUNA_ICO + esc(l && l.nombre) + '</span>') + '</span></span>';
         }).join('') + '</span>';
     }
     function construir(mods) {
