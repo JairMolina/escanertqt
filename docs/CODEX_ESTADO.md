@@ -1,13 +1,13 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-27 15:09 UTC
-Commit de referencia: `1bb98bd4385d` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-27 15:12 UTC
+Commit de referencia: `000a30bdc1c6` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Preparada web1.4.46 sobre origin/main1.4.45/1bb98bd. Comandos ya estaba integrado y produccion ejecuta1.4.45. Se actualizan version del servidor, README, CHANGELOG y prueba de version; se conservan catalogo beta/aprobado, lote persistente, agentes fijos y estado historico STM32. Usuario autoriza guardar en Git/memoria y desplegar. Ruta efectiva OrangePi192.168.4.70 por salto MiniPc, repo /home/orangepi/escanertqt, servicio tqt de servidor/compose.yml; acceso directo Tailscale no responde.
+Web1.4.46 publicada en main y etiqueta v1.4.46, commit de codigo000a30b, desplegada y verificada el2026-10-27 en inventariotqt.site. Git y produccion ya estaban en1.4.45/1bb98bd, con Comandos y cambiosSTM32/agentes integrados. Se alinearon version servidor/README/CHANGELOG y prueba de version; se actualizaron memoria y pendientes reales. OrangePi orangepizero3: SSH porMiniPc aorangepi@192.168.4.70, repo/home/orangepi/escanertqt. Fast-forward y recreacion exclusiva tqt; cloudflared continuo activo.
 
 ## Siguiente paso
-Publicar1.4.46 en main y etiquetar; respaldo SQLite y nueva comprobacion sin trabajos activos; recrear solo servicio tqt y verificar salud/version publica. Banco fisico de FW4.4 beta sigue pendiente; no aprobar firmware ni programar hardware ni borrar agentes por esta actualizacion.
+Banco fisico del FW4.4 beta y decision humana posterior de aprobacion siguen pendientes. No programar hardware ni ejecutar limpieza destructiva de agentes/inventario por esta actualizacion. Proximas sesiones partir de origin/main y verificar version real, no notas antiguas que aun describen1.4.41 como no desplegada. Evidencia en docs/DESPLIEGUE_1.4.46.md.
 
 ## Evidencia
-115PythonPASS en Docker aislado;9NodePASS;16escenarios PlaywrightPASS en localhost18086 con clipboard real y capturas1440/1024/390 claro/oscuro sin JS/HTTPerrors. Compose/buildOK. Produccion1.4.45 cleanmain1bb98bd,0trabajosSTM32/test/BLE/R2 activos y PRAGMA quick_check=ok. Revisados imagen, puertos y montajes; cmdeployMiniPc no aplica al hostOrangePi, se usa procedimiento SSH/Docker vigente. ui-ux-pro-max/ECC verificacion reutilizadas; sin cambios funcionales de UI.
+115Python+9Node+16Playwright PASS en QA aislada; Compose/buildOK. Backup /backups/predeploy_1.4.46_20261027_151013.db integrity_checkok SHA256403b25b8b44903eb383f80dd3acdefd05f8def41ff22c9dff0d18a7c02766f9e.0trabajos activos al respaldar. Produccion running healthy, APP_VERSION1.4.46, SQLite quick_checkok, salud interna ok:true, loginpublicoHTTP200/version1.4.46. Sin cambiosCloudflare/red ni firmware fisico. CM continuidad/Git/memoria y ECC verificacion utilizados.

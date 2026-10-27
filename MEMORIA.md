@@ -1,5 +1,17 @@
 # Memoria de TQT-Web
 
+## Estado vigente — 2026-10-27
+
+Web1.4.46 publicada en main y etiqueta v1.4.46, commit de código000a30b,
+desplegada y verificada en https://inventariotqt.site. Comandos y las mejoras
+de STM32/agentes ya estaban integrados en main1.4.45; esta actualización
+alinea versión y documentación. OrangePi se alcanza por MiniPc a
+192.168.4.70, usuarioorangepi, repo/home/orangepi/escanertqt; solo servicio tqt
+de servidor/compose.yml recreado. Respaldo íntegro y evidencia en
+docs/DESPLIEGUE_1.4.46.md.115Python+9Node+16PlaywrightPASS, salud interna y
+login público correctos. FW4.4 beta mantiene pendiente su banco físico;
+no se aprobó firmware ni se programó hardware en esta actualización.
+
 Aplicación Inventario TQT (JairMolina/escanertqt): FastAPI, SQLite, WebSockets y HTML/JS. Mantener separada de TQT-OrangePi, que contiene infraestructura del servidor.
 
 ## Estado confirmado 2026-10-13
