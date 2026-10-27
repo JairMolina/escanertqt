@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.47 — 2026-10-27
+- Cierre de mantenimiento sobre `main` 1.4.46: las mejoras de agentes ya estaban integradas; se conserva la cuenta web asociada al agente, el actor real de cada operación, el botón de borrado seguro y los historiales.
+- Verificado el retiro previo de 20 agentes físicos en el servidor. Se completó la limpieza pendiente de esta laptop: cuatro procesos detenidos, seis arranques automáticos retirados y siete carpetas conservadas en respaldo privado local, fuera de Git y memoria.
+- Alinea versión visible, README, prueba de versión y documentación del estado real. Conserva lotes persistentes, Comandos, firmware beta y todos los datos de inventario; no programa hardware ni aprueba firmware.
+
 ## v1.4.46 — 2026-10-27
 - Actualización de continuidad sobre `main` 1.4.45: conserva las integraciones de Comandos, lote persistente, catálogo beta/aprobado, selección fija de agentes y estado histórico de programación STM32.
 - Alinea la versión del servidor, el README y la prueba de versión visible. Registra el estado real del despliegue y los pendientes vigentes en la memoria del proyecto.
