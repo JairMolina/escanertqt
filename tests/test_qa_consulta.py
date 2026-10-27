@@ -2,6 +2,7 @@
 import _aislamiento  # noqa: F401  (debe ser lo primero)
 import sqlite3
 import tempfile
+import re
 import unittest
 from pathlib import Path
 
@@ -138,8 +139,10 @@ class TestPruebasEliminado(unittest.TestCase):
             if f.name == "jsQR.js":
                 continue
             txt = f.read_text(encoding="utf-8", errors="ignore")
-            for malo in ("/pruebas", "pruebas.html", "pruebas.js", "PRUEBA_ACTUALIZADA", "PRUEBAS_LOTE_ACTUALIZADAS"):
+            for malo in ("pruebas.html", "pruebas.js", "PRUEBA_ACTUALIZADA", "PRUEBAS_LOTE_ACTUALIZADAS"):
                 self.assertNotIn(malo, txt, f"{f.name} sigue mencionando {malo}")
+            # la ruta vieja /pruebas (o /api/pruebas/...); /pruebas-automaticas y /api/pruebas-auto son la luna (v1.4.51)
+            self.assertIsNone(re.search(r"/pruebas(?![-\w])", txt), f"{f.name} sigue mencionando /pruebas")
 
     def test_la_navegacion_ofrece_consultar_en_lugar_de_pruebas(self):
         js = (RAIZ / "app" / "static" / "js" / "common.js").read_text(encoding="utf-8")
