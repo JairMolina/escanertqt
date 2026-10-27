@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.62 — 2026-10-27
+- **Skytec: sin error falso al crear candados.** La llamada cortaba a los 8 s (tiempo por defecto de `api()`), pero Skytec tarda más: sesión, lista y 2 altas. Ahora espera hasta 2 min, muestra el avance («puede tardar hasta un minuto», «sigue procesando…») y al terminar dice «Candados listos en Skytec» con R1/R2 «creado ✓» o «ya existía ✓». Si Skytec falla o tarda en responder un alta, el servidor la confirma en la lista de Skytec antes de reportar error. Lo mismo en «Imprimir etiquetas».
+- **Tarjetas › Por emparejar: botón «Sincronizar Skytec»** (a la derecha). Lee los candados de Skytec y marca o desmarca qué tarjetas con R1/R2 con MAC ya tienen los suyos (por identificador o MAC). Informa cuántas están completas, parciales y sin candado, y la lista de las que faltan. No crea nada en Skytec. Endpoint `POST /api/tarjetas/skytec/sincronizar`.
+
 ## v1.4.61 — 2026-10-27
 - **Skytec ya no espera la R3.** El botón «Crear candados en Skytec» de Tarjetas aparece en cuanto R1 y R2 están programadas (con MAC y firmware), también en «Falta R3 · R1 y R2 programadas». La marca «· Skytec» se ve en ese estado y en los completos.
 

@@ -107,10 +107,9 @@ def alta_armado(tarjeta: dict) -> list:
     sesion = _login()
     token = sesion["token"]
     creado = (str(sesion.get("nombre") or "") + " " + str(sesion.get("apellido_p") or "")).strip() or "Escáner TQT"
-    lista = _post("/get_candados", {"headers": {"Authorization": token}}).get("datos") or []
+    lista = _candados(token)
     for s in slots:
-        dup = next((x for x in lista if str(x.get("identificador") or "").upper() == s["nombre"]
-                    or _norm_mac(x.get("mac_address")) == s["mac"]), None)
+        dup = _buscar(lista, s)
         if dup:
             s.update(estado="ya_existia", detalle=f"Ya estaba registrado como «{dup.get('nombre')}» ({_norm_mac(dup.get('mac_address'))}).")
             continue
@@ -118,8 +117,52 @@ def alta_armado(tarjeta: dict) -> list:
         try:
             r = _post("/upd_candado", {"headers": {"Authorization": token}, "upd": 0, "creado": creado, "formDataJSON": form})
             ok = str(r.get("respuesta", "")).lower() == "success"
-            s.update(estado="creado" if ok else "error",
-                     detalle="Candado creado en Skytec correctamente." if ok else f"Skytec respondió: {r.get('respuesta') or r}")
+            detalle = f"Skytec respondió: {r.get('respuesta') or r}"
         except SkytecError as e:
-            s.update(estado="error", detalle=str(e))
+            ok, detalle = False, str(e)
+        if not ok:
+            # v1.4.62: Skytec a veces sí lo crea aunque la respuesta falle o tarde; se confirma en su lista antes de reportar error.
+            try:
+                ok = bool(_buscar(_candados(token), s))
+            except SkytecError:
+                pass
+        s.update(estado="creado" if ok else "error", detalle="Candado creado en Skytec correctamente." if ok else detalle)
     return slots
+
+
+def _candados(token: str) -> list:
+    return _post("/get_candados", {"headers": {"Authorization": token}}).get("datos") or []
+
+
+def _buscar(lista: list, s: dict):
+    return next((x for x in lista if str(x.get("identificador") or "").upper() == s["nombre"]
+                 or _norm_mac(x.get("mac_address")) == s["mac"]), None)
+
+
+def sincronizar(operador: str = "") -> dict:
+    """v1.4.62: compara todas las tarjetas con R1/R2 con MAC contra la lista de Skytec y actualiza skytec_candados
+    (marca las que ya están y quita las marcas que ya no existen en Skytec). No crea nada en Skytec."""
+    from app.database import db
+    lista = _candados(_login()["token"])
+    with db.get_db() as c:
+        filas = c.execute(
+            "SELECT t.id, t.id_tarjeta_num, p1.nombre AS n1, p1.mac AS m1, p2.nombre AS n2, p2.mac AS m2 FROM tarjetas_produccion t "
+            "JOIN pcb_inventario p1 ON p1.id = t.pcb_r1_id JOIN pcb_inventario p2 ON p2.id = t.pcb_r2_id "
+            "WHERE p1.mac IS NOT NULL AND p1.mac <> '' AND p2.mac IS NOT NULL AND p2.mac <> ''").fetchall()
+        res = {"tarjetas": len(filas), "con_candados": 0, "parciales": 0, "sin_candados": 0, "candados_skytec": len(lista), "faltan": []}
+        for f in filas:
+            n = 0
+            for slot, nom, mac in (("R1", f["n1"], f["m1"]), ("R2", f["n2"], f["m2"])):
+                s = {"slot": slot, "nombre": nombre_completo({"nombre": nom}), "mac": _norm_mac(mac)}
+                if _buscar(lista, s):
+                    n += 1
+                    c.execute("INSERT INTO skytec_candados(tarjeta_id,slot,nombre,mac,estado,operador) VALUES(?,?,?,?,'ya_existia',?) "
+                              "ON CONFLICT(tarjeta_id,slot) DO UPDATE SET nombre=excluded.nombre, mac=excluded.mac",
+                              (f["id"], slot, s["nombre"], s["mac"], operador))
+                else:
+                    c.execute("DELETE FROM skytec_candados WHERE tarjeta_id=? AND slot=?", (f["id"], slot))
+            clave = "con_candados" if n == 2 else "parciales" if n else "sin_candados"
+            res[clave] += 1
+            if n < 2:
+                res["faltan"].append(f["id_tarjeta_num"])
+    return res

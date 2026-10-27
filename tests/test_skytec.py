@@ -128,5 +128,43 @@ class TestSkytec(unittest.TestCase):
         self.assertEqual(c.post("/api/tarjetas/999999/skytec").status_code, 404)
 
 
+    def test_respuesta_fallida_pero_creado_se_confirma_en_la_lista(self):
+        """v1.4.62: si upd_candado no responde 'success' pero el candado aparece en la lista de Skytec, cuenta como creado."""
+        creados = []
+
+        def post(ruta, cuerpo):
+            if ruta == "/login_web":
+                return {"token": "tk"}
+            if ruta == "/get_candados":
+                return {"datos": [{"identificador": n, "mac_address": "", "nombre": n} for n in creados]}
+            creados.append(cuerpo["formDataJSON"]["identificador"])
+            raise skytec.SkytecError("Sin conexión con Skytec (timed out).")
+        with mock.patch.dict(os.environ, ENV), mock.patch.object(skytec, "_post", side_effect=post):
+            items = skytec.alta_armado(TARJETA)
+        self.assertEqual([i["estado"] for i in items], ["creado", "creado"])
+
+    def test_sincronizar_marca_y_desmarca(self):
+        import _aislamiento as iso
+        t = iso.crear_par(iso.nuevo_lote()["id"])
+        tj = db.get_tarjeta_by_id(t["id"])
+        r1, r2 = skytec.nombre_completo(tj["r1"]), tj["r2"]["mac"].upper()
+        lista = [{"identificador": r1, "mac_address": "", "nombre": r1}, {"identificador": "OTRO", "mac_address": r2, "nombre": "OTRO"}]
+        c = cliente_sin_sesion(app)
+        c.cookies.set(usuarios.COOKIE, usuarios.emitir_sesion("developer@skyguardian.mx"))
+        post, llamadas = falso_skytec(existentes=lista)
+        with mock.patch.dict(os.environ, ENV), mock.patch.object(skytec, "_post", side_effect=post):
+            r = c.post("/api/tarjetas/skytec/sincronizar")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertGreaterEqual(r.json()["con_candados"], 1)
+        self.assertNotIn("/upd_candado", [x for x, _ in llamadas])   # sincronizar nunca crea
+        self.assertTrue(db.get_tarjeta_by_id(t["id"])["skytec"])
+        post, _ = falso_skytec(existentes=lista[:1])               # la R2 ya no está en Skytec
+        with mock.patch.dict(os.environ, ENV), mock.patch.object(skytec, "_post", side_effect=post):
+            self.assertEqual(c.post("/api/tarjetas/skytec/sincronizar").status_code, 200)
+        self.assertFalse(db.get_tarjeta_by_id(t["id"])["skytec"])
+        with mock.patch.dict(os.environ, {"TQT_SKYTEC_USER": "", "TQT_SKYTEC_PASSWORD": ""}):
+            self.assertEqual(c.post("/api/tarjetas/skytec/sincronizar").status_code, 503)
+
+
 if __name__ == "__main__":
     unittest.main()

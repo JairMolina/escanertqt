@@ -325,6 +325,17 @@ async def patch_tarjeta(tarjeta_id: int, payload: TarjetaDatos):
     return tarjeta
 
 
+@router.post("/tarjetas/skytec/sincronizar", summary="Sincronizar con Skytec qué tarjetas ya tienen sus candados")
+async def sincronizar_skytec(request: Request):
+    """v1.4.62: lee la lista de candados de Skytec y marca/desmarca las tarjetas; no crea candados."""
+    from app.services import skytec
+    operador = usuarios.validar_sesion(request.cookies.get(usuarios.COOKIE))['email']
+    try:
+        return await run_in_threadpool(skytec.sincronizar, operador)
+    except (skytec.SkytecNoConfigurado, skytec.SkytecError) as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
 @router.post("/tarjetas/{tarjeta_id}/skytec", summary="Crear en Skytec los candados R1/R2 de una tarjeta completa")
 async def alta_skytec(tarjeta_id: int, request: Request):
     """v1.4.60: botón de Tarjetas para las completas sin candado (las probadas se dan de alta al imprimir etiquetas)."""

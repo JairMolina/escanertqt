@@ -84,20 +84,43 @@
                         h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { if (!gab.value) { toast('Elige Quintalock o Translock antes de marcar la entrega', { kind: 'bad' }); gab.focus(); return; } guardar({ fecha_real: hoy() }); } }, icon('box'), 'Marcar entregada hoy')));
             }
             // v1.4.61: el candado solo necesita R1 y R2 programadas (con MAC y firmware); no espera la R3.
+            // v1.4.62: compara las tarjetas con la lista de Skytec y marca cuáles ya tienen sus candados (no crea nada).
+            const syncOut = h('p', { class: 'hint', 'aria-live': 'polite' });
+            function botonSync() {
+                const b = h('button', { class: 'btn', type: 'button', 'data-escribe': true, title: 'Ver qué tarjetas ya tienen sus candados en Skytec', onclick: async () => {
+                    b.disabled = true; syncOut.className = 'hint'; syncOut.textContent = 'Leyendo los candados de Skytec y comparando con las tarjetas…';
+                    const r = await api('/api/tarjetas/skytec/sincronizar', { method: 'POST', body: {}, timeout: 120000 });
+                    b.disabled = false;
+                    if (!r.ok) { syncOut.className = 'hint bad'; syncOut.textContent = 'No se pudo sincronizar con Skytec: ' + (r.network ? 'tardó demasiado o se perdió la conexión; reintenta.' : r.error); return; }
+                    const d = r.data, f = d.faltan || [];
+                    syncOut.className = 'hint ok';
+                    syncOut.textContent = `Skytec sincronizado: ${d.con_candados} de ${d.tarjetas} tarjetas con R1 y R2 tienen sus candados` + (d.parciales ? ` · ${d.parciales} con solo uno` : '')
+                        + ` · ${d.sin_candados} sin candado.` + (f.length ? ` Faltan: ${f.slice(0, 30).join(', ')}${f.length > 30 ? '…' : ''}.` : '');
+                    toast('Skytec sincronizado', { kind: 'ok' }); ctx.actualizar();
+                } }, icon('refresh'), 'Sincronizar Skytec');
+                return b;
+            }
             function botonSkytec(t) {
                 if (!T.r1r2Programadas(t) || t.skytec) return null;
                 const out = h('p', { class: 'hint', 'aria-live': 'polite' });
                 const b = h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
-                    b.disabled = true; out.className = 'hint'; out.textContent = 'Creando candados de R1 y R2 en Skytec…';
-                    const r = await api(`/api/tarjetas/${t.id}/skytec`, { method: 'POST', body: {} });
-                    b.disabled = false;
-                    if (!r.ok) { out.className = 'hint bad'; out.textContent = 'Skytec: no se crearon los candados. ' + (r.error || 'Sin detalle'); return; }
-                    const txt = { creado: 'candado creado en Skytec correctamente', ya_existia: 'ya estaba registrado en Skytec', error: 'ERROR' };
+                    // v1.4.62: Skytec tarda (sesión + lista + 2 altas); se espera hasta 2 min y se informa el avance, sin error falso.
+                    b.disabled = true; b.lastChild.textContent = 'Creando candados…'; out.className = 'hint';
+                    out.textContent = 'Creando los candados de R1 y R2 en Skytec… puede tardar hasta un minuto; no cierres el panel.';
+                    const espera = setTimeout(() => { out.textContent = 'Skytec sigue procesando; esperando su confirmación…'; }, 15000);
+                    const r = await api(`/api/tarjetas/${t.id}/skytec`, { method: 'POST', body: {}, timeout: 120000 });
+                    clearTimeout(espera); b.disabled = false; b.lastChild.textContent = 'Crear candados en Skytec';
+                    if (!r.ok) {
+                        out.className = 'hint bad';
+                        out.textContent = (r.network ? 'No llegó la confirmación de Skytec (tardó demasiado o se perdió la conexión). Puede que sí se hayan creado: pulsa «Sincronizar Skytec» o vuelve a intentar; no se duplican.' : 'Skytec: no se crearon los candados. ' + (r.error || 'Sin detalle'));
+                        return;
+                    }
+                    const txt = { creado: 'creado ✓', ya_existia: 'ya existía ✓', error: 'no se creó' };
                     out.className = r.data.ok ? 'hint ok' : 'hint bad';
-                    out.textContent = r.data.items.map((i) => `${i.slot} ${i.nombre}: ${txt[i.estado]}` + (i.estado === 'error' ? ' — ' + i.detalle : '')).join(' · ');
-                    toast(r.data.ok ? `Tarjeta ${t.id_tarjeta_num}: candados creados en Skytec` : `Tarjeta ${t.id_tarjeta_num}: Skytec con errores`, { kind: r.data.ok ? 'ok' : 'bad' });
+                    out.textContent = (r.data.ok ? 'Candados listos en Skytec. ' : 'Skytec con errores. ') + r.data.items.map((i) => `${i.slot} ${i.nombre}: ${txt[i.estado]}` + (i.estado === 'error' ? ' — ' + i.detalle : '')).join(' · ');
+                    toast(r.data.ok ? `Tarjeta ${t.id_tarjeta_num}: candados de Skytec listos` : `Tarjeta ${t.id_tarjeta_num}: Skytec con errores; puedes reintentar`, { kind: r.data.ok ? 'ok' : 'bad' });
                     if (r.data.ok) ctx.actualizar();
-                } }, icon('lock'), 'Crear candados en Skytec');
+                } }, icon('lock'), h('span', null, 'Crear candados en Skytec'));
                 return h('div', { 'data-escribe': true, style: 'display:flex;flex-direction:column;gap:4px' }, b, out);
             }
             function pintarPanel(enfocar) {
@@ -174,7 +197,9 @@
                         + (g.r3_pendientes && g.r3_pendientes.length ? `, y se montarán ${g.r3_pendientes.length} R3 en tarjetas existentes` : '') + '. '
                         + (selR3.value === 'manual' ? 'La R3 se asigna a mano en cada tarjeta.' : '')),
                     filas.length ? tabla : h('p', { class: 'muted' }, sueltas[0] + sueltas[1] + sueltas[2] ? 'No hay R1 y R2 por emparejar; las sueltas se pueden armar a mano.' : 'No hay placas sueltas: recíbelas y confírmalas con el celular.'),
-                    h('div', { class: 'row wrap' }, h('button', { class: 'btn', type: 'button', 'data-escribe': true, onclick: armarMano }, icon('plus'), 'Armar a mano (impar)')));
+                    h('div', { class: 'row wrap' }, h('button', { class: 'btn', type: 'button', 'data-escribe': true, onclick: armarMano }, icon('plus'), 'Armar a mano (impar)'),
+                        h('div', { class: 'grow' }), botonSync()),
+                    syncOut);
                 if (filas.length) util.pintarTabla(tabla, { cols, rows: filas, key: (x) => x.id_tarjeta_num, sort: { id: 'n', dir: 'asc' }, onSort: () => {}, label: (x) => `Tarjeta ${x.id_tarjeta_num}`, limit: 50, onMas: () => {}, caption: 'Tarjetas que se crearán al emparejar' });
             }
             async function unir(serie) {

@@ -916,8 +916,8 @@
     // v1.4.58: cada armado impreso se registra en Skytec (2 candados: R1 y R2). Reimprimir no duplica.
     async function altaSkytec(t) {
       skyOut.className = "hint";
-      skyOut.textContent = "Skytec: registrando candados de R1 y R2…";
-      const r = await api("/api/validacion/tqt/tarjetas/" + t.id + "/skytec", { method: "POST", body: {} });
+      skyOut.textContent = "Skytec: creando candados de R1 y R2… puede tardar hasta un minuto; no cierres la página.";
+      const r = await api("/api/validacion/tqt/tarjetas/" + t.id + "/skytec", { method: "POST", body: {}, timeout: 120000 });   // Skytec tarda; el corte de 8 s daba un error falso
       if (!r.ok) {
         skyOut.className = "hint bad";
         skyOut.textContent = "Skytec: no se crearon los candados. " + (r.error || "Sin detalle") + " Puedes reintentar con «Reimprimir etiquetas».";
