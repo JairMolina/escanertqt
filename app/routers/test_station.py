@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from app.routers.stm32 import station_token, operator, run
 from app.services import test_station as svc, stm32_programming as stm
-from app.services import native_ble, pruebas_auto
+from app.services import native_ble, pruebas_auto, usuarios
 from app.database import db
 
 router = APIRouter(prefix="/api/validacion/tqt", tags=["Pruebas TQT"])
@@ -101,8 +101,9 @@ def native_authorize(identifier: str, st=Depends(station_token)):
 
 
 @router.get("/stations")
-def stations():
+def stations(req: Request):
     svc.init()
+    yo = operator(req)
     with db.get_db() as c:
         return [
             dict(
@@ -112,7 +113,7 @@ def stations():
                 **json.loads(r["state"]),
             )
             for r in c.execute(
-                "SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.revoked_at IS NULL AND s.name NOT LIKE ?", (svc.RASPBERRY_LIKE,)
+                "SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.revoked_at IS NULL AND s.name NOT LIKE ? AND lower(s.owner)=lower(?)", (svc.RASPBERRY_LIKE, yo)
             )
             # v1.4.55: un puente «solo BLE» no ejecuta pruebas ni abre el COM; no se ofrece como agente
             if not json.loads(r["state"]).get("ble_only")
@@ -120,9 +121,9 @@ def stations():
 
 
 @router.post("/commands")
-def commands(body: Command):
+def commands(body: Command, req: Request):
     with db.get_db() as c:
-        run(svc.no_raspberry, c, body.station_id)
+        run(svc.propia, c, body.station_id, operator(req))
     return run(svc.command, body.station_id, body.action, body.model_dump())
 
 
@@ -194,9 +195,14 @@ def get_run(jid: str):
 
 
 @router.post("/runs/{jid}/cancel")
-def cancel(jid: str):
+def cancel(jid: str, req: Request):
     svc.read(jid)
     with db.get_db() as c:
+        # v1.4.56: solo quien la inició, el dueño del agente o un administrador
+        u = usuarios.validar_sesion(req.cookies.get(usuarios.COOKIE))
+        r = c.execute("SELECT r.operator,s.owner FROM tqt_test_runs r JOIN stm32_stations s ON s.id=r.station WHERE r.id=?", (jid,)).fetchone()
+        if r and u.get("rol") != "administrador" and u["email"].lower() not in (str(r["operator"]).lower(), str(r["owner"]).lower()):
+            raise HTTPException(403, "Esa prueba es de otra cuenta; no puedes cancelarla.")
         c.execute(
             "UPDATE tqt_test_runs SET cancel=1 WHERE id=? AND state IN ('queued','running')",
             (jid,),

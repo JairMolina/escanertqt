@@ -185,19 +185,31 @@ class PruebasAuto(unittest.TestCase):
         self.assertIn(win["id"], [x["id"] for x in native_ble.stations("operador@test.mx")])
 
 
-    def test_lista_de_agentes_sin_raspberry_ni_puentes_solo_ble(self):
-        """v1.4.55: /stations (modo agente de Pruebas TQT) no ofrece la Raspberry ni un puente «solo BLE» de otra laptop."""
+    def test_cada_cuenta_ve_y_usa_solo_sus_agentes(self):
+        """v1.4.55/56: /stations (modo agente de Pruebas TQT) solo lista agentes de la cuenta, sin la Raspberry ni puentes
+        «solo BLE»; crear pruebas o mandar comandos a un agente ajeno se rechaza."""
         from starlette.testclient import TestClient
         from app.main import app
+        from app.services import usuarios
+        yo = usuarios.CUENTAS_INICIALES[0]
+        yo = yo["email"] if isinstance(yo, dict) else yo
         s.claim(self.st["id"], {"ble_bridge": 1})
-        puente = stm.station_create("Bluetooth TQT Windows (solo BLE)", "otra@test.mx")
+        puente = stm.station_create("Bluetooth TQT Windows (solo BLE)", yo)
         s.claim(puente["id"], {"ble_bridge": 1, "ble_only": True})
-        banco = stm.station_create("Banco TQT Windows", "otra@test.mx")
-        s.claim(banco["id"], {"ble_bridge": 1, "ble_only": False})
-        ids = [x["id"] for x in TestClient(app).get("/api/validacion/tqt/stations").json()]
-        self.assertIn(banco["id"], ids)
-        self.assertNotIn(puente["id"], ids)
-        self.assertNotIn(self.st["id"], ids)
+        mio = stm.station_create("Banco TQT Windows", yo)
+        s.claim(mio["id"], {"ble_bridge": 1, "ble_only": False})
+        ajeno = stm.station_create("Banco TQT Windows", "otra@test.mx")
+        s.claim(ajeno["id"], {"ble_bridge": 1, "ble_only": False, "serial_connected": True})
+        cli = TestClient(app)
+        ids = [x["id"] for x in cli.get("/api/validacion/tqt/stations").json()]
+        self.assertIn(mio["id"], ids)
+        for otro in (puente["id"], ajeno["id"], self.st["id"]):
+            self.assertNotIn(otro, ids)
+        with self.assertRaisesRegex(ValueError, "otra cuenta"):
+            s.create(ajeno["id"], self.t["id"], yo, True)
+        r = cli.post("/api/validacion/tqt/commands", json={"station_id": ajeno["id"], "action": "scan_ble"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("otra cuenta", r.text)
 
 if __name__ == "__main__":
     unittest.main()

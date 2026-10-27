@@ -1,6 +1,6 @@
 """Outbound Windows bridge. The original 0.6.3 engine owns serial/BLE timing."""
 
-import argparse, json, os, platform, socket, sqlite3, threading, time, urllib.request, urllib.parse, ssl
+import argparse, http.client, io, json, os, platform, socket, sqlite3, threading, time, urllib.request, urllib.parse, ssl
 import urllib.error
 from pathlib import Path
 from dataclasses import asdict
@@ -11,7 +11,7 @@ from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
 
 
-AGENT_VERSION = "1.4.51-pruebas-auto"   # v1.4.51: se muestra en /pruebas-automaticas
+AGENT_VERSION = "1.4.56-pruebas-auto"   # se muestra en /pruebas-automaticas
 LOG_MAX = 256 * 1024                      # cola de agent.log que se sube cuando la web la pide
 
 
@@ -43,6 +43,7 @@ class Bridge:
         self.cfg, self.folder = cfg, folder
         self.folder.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
+        self._http = threading.local()   # v1.4.56: una conexión HTTPS keep-alive por hilo
         self.active = None
         self.sequence = 0
         self.expected = None
@@ -136,23 +137,43 @@ class Bridge:
                     self.active = None
 
     def api(self, path, body):
+        # v1.4.56: antes cada petición abría TLS nuevo (el puente BLE, 4 por segundo) con 10 s de espera; un handshake
+        # atascado bastaba para que un comando BLE venciera sin atenderse. Ahora se reusa la conexión y el claim espera 5 s.
         url = self.cfg["server"].rstrip("/") + "/api/stm32/agent/tests/" + path
-        request = urllib.request.Request(
-            url,
-            data=json.dumps(body).encode(),
-            headers={
-                "Authorization": "Bearer " + self.cfg["token"],
-                "Content-Type": "application/json",
-                "User-Agent": "TQT-Test-Station/0.6.3-web",
-            },
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=10) as r:
-                return json.load(r)
-        except urllib.error.HTTPError as e:
-            if e.code == 410:
-                raise StationRevokedError('Agente eliminado desde la web; se detiene sin borrar su historial.') from e
-            raise
+        u = urllib.parse.urlsplit(url)
+        data = json.dumps(body).encode()
+        headers = {
+            "Authorization": "Bearer " + self.cfg["token"],
+            "Content-Type": "application/json",
+            "User-Agent": "TQT-Test-Station/0.6.3-web",
+        }
+        timeout = 5 if path == "claim" else 15
+        for intento in (0, 1):
+            conn = getattr(self._http, "conn", None)
+            reusada = conn is not None
+            if conn is None:
+                cls = http.client.HTTPSConnection if u.scheme == "https" else http.client.HTTPConnection
+                conn = self._http.conn = cls(u.netloc, timeout=timeout)
+            conn.timeout = timeout
+            if conn.sock is not None:
+                conn.sock.settimeout(timeout)
+            try:
+                conn.request("POST", u.path, body=data, headers=headers)
+                r = conn.getresponse()
+                raw = r.read()
+            except (http.client.RemoteDisconnected, ConnectionError) as e:
+                conn.close(); self._http.conn = None
+                if reusada and intento == 0:
+                    continue   # el servidor cerró la conexión inactiva: se reintenta una vez con una nueva
+                raise urllib.error.URLError(e) from e
+            except Exception:
+                conn.close(); self._http.conn = None
+                raise
+            if r.status >= 400:
+                if r.status == 410:
+                    raise StationRevokedError('Agente eliminado desde la web; se detiene sin borrar su historial.')
+                raise urllib.error.HTTPError(url, r.status, r.reason, r.headers, io.BytesIO(raw))
+            return json.loads(raw or b"null")
 
     def flush(self):
         # Persistent ordered retries never repeat a command or a test run.

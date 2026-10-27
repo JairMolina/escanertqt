@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.56 — 2026-10-27
+- **Bluetooth y agentes separados por cuenta (auditoría).** Pruebas TQT: `/stations` (modo agente) solo lista los agentes de la cuenta con sesión; crear pruebas y mandar comandos (`/runs`, `/commands`) a un agente de otra cuenta o a la Raspberry se rechaza (`test_station.propia`); cancelar una prueba solo lo puede quien la inició, el dueño del agente o un administrador (403). Los puentes BLE ya estaban por dueño (`native_ble.stations/prepare/result`) y la Raspberry solo la maneja Pruebas automáticas con su ocupación por cuenta (v1.4.52).
+- **«El puente no atendió a tiempo; comando vencido sin ejecutar».** El agente abría una conexión TLS nueva en cada petición (el puente solo-BLE, 4 por segundo) con 10 s de espera; un handshake lento («handshake operation timed out», visto también en la Raspberry) consumía los 8 s de vida de un `send` (PPON/POFF) y vencía sin atenderse. Ahora el agente reusa una conexión keep-alive por hilo (reintenta una vez si el servidor cerró la inactiva), el claim espera 5 s y el `send` vive 20 s. Medido contra producción: 0.38 s la primera petición y ~0.12 s las siguientes por la misma conexión. Agente `1.4.56-pruebas-auto`: hay que volver a descargar el puente/agente de la laptop y actualizar la Raspberry.
+- Pruebas automáticas: «Detener y liberar (administrador)» confirma en dos pasos dentro de la pantalla en vez de `confirm()` nativo (lo marcaba `test_qa_e2e.test_sin_dialogos_nativos`).
+- Pruebas: `test_cada_cuenta_ve_y_usa_solo_sus_agentes` y `station/test_station/tests/test_agente_http.py` (keep-alive, reconexión tras cierre, 4xx y 410).
+
 ## v1.4.55 — 2026-10-27
 - **Pruebas TQT (modo agente): un puente «solo BLE» ya no se ofrece como agente.** Verificado en producción con v1.4.54: la Raspberry ya no aparece en `/stations` ni en `/web/ble/stations`, pero `/stations` (sin filtro de dueño) mostraba el puente «Bluetooth TQT Windows (solo BLE)» de otra cuenta como único agente en línea, y la página lo elegía como «Agente Windows» aunque no abre el COM ni ejecuta pruebas. Ahora `/stations` omite las estaciones con `ble_only`. Prueba nueva `test_lista_de_agentes_sin_raspberry_ni_puentes_solo_ble` (falla sin el cambio). Agente de la Raspberry actualizado por SSH a 1.4.51-pruebas-auto (respaldo en `~/tqt-pruebas-respaldo-20261027-1435`).
 

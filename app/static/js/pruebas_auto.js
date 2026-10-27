@@ -60,8 +60,16 @@
             location.href = '/inicio';
         });
     });
+    // v1.4.56: confirmación en dos pasos dentro de la pantalla (sin confirm() nativo)
     $('ocForzar').addEventListener('click', function () {
-        if (!confirm('¿Detener la campaña de ' + $('ocQuien').textContent + ' y liberar la Raspberry? El ciclo en curso termina y no se encola otro.')) return;
+        var bt = $('ocForzar');
+        if (!bt.dataset.seguro) {
+            bt.dataset.seguro = '1';
+            bt.textContent = 'Confirmar: detener la campaña de ' + $('ocQuien').textContent + ' y liberar';
+            setTimeout(function () { delete bt.dataset.seguro; bt.textContent = 'Detener y liberar (administrador)'; }, 6000);
+            return;
+        }
+        delete bt.dataset.seguro; bt.textContent = 'Detener y liberar (administrador)';
         api('/api/pruebas-auto/banco/liberar', { method: 'POST' }).then(function (r) {
             if (!r.ok) T.toast(r.error, { kind: 'bad' }); refrescar();
         });

@@ -26,6 +26,14 @@ def no_raspberry(c, sid):
         raise ValueError("Ese agente es la Raspberry de Pruebas automáticas; Pruebas TQT usa el banco o puente de Windows.")
 
 
+def propia(c, sid, operator):
+    """v1.4.56: cada cuenta usa solo SUS agentes/puentes (serial y Bluetooth) y nunca la Raspberry."""
+    no_raspberry(c, sid)
+    r = c.execute("SELECT owner FROM stm32_stations WHERE id=?", (sid,)).fetchone()
+    if r and str(r["owner"]).lower() != str(operator).lower():
+        raise ValueError("Ese agente pertenece a otra cuenta; instala o abre el de tu laptop.")
+
+
 def norm(value):
     return re.sub(r"[^A-Z0-9]", "", str(value or "").upper())
 
@@ -149,7 +157,7 @@ def create(sid, tid, operator, confirmed):
         )
     with db.transaction() as c:
         stm.require_station(c, sid)
-        no_raspberry(c, sid)
+        propia(c, sid, operator)
         p = c.execute(
             "SELECT seen,state FROM tqt_test_presence WHERE station=?", (sid,)
         ).fetchone()

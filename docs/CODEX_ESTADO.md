@@ -4,6 +4,8 @@ Actualizado:2026-10-27. Código de referencia:a1ea3d57d6907ef668e0d0156567a14edf
 
 ## Avance reportado
 
+Claude v1.4.56: agentes y puentes BLE de Pruebas TQT separados por cuenta (test_station.propia; cancelar solo dueño/admin); agente con keep-alive HTTPS (comandos BLE ya no vencen por handshakes lentos; send 20 s); sin confirm() en Pruebas automáticas. Pendiente: re-descargar el puente de cada laptop y actualizar el agente de la Raspberry.
+
 Claude v1.4.55: /stations de Pruebas TQT omite puentes «solo BLE» (verificado en producción 1.4.54: la Raspberry ya no aparece). Agente de la Raspberry actualizado a 1.4.51-pruebas-auto.
 
 Claude v1.4.54: Pruebas TQT ya no lista ni usa la Raspberry de Pruebas automáticas como puente Bluetooth ni como agente (test_station.RASPBERRY/no_raspberry; antes el escaneo/conexión BLE podía hacerse con el Bluetooth de la Raspberry). v1.4.53: scroll del esquema de Diagrama.

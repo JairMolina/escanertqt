@@ -92,7 +92,7 @@ def prepare(operator, body):
                   (sid, lid, operator, d['id'], body.get('run_id'), now))
         payload = dict(request=body, operator=operator, lease=lid, address=address,
                        operation=op, role=role, command=body.get('command'),
-                       deadline=now+(8 if op == 'send' else 45))
+                       deadline=now+(20 if op == 'send' else 45))   # v1.4.56: 8 s no aguantaba un handshake lento
         c.execute('INSERT INTO tqt_test_commands VALUES(?,?,?,?,?,?,NULL)',
                   (identifier, sid, 'ble_bridge', json.dumps(payload), 'queued', now))
     return {'id': identifier}
