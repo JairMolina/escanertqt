@@ -2,7 +2,7 @@
 
 Aplicación web del área de I+D para controlar la producción de tarjetas electrónicas. Empezó como el **Escáner TQT** (placas R1 + R2 + R3) y hoy es una plataforma con un portal (`/inicio`) desde el que se entra a cada módulo: registro de placas por QR con la cámara del celular, programación de firmware, etiquetas DYMO, costos e inventario de materiales, activos de la empresa y documentación del equipo.
 
-**Versión actual: v1.4.62** · historial en [`CHANGELOG.md`](CHANGELOG.md) (la versión también se muestra en la app).
+**Versión actual: v1.4.63** · historial en [`CHANGELOG.md`](CHANGELOG.md) (la versión también se muestra en la app).
 
 ## Módulos
 

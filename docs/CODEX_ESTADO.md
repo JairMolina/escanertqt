@@ -4,6 +4,7 @@ Actualizado:2026-10-27. Código de referencia:a1ea3d57d6907ef668e0d0156567a14edf
 
 ## Avance reportado
 
+Claude v1.4.63: easter egg en /inicio (5 estrellas en orden → crédito jairmolina.dev).
 Claude v1.4.62: Skytec sin error falso (timeout 120 s y confirmación en lista) y botón Sincronizar Skytec en Tarjetas.
 Claude v1.4.61: botón y marca Skytec con R1 y R2 programadas (sin esperar R3).
 Claude v1.4.60: tabla skytec_candados, estado «· Skytec» y botón en Tarjetas; versión del agente visible en Pruebas TQT y aviso solo sin agente actualizado.

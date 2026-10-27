@@ -955,3 +955,48 @@
     leerColores(); ajustarCampo(); pintarCampo(0);
     cargar();
 })();
+
+/* v1.4.63: easter egg. Cinco estrellas del fondo destellan suave, una tras otra; al tocarlas en ese orden (ratón o dedo)
+   aparece el crédito. Son botones pequeños en los márgenes (no tapan módulos); un toque fuera de orden reinicia la cuenta. */
+(function () {
+    'use strict';
+    var POS = [[3.5, 30], [96.5, 22], [95.5, 60], [4.5, 74], [50, 97]];   // % de ancho / alto, en orden de destello
+    var capa = document.createElement('div'), paso = 0, reinicio = 0;
+    capa.className = 'egg-capa'; capa.setAttribute('aria-hidden', 'true');
+    POS.forEach(function (p, i) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.tabIndex = -1; b.className = 'egg-est';
+        b.style.left = p[0] + '%'; b.style.top = p[1] + '%'; b.style.setProperty('--n', i);
+        b.addEventListener('click', function (e) {
+            e.stopPropagation();
+            clearTimeout(reinicio);
+            if (i !== paso) { paso = i === 0 ? 1 : 0; marcar(); return; }
+            paso++; marcar();
+            if (paso === POS.length) { paso = 0; marcar(); credito(); return; }
+            reinicio = setTimeout(function () { paso = 0; marcar(); }, 8000);   // si se deja a medias, vuelve a empezar
+        });
+        capa.appendChild(b);
+    });
+    function marcar() {
+        Array.prototype.forEach.call(capa.children, function (b, j) { b.classList.toggle('egg-ok', j < paso); });
+    }
+    function credito() {
+        var prev = document.getElementById('eggCred');
+        if (prev) prev.remove();
+        var d = document.createElement('div');
+        d.id = 'eggCred'; d.className = 'egg-fondo';
+        d.innerHTML = '<div class="egg-pop" role="dialog" aria-modal="true" aria-labelledby="eggT">' +
+            '<span class="egg-brillo" aria-hidden="true">✦</span>' +
+            '<p id="eggT" class="egg-t">Creado y desarrollado por<br><b>Jair Molina Arce</b></p>' +
+            '<a class="egg-link" href="https://jairmolina.dev" target="_blank" rel="noopener">jairmolina.dev</a>' +
+            '<button type="button" class="egg-x">Cerrar</button></div>';
+        function cerrar() { d.remove(); document.removeEventListener('keydown', esc); }
+        function esc(e) { if (e.key === 'Escape') cerrar(); }
+        d.addEventListener('click', function (e) { if (e.target === d) cerrar(); });
+        d.querySelector('.egg-x').addEventListener('click', cerrar);
+        document.addEventListener('keydown', esc);
+        document.body.appendChild(d);
+        d.querySelector('.egg-link').focus();
+    }
+    document.body.appendChild(capa);
+})();

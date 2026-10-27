@@ -677,3 +677,27 @@ a.luna:focus-visible .luna-nom { box-shadow: 0 0 0 2px color-mix(in srgb, var(--
   .luna::after { content: none; }
   .luna-nom { position: static; transform: none; opacity: 1; translate: none; pointer-events: auto; }   /* sin cursor en móvil: siempre visible */
 }
+
+/* v1.4.63: easter egg — 5 estrellas que destellan en orden (ciclo de 10 s, suave) y crédito al tocarlas en ese orden */
+.egg-capa { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+.egg-est { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; padding: 0; border: 0; background: none; cursor: default;
+           pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.egg-est::before { content: ""; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%;
+                   background: var(--text); opacity: .55; box-shadow: 0 0 3px color-mix(in srgb, var(--text) 60%, transparent);
+                   animation: egg-destello 10s ease-in-out infinite; animation-delay: calc(var(--n) * 1.4s + 2s); }
+.egg-est.egg-ok::before { background: var(--accent); opacity: .9; box-shadow: 0 0 6px var(--accent); animation: none; }
+@keyframes egg-destello { 0%, 9%, 100% { transform: scale(1); opacity: .55; } 4% { transform: scale(2.1); opacity: 1; box-shadow: 0 0 8px var(--text); } }
+@media (prefers-reduced-motion: reduce) { @keyframes egg-destello { 0%, 9%, 100% { opacity: .55; } 4% { opacity: 1; } } }
+.egg-fondo { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px;
+             background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(3px); animation: egg-in .25s ease-out; }
+.egg-pop { position: relative; width: min(340px, 100%); padding: 28px 24px 20px; border-radius: 16px; text-align: center;
+           background: var(--bg-2, var(--bg)); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line, transparent));
+           box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent), 0 18px 50px rgba(0,0,0,.45); color: var(--text); }
+.egg-brillo { display: block; font-size: 28px; line-height: 1; color: var(--accent); margin-bottom: 10px; }
+.egg-t { margin: 0 0 14px; font-size: 15px; line-height: 1.5; color: var(--muted, var(--text)); }
+.egg-t b { display: block; font-size: 22px; color: var(--text); letter-spacing: .01em; }
+.egg-link { display: inline-block; font-weight: 700; color: var(--accent-text, var(--accent)); text-underline-offset: 3px; }
+.egg-x { display: block; margin: 18px auto 0; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--line-2, var(--line)); background: none;
+         color: var(--text); font: inherit; cursor: pointer; }
+.egg-x:focus-visible, .egg-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@keyframes egg-in { from { opacity: 0; } }
