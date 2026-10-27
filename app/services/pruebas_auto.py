@@ -45,10 +45,73 @@ def init():
           run TEXT NOT NULL UNIQUE REFERENCES tqt_test_runs(id), PRIMARY KEY(campana, n));
         """
         )
+        # v1.4.52: ocupación del banco por usuario (sesiones separadas)
+        cols = {r[1] for r in c.execute("PRAGMA table_info(tqt_resistencia_banco)")}
+        for col, ddl in (("ocupado_por", "TEXT"), ("ocupado_desde", "REAL"), ("ocupado_visto", "REAL")):
+            if col not in cols:
+                c.execute(f"ALTER TABLE tqt_resistencia_banco ADD COLUMN {col} {ddl}")
 
 
 BANCO = "raspberry"   # el submódulo trabaja con UN solo banco: la Raspberry de la DYMO
 LOG_MAX = 300 * 1024
+LIBERAR_S = 120       # v1.4.52: sin campaña, el banco se libera solo si su usuario deja la página 2 min
+
+
+class Ocupado(ValueError):
+    """v1.4.52: la Raspberry la está usando otra cuenta. `info` va a la web para la pantalla de «Raspberry ocupada»."""
+    def __init__(self, info):
+        super().__init__(f"La Raspberry está ocupada por {info['por']}.")
+        self.info = info
+
+
+def _ocupacion(c, now=None):
+    """Quién usa el banco: el dueño de una campaña activa/pausada manda; si no hay, quien tomó el banco y sigue en la
+    página (latido de la web en los últimos LIBERAR_S s). None = libre."""
+    now = now or time.time()
+    camp = c.execute("SELECT * FROM tqt_resistencia WHERE estado IN ('activa','pausada') ORDER BY creado DESC LIMIT 1").fetchone()
+    b = c.execute("SELECT ocupado_por,ocupado_desde,ocupado_visto FROM tqt_resistencia_banco WHERE clave=?", (BANCO,)).fetchone()
+    if camp:
+        k = _conteo(c, camp["id"])
+        return {"por": camp["operador"], "desde": camp["creado"], "motivo": "campana",
+                "campana": {"id": camp["id"], "nombre": camp["nombre"], "firmware": camp["firmware"], "estado": camp["estado"],
+                            "hechos": k["hechos"], "ciclos": camp["ciclos"], "en_curso": k["en_curso"]}}
+    if b and b["ocupado_por"] and now - (b["ocupado_visto"] or 0) < LIBERAR_S:
+        return {"por": b["ocupado_por"], "desde": b["ocupado_desde"], "motivo": "sesion", "campana": None}
+    return None
+
+
+def tomar(c, email, admin=False):
+    """Reserva el banco para `email` (o renueva su reserva). Si lo usa otra cuenta lanza Ocupado (ni el admin lo toma:
+    primero debe liberarlo con «Detener y liberar»)."""
+    now = time.time()
+    occ = _ocupacion(c, now)
+    if occ and occ["por"] != email:
+        raise Ocupado(occ)
+    c.execute("UPDATE tqt_resistencia_banco SET ocupado_por=?,ocupado_desde=CASE WHEN ocupado_por=? THEN ocupado_desde ELSE ? END,"
+              "ocupado_visto=? WHERE clave=?", (email, email, now, now, BANCO))
+
+
+def _ver(c, email, admin):
+    """Lectura de datos del banco (log del agente): solo quien lo usa, o cualquiera si está libre; el admin siempre."""
+    occ = _ocupacion(c)
+    if occ and occ["por"] != email and not admin:
+        raise Ocupado(occ)
+
+
+def liberar(email, admin=False):
+    """Suelta el banco. Su dueño solo sin campaña activa/pausada; el administrador puede forzarlo: detiene la campaña."""
+    init()
+    with db.transaction() as c:
+        occ = _ocupacion(c)
+        if occ and occ["por"] != email and not admin:
+            raise Ocupado(occ)
+        if occ and occ["campana"]:
+            if not admin and occ["por"] == email:
+                raise ValueError("Detén tu campaña antes de liberar la Raspberry.")
+            c.execute("UPDATE tqt_resistencia SET estado='detenida',motivo=?,actualizado=? WHERE id=?",
+                      (f"Detenida por {email} (administrador) para liberar la Raspberry.", time.time(), occ["campana"]["id"]))
+        c.execute("UPDATE tqt_resistencia_banco SET ocupado_por=NULL,ocupado_desde=NULL,ocupado_visto=NULL WHERE clave=?", (BANCO,))
+    return {"ok": True}
 
 
 def banco_station(c):
@@ -57,43 +120,55 @@ def banco_station(c):
     return r["station"] if r else None
 
 
-def registrar_banco(operador):
+def registrar_banco(operador, admin=False):
     """Crea la credencial del agente de la Raspberry y la fija como EL banco. La anterior queda registrada (sin uso aquí);
     se puede eliminar en Programación STM32 → agentes."""
     init()
-    st = stm.station_create("Raspberry · Pruebas automáticas", operador)
-    with db.transaction() as c:
+    with db.get_db() as c:
+        if c.execute("SELECT 1 FROM tqt_resistencia_banco WHERE clave=?", (BANCO,)).fetchone():
+            occ = _ocupacion(c)
+            if occ and occ["por"] != operador:
+                raise Ocupado(occ)
         if c.execute("SELECT 1 FROM tqt_resistencia WHERE estado IN ('activa','pausada')").fetchone():
             raise ValueError("Hay una campaña activa o pausada: deténla antes de reinstalar el agente.")
+    st = stm.station_create("Raspberry · Pruebas automáticas", operador)
+    with db.transaction() as c:
         c.execute("INSERT INTO tqt_resistencia_banco(clave,station,creado,operador) VALUES(?,?,?,?) "
                   "ON CONFLICT(clave) DO UPDATE SET station=excluded.station,creado=excluded.creado,operador=excluded.operador,"
                   "log_pedido=NULL,log_texto=NULL,log_ts=NULL", (BANCO, st["id"], time.time(), operador))
     return st
 
 
-def banco():
-    """Estado del banco para la página: registro, presencia (puertos, versión del agente, plataforma) y log del agente."""
+def banco(email=None):
+    """Estado del banco para la página: registro, presencia (puertos, versión del agente, plataforma), log del agente y
+    ocupación (v1.4.52). La consulta de su dueño es el latido que mantiene la reserva."""
     init()
-    with db.get_db() as c:
+    with db.transaction() as c:
+        occ = _ocupacion(c)
+        if email and occ and occ["por"] == email:
+            c.execute("UPDATE tqt_resistencia_banco SET ocupado_visto=? WHERE clave=? AND ocupado_por=?", (time.time(), BANCO, email))
         b = c.execute("SELECT b.*,s.name,s.revoked_at FROM tqt_resistencia_banco b JOIN stm32_stations s ON s.id=b.station "
                       "WHERE b.clave=?", (BANCO,)).fetchone()
         if not b or b["revoked_at"]:
-            return {"registrado": False}
+            return {"registrado": False, "ocupacion": occ}
         p = c.execute("SELECT seen,state FROM tqt_test_presence WHERE station=?", (b["station"],)).fetchone()
     estado = json.loads(p["state"]) if p else {}
     estado.pop("fields", None)
     return {"registrado": True, "station": b["station"], "nombre": b["name"], "creado": b["creado"],
             "visto": p["seen"] if p else None, "en_linea": bool(p and time.time() - p["seen"] < 15), "estado": estado,
-            "log_pedido": b["log_pedido"], "log_ts": b["log_ts"], "log_bytes": len(b["log_texto"] or "")}
+            "log_pedido": b["log_pedido"], "log_ts": b["log_ts"], "log_bytes": len(b["log_texto"] or ""),
+            "ocupacion": dict(occ, mio=occ["por"] == email) if occ else None}
 
 
-def pedir_log():
+def pedir_log(email=None, admin=False):
     init()
     with db.transaction() as c:
         if not banco_station(c):
             raise ValueError("Primero instala el agente de la Raspberry.")
+        if email:
+            _ver(c, email, admin)
         c.execute("UPDATE tqt_resistencia_banco SET log_pedido=? WHERE clave=?", (time.time(), BANCO))
-    return banco()
+    return banco(email)
 
 
 def pide_log(sid):
@@ -115,16 +190,18 @@ def guardar_log(sid, texto):
     return {"ok": True}
 
 
-def log_agente():
+def log_agente(email=None, admin=False):
     init()
     with db.get_db() as c:
+        if email:
+            _ver(c, email, admin)
         r = c.execute("SELECT log_texto,log_ts FROM tqt_resistencia_banco WHERE clave=?", (BANCO,)).fetchone()
     return (r["log_texto"] or "", r["log_ts"]) if r else ("", None)
 
 
-def log_campana(cid, texto_ciclo):
+def log_campana(cid, texto_ciclo, email=None, admin=False):
     """LOG de todos los ciclos de una campaña en un solo .txt, con encabezado por ciclo."""
-    d = leer(cid)
+    d = leer(cid, email, admin)
     motivo = " · " + d["motivo"] if d["motivo"] else ""
     partes = [f"Campaña: {d['nombre']}\nFirmware: {d['firmware']}\nTarjeta: {(d['tarjeta'] or {}).get('id_tarjeta_num', '?')}\n"
               f"Estado: {d['estado']}{motivo}\n"]
@@ -135,7 +212,7 @@ def log_campana(cid, texto_ciclo):
     return d, "".join(partes)
 
 
-def crear(nombre, firmware, tid, ciclos, pausa_s, detener_en_falla, operador, confirmado):
+def crear(nombre, firmware, tid, ciclos, pausa_s, detener_en_falla, operador, confirmado, admin=False):
     init()
     if confirmado is not True:
         raise ValueError("Confirma la tarjeta física y el banco libre: cada ciclo restablece ajustes y mueve el perno.")
@@ -150,6 +227,7 @@ def crear(nombre, firmware, tid, ciclos, pausa_s, detener_en_falla, operador, co
         sid = banco_station(c)
         if not sid:
             raise ValueError("Primero instala el agente de la Raspberry (paso 1).")
+        tomar(c, operador, admin)
         ts.snapshot(tid, c)   # misma validación que Pruebas TQT: tarjeta emparejada y MAC únicas
         if c.execute("SELECT 1 FROM tqt_resistencia WHERE (station=? OR tarjeta_id=?) AND estado IN ('activa','pausada')",
                      (sid, tid)).fetchone():
@@ -189,17 +267,22 @@ def _fila(c, r):
     return d
 
 
-def lista():
+def lista(email=None):
+    """v1.4.52: cada cuenta ve solo sus campañas (sesiones separadas). Sin email (uso interno): todas."""
     init()
     with db.get_db() as c:
-        return [_fila(c, r) for r in c.execute("SELECT * FROM tqt_resistencia ORDER BY creado DESC LIMIT 200")]
+        if email:
+            filas = c.execute("SELECT * FROM tqt_resistencia WHERE operador=? ORDER BY creado DESC LIMIT 200", (email,))
+        else:
+            filas = c.execute("SELECT * FROM tqt_resistencia ORDER BY creado DESC LIMIT 200")
+        return [_fila(c, r) for r in filas]
 
 
-def leer(cid):
+def leer(cid, email=None, admin=False):
     init()
     with db.get_db() as c:
         r = c.execute("SELECT * FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
-        if not r:
+        if not r or (email and r["operador"] != email and not admin):
             raise ValueError("Campaña no encontrada.")
         d = _fila(c, r)
         d["ciclos_detalle"] = [dict(x) for x in c.execute(
@@ -208,7 +291,7 @@ def leer(cid):
     return d
 
 
-def cambiar(cid, accion, operador):
+def cambiar(cid, accion, operador, admin=False):
     """pausar | reanudar | detener. Pausar/detener no cortan el ciclo en curso: termina y no se encola otro."""
     init()
     destino = {"pausar": ("activa", "pausada"), "reanudar": ("pausada", "activa"), "detener": (None, "detenida")}
@@ -216,15 +299,15 @@ def cambiar(cid, accion, operador):
         raise ValueError("Acción no válida.")
     desde, hacia = destino[accion]
     with db.transaction() as c:
-        r = c.execute("SELECT estado FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
-        if not r:
+        r = c.execute("SELECT estado,operador FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
+        if not r or (r["operador"] != operador and not admin):
             raise ValueError("Campaña no encontrada.")
         if r["estado"] not in ACTIVAS or (desde and r["estado"] != desde):
             raise ValueError("La campaña no está en un estado que permita esa acción.")
         motivo = f"Detenida por {operador}." if accion == "detener" else None
         c.execute("UPDATE tqt_resistencia SET estado=?,motivo=COALESCE(?,motivo),actualizado=? WHERE id=?",
                   (hacia, motivo, time.time(), cid))
-    return leer(cid)
+    return leer(cid, operador, admin)
 
 
 def _cerrar(c, cid, estado, motivo, now):
@@ -299,3 +382,12 @@ def buscar_tarjetas(q):
             "WHERE p.mac IS NOT NULL AND p.mac<>'' AND q.mac IS NOT NULL AND q.mac<>'' "
             "AND (CAST(t.id_tarjeta_num AS TEXT) LIKE ? OR p.nombre LIKE ? OR q.nombre LIKE ?) "
             "ORDER BY t.id DESC LIMIT 20", (like, like, like))]
+
+
+def ciclo_permitido(jid, email, admin=False):
+    """El LOG de un ciclo solo lo baja quien lanzó su campaña (o un administrador)."""
+    with db.get_db() as c:
+        r = c.execute("SELECT r.operador FROM tqt_resistencia_ciclos x JOIN tqt_resistencia r ON r.id=x.campana WHERE x.run=?",
+                      (jid,)).fetchone()
+    if not r or (r["operador"] != email and not admin):
+        raise ValueError("Ciclo no encontrado.")

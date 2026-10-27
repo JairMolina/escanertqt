@@ -93,3 +93,18 @@
 }
 @media (max-width: 1000px) and (min-width: 761px) { .pa-dl { grid-template-columns: max-content minmax(0, 1fr); } }
 @media (max-width: 420px) { .pa-dl { grid-template-columns: max-content minmax(0, 1fr); } }
+
+/* v1.4.52: sesiones separadas — «en uso por ti» y pantalla completa de Raspberry ocupada */
+.pa-uso { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 2px 4px 2px 10px; border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); border-radius: 999px; white-space: nowrap; }
+.pa-uso[hidden] { display: none; }
+.pa-ocupada { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px;
+              background: color-mix(in srgb, var(--bg) 96%, transparent); }
+.pa-ocupada[hidden] { display: none; }
+.pa-ocupada-caja { width: min(520px, 100%); padding: 28px 24px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--line));
+                   background: var(--surface); box-shadow: 0 24px 60px rgba(0,0,0,.35); text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.pa-ocupada-ico { width: 44px; height: 44px; color: var(--warn); }
+.pa-ocupada h2 { margin: 0; font-size: 22px; }
+.pa-ocupada p { margin: 0; line-height: 1.5; }
+.pa-ocupada-que { font-family: var(--font-mono); font-size: 13px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); overflow-wrap: anywhere; }
+.pa-ocupada .pa-acc { justify-content: center; margin-top: 6px; }
+@media (max-width: 760px) { .pa-uso #enUsoTxt { display: none; } }

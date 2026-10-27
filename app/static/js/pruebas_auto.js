@@ -10,6 +10,63 @@
     var LUNA = 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z';
     var tarjeta = null, abierta = null, banco = null, esperaLog = 0, puertoElegido = '';
 
+    /* v1.4.52: sesiones separadas. La Raspberry es de una sola cuenta a la vez: si la usa otra, la API responde 409 con
+       quién la tiene y la página se tapa con «Raspberry ocupada» hasta que se libere (entonces se toma sola). */
+    var ocupadaVisible = false, tomando = false;
+    function api(url, opts) {
+        return T.api(url, opts).then(function (r) {
+            var d = r.data && r.data.detail;
+            if (r.status === 409 && d && d.ocupacion) { r.error = d.mensaje; mostrarOcupada(d.ocupacion, banco && banco.admin); }
+            return r;
+        });
+    }
+    function mostrarOcupada(o, admin) {
+        var c = o.campana;
+        $('ocQuien').textContent = o.por;
+        $('ocDesde').textContent = fecha(o.desde);
+        $('ocQue').textContent = c ? 'Campaña «' + c.nombre + '» (' + c.firmware + ') · ' + c.hechos + ' de ' + c.ciclos + ' ciclos' +
+            (c.en_curso ? ' · ciclo en curso' : '') + (c.estado === 'pausada' ? ' · pausada' : '')
+            : 'Sesión abierta en Pruebas automáticas (sin campaña en curso).';
+        $('ocForzar').hidden = !admin;
+        if (!ocupadaVisible) {
+            ocupadaVisible = true; $('ocupada').hidden = false;
+            document.querySelector('.app.pa').setAttribute('inert', '');
+            $('ocVolver').focus();
+        }
+    }
+    function ocultarOcupada() {
+        if (!ocupadaVisible) return;
+        ocupadaVisible = false; $('ocupada').hidden = true;
+        document.querySelector('.app.pa').removeAttribute('inert');
+        T.toast('La Raspberry quedó libre y ahora es tuya.');
+    }
+    function tomar() {
+        if (tomando) return; tomando = true;
+        api('/api/pruebas-auto/banco/tomar', { method: 'POST' }).then(function () { tomando = false; });
+    }
+    function pintarOcupacion(b) {
+        var o = b.ocupacion;
+        if (o && !o.mio) { mostrarOcupada(o, b.admin); $('enUso').hidden = true; return; }
+        ocultarOcupada();
+        if (!o) tomar();   // libre: se reserva para esta cuenta
+        $('enUso').hidden = !o;
+        $('enUsoTxt').textContent = 'Raspberry en uso por ti' + (o && o.campana ? ' · campaña en curso' : '');
+        $('liberar').disabled = !!(o && o.campana);
+        $('liberar').title = o && o.campana ? 'Detén tu campaña para liberar la Raspberry' : 'Deja la Raspberry libre para otra cuenta';
+    }
+    $('liberar').addEventListener('click', function () {
+        api('/api/pruebas-auto/banco/liberar', { method: 'POST' }).then(function (r) {
+            if (!r.ok) { T.toast(r.error, { kind: 'bad' }); return; }
+            location.href = '/inicio';
+        });
+    });
+    $('ocForzar').addEventListener('click', function () {
+        if (!confirm('¿Detener la campaña de ' + $('ocQuien').textContent + ' y liberar la Raspberry? El ciclo en curso termina y no se encola otro.')) return;
+        api('/api/pruebas-auto/banco/liberar', { method: 'POST' }).then(function (r) {
+            if (!r.ok) T.toast(r.error, { kind: 'bad' }); refrescar();
+        });
+    });
+
     function fecha(s) { return s ? new Date(s * 1000).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'medium' }) : '—'; }
     function hace(s) { if (!s) return 'nunca'; var d = Math.max(0, Date.now() / 1000 - s); return d < 60 ? 'hace ' + Math.round(d) + ' s' : d < 3600 ? 'hace ' + Math.round(d / 60) + ' min' : fecha(s); }
 
@@ -69,8 +126,9 @@
     }
 
     function cargarBanco() {
-        return T.api('/api/pruebas-auto/banco').then(function (r) {
+        return api('/api/pruebas-auto/banco').then(function (r) {
             if (!r.ok) { $('p1Estado').textContent = r.error; return {}; }
+            pintarOcupacion(r.data);
             var l = pintarBanco(r.data);
             if (esperaLog && r.data.log_ts && r.data.log_ts * 1000 >= esperaLog) { esperaLog = 0; verLog(); }
             return l;
@@ -80,7 +138,7 @@
     $('pPuerto').addEventListener('change', function () { puertoElegido = this.value; });
     function puerto(accion) {
         $('pMsg').textContent = accion === 'conectar' ? 'Conectando…' : 'Desconectando…';
-        T.api('/api/pruebas-auto/puerto', { method: 'POST', body: { accion: accion, puerto: accion === 'conectar' ? $('pPuerto').value : '' } }).then(function (r) {
+        api('/api/pruebas-auto/puerto', { method: 'POST', body: { accion: accion, puerto: accion === 'conectar' ? $('pPuerto').value : '' } }).then(function (r) {
             if (!r.ok) { $('pMsg').textContent = r.error; return; }
             var n = 0, id = r.data.id;
             (function sondeo() {
@@ -114,7 +172,7 @@
     var buscar = T.debounce(function () {
         var q = $('cBusca').value.trim();
         if (!q) { $('cTarjetas').innerHTML = ''; return; }
-        T.api('/api/pruebas-auto/tarjetas?q=' + encodeURIComponent(q)).then(function (r) {
+        api('/api/pruebas-auto/tarjetas?q=' + encodeURIComponent(q)).then(function (r) {
             var l = r.ok ? r.data : [];
             $('cTarjetas').innerHTML = l.length ? l.map(function (t) {
                 return '<button type="button" role="option" class="pa-op" data-id="' + t.id + '" aria-selected="' + (tarjeta && tarjeta.id === t.id) + '">' +
@@ -134,7 +192,7 @@
         var msg = $('nMsg');
         if (!tarjeta) { msg.textContent = 'Elige una tarjeta de la lista.'; $('cBusca').focus(); return; }
         msg.textContent = 'Creando…';
-        T.api('/api/pruebas-auto/campanas', { method: 'POST', body: {
+        api('/api/pruebas-auto/campanas', { method: 'POST', body: {
             nombre: $('cNombre').value, firmware: $('cFw').value, tarjeta_id: tarjeta.id,
             ciclos: +$('cCiclos').value, pausa_s: +$('cPausa').value, detener_en_falla: $('cDetener').checked, physical_confirmed: $('cConf').checked,
         } }).then(function (r) {
@@ -151,7 +209,7 @@
             '<i data-k="warn" style="width:' + (100 * k.no_verificados / tot) + '%"></i><i data-k="run" style="width:' + (100 * k.en_curso / tot) + '%"></i></div>';
     }
     function campanas() {
-        return T.api('/api/pruebas-auto/campanas').then(function (r) {
+        return api('/api/pruebas-auto/campanas').then(function (r) {
             var l = r.ok && Array.isArray(r.data) ? r.data : [];
             $('campanas').innerHTML = l.length ? l.map(function (c) {
                 var k = c.conteo, act = c.estado === 'activa' || c.estado === 'pausada';
@@ -175,7 +233,7 @@
     }
     function detalle(id) {
         var box = $('d' + id); if (!box) return;
-        T.api('/api/pruebas-auto/campanas/' + id).then(function (r) {
+        api('/api/pruebas-auto/campanas/' + id).then(function (r) {
             if (!r.ok) { box.textContent = r.error; return; }
             box.innerHTML = r.data.ciclos_detalle.length ? '<table class="pa-tabla"><thead><tr><th>Ciclo</th><th>Resultado</th><th>Inicio</th><th>Fin</th><th>LOG</th></tr></thead><tbody>' +
                 r.data.ciclos_detalle.map(function (x) {
@@ -196,14 +254,14 @@
         }
         if (!b.dataset.a) return;
         b.disabled = true;
-        T.api('/api/pruebas-auto/campanas/' + b.dataset.id + '/accion', { method: 'POST', body: { accion: b.dataset.a } }).then(function (r) {
+        api('/api/pruebas-auto/campanas/' + b.dataset.id + '/accion', { method: 'POST', body: { accion: b.dataset.a } }).then(function (r) {
             if (!r.ok) T.toast(r.error, { kind: 'bad' });
             refrescar();
         });
     });
 
     function verLog() {
-        T.api('/api/pruebas-auto/agente/log').then(function (r) {
+        api('/api/pruebas-auto/agente/log').then(function (r) {
             if (!r.ok) { $('lMeta').textContent = r.error; return; }
             var pre = $('lTexto'), abajo = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 8;
             pre.textContent = r.data.texto ? r.data.texto.split('\n').slice(-400).join('\n') : 'Sin log todavía. Pulsa «Traer log».';
@@ -212,7 +270,7 @@
         });
     }
     $('lPedir').addEventListener('click', function () {
-        T.api('/api/pruebas-auto/agente/log', { method: 'POST' }).then(function (r) {
+        api('/api/pruebas-auto/agente/log', { method: 'POST' }).then(function (r) {
             if (!r.ok) { T.toast(r.error, { kind: 'bad' }); return; }
             esperaLog = Date.now() - 1000;
             $('lMeta').textContent = r.data.en_linea ? 'Pidiendo el log a la Raspberry…' : 'La Raspberry está sin señal: el log llegará cuando vuelva.';

@@ -23,6 +23,7 @@ class PruebasAuto(unittest.TestCase):
     def tearDown(self):
         with db.get_db() as c:   # BD de pruebas compartida: no dejar campañas activas que bloqueen reinstalar el banco
             c.execute("UPDATE tqt_resistencia SET estado='detenida' WHERE estado IN ('activa','pausada')")
+            c.execute("UPDATE tqt_resistencia_banco SET ocupado_por=NULL,ocupado_desde=NULL,ocupado_visto=NULL")
 
     def report(self, ok=True):
         return dict(
@@ -121,6 +122,54 @@ class PruebasAuto(unittest.TestCase):
         _, texto = pa.log_campana(c["id"], lambda jid: "LOG " + jid + "\n")
         self.assertIn("===== Ciclo 1 · aprobado", texto)
         self.assertIn("Firmware: FW 4.4 beta", texto)
+
+    # ---- v1.4.52: sesiones separadas y Raspberry ocupada ----
+    def tomar(self, email, admin=False):
+        with db.transaction() as c:
+            pa.tomar(c, email, admin)
+
+    def test_otra_cuenta_ve_la_raspberry_ocupada(self):
+        c = self.campana(ciclos=3)
+        with self.assertRaises(pa.Ocupado) as e:
+            self.tomar("otra@test.mx")
+        self.assertEqual(e.exception.info["por"], "operador@test.mx")
+        self.assertEqual(e.exception.info["campana"]["id"], c["id"])
+        b = pa.banco("otra@test.mx")["ocupacion"]
+        self.assertFalse(b["mio"])
+        self.assertTrue(pa.banco("operador@test.mx")["ocupacion"]["mio"])
+        with self.assertRaises(pa.Ocupado):   # tampoco crea campañas ni lee el log del agente
+            pa.crear("x", "fw", self.t["id"], 1, 0, True, "otra@test.mx", True)
+        with self.assertRaises(pa.Ocupado):
+            pa.log_agente("otra@test.mx")
+
+    def test_cada_cuenta_ve_solo_sus_campanas(self):
+        c = self.campana(ciclos=1)
+        self.assertEqual([x["id"] for x in pa.lista("operador@test.mx")][:1], [c["id"]])
+        self.assertNotIn(c["id"], [x["id"] for x in pa.lista("otra@test.mx")])
+        with self.assertRaises(ValueError):
+            pa.leer(c["id"], "otra@test.mx")
+        with self.assertRaises(ValueError):
+            pa.cambiar(c["id"], "detener", "otra@test.mx")
+        self.assertEqual(pa.leer(c["id"], "jefe@test.mx", True)["id"], c["id"])   # el administrador sí
+
+    def test_sesion_sin_campana_se_libera_al_salir(self):
+        self.tomar("operador@test.mx")
+        with self.assertRaises(pa.Ocupado):
+            self.tomar("otra@test.mx")
+        with db.get_db() as c:   # dejó la página hace más de LIBERAR_S
+            c.execute("UPDATE tqt_resistencia_banco SET ocupado_visto=?", (0,))
+        self.tomar("otra@test.mx")
+        self.assertTrue(pa.banco("otra@test.mx")["ocupacion"]["mio"])
+
+    def test_liberar_dueno_y_admin(self):
+        c = self.campana(ciclos=3)
+        with self.assertRaises(ValueError):   # el dueño primero detiene su campaña
+            pa.liberar("operador@test.mx")
+        with self.assertRaises(pa.Ocupado):
+            pa.liberar("otra@test.mx")
+        pa.liberar("jefe@test.mx", True)   # el administrador fuerza: detiene la campaña y libera
+        self.assertEqual(pa.leer(c["id"])["estado"], "detenida")
+        self.assertIsNone(pa.banco("otra@test.mx")["ocupacion"])
 
 
 if __name__ == "__main__":

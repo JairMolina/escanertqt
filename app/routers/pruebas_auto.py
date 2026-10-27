@@ -7,10 +7,11 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from app.routers.stm32 import operator, run
+from app.database import db
 from app.routers.test_station import texto_log, zip_agente
 from app.services import pruebas_auto as svc
 from app.services import test_station as ts
+from app.services import usuarios
 
 router = APIRouter(prefix="/api/pruebas-auto", tags=["Pruebas automáticas"])
 
@@ -43,78 +44,118 @@ class Accion(BaseModel):
     accion: Literal["pausar", "reanudar", "detener"]
 
 
+def quien(req):
+    """(email, es_admin) de la sesión. v1.4.52: cada cuenta tiene su sesión de pruebas."""
+    u = usuarios.validar_sesion(req.cookies.get(usuarios.COOKIE))
+    return u["email"], u.get("rol") == "administrador"
+
+
+def run(fn, *args):
+    """Como stm32.run, y además «Raspberry ocupada» → 409 con quién la usa (la web muestra la pantalla completa)."""
+    try:
+        return fn(*args)
+    except svc.Ocupado as e:
+        raise HTTPException(409, {"mensaje": str(e), "ocupacion": e.info})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+def _tomar(email, admin):
+    with db.transaction() as c:
+        svc.tomar(c, email, admin)
+
+
 @router.get("/banco")
-def banco():
-    return svc.banco()
+def banco(req: Request):
+    email, admin = quien(req)
+    return dict(svc.banco(email), yo=email, admin=admin)
+
+
+@router.post("/banco/tomar")
+def tomar(req: Request):
+    """Reserva la Raspberry para esta cuenta (al entrar a la página); 409 si la usa otra."""
+    svc.init()
+    email, admin = quien(req)
+    run(_tomar, email, admin)
+    return dict(svc.banco(email), yo=email, admin=admin)
+
+
+@router.post("/banco/liberar")
+def liberar(req: Request):
+    """Suelta la Raspberry. El administrador puede forzarlo (detiene la campaña de otra cuenta)."""
+    return run(svc.liberar, *quien(req))
 
 
 @router.post("/agente")
 def agente(body: Agente, req: Request):
     """ZIP del agente para la Raspberry; lo registra como EL banco del submódulo."""
-    st = run(svc.registrar_banco, operator(req))
+    st = run(svc.registrar_banco, *quien(req))
     return zip_agente(req, st, False, body.puerto_serie, "TQT_Pruebas_Raspberry.zip")
 
 
 @router.post("/puerto")
-def puerto(body: Puerto):
+def puerto(body: Puerto, req: Request):
     """Conecta o desconecta el puerto serie de la R1 en la Raspberry (comandos normales de Pruebas TQT)."""
     b = svc.banco()
     if not b["registrado"]:
         raise HTTPException(400, "Primero instala el agente de la Raspberry.")
     if body.accion == "conectar" and not body.puerto:
         raise HTTPException(400, "Elige un puerto.")
+    run(_tomar, *quien(req))   # el puerto solo lo maneja quien tiene la Raspberry
     accion = "connect_serial" if body.accion == "conectar" else "disconnect_serial"
     return run(ts.command, b["station"], accion, {"port": body.puerto})
 
 
 @router.post("/agente/log")
-def pedir_log():
-    return run(svc.pedir_log)
+def pedir_log(req: Request):
+    return run(svc.pedir_log, *quien(req))
 
 
 @router.get("/agente/log")
-def ver_log():
-    texto, t = svc.log_agente()
+def ver_log(req: Request):
+    texto, t = run(svc.log_agente, *quien(req))
     return {"texto": texto, "ts": t}
 
 
 @router.get("/agente/log.txt")
-def bajar_log():
-    texto, t = svc.log_agente()
+def bajar_log(req: Request):
+    texto, t = run(svc.log_agente, *quien(req))
     marca = time.strftime("%Y%m%d-%H%M", time.localtime(t)) if t else "vacio"
     return _txt(texto, f"raspberry_agent_{marca}.txt")
 
 
 @router.get("/campanas")
-def campanas():
-    return svc.lista()
+def campanas(req: Request):
+    return svc.lista(quien(req)[0])
 
 
 @router.post("/campanas")
 def crear(body: Campana, req: Request):
+    email, admin = quien(req)
     return run(svc.crear, body.nombre, body.firmware, body.tarjeta_id, body.ciclos, body.pausa_s,
-               body.detener_en_falla, operator(req), body.physical_confirmed)
+               body.detener_en_falla, email, body.physical_confirmed, admin)
 
 
 @router.get("/campanas/{cid}")
-def detalle(cid: str):
-    return run(svc.leer, cid)
+def detalle(cid: str, req: Request):
+    return run(svc.leer, cid, *quien(req))
 
 
 @router.get("/campanas/{cid}/log.txt")
-def log_campana(cid: str):
-    d, texto = run(svc.log_campana, cid, texto_log)
+def log_campana(cid: str, req: Request):
+    d, texto = run(svc.log_campana, cid, texto_log, *quien(req))
     return _txt(texto, f"campana_{cid[:8]}_{len(d['ciclos_detalle'])}ciclos.txt")
 
 
 @router.get("/ciclos/{jid}/log.txt")
-def log_ciclo(jid: str):
+def log_ciclo(jid: str, req: Request):
+    run(svc.ciclo_permitido, jid, *quien(req))
     return _txt(run(texto_log, jid), f"ciclo_{jid[:8]}.txt")
 
 
 @router.post("/campanas/{cid}/accion")
 def accion(cid: str, body: Accion, req: Request):
-    return run(svc.cambiar, cid, body.accion, operator(req))
+    return run(svc.cambiar, cid, body.accion, *quien(req))
 
 
 @router.get("/tarjetas")

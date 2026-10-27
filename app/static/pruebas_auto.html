@@ -19,6 +19,10 @@
             <h1>Pruebas automáticas</h1>
             <p class="pa-sub">Escáner TQT · banco de resistencia de firmware en la Raspberry (Linux)</p>
         </div>
+        <div class="pa-uso" id="enUso" hidden>
+            <span class="pa-dot" data-k="ok" aria-hidden="true"></span><span id="enUsoTxt">Raspberry en uso por ti</span>
+            <button class="btn btn-sm btn-ghost" id="liberar" type="button">Liberar</button>
+        </div>
         <span class="pa-ver" title="Versión de la web">v__VERSION__</span>
         <button class="btn btn-ghost btn-sm pa-tema" id="tema" type="button" aria-label="Cambiar a modo claro">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path id="temaIco" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d=""/></svg>
@@ -109,6 +113,19 @@
             </div>
         </section>
     </main>
+</div>
+<div class="pa-ocupada" id="ocupada" role="alertdialog" aria-modal="true" aria-labelledby="ocTit" aria-describedby="ocTxt" hidden>
+    <div class="pa-ocupada-caja">
+        <svg class="pa-ocupada-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5zM12 15v2"/></svg>
+        <h2 id="ocTit">Raspberry ocupada</h2>
+        <p id="ocTxt">Los puertos de la Raspberry los está usando <b id="ocQuien"></b> desde <span id="ocDesde"></span></p>
+        <p class="pa-ocupada-que" id="ocQue"></p>
+        <p class="hint">Esta pantalla se quita sola cuando la Raspberry quede libre. Cada cuenta ve solo sus propias campañas.</p>
+        <div class="pa-acc">
+            <a class="btn btn-primary" id="ocVolver" href="/inicio">Volver a módulos</a>
+            <button class="btn btn-danger" id="ocForzar" type="button" hidden>Detener y liberar (administrador)</button>
+        </div>
+    </div>
 </div>
 <script src="/static/js/common.js?v=__VERSION__"></script>
 <script src="/static/js/pruebas_auto.js?v=__VERSION__"></script>
