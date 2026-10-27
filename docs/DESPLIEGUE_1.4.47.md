@@ -16,6 +16,18 @@ No se crea un agente nuevo automáticamente. Para volver a programar, iniciar se
 
 ## Verificación y despliegue
 
-Verificación local aprobada: 122 pruebas Python en bases aisladas, 9 pruebas Node de Comandos y 15 grupos Playwright de borrado/agente fijo/estado STM32. Móvil390 sin desborde y sin erroresJS; ComposeQA y revisión de diff correctos. Pendiente respaldo SQLite nuevo, nueva comprobación de actividad, fast-forward de producción y recreación exclusiva del servicio `tqt`. No se modificará el túnel ni la infraestructura compartida. Se registrará aquí el resultado observado; todavía no se declara desplegada.
+Verificación local aprobada: 122 pruebas Python en bases aisladas, 9 pruebas Node de Comandos y 15 grupos Playwright de borrado/agente fijo/estado STM32. Móvil390 sin desborde y sin erroresJS; ComposeQA y revisión de diff correctos. El respaldo SQLite nuevo, la comprobación de actividad, el fast-forward y la recreación exclusiva de tqt se completaron como se registra abajo. No se modificó el túnel ni la infraestructura compartida.
 
 La actualización conserva FW4.4 beta pendiente de banco físico y aprobación humana. No realiza grabaciones, lecturas de sondas, resets de tarjetas ni movimientos del banco.
+
+## Resultado observado
+
+Desplegada 1.4.47, commit de código 23a7d8da8ae35030497b296a0488310dceec9b31, publicado por fast-forward en main y rama de tarea. OrangePi actualizado desde 04676c5 limpio. Solo se recreó tqt; cloudflared continuó activo. Se reutiliza la imagen vigente: no cambian dependencias y la aplicación se monta en lectura desde el checkout.
+
+Respaldo /backups/predeploy_1.4.47_20261027_092049.db; integrity_check=ok; SHA256 d51ad4340fb1e321341685fb46e7b4ce067e2167ec6ef37b0551403b7fa44b11. Cero trabajos activos al respaldar.
+
+Comprobado: contenedor running healthy, APP_VERSION1.4.47, SQLite quick_checkok, salud interna/pública ok:true y login público HTTP200 con versión1.4.47. Conteos idénticos antes/después:94 trabajosSTM32,50 pruebas,239 comandos,446PCB,100tarjetas,1883escaneos,20registros físicos revocados,0agentes vigentes y1banco lógico. No se borraron ni reescribieron historiales.
+
+Laptop comprobada:0procesos de agentes y0arranquesTQT; carpetasSTM32/TestStation vacías; respaldo privado existente; LocalWeb/R2 preservados. La limpieza solicitada está completa. Instalar un solo agente nuevo con la cuenta web cuando se necesite programar.
+
+CM para checkpoint y sincronización documental; Git nativo en checkout aislado para preservar cambios del checkout registrado. ECCbackend/seguridad/verificación y pruebas existentes para permisos, revocación y regresiones. Respaldos SQLite y credenciales quedan fuera de Git/memoria.

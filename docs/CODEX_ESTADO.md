@@ -1,13 +1,16 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-27 15:12 UTC
-Commit de referencia: `000a30bdc1c6` (puede no incluir cambios pendientes)
+Actualizado: 2026-10-27
+Commit de código de referencia: 23a7d8da8ae35030497b296a0488310dceec9b31.
 
 ## Avance reportado
-Web1.4.46 publicada en main y etiqueta v1.4.46, commit de codigo000a30b, desplegada y verificada el2026-10-27 en inventariotqt.site. Git y produccion ya estaban en1.4.45/1bb98bd, con Comandos y cambiosSTM32/agentes integrados. Se alinearon version servidor/README/CHANGELOG y prueba de version; se actualizaron memoria y pendientes reales. OrangePi orangepizero3: SSH porMiniPc aorangepi@192.168.4.70, repo/home/orangepi/escanertqt. Fast-forward y recreacion exclusiva tqt; cloudflared continuo activo.
+
+Web1.4.47 publicada en main y desplegada sobre main/producción1.4.46/04676c5. Nuestro cambio de agentes0ca9d86 ya estaba integrado, sin repetir ni sobrescribir funciones de main. Cuenta web como propietario de agente; operator identifica a quien inicia cada trabajo. Servidor con20registros físicos previamente revocados,0vigentes,1banco lógico. Limpieza local completada:4procesos detenidos,6arranques retirados,7carpetas en respaldo privado local;LocalWeb/R2 preservados. No se creó un agente nuevo ni se programó hardware. Ver docs/DESPLIEGUE_1.4.47.md.
 
 ## Siguiente paso
-Banco fisico del FW4.4 beta y decision humana posterior de aprobacion siguen pendientes. No programar hardware ni ejecutar limpieza destructiva de agentes/inventario por esta actualizacion. Proximas sesiones partir de origin/main y verificar version real, no notas antiguas que aun describen1.4.41 como no desplegada. Evidencia en docs/DESPLIEGUE_1.4.46.md.
+
+Recargar web y, cuando se vaya a programar, instalar solo un agente nuevo usando la cuenta web. Banco físico y aprobación humana de FW4.4 beta siguen pendientes. No repetir la limpieza de los20registros ya revocados. Para trabajos futuros partir de origin/main y comprobar servidor antes de modificarlo. Checkout activo: work/tqt-fw-beta-20261026,rama codex/cierre-agentes-20261027;checkout CM registrado conserva cambios documentales sin reset ni stash.
 
 ## Evidencia
-115Python+9Node+16Playwright PASS en QA aislada; Compose/buildOK. Backup /backups/predeploy_1.4.46_20261027_151013.db integrity_checkok SHA256403b25b8b44903eb383f80dd3acdefd05f8def41ff22c9dff0d18a7c02766f9e.0trabajos activos al respaldar. Produccion running healthy, APP_VERSION1.4.46, SQLite quick_checkok, salud interna ok:true, loginpublicoHTTP200/version1.4.46. Sin cambiosCloudflare/red ni firmware fisico. CM continuidad/Git/memoria y ECC verificacion utilizados.
+
+122Python aisladas+9Node+15gruposPlaywrightPASS,0JSerrors,móvil390sin desborde,ComposeQA/diffcorrectos. Backup /backups/predeploy_1.4.47_20261027_092049.db,integrity_checkok,SHA256d51ad4340fb1e321341685fb46e7b4ce067e2167ec6ef37b0551403b7fa44b11. Producción tqt runninghealthy,APP_VERSION1.4.47,quick_checkok,health interno/público ok:true,loginHTTP200/1.4.47. Antes/después coinciden94trabajosSTM32,50pruebas,239comandos,446PCB,100tarjetas,1883escaneos,20agentesrevocados,0vigentes,1bancoweb. Cloudflared sin reiniciar. CMcheckpoint/memoria y ECCbackend/seguridad/verificación;sin secretos o bases en Git/CM.

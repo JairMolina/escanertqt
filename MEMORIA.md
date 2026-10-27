@@ -2,15 +2,18 @@
 
 ## Estado vigente — 2026-10-27
 
-Web1.4.46 publicada en main y etiqueta v1.4.46, commit de código000a30b,
-desplegada y verificada en https://inventariotqt.site. Comandos y las mejoras
-de STM32/agentes ya estaban integrados en main1.4.45; esta actualización
-alinea versión y documentación. OrangePi se alcanza por MiniPc a
-192.168.4.70, usuarioorangepi, repo/home/orangepi/escanertqt; solo servicio tqt
-de servidor/compose.yml recreado. Respaldo íntegro y evidencia en
-docs/DESPLIEGUE_1.4.46.md.115Python+9Node+16PlaywrightPASS, salud interna y
-login público correctos. FW4.4 beta mantiene pendiente su banco físico;
-no se aprobó firmware ni se programó hardware en esta actualización.
+Web1.4.47 publicada en main, commit de código23a7d8d, desplegada y verificada
+sobre main/producción1.4.46/04676c5. Agentes por cuenta web ya integrados;
+verificados20registros físicos previamente revocados y0vigentes. Completada
+limpieza local:4procesos detenidos,6arranques retirados y7carpetas conservadas
+en respaldo privado, fuera deGit/CM. Nuevo agente toma el usuario de la web;
+operator identifica al actor de cada trabajo, separado del propietario.
+Instalar un único agente cuando se necesite programar; no se crea solo.
+OrangePi porMiniPc aorangepi@192.168.4.70,repo/home/orangepi/escanertqt;
+solo tqt recreado.122Python+9Node+15gruposPlaywrightPASS;health/login1.4.47,
+DBquick_checkok e inventario/historial idénticos antes/después.
+Respaldo y evidencia:docs/DESPLIEGUE_1.4.47.md. FW4.4 beta sigue pendiente
+de banco físico y aprobación humana; no se programó hardware.
 
 Aplicación Inventario TQT (JairMolina/escanertqt): FastAPI, SQLite, WebSockets y HTML/JS. Mantener separada de TQT-OrangePi, que contiene infraestructura del servidor.
 

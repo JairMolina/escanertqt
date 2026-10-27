@@ -24,3 +24,7 @@ Preparado sobre producción 1.4.43 / `38e1746d0627b82fe98d9bd7875e947c4eaecafa`,
 Inventario de mantenimiento: 19 agentes físicos registrados; 0 trabajos activos al inspeccionar. Laptop: cinco instalaciones STM32 y una instalación TestStation, seis accesos de inicio automático; cuatro procesos STM32 activos observados. También existe el entorno auxiliar `.tqt/BLE-Preview142`. Estos conteos son diagnóstico, no afirman borrado ejecutado.
 
 Pendiente: autorización expresa de despliegue según AGENTS.md, respaldo SQLite previo y nueva comprobación de trabajos activos. Después aplicar la retirada de todos los agentes físicos mediante `revoke_stations` y verificar que no cambió ningún historial. Detener solo procesos locales con rutas exactas de esos agentes y mover sus carpetas/accesos a cuarentena privada fuera de Git y CM; conservar LocalWeb, R2, DYMO y entornos de firmware. No crear automáticamente una estación nueva: el usuario instalará una sola con su cuenta cuando corresponda.
+
+## Cierre vigente — 2026-10-27
+
+Los pendientes anteriores son históricos: main/producción ya estaban en1.4.46/04676c5 y20agentes estaban revocados,0vigentes. Completada limpieza local(4procesos,6arranques,7carpetas a respaldo privado); publicada/desplegada1.4.47.122Python+9Node+15gruposPlaywrightPASS;webhealthy;inventario/historial sin cambios. Ver DESPLIEGUE_1.4.47.md. Instalar solo un agente nuevo con la cuenta web al programar.
