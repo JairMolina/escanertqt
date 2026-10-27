@@ -1,113 +1,13 @@
-# Avance actual — 2026-10-26
-
-Preparada web1.4.41 en codex/fw-beta-20261026 sobre produccion1.4.39/bfb6465. Catálogo STM32 beta/aprobado con aprobación manual de administrador y evidencia, excluyendo beta de predeterminado y vigencia. 48pruebasPython y Playwright locales correctos; sin despliegue. Firmware4.4 corregido y compilado para unidad0054 según inventario, sin publicar identidad personal ni programar hardware;74ARM+14HEX+8resultados protocolo correctos. Ver FIRMWARE_BETA_STM32.md. Pendiente autorizar despliegue web y registro de beta, y banco físico antes de promover firmware.
-
----
-
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-21 22:56 UTC
-Commit de referencia: `df5d11e6492d` (puede no incluir cambios pendientes)
-
-## v1.4.45 (2026-10-26, Claude Code, rama integrar-1.4.45 → main)
-- Une main 1.4.44 (`3ac4fdd`) con `codex/gestionar-agentes-20261026` hasta `0ca9d86` (su 1.4.44 `9eda711` era la que corría en producción). Producción avanza por fast-forward desde `9eda711`. Siguiente versión: 1.4.46, partiendo de `origin/main`.
-
-## v1.4.44 (2026-10-26, Claude Code, rama integrar-1.4.44 → main)
-- Une main (README nuevo + lote persistente, publicado en main como «1.4.42», `77cabc0`) con `codex/stm32-estado-actual-20261026` (1.4.42–1.4.43 STM32, la que corre en producción). NO incluye `codex/gestionar-agentes-20261026`: esa rama también se numeró 1.4.44 y debe rebasarse sobre `origin/main` como 1.4.45. Sesiones: partir siempre de `origin/main` y cerrar ahí.
-
-## Lote persistente (publicado en main como 1.4.42, rama lote-elegido)
-- Lote de vista persistente por navegador: `T.loteVista(lotes)` / `T.guardarLoteVista(id)` en common.js (localStorage `tqt.lote.vista`). Lo usan escritorio.js (`cargarLotes`, `seleccionarLote`, evento `tqt:lote-cambiado`), `loteCambiado` de la hoja de lotes, dymo.js (`load` y `cargarLotesR3`) y admin.js (`tLote`; `vLote` sigue en el activo). El lote de la cuenta en el servidor (v1.4.24) no cambia.
-- Evidencia: node --check OK; test_lote_por_usuario + test_qa_version_hoy OK; prueba en navegador (ver CHANGELOG/commit).
-
-## v1.4.39 (2026-10-26, Claude Code, rama manual-usuario, sin commit)
-- Manual de usuario `/documentacion/manual` (`documentacion/manual.html/.js/.css`; ruta en `main.py`, permitida a consultor). Guías JSON en `documentacion/guias/` (10, índice `indice.json`), capturas en `documentacion/capturas/<guía>/` (datos de demostración). Al agregar un módulo: su guía JSON + entrada en `indice.json`.
-- Tema claro/oscuro en el manual (`data-tema` en <html>, localStorage `tqt-manual-tema`, variables `--b/--n/--mezcla/--ok`). Portada: fondo PCB procedural (`img/pcb-hero.jpg`, `img/pcb-detalle.jpg`) en lugar de la ciudad; textos «ciudad» de la portada sin cambiar.
-- Markdown: `scripts/generar_manual_md.py` → `docs/manual/` (fuente = guías JSON; correr tras agregar/editar/borrar una guía o módulo). `tests/test_manual_guias.py` (módulo sin guía, capturas, .md al día).
-- Documentación pública: `RUTAS_PUBLICAS` += /documentacion, /documentacion/manual; `PREFIJOS_PUBLICOS` += /static/documentacion/; `modulos.PUBLICOS` (puede() True, permitido True sin sesión, campo `publico`); inicio.js entra directo. Todo lo que se ponga en `static/documentacion/` queda público: nada de datos reales ni secretos ahí.
-- Evidencia: test_manual_guias (6, incluye público/cerrado) + test_portal_modulos + test_auth_seguridad + test_invitaciones_modulo + qa_version = 46 OK; capturas CDP 390/768/1440 en claro y oscuro sin errores JS ni desborde (320 px: 1–3 px en primeros-pasos/cuentas).
-
-## v1.4.38 (2026-10-23, Claude Code, rama colores-impresora-caiquen)
-- Impresora: acento gris grafito (`css/impresora.css`, `impresora_acceso.html`). Caiquén: rojo #EF4444 (`modulos.py` acento, `css/caiquen*.css`, `caiquen*.html`; neutros rotados a tinte rojo). v1.4.37 confirmada en producción.
-- Documentación TEAM HW (`modulos.DOCUMENTACION` = `documentacion-hw`, ruta `/documentacion` → `static/documentacion/index.html`, prefijo `/static/documentacion`, icono `ciudad` en inicio.js; entra con /login general). Contenido en `documentacion.js` (`PROYECTOS`: un capítulo por módulo; al agregar un módulo, agregarlo ahí y su foto en `documentacion/img`). Acceso Caiquén: escena J1939 de tractocamión. Portal: `inicio.js` con una órbita por módulo (`it.ang`, `o.w` ∝ k^-1.5, `--p` profundidad, `data-tapada`).
-- Evidencia: capturas de /inicio, /caiquen, /impresora , /documentacion (1440/390 y movimiento reducido) y accesos sin errores JS; pruebas de módulos OK.
-
-## v1.4.37 (2026-10-23, Claude Code, commit 8e781da)
-- Módulo Caiquén: archivos `caiquen*` clonados de Sigfox (colores rotados a azul acero), `parse_caiquen`/`CAIQUEN_RE` (QR PROVISIONAL CQ-0001), rechazos cruzados en TQT/TPMS/AJ/SL/Sigfox, `modulos.CAIQUEN` disponible, costeo `caiquen` (tarjeta Caiquén).
-- Evidencia: test_caiquen + suites de módulos (43 pruebas) OK.
-- Pendiente: QR real de Caiquén (ajustar regex en models y common.js).
-
-## v1.4.36 (2026-10-23, Claude Code, commit 3221659)
-- `MODULOS_COSTEO` suma `tpms` (tarjeta TPMS) y `speedlocker` (tarjeta SpeedLocker); `tpms.html`/`speedlocker.html` cargan `costeo.js`/`materiales.js` (ns TPMS / SL). v1.4.35 confirmada desplegada (prod sirve `costeo.css`).
-- Evidencia: test_costeo (5) + test_materiales (2) OK; importación de los cotizadores reales en BD aislada = Excel (TPMS 439.91, SpeedLocker 544.06).
-
-## v1.4.35 (2026-10-23, Claude Code, rama inventario-modulos → main)
-- Inventario de materiales por módulo (`services/materiales.py`, rutas `/api/<slug>/materiales` en `routers/costeo.py`, `js/materiales.js`, estilos en `css/costeo.css`). Placa realizada = `programada_en`; consumo por lista de materiales de Costos (snapshot), devuelto al desprogramar/eliminar; activación por fecha (`costeo_meta.consumo_desde`); AJ asigna RX/TX en `costeo_pcb_tarjeta`.
-- Evidencia: test_materiales (2) + test_costeo + qa_version OK.
-- Pendiente: alertas por correo de stock mínimo y pedidos (TQT los tiene); autoasignar RX/TX si el QR llega a distinguirlo.
-
-## v1.4.34 (2026-10-23, Claude Code, commit c52e5e0)
-- Costos por módulo (opción A, fase 1): pestaña «Costos» en AntiJammer y Sigfox con un solo motor (`services/costeo.py`, `routers/costeo.py` → `/api/<slug>/costos`, `js/costeo.js` con `data-ns`/`data-base`, `css/costeo.css`). Tablas `costeo_componentes`/`costeo_meta` con `modulo`: materiales y tipo de cambio propios por módulo. Costo por tarjeta (cada QR = una tarjeta; AJ RX/TX, Sigfox una), recurrentes (licencia) aparte. Importar Excel del cotizador (filas «RX y TX» repartidas) y exportar con fórmulas.
-- Evidencia: test_costeo (4) + sigfox + antijammer + qa_version OK; importando los Excel corregidos da RX 931.47 / TX 875.82 / AJ 1807.29 y Sigfox 1226.74 + licencia 92.50 (igual que Excel recalculado). Capturas 1440/390 sin desborde ni errores JS.
-- Pendiente: fase 2 (existencias, movimientos, stock mínimo, pedidos), fase 3 (consumo automático al programar una PCB; requiere saber si un QR AJ es RX o TX), extender a SpeedLocker/TPMS; cargar los cotizadores en producción tras desplegar.
-- v1.4.32 y v1.4.33 ya están en main (`57a44de`, `0c65512`).
-
-## v1.4.33 (2026-10-22, Claude Code, commit 0c65512)
-- Rama `skudo-sigfox` avanzada (fast-forward) a `57a44de` (v1.4.32 SpeedLocker) para clonar ese módulo.
-- Módulo Skudo Sigfox (`skudo-sigfox`, #A855F7), clon de SpeedLocker: `/sigfox`, `/sigfox/acceso`, API `/api/sigfox/*`, tablas `sigfox_pcb`/`sigfox_eventos` (BEGIN IMMEDIATE). QR PROVISIONAL `SF-0001` → `SF-V1-0001` (`models._SIGFOX_REGEX`, `VERSION_SIGFOX = "1"`, espejo `T.esSigfox`); rechazos cruzados con TQT/TPMS/AntiJammer/SpeedLocker.
-- Evidencia: test_sigfox + test_speedlocker + test_antijammer + test_tpms + test_qa_version_hoy OK (35 tests); `node --check` OK en common/recibir/antijammer/speedlocker. Pendiente: foto del QR real, prueba con celular y Docker.
-
-## v1.4.32 (2026-10-22, Claude Code, commit 57a44de)
-- Módulo SpeedLocker (`speedlocker`, #38BDF8), clon de AntiJammer: `/speedlocker`, `/speedlocker/acceso`, API `/api/speedlocker/*`, tablas `speedlocker_pcb`/`speedlocker_eventos` (`_asegurar` con BEGIN IMMEDIATE). QR real `SL-0024` → `SL-V2-0024` (sin versión = V2, `models.VERSION_SPEEDLOCKER`) (leído de foto de placa V2.0) (`models._SPEEDLOCKER_REGEX`, espejo `T.esSpeedlocker`); rechazos cruzados con TQT/TPMS/AntiJammer.
-- Evidencia: test_speedlocker + test_antijammer + test_tpms + test_qa_version_hoy OK (29 tests); `node --check` OK en common/recibir/antijammer. Pendiente: QR real de la placa, prueba con celular y Docker.
-
-## v1.4.30–v1.4.31 (2026-10-22, Claude Code, rama tpms-boton-escaneo → main)
-- v1.4.30: TPMS con «Botón de escaneo» en la cabecera (`js/tpms_escaner.js`: `/api/escaner/*`, WS `ESCANEO_REMOTO` + sondeo HTTP). Recibir registra la placa y Consultar abre su ficha.
-- v1.4.31: módulo Skudo AntiJammer (`skudo-antijammer`, #39FF14), clon de TPMS: `/antijammer`, `/antijammer/acceso`, API `/api/antijammer/*`, tablas `antijammer_pcb`/`antijammer_eventos`; `_asegurar` con BEGIN IMMEDIATE (fix v1.4.29). QR real `SJ_0052` → `SJ-V1-0052` (`models._ANTIJAMMER_REGEX`, espejo `T.esAntijammer`); Escáner TQT y TPMS lo rechazan.
-- Evidencia: test_antijammer + test_tpms + test_qa_version_hoy OK; `node --check` OK; Docker local 1.4.31. Sin prueba con celular real vinculado.
+Actualizado: 2026-10-27 15:09 UTC
+Commit de referencia: `1bb98bd4385d` (puede no incluir cambios pendientes)
 
 ## Avance reportado
-Comandos integrado y publicado en GitHub JairMolina/escanertqt, rama codex/comandos-r1-local, commit funcional df5d11e, sobre web1.4.28/main7fe97eb. Gestion > Comandos es nativo, con37 comandos y28 valores de fabrica, filtros, comparacion, favoritos, constructor reactivo y catalogo extensible. Plataforma inicial; CRLF manual solo Serial/GPS; BLE y acuse originales. URL local http://localhost:18086/monitor#/comandos, base de prueba nueva. Git pull --ff-only origin main completo sin cambios remotos nuevos y push de rama confirmado. No se desplego produccion ni se integro a main.
+Preparada web1.4.46 sobre origin/main1.4.45/1bb98bd. Comandos ya estaba integrado y produccion ejecuta1.4.45. Se actualizan version del servidor, README, CHANGELOG y prueba de version; se conservan catalogo beta/aprobado, lote persistente, agentes fijos y estado historico STM32. Usuario autoriza guardar en Git/memoria y desplegar. Ruta efectiva OrangePi192.168.4.70 por salto MiniPc, repo /home/orangepi/escanertqt, servicio tqt de servidor/compose.yml; acceso directo Tailscale no responde.
 
 ## Siguiente paso
-Revisar/integrar codex/comandos-r1-local a main cuando se solicite; despliegue de produccion pendiente de instruccion expresa. Checkout activo C:/Users/usuario/Documents/Codex/2026-10-19/new-chat/work/tqt-web-comandos. Checkout registrado anterior permanece con su rama y cambios documentales, sin reset/stash. Consultar docs/COMANDOS_R1_INTEGRACION.md; completar sincronizacion central del presente checkpoint.
+Publicar1.4.46 en main y etiquetar; respaldo SQLite y nueva comprobacion sin trabajos activos; recrear solo servicio tqt y verificar salud/version publica. Banco fisico de FW4.4 beta sigue pendiente; no aprobar firmware ni programar hardware ni borrar agentes por esta actualizacion.
 
 ## Evidencia
-52Python,9Node,16escenarios Playwright y enlace movil aprobados; clipboard real y capturas1440/1024/390 claro/oscuro sin desborde ni errores JS/HTTP. Compose/build OK, contenedor tqt-comandos-qa-web-1 healthy en127.0.0.1:18086. git pull --ff-only origin main: Already up to date. CM git push: Commits enviados codex/comandos-r1-local. Sin datos, capturas, contrasenas de QA ni bases en commit. CM, ui-ux-pro-max y ECC E2E/verificacion aplicados.
-
-Integración concurrente: producción avanzó a1.4.40/b90ee570 durante el ensayo. Se conserva íntegra su reducción de escrituras de presencia de agentes; versión final de esta tarea1.4.41.
-
-## Despliegue comprobado — 2026-10-26
-
-Con autorización expresa, desplegada web1.4.41, commit a1b90f9ec18fa859fdf22940fe96006211aea475. Conserva también producción1.4.40/b90ee570 y sus cambios de agentes. Respaldo previo /backups/predeploy_1.4.41_20261026_153233.db; sin trabajos activos al desplegar. Solo servicio web recreado; túnel y volúmenes conservados.
-
-FW4.4 Debug corregido registrado como beta cb734913f0b8fcfc98dffd15, SHA256 a5d121ef5c5087237c2dbe15683f3cdb9d0d51a1c31d01e35a2b84fa36bbc2aa. Se verificó estado beta y default base-R1/FW4.3 sin cambios. No se aprobó firmware ni se programó hardware. Integración final:67pruebasPythonPASS, además74ARM+14HEX+8resultadosprotocolo y QAPlaywright previos. Falta banco físico de la unidad preparada antes de solicitar su aprobación.
-
-## 2026-10-26 — Agente fijo STM32 1.4.42
-
-Corregida sustitución automática porIP/primeronline; selección manual visible y persistida, ausencia/offline no cambianID, respuestas tardías ignoradas y trabajo/cancelación fijados al destino original. Seis gruposPlaywrightPASS sinhardwareincluidosondeo5segundos,móvil390yrecarga;JSsyntax/diffPASS. Usuario autorizó despliegue y respaldo adicional de captura. Ver AGENTE_STM32_FIJO.md. Sin cambiosFW ni aprobaciónbeta.
-
-
-## Despliegue verificado 2026-10-26
-
-Web1.4.42 desplegada y saludable, código c1113ea0d98299f847675754a4ecea08e0a711d5. Respaldo previo /backups/predeploy_1.4.42_20261026_155549.db; sin trabajos activos al recrear solo web. El ajuste final estático del resumen de conexión se aplicó sin otro reinicio. Login público y apihealth correctos; SHA256 del contenido Git normalizado y del JS servido coinciden (352f999cdf8ba1eacb2be45d050575d0e6fe52f5712fbd19e6a83aaf3347d81e). Cache1442b. Firmware4.4 siguebeta; sin nuevas grabaciones por esta tarea.
-
-El usuario autorizó explícitamente captura y destino tras rechazo automático. Original respaldado y verificado enMiniPC, SHA256prefijof00308f7f1f3; nota técnica remota y0adjuntos pendientes. Captura fuera deGit.
-
-Usuario: recargar Ctrl+F5 cuando no haya grabación y seleccionar UNA vez el agente que tiene suJLink en AgenteWindows conectadoalJLink. El campo de instalación de abajo no cambia esa elección. Si aparece desconectado se conserva el vínculo; solo el operador puede elegir otro. Prueba física real pendiente si persiste error deprobeconelagentecorrecto.
-
-## 2026-10-26 — Estado STM32 independiente,1.4.43
-
-Preparados izq/registro der separados; nuevoendpointestado sinfirmwareseleccionado y sinhardware, identidadarchivada/fechaUID o inventario rotulado; falloposterior noacreditaFWnuevo.54PythonPASS,5gruposUIestado y6regresionagentefijoPASS,0JSerrors,móvil390. Usuarioautorizódespliegue/memoria; noautorizaunagrabaciónfísica. Ver STM32_ESTADO_PREPARADO_Y_REGISTRADO.md.
-
-
-## Despliegue verificado — 2026-10-26
-
-Web1.4.43 desplegada, código38e1746d0627b82fe98d9bd7875e947c4eaecafa. Respaldo /backups/predeploy_1.4.43_20261026_162708.db; sin trabajos activos al actualizar. Solo servicio web recreado, túnel/volúmenes conservados. APIhealth pública y login1.4.43 correctos; contenedorhealthy.
-
-Comprobación de producción solo en software: se generaron previews4.3/4.4 para la unidad de laboratorio y el objeto de estado independiente fue idéntico antes/después. Se conserva última Flash4.4 verificada, origenlecturaJLink, sin intento posterior incierto. No se hizo lectura física nueva. Catálogo mantiene beta4.4 y predeterminado4.3.
-
-Quedan pendientes únicamente banco físico y aprobación del FWbeta por el operador. La actualización de esta tarea no realiza movimientos, grabación, aprobación ni lectura física. El selector de agente fijado se conserva.
-
-## 2026-10-26 — Agentes vinculados al usuario y borrado, 1.4.44 preparada
-
-Cuenta web como propietario automático y actor de cada operación separado; borrado con permisos, revocación 410 y protección de trabajos activos, conservando historiales. 121 Python y 15 grupos Playwright PASS sin hardware, Compose QA/JS/diff correctos. Ver AGENTES_USUARIO_Y_BORRADO.md. Pendiente autorización expresa de despliegue, retirada de 19 agentes físicos y cuarentena de instalaciones locales; aún sin aplicar en producción. Rama codex/gestionar-agentes-20261026.
+115PythonPASS en Docker aislado;9NodePASS;16escenarios PlaywrightPASS en localhost18086 con clipboard real y capturas1440/1024/390 claro/oscuro sin JS/HTTPerrors. Compose/buildOK. Produccion1.4.45 cleanmain1bb98bd,0trabajosSTM32/test/BLE/R2 activos y PRAGMA quick_check=ok. Revisados imagen, puertos y montajes; cmdeployMiniPc no aplica al hostOrangePi, se usa procedimiento SSH/Docker vigente. ui-ux-pro-max/ECC verificacion reutilizadas; sin cambios funcionales de UI.

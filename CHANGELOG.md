@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.46 — 2026-10-27
+- Actualización de continuidad sobre `main` 1.4.45: conserva las integraciones de Comandos, lote persistente, catálogo beta/aprobado, selección fija de agentes y estado histórico de programación STM32.
+- Alinea la versión del servidor, el README y la prueba de versión visible. Registra el estado real del despliegue y los pendientes vigentes en la memoria del proyecto.
+- No cambia firmware ni aprueba imágenes beta; las pruebas físicas pendientes continúan pendientes.
+
 ## v1.4.45 — 2026-10-26
 - Une las dos versiones que salieron como 1.4.44: la de `main` (`3ac4fdd`: README nuevo y lote persistente, descrita abajo) y la de `codex/gestionar-agentes-20261026` (`9eda711`, ya desplegada, más el arreglo `0ca9d86`). No cambia funciones: junta ambas para que producción avance por fast-forward desde `9eda711`.
 - **Agentes de programación (de `codex/gestionar-agentes-20261026`):** retiro seguro de agentes y la cuenta web queda identificada (Programación STM32, `station/agent.py`, `station/test_station/agent.py`; detalle en docs/AGENTES_USUARIO_Y_BORRADO.md). `0ca9d86`: la migración que revoca estaciones es segura mientras los agentes consultan.
