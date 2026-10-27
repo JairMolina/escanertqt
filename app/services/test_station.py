@@ -34,6 +34,35 @@ def propia(c, sid, operator):
         raise ValueError("Ese agente pertenece a otra cuenta; instala o abre el de tu laptop.")
 
 
+def agente_actual():
+    """AGENT_VERSION del agente que se descarga hoy (station/test_station/agent.py)."""
+    from pathlib import Path
+    f = Path(__file__).resolve().parents[2] / "station/test_station/agent.py"
+    m = re.search(r'^AGENT_VERSION = "([^"]+)"', f.read_text(encoding="utf-8"), re.M) if f.exists() else None
+    return m.group(1) if m else ""
+
+
+def desactualizados(operator, dias=7):
+    """v1.4.57: agentes/puentes de la cuenta vistos en los últimos días con una versión distinta de la actual
+    (sin la Raspberry, que se actualiza aparte). Pruebas TQT avisa con instrucciones hasta que se reinstalen."""
+    init()
+    actual = agente_actual()
+    with db.get_db() as c:
+        filas = c.execute(
+            "SELECT p.seen,p.state,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station "
+            "WHERE s.revoked_at IS NULL AND lower(s.owner)=lower(?) AND s.name NOT LIKE ? AND p.seen>?",
+            (operator, RASPBERRY_LIKE, time.time() - dias * 86400)).fetchall()
+    # Uno viejo apagado ya no cuenta si la cuenta tiene otro actualizado (lo reemplazó); uno viejo en línea siempre cuenta.
+    hay_nuevo = any(json.loads(r["state"]).get("agent_version") == actual for r in filas)
+    out = []
+    for r in filas:
+        st = json.loads(r["state"])
+        if actual and st.get("agent_version") != actual and (time.time() - r["seen"] < 15 or not hay_nuevo):
+            out.append(dict(nombre=r["name"], version=st.get("agent_version") or "anterior a 1.4.51",
+                            solo_ble=bool(st.get("ble_only")), en_linea=time.time() - r["seen"] < 15))
+    return {"actual": actual, "estaciones": out}
+
+
 def norm(value):
     return re.sub(r"[^A-Z0-9]", "", str(value or "").upper())
 

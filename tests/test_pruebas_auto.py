@@ -211,5 +211,26 @@ class PruebasAuto(unittest.TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("otra cuenta", r.text)
 
+    def test_aviso_de_agente_viejo(self):
+        """v1.4.57: Pruebas TQT avisa de agentes/puentes viejos de la cuenta; no de otras cuentas ni de la Raspberry;
+        un viejo apagado deja de contar cuando la cuenta ya tiene uno actualizado."""
+        actual = s.agente_actual()
+        self.assertRegex(actual, r"^1\.4\.")
+        yo = "aviso-%s@test.mx" % self.t["id"]
+        s.claim(self.st["id"], {"ble_bridge": 1, "agent_version": "viejo"})
+        ajeno = stm.station_create("Bluetooth TQT Windows (solo BLE)", "otra-" + yo)
+        s.claim(ajeno["id"], {"ble_bridge": 1, "ble_only": True})
+        viejo = stm.station_create("Bluetooth TQT Windows (solo BLE)", yo)
+        s.claim(viejo["id"], {"ble_bridge": 1, "ble_only": True})
+        d = s.desactualizados(yo)
+        self.assertEqual([(x["nombre"], x["version"], x["solo_ble"]) for x in d["estaciones"]],
+                         [(viejo["name"], "anterior a 1.4.51", True)])
+        nuevo = stm.station_create("Bluetooth TQT Windows (solo BLE)", yo)
+        s.claim(nuevo["id"], {"ble_bridge": 1, "ble_only": True, "agent_version": actual})
+        self.assertEqual(len(s.desactualizados(yo)["estaciones"]), 1)   # el viejo sigue en línea
+        with db.get_db() as c:
+            c.execute("UPDATE tqt_test_presence SET seen=seen-60 WHERE station=?", (viejo["id"],))
+        self.assertEqual(s.desactualizados(yo)["estaciones"], [])
+
 if __name__ == "__main__":
     unittest.main()

@@ -1332,6 +1332,26 @@
     const refresh = setInterval(() => {
       if (alive && !active && !manualBusy) { if (web()) refreshNative().catch(() => {}); else stations().catch(() => {}); }
     }, 3000);
+    // v1.4.57: aviso a quien tenga un agente o puente Bluetooth viejo (sin keep-alive ni separación por cuenta).
+    api("/api/validacion/tqt/agentes/desactualizados").then((r) => {
+      const l = r.ok && r.data ? r.data.estaciones : [];
+      if (!alive || !l.length) return;
+      T.sheet({
+        title: "Actualiza tu " + (l.every((x) => x.solo_ble) ? "puente Bluetooth" : "agente de Pruebas TQT"),
+        body: [
+          h("p", null, "Tienes " + (l.length === 1 ? "un agente viejo" : l.length + " agentes viejos") + " (la versión actual es " + r.data.actual + "). Con la versión vieja aparece «El puente no atendió a tiempo; comando vencido sin ejecutar» y la prueba se interrumpe."),
+          h("ul", null, l.map((x) => h("li", null, x.nombre + " · " + x.version + (x.en_linea ? " · en línea" : "")))),
+          h("ol", null,
+            h("li", null, "Cierra el agente o puente viejo: la ventana negra de iniciar.cmd en tu laptop."),
+            h("li", null, "Aquí en Pruebas TQT pulsa «" + (l.some((x) => !x.solo_ble) ? "Descargar agente de pruebas» o «" : "") + "Preparar puente Bluetooth» y descarga el ZIP."),
+            h("li", null, "Extráelo en una carpeta nueva y ejecuta iniciar.cmd."),
+            h("li", null, "Vuelve aquí: debe decir «Bluetooth Windows: <tu cuenta> · conectado»."),
+          ),
+          h("p", { class: "hint" }, "Cada cuenta usa solo sus propios agentes y puentes; los de otra cuenta y la Raspberry ya no aparecen. Este aviso se quita cuando el agente viejo deja de usarse."),
+        ],
+        actions: [{ label: "Entendido", kind: "primary", onClick: () => true }],
+      });
+    }).catch(() => {});
     const tid = new URLSearchParams(location.hash.split("?")[1] || "").get("tarjeta");
     if (tid) selectCard({ id: Number(tid) || tid }).catch(() => {});
     return {

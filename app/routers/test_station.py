@@ -120,6 +120,11 @@ def stations(req: Request):
         ]
 
 
+@router.get("/agentes/desactualizados")
+def agentes_desactualizados(req: Request):
+    return svc.desactualizados(operator(req))
+
+
 @router.post("/commands")
 def commands(body: Command, req: Request):
     with db.get_db() as c:
