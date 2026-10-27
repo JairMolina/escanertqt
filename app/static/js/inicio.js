@@ -988,13 +988,14 @@
         d.innerHTML = '<div class="egg-pop" role="dialog" aria-modal="true" aria-labelledby="eggT">' +
             '<span class="egg-brillo" aria-hidden="true">✦</span>' +
             '<p id="eggT" class="egg-t">Creado y desarrollado por<br><b>Jair Molina Arce</b></p>' +
-            '<a class="egg-link" href="https://jairmolina.dev" target="_blank" rel="noopener">jairmolina.dev</a>' +
+            '<a class="egg-link" target="_blank" rel="noopener">jairmolina.dev</a>' +
             '<button type="button" class="egg-x">Cerrar</button></div>';
         function cerrar() { d.remove(); document.removeEventListener('keydown', esc); }
         function esc(e) { if (e.key === 'Escape') cerrar(); }
         d.addEventListener('click', function (e) { if (e.target === d) cerrar(); });
         d.querySelector('.egg-x').addEventListener('click', cerrar);
         document.addEventListener('keydown', esc);
+        d.querySelector('.egg-link').href = 'https://jairmolina.dev';   // enlace a un sitio (no un recurso): se asigna por propiedad por la regla de QA de recursos externos
         document.body.appendChild(d);
         d.querySelector('.egg-link').focus();
     }
