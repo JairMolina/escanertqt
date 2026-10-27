@@ -1,20 +1,15 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-27
-Commit de código de referencia: 23a7d8da8ae35030497b296a0488310dceec9b31.
+Actualizado:2026-10-27. Código de referencia:f608baf857dd0e023e6063d55110bdeb505a5ffc.
 
 ## Avance reportado
 
-Web1.4.47 publicada en main y desplegada sobre main/producción1.4.46/04676c5. Nuestro cambio de agentes0ca9d86 ya estaba integrado, sin repetir ni sobrescribir funciones de main. Cuenta web como propietario de agente; operator identifica a quien inicia cada trabajo. Servidor con20registros físicos previamente revocados,0vigentes,1banco lógico. Limpieza local completada:4procesos detenidos,6arranques retirados,7carpetas en respaldo privado local;LocalWeb/R2 preservados. No se creó un agente nuevo ni se programó hardware. Ver docs/DESPLIEGUE_1.4.47.md.
+Web1.4.48 publicada enmain y desplegada con autorización del usuario sobre1.4.47/454add0. En programaciónR1/R3, lista y panel comparan FW registrado con el último aprobado del mismoHW;naranja/Desactualizada si anterior,verde si verificada/vigente. Selector no modifica historial;beta/otroHW no cuentan;sin catálogo no se da falsoverde. Producción confirma0054verificada4.4/vigente4.4 y0055verificada4.3/vigente4.4. El catálogo ya marca4.4 aprobado;no se cambió su aprobación ni se programó hardware. Ver docs/STM32_INDICADOR_VIGENCIA.md.
 
 ## Siguiente paso
 
-Recargar web y, cuando se vaya a programar, instalar solo un agente nuevo usando la cuenta web. Banco físico y aprobación humana de FW4.4 beta siguen pendientes. No repetir la limpieza de los20registros ya revocados. Para trabajos futuros partir de origin/main y comprobar servidor antes de modificarlo. Checkout activo: work/tqt-fw-beta-20261026,rama codex/cierre-agentes-20261027;checkout CM registrado conserva cambios documentales sin reset ni stash.
+RecargarCtrl+F5 en web1.4.48 y comprobar los colores. Para cambios futuros partir deorigin/main y consultar servidor real. La limpieza anterior de agentes está completa;no repetirla. Instalar un agente nuevo cuando se requiera programar. Esta tarea no hace nuevas pruebas físicas. Checkout activo work/tqt-fw-beta-20261026,rama codex/stm32-fw-indicador-20261027.
 
 ## Evidencia
 
-122Python aisladas+9Node+15gruposPlaywrightPASS,0JSerrors,móvil390sin desborde,ComposeQA/diffcorrectos. Backup /backups/predeploy_1.4.47_20261027_092049.db,integrity_checkok,SHA256d51ad4340fb1e321341685fb46e7b4ce067e2167ec6ef37b0551403b7fa44b11. Producción tqt runninghealthy,APP_VERSION1.4.47,quick_checkok,health interno/público ok:true,loginHTTP200/1.4.47. Antes/después coinciden94trabajosSTM32,50pruebas,239comandos,446PCB,100tarjetas,1883escaneos,20agentesrevocados,0vigentes,1bancoweb. Cloudflared sin reiniciar. CMcheckpoint/memoria y ECCbackend/seguridad/verificación;sin secretos o bases en Git/CM.
-
-## Corrección preparada — indicador de vigencia STM32,1.4.48
-
-El panel histórico ahora compara FW registrado con el último aprobado del mismoHW: naranja si anterior, verde si verificado y vigente. Comparación compartida con lista, independiente del selector;beta no cuenta.19gruposPlaywright y11PythonPASS;JS/ComposeQA/diffOK. Ver STM32_INDICADOR_VIGENCIA.md. Producción sigue1.4.47/454add0;pendiente autorización expresa del despliegue de esta corrección.
+19gruposPlaywrightPASS(8vigencia+5historial+6agentefijo),CSSnaranja/verde renderizado,0JSerrors,móvil390;11Pythonversion/estadoPASS;JSsyntax/diff/ComposeQAOK. Produccióntqt runninghealthy,quick_checkok,health interno/públicook:true,loginHTTP200/1.4.48,JS/CSSGitcoinciden. Backup /backups/predeploy_1.4.48_20261027_093845.db integrity_checkok SHA256dcecdd6731321644cf646e2358f339d35b0c2658b300fd73e3a57baae6cc5845.0trabajos activos;inventario/historial sin cambios. ui-ux-pro-max(color acompañado de texto),ECCverificación yCMcheckpoint/memoria utilizados. Originales de capturas no copiados aGit/MiniPC por esta corrección.

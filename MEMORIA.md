@@ -2,18 +2,20 @@
 
 ## Estado vigente — 2026-10-27
 
-Web1.4.47 publicada en main, commit de código23a7d8d, desplegada y verificada
-sobre main/producción1.4.46/04676c5. Agentes por cuenta web ya integrados;
-verificados20registros físicos previamente revocados y0vigentes. Completada
-limpieza local:4procesos detenidos,6arranques retirados y7carpetas conservadas
-en respaldo privado, fuera deGit/CM. Nuevo agente toma el usuario de la web;
-operator identifica al actor de cada trabajo, separado del propietario.
-Instalar un único agente cuando se necesite programar; no se crea solo.
+Web1.4.48 desplegada y verificada enmain, código f608baf, sobre1.4.47/454add0.
+Panel STM32 R1/R3 y lista comparan FW registrado con el último aprobado del
+mismoHW:naranja si anterior,verde si verificado/vigente. Selector independiente;
+beta/otroHW no elevanvigencia;sin referencia confirmada noaseguraractualizada.
+Producción0054verificada4.4/vigente4.4verde;0055verificada4.3/vigente4.4naranja.
+FW4.4 ya figura aprobado en catálogo;esta tarea no lo aprobó ni probó hardware.
+19gruposPlaywright+11PythonPASS;coloresCSScomprobados,móvil390,0JSerrors;
+ComposeQA/JSsyntax/diffOK. Producciónhealthy/quick_checkok/login1.4.48.
+Backup y evidencia en docs/STM32_INDICADOR_VIGENCIA.md;inventario/historial
+sin cambios. Agentes:limpieza local anterior completa(4procesos/6arranques/
+7carpetas respaldadas),20registros físicos revocados verificados antes;
+no repetirlimpieza. Nuevo agente usa cuentaweb,operator guardaactorreal.
 OrangePi porMiniPc aorangepi@192.168.4.70,repo/home/orangepi/escanertqt;
-solo tqt recreado.122Python+9Node+15gruposPlaywrightPASS;health/login1.4.47,
-DBquick_checkok e inventario/historial idénticos antes/después.
-Respaldo y evidencia:docs/DESPLIEGUE_1.4.47.md. FW4.4 beta sigue pendiente
-de banco físico y aprobación humana; no se programó hardware.
+solo tqt recreado,cloudflared intacto. RecargarCtrl+F5 para vercorrección.
 
 Aplicación Inventario TQT (JairMolina/escanertqt): FastAPI, SQLite, WebSockets y HTML/JS. Mantener separada de TQT-OrangePi, que contiene infraestructura del servidor.
 
