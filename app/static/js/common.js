@@ -165,8 +165,9 @@
         if (falta.includes('R1') || falta.includes('R2')) return { key: 'incompleta', label: 'Falta ' + falta.join(', '), kind: 'warn', icon: 'alert' };
         if (sm.length) return { key: 'sin_mac', label: 'Sin MAC: ' + sm.join(', ') + (falta.length ? ' · falta ' + falta.join(', ') : ''), kind: 'info', icon: 'clock' };
         if (falta.length) return { key: 'incompleta', label: 'Falta ' + falta.join(', ') + (r1r2Programadas(x) ? ' · R1 y R2 programadas' : ''), kind: 'warn', icon: 'alert' };
-        if (x.validada) return { key: 'completa', programada: tarjetaProgramada(x), validada: true, label: 'Completa · validada', kind: 'ok', icon: 'check' };
-        return tarjetaProgramada(x) ? { key: 'completa', programada: true, label: 'Completa · programada', kind: 'ok', icon: 'check' } : { key: 'completa', label: 'Completa', kind: 'ok', icon: 'check' };
+        const sk = x.skytec ? ' · Skytec' : '';   // v1.4.60: R1 y R2 con su candado creado en Skytec
+        if (x.validada) return { key: 'completa', programada: tarjetaProgramada(x), validada: true, skytec: !!x.skytec, label: 'Completa · validada' + sk, kind: 'ok', icon: 'check' };
+        return tarjetaProgramada(x) ? { key: 'completa', programada: true, skytec: !!x.skytec, label: 'Completa · programada' + sk, kind: 'ok', icon: 'check' } : { key: 'completa', skytec: !!x.skytec, label: 'Completa' + sk, kind: 'ok', icon: 'check' };
     }
     /** v1.3.52: tarjeta PROGRAMADA = R1, R2 y R3 presentes y las tres programadas (misma regla por placa que `programada`: R1/R2 con MAC y firmware, R3 con firmware).
      *  Es un avance dentro de «completa» (nunca hay programada sin MAC ni sin las 3 placas). Orden: Falta placa → Sin MAC → Programada → Completa. */

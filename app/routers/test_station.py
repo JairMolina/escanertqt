@@ -224,14 +224,16 @@ def alta_skytec(tarjeta_id: int, req: Request):
     operator(req)
     from app.routers.excel_dymo import _exigir_aprobada  # import diferido: evita ciclos
     _exigir_aprobada(tarjeta_id)
-    tarjeta = db.get_tarjeta_by_id(tarjeta_id)
-    if not tarjeta:
-        raise HTTPException(404, "Tarjeta no encontrada.")
+    return alta_skytec_tarjeta(tarjeta_id, operator(req))
+
+
+def alta_skytec_tarjeta(tarjeta_id: int, operador: str):
     try:
-        items = skytec.alta_armado(tarjeta)
+        return skytec.alta_tarjeta(tarjeta_id, operador)
+    except skytec.TarjetaNoEncontrada as e:
+        raise HTTPException(404, str(e))
     except (skytec.SkytecNoConfigurado, skytec.SkytecError) as e:
         raise HTTPException(503, str(e))
-    return {"ok": all(i["estado"] != "error" for i in items), "items": items}
 
 
 @router.get("/runs/{jid}/events")

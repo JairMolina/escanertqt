@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.60 — 2026-10-27
+- **Tarjetas: estado «Skytec» y botón «Crear candados en Skytec».** Cada alta (desde «Imprimir etiquetas» o desde Tarjetas) se guarda en la tabla nueva `skytec_candados` (tarjeta, ranura, nombre, MAC; se crea sola al iniciar). Una tarjeta con R1 y R2 registradas con su MAC vigente muestra «Completa · programada · Skytec». Si se cambia una placa, deja de contar. Las completas o validadas sin candado tienen el botón bajo «Pruebas e historial de esta tarjeta», que no exige prueba aprobada y avisa del resultado de cada ranura. Endpoint `POST /api/tarjetas/{id}/skytec`.
+- **Pruebas TQT muestra la versión del agente.** La línea del agente o puente dice «agente <versión> (actualizado)» o «(viejo; actual …)». El aviso de agente viejo deja de salir en cuanto la cuenta tiene uno con la versión actual, aunque el viejo siga en línea.
+
 ## v1.4.59 — 2026-10-27
 - **Inicio: los módulos son planetas, no esferas.** Cada uno conserva su color de acento y alterna 3 tipos: gigante con bandas y anillo inclinado (la mitad trasera del anillo queda oculta tras el disco), rocoso con continentes y cráteres, y bandas con tormenta ovalada. Todos tienen lado nocturno, reflejo y atmósfera. Se quitó la cruz de rayos de «estrella». Los módulos apagados se ven desaturados; en móvil no cambia (lista con icono). Solo `app/static/css/inicio.css`.
 

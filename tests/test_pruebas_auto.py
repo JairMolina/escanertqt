@@ -227,7 +227,7 @@ class PruebasAuto(unittest.TestCase):
                          [(viejo["name"], "anterior a 1.4.51", True)])
         nuevo = stm.station_create("Bluetooth TQT Windows (solo BLE)", yo)
         s.claim(nuevo["id"], {"ble_bridge": 1, "ble_only": True, "agent_version": actual})
-        self.assertEqual(len(s.desactualizados(yo)["estaciones"]), 1)   # el viejo sigue en línea
+        self.assertEqual(s.desactualizados(yo)["estaciones"], [])   # v1.4.60: con uno actualizado ya no se avisa
         with db.get_db() as c:
             c.execute("UPDATE tqt_test_presence SET seen=seen-60 WHERE station=?", (viejo["id"],))
         self.assertEqual(s.desactualizados(yo)["estaciones"], [])

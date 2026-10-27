@@ -325,6 +325,14 @@ async def patch_tarjeta(tarjeta_id: int, payload: TarjetaDatos):
     return tarjeta
 
 
+@router.post("/tarjetas/{tarjeta_id}/skytec", summary="Crear en Skytec los candados R1/R2 de una tarjeta completa")
+async def alta_skytec(tarjeta_id: int, request: Request):
+    """v1.4.60: botón de Tarjetas para las completas sin candado (las probadas se dan de alta al imprimir etiquetas)."""
+    from app.routers.test_station import alta_skytec_tarjeta  # import diferido: evita ciclos
+    return await run_in_threadpool(alta_skytec_tarjeta, tarjeta_id,
+                                   usuarios.validar_sesion(request.cookies.get(usuarios.COOKIE))['email'])
+
+
 @router.put("/tarjetas/{tarjeta_id}/asignar", summary="Asignar, reemplazar o liberar la PCB de una ranura")
 async def asignar_pcb(tarjeta_id: int, payload: AsignarPCB):
     tarjeta = await _run(inv.asignar_pcb, tarjeta_id, payload.ranura, payload.pcb_id, payload.marcar_falla,

@@ -83,6 +83,24 @@
                         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => guardar() }, icon('check'), 'Guardar'),
                         h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { if (!gab.value) { toast('Elige Quintalock o Translock antes de marcar la entrega', { kind: 'bad' }); gab.focus(); return; } guardar({ fecha_real: hoy() }); } }, icon('box'), 'Marcar entregada hoy')));
             }
+            // v1.4.60: las completas y programadas sin candado en Skytec se pueden dar de alta desde aquí (R1 y R2).
+            function botonSkytec(t) {
+                const e = T.estadoTarjeta(t);
+                if (e.key !== 'completa' || !(e.programada || e.validada) || t.skytec) return null;
+                const out = h('p', { class: 'hint', 'aria-live': 'polite' });
+                const b = h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
+                    b.disabled = true; out.className = 'hint'; out.textContent = 'Creando candados de R1 y R2 en Skytec…';
+                    const r = await api(`/api/tarjetas/${t.id}/skytec`, { method: 'POST', body: {} });
+                    b.disabled = false;
+                    if (!r.ok) { out.className = 'hint bad'; out.textContent = 'Skytec: no se crearon los candados. ' + (r.error || 'Sin detalle'); return; }
+                    const txt = { creado: 'candado creado en Skytec correctamente', ya_existia: 'ya estaba registrado en Skytec', error: 'ERROR' };
+                    out.className = r.data.ok ? 'hint ok' : 'hint bad';
+                    out.textContent = r.data.items.map((i) => `${i.slot} ${i.nombre}: ${txt[i.estado]}` + (i.estado === 'error' ? ' — ' + i.detalle : '')).join(' · ');
+                    toast(r.data.ok ? `Tarjeta ${t.id_tarjeta_num}: candados creados en Skytec` : `Tarjeta ${t.id_tarjeta_num}: Skytec con errores`, { kind: r.data.ok ? 'ok' : 'bad' });
+                    if (r.data.ok) ctx.actualizar();
+                } }, icon('lock'), 'Crear candados en Skytec');
+                return h('div', { 'data-escribe': true, style: 'display:flex;flex-direction:column;gap:4px' }, b, out);
+            }
             function pintarPanel(enfocar) {
                 const t = st.abierta && st.tars ? st.tars.find((x) => x.id === st.abierta) : null;
                 if (panel) { panel.remove(); panel = null; }
@@ -94,6 +112,7 @@
                     h('header', null, h('div', null, h('div', { class: 'silk', style: 'margin-bottom:3px' }, 'Tarjeta'), h('span', { id: 'tarPanelT', class: 'sr-only' }, `Detalle de la tarjeta ${t.id_tarjeta_num}`), num), h('div', { class: 'grow' }), T.tarjetaBadge(t), cerrar),
                     h('div', { class: 'cuerpo' },
                         h('a', { class: 'btn', href: '/monitor#/validacion?tarjeta=' + t.id }, 'Pruebas e historial de esta tarjeta'),
+                        botonSkytec(t),
                         h('div', { class: 'esc-placas' }, ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'esc-placa-w' },
                             util.placaCard(sl, conFw(t, sl.toLowerCase())),
                             // v1.3.67: Cambiar/Quitar junto a su placa (antes al final del panel)

@@ -95,7 +95,7 @@ class TestSkytec(unittest.TestCase):
                 cx.execute("INSERT INTO tqt_test_runs(id,station,requested_card,tarjeta_id,operator,state,created,updated,inventory,result,origin)"
                            " VALUES(?,?,?,?,?,'finished',?,?,'{}','aprobado','web')",
                            ("sky-%d" % t["id"], sid, t["id"], t["id"], "op@test.mx", time.time(), time.time()))
-            alta.return_value = [{"slot": "R1", "estado": "creado"}, {"slot": "R2", "estado": "creado"}]
+            alta.return_value = [{"slot": "R1", "nombre": "TQT_R1_X", "mac": "AA", "estado": "creado"}, {"slot": "R2", "nombre": "TQT_R2_X", "mac": "BB", "estado": "creado"}]
             r = c.post(url)
             self.assertEqual(r.status_code, 200, r.text)
             self.assertTrue(r.json()["ok"])
@@ -103,6 +103,29 @@ class TestSkytec(unittest.TestCase):
             r = c.post(url)
             self.assertEqual(r.status_code, 503)
             self.assertIn("Skytec", r.text)
+
+
+    def test_tarjeta_queda_marcada_skytec_y_boton_de_tarjetas(self):
+        """v1.4.60: el alta se guarda por tarjeta; la tarjeta trae skytec=True solo con R1 y R2 registradas con su MAC vigente."""
+        import _aislamiento as iso
+        t = iso.crear_par(iso.nuevo_lote()["id"])
+        self.assertFalse(db.get_tarjeta_by_id(t["id"])["skytec"])
+        c = cliente_sin_sesion(app)
+        c.cookies.set(usuarios.COOKIE, usuarios.emitir_sesion("developer@skyguardian.mx"))
+        post, llamadas = falso_skytec()
+        with mock.patch.dict(os.environ, ENV), mock.patch.object(skytec, "_post", side_effect=post):
+            r = c.post("/api/tarjetas/%d/skytec" % t["id"])   # sin prueba aprobada: el botón de Tarjetas sí procede
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual([i["estado"] for i in r.json()["items"]], ["creado", "creado"])
+        self.assertTrue(db.get_tarjeta_by_id(t["id"])["skytec"])
+        items, _ = db.list_tarjetas(lote_id=db.get_tarjeta_by_id(t["id"])["lote_id"])
+        self.assertTrue(next(x for x in items if x["id"] == t["id"])["skytec"])
+        with db.get_db() as cx:   # otra MAC en la R2 (placa cambiada): deja de contar
+            cx.execute("UPDATE skytec_candados SET mac='00:00:00:00:00:00' WHERE tarjeta_id=? AND slot='R2'", (t["id"],))
+        self.assertFalse(db.get_tarjeta_by_id(t["id"])["skytec"])
+        with mock.patch.dict(os.environ, {"TQT_SKYTEC_USER": "", "TQT_SKYTEC_PASSWORD": ""}):
+            self.assertEqual(c.post("/api/tarjetas/%d/skytec" % t["id"]).status_code, 503)
+        self.assertEqual(c.post("/api/tarjetas/999999/skytec").status_code, 404)
 
 
 if __name__ == "__main__":

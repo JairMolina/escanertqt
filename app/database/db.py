@@ -685,6 +685,8 @@ _SELECT_TARJETA = f"""
            AND (v.tarjeta_id = t.id OR v.pcb_id IN (t.pcb_r1_id, t.pcb_r2_id, t.pcb_r3_id))) AS _validacion,
         t.semana_produccion, t.fecha_proyectada, t.fecha_real, t.fecha_llegada, t.fecha_finalizado, t.gabinete, t.etiqueta_firma,
         t.created_at, t.updated_at,
+        (SELECT COUNT(*) FROM skytec_candados sk WHERE sk.tarjeta_id = t.id
+           AND ((sk.slot = 'R1' AND sk.mac = upper(p1.mac)) OR (sk.slot = 'R2' AND sk.mac = upper(p2.mac)))) AS _skytec,
         {_cols_pcb('p1', 'R1')},
         {_cols_pcb('p2', 'R2')},
         {_cols_pcb('p3', 'R3')},
@@ -705,6 +707,7 @@ _SELECT_TARJETA = f"""
 def _fila_a_tarjeta(row: sqlite3.Row) -> Dict[str, Any]:
     """Fila SQL -> tarjeta enriquecida: objetos r1/r2/r3, `completa` (R1 y R2 presentes) y `sin_mac`."""
     d = dict(row)
+    d["skytec"] = (d.pop("_skytec", 0) or 0) >= 2   # v1.4.60: R1 y R2 con su candado en Skytec (MAC vigente)
     for r in ("r1", "r2", "r3"):
         pid = d.get(f"pcb_{r}_id")
         version, serie, ciclo = d.pop(f"_{r}_version"), d.pop(f"_{r}_serie"), d.pop(f"_{r}_ciclo")

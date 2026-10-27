@@ -438,6 +438,18 @@ CREATE TABLE IF NOT EXISTS pcb_inventario (
 )"""
 
 SCHEMA = f"""
+-- v1.4.60: candados dados de alta en Skytec por tarjeta y ranura (R1/R2); la MAC liga el registro a la placa vigente
+CREATE TABLE IF NOT EXISTS skytec_candados (
+    tarjeta_id INTEGER NOT NULL,
+    slot TEXT NOT NULL CHECK (slot IN ('R1','R2')),
+    nombre TEXT NOT NULL,
+    mac TEXT NOT NULL,
+    estado TEXT NOT NULL,                         -- 'creado' | 'ya_existia'
+    operador TEXT,
+    creado_en TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    PRIMARY KEY (tarjeta_id, slot)
+);
+
 -- v1.3.59: pruebas BLE (sección Pruebas y validación); aquí para que exista antes de leer tarjetas (estado «validada»)
 CREATE TABLE IF NOT EXISTS validaciones_ble (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

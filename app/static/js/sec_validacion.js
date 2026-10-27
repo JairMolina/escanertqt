@@ -462,6 +462,12 @@
       if (alive) paintCard("");
     });
     // ---------------------------------------------------------------- estaciones (respaldo agente)
+    // v1.4.60: versión del agente/puente en uso; se compara con la que se descarga hoy.
+    let agenteActual = "";
+    function verAgente(s) {
+      const v = s?.agent_version || "anterior a 1.4.51";
+      return " · agente " + v + (agenteActual ? (v === agenteActual ? " (actualizado)" : " (viejo; actual " + agenteActual + ")") : "");
+    }
     async function stations() {
       if (web()) return;
       const list = await call("/stations");
@@ -478,7 +484,7 @@
       stationId = pick?.id || "";
       if (pick?.online) saveStation(stationId);
       stationInfo.textContent = pick
-        ? "Agente Windows: " + pick.name + (pick.online ? " · en línea" : " · sin conexión") + (online.length > 1 ? " (" + online.length + " en línea; se usa esta)" : "")
+        ? "Agente Windows: " + pick.name + (pick.online ? " · en línea" : " · sin conexión") + verAgente(pick) + (online.length > 1 ? " (" + online.length + " en línea; se usa esta)" : "")
         : online.length > 1 ? "Hay varios bancos Windows; configura en esta laptop su estación para no usar otra computadora." : "No hay agente de pruebas registrado.";
       if (!pick || !pick.online) connSerial.set("off", pick ? "agente sin conexión" : "sin agente");
       else if (pick.serial_connected) connSerial.set("ok", "conectado · " + (pick.port || "COM") + " (agente)");
@@ -594,7 +600,7 @@
       const online = r.ok ? (r.data || []).filter(s => s.online && !s.serial_connected && !s.running) : [];
       const chosen = online.find(s => s.id === nativeStationId) || (online.length === 1 ? online[0] : null);
       nativeReady = !!chosen;
-      nativeInfo.textContent = chosen ? "Bluetooth Windows: " + chosen.name + " · conectado (solo BLE)"
+      nativeInfo.textContent = chosen ? "Bluetooth Windows: " + chosen.name + " · conectado (solo BLE)" + verAgente(chosen)
         : online.length > 1 ? "Hay varios puentes. Prepara el de esta laptop para asociarlo."
         : "Puente Bluetooth Windows desconectado. El serial continúa directo en el navegador.";
       if (chosen) { nativeStationId = chosen.id; try { localStorage.setItem("tqt.station.ble", chosen.id); } catch (_) {} }
@@ -1354,6 +1360,7 @@
     // v1.4.57: aviso a quien tenga un agente o puente Bluetooth viejo (sin keep-alive ni separación por cuenta).
     api("/api/validacion/tqt/agentes/desactualizados").then((r) => {
       const l = r.ok && r.data ? r.data.estaciones : [];
+      if (r.ok && r.data) agenteActual = r.data.actual || "";
       if (!alive || !l.length) return;
       T.sheet({
         title: "Actualiza tu " + (l.every((x) => x.solo_ble) ? "puente Bluetooth" : "agente de Pruebas TQT"),
@@ -1366,7 +1373,7 @@
             h("li", null, "Extráelo en una carpeta nueva y ejecuta iniciar.cmd."),
             h("li", null, "Vuelve aquí: debe decir «Bluetooth Windows: <tu cuenta> · conectado»."),
           ),
-          h("p", { class: "hint" }, "Cada cuenta usa solo sus propios agentes y puentes; los de otra cuenta y la Raspberry ya no aparecen. Este aviso se quita cuando el agente viejo deja de usarse."),
+          h("p", { class: "hint" }, "Cada cuenta usa solo sus propios agentes y puentes; los de otra cuenta y la Raspberry ya no aparecen. Este aviso deja de salir en cuanto tu cuenta tiene un agente o puente con la versión actual."),
         ],
         actions: [{ label: "Entendido", kind: "primary", onClick: () => true }],
       });

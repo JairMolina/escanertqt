@@ -22,6 +22,10 @@ class SkytecError(RuntimeError):
     pass
 
 
+class TarjetaNoEncontrada(Exception):
+    pass
+
+
 def _cfg() -> dict:
     return {
         "api": os.getenv("TQT_SKYTEC_API", API_DEFAULT).rstrip("/"),
@@ -67,6 +71,27 @@ def nombre_completo(slot: dict) -> str:
 
 def _norm_mac(mac: Optional[str]) -> str:
     return str(mac or "").strip().upper().replace("-", ":")
+
+
+def registrar(tarjeta_id: int, items: list, operador: str = "") -> None:
+    """v1.4.60: guarda los candados que quedaron en Skytec (creados o ya existentes) para marcar la tarjeta."""
+    from app.database import db
+    with db.get_db() as c:
+        for i in items:
+            if i.get("estado") in ("creado", "ya_existia"):
+                c.execute("INSERT OR REPLACE INTO skytec_candados(tarjeta_id,slot,nombre,mac,estado,operador) VALUES(?,?,?,?,?,?)",
+                          (tarjeta_id, i["slot"], i["nombre"], i["mac"], i["estado"], operador))
+
+
+def alta_tarjeta(tarjeta_id: int, operador: str = "") -> dict:
+    """Alta de R1/R2 de una tarjeta y registro local. Lanza SkytecNoConfigurado/SkytecError/TarjetaNoEncontrada."""
+    from app.database import db
+    tarjeta = db.get_tarjeta_by_id(tarjeta_id)
+    if not tarjeta:
+        raise TarjetaNoEncontrada("Tarjeta no encontrada.")
+    items = alta_armado(tarjeta)
+    registrar(tarjeta_id, items, operador)
+    return {"ok": all(i["estado"] != "error" for i in items), "items": items}
 
 
 def alta_armado(tarjeta: dict) -> list:

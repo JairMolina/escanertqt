@@ -52,12 +52,12 @@ def desactualizados(operator, dias=7):
             "SELECT p.seen,p.state,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station "
             "WHERE s.revoked_at IS NULL AND lower(s.owner)=lower(?) AND s.name NOT LIKE ? AND p.seen>?",
             (operator, RASPBERRY_LIKE, time.time() - dias * 86400)).fetchall()
-    # Uno viejo apagado ya no cuenta si la cuenta tiene otro actualizado (lo reemplazó); uno viejo en línea siempre cuenta.
+    # v1.4.60: en cuanto la cuenta tiene un agente/puente con la versión actual, el aviso deja de salir.
     hay_nuevo = any(json.loads(r["state"]).get("agent_version") == actual for r in filas)
     out = []
     for r in filas:
         st = json.loads(r["state"])
-        if actual and st.get("agent_version") != actual and (time.time() - r["seen"] < 15 or not hay_nuevo):
+        if actual and not hay_nuevo and st.get("agent_version") != actual:
             out.append(dict(nombre=r["name"], version=st.get("agent_version") or "anterior a 1.4.51",
                             solo_ble=bool(st.get("ble_only")), en_linea=time.time() - r["seen"] < 15))
     return {"actual": actual, "estaciones": out}
