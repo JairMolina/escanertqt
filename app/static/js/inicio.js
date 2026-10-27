@@ -181,9 +181,10 @@
     function lunasHtml(ls, entra) {
         if (!Array.isArray(ls) || !ls.length) return '';
         return '<span class="lunas">' + ls.slice(0, 3).map(function (l, j, a) {
-            return '<span class="luna-sis" style="--j:' + (j / a.length) + '"><span class="luna"><i class="luna-esf" aria-hidden="true"></i>' +
-                (entra && destino(l && l.url) ? '<a class="luna-nom" href="' + esc(l.url) + '">' + LUNA_ICO + esc(l.nombre) + '</a>'
-                    : '<span class="luna-nom">' + LUNA_ICO + esc(l && l.nombre) + '</span>') + '</span></span>';
+            // toda la luna es el enlace; su nombre solo se muestra al pasar el cursor por ella (o al enfocarla con teclado)
+            var url = entra && destino(l && l.url), tag = url ? 'a' : 'span';
+            return '<span class="luna-sis" style="--j:' + (j / a.length) + '"><' + tag + ' class="luna"' + (url ? ' href="' + esc(url) + '"' : '') + '>' +
+                '<i class="luna-esf" aria-hidden="true"></i><span class="luna-nom">' + LUNA_ICO + esc(l && l.nombre) + '</span></' + tag + '></span>';
         }).join('') + '</span>';
     }
     function construir(mods) {
@@ -398,15 +399,18 @@
 
     /* ---- eventos de las estrellas (delegados en la lista) ---- */
     function itemDe(el) { var b = el.closest && el.closest('.est'); return b ? items[+b.dataset.i] : null; }
-    // hover: la estrella o su luna enlazada (detiene la órbita para poder pulsar la luna)
-    function itemHov(el) { var a = el.closest && el.closest('a.luna-nom'), li = a && a.closest('.mod'); return li ? items.filter(function (x) { return x.li === li; })[0] || null : itemDe(el); }
+    // la luna solo frena la órbita para poder pulsarla; no activa su estrella ni abre la ficha (que taparía su nombre)
+    var lunaHov = false;
+    function lunaDe(el) { return el && el.closest ? el.closest('.luna') : null; }
     listaEl.addEventListener('pointerover', function (e) {
         if (e.pointerType === 'touch') return;
-        var it = itemHov(e.target); if (it && !it.li.contains(e.relatedTarget)) entrarHover(items.indexOf(it));
+        if (lunaDe(e.target)) { lunaHov = true; return; }
+        var it = itemDe(e.target); if (it && !it.btn.contains(e.relatedTarget)) entrarHover(items.indexOf(it));
     });
     listaEl.addEventListener('pointerout', function (e) {
         if (e.pointerType === 'touch') return;
-        var it = itemHov(e.target); if (it && !it.li.contains(e.relatedTarget)) salirHover();
+        var l = lunaDe(e.target); if (l) { if (!l.contains(e.relatedTarget)) lunaHov = false; return; }
+        var it = itemDe(e.target); if (it && !it.btn.contains(e.relatedTarget)) salirHover();
     });
     listaEl.addEventListener('click', function (e) {
         var it = itemDe(e.target); if (!it) return;
@@ -486,7 +490,8 @@
         var k = 1 - Math.exp(-dt * 4);
         par.x += (par.tx - par.x) * k; par.y += (par.ty - par.y) * k;
         if (orbs.length) {
-            vel += ((act ? 0 : 1) - vel) * (1 - Math.exp(-dt * (act ? 6 : 2.4)));     // frena y arranca con suavidad cuando hay una estrella activa
+            var quietas = act || lunaHov;
+            vel += ((quietas ? 0 : 1) - vel) * (1 - Math.exp(-dt * (quietas ? 6 : 2.4)));     // frena y arranca con suavidad con una estrella activa o la luna bajo el cursor
             if (vel < .002) vel = 0; else if (vel > .998) vel = 1;
             if (vel > 0) { items.forEach(function (it) { it.ang += it.orb.w * vel * dt; }); colocar(); }
         }

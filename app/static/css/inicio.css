@@ -567,7 +567,9 @@ body::before {
 .lunas::after { content: ""; position: absolute; left: -48px; top: -16px; width: 96px; height: 32px; border-radius: 50%; pointer-events: none;
                 box-shadow: 0 6px 14px -8px color-mix(in srgb, var(--a) 70%, transparent); opacity: .7; }
 .luna-sis { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 2; transform: translateX(42px); }
-.luna { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; transform: translateY(8px); }
+.luna { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; transform: translateY(8px); pointer-events: auto; color: inherit; text-decoration: none; outline: none; }
+.luna::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; }   /* área de hover cómoda (28 px) */
+a.luna { cursor: pointer; }
 /* esfera: luz arriba-izquierda, terminador a la derecha, tres cráteres y halo del color del planeta */
 .luna-esf { position: absolute; inset: 0; border-radius: 50%; transition: transform var(--t-rapida) var(--ease), box-shadow var(--t-rapida) var(--ease);
             background: radial-gradient(circle at 64% 60%, rgba(40,34,26,.30) 0 11%, transparent 13%),
@@ -581,15 +583,16 @@ body::before {
             font-size: 11px; font-weight: 600; letter-spacing: .02em; line-height: 1; color: var(--muted);
             padding: 4px 8px 4px 6px; border-radius: 999px; background: var(--surface, var(--bg));
             border: 1px solid color-mix(in srgb, var(--a) 35%, var(--line));
-            box-shadow: 0 1px 2px rgba(0,0,0,.12); transition: color var(--t-rapida) var(--ease), border-color var(--t-rapida) var(--ease); }
+            box-shadow: 0 1px 2px rgba(0,0,0,.12); opacity: 0; pointer-events: none; translate: -4px 0;
+            transition: opacity var(--t-rapida) var(--ease), translate var(--t-rapida) var(--ease); }
+/* el nombre solo aparece encima de la luna */
+.luna:hover .luna-nom, .luna:focus-visible .luna-nom { opacity: 1; translate: 0 0; pointer-events: auto; color: var(--text); border-color: var(--a); }
+a.luna:focus-visible .luna-nom { box-shadow: 0 0 0 2px color-mix(in srgb, var(--a) 40%, transparent); }
 .luna-nom::before { content: ""; position: absolute; right: 100%; top: 50%; width: 7px; height: 1px; background: color-mix(in srgb, var(--a) 55%, var(--line)); }
 .luna-ico { width: 11px; height: 11px; flex: none; color: var(--a); }
-a.luna-nom { pointer-events: auto; text-decoration: none; cursor: pointer; }
-a.luna-nom:hover, a.luna-nom:focus-visible { color: var(--text); border-color: var(--a); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--a) 40%, transparent); }
-.luna:has(a.luna-nom:hover) .luna-esf, .luna:has(a.luna-nom:focus-visible) .luna-esf, .est[data-on] ~ .lunas .luna-esf {
+.luna:hover .luna-esf, .luna:focus-visible .luna-esf, .est[data-on] ~ .lunas .luna-esf {
   box-shadow: inset -3px -2px 4px rgba(0,0,0,.45), inset 1px 1px 1px rgba(255,255,255,.55),
               0 0 0 1px var(--a), 0 0 16px 3px color-mix(in srgb, var(--a) 60%, transparent); }
-.est[data-on] ~ .lunas .luna-nom { color: var(--text); border-color: color-mix(in srgb, var(--a) 60%, var(--line)); }
 @keyframes luna-x { from { transform: translateX(48px); } to { transform: translateX(-48px); } }
 @keyframes luna-y { from { transform: translateY(-16px); } to { transform: translateY(16px); } }
 @keyframes luna-capa { 0%, 49% { z-index: 2; opacity: 1; } 51%, 99% { z-index: 0; opacity: .45; } 100% { z-index: 2; opacity: 1; } }
@@ -601,9 +604,8 @@ a.luna-nom:hover, a.luna-nom:focus-visible { color: var(--text); border-color: v
   .luna { animation: luna-y 7s cubic-bezier(.37, 0, .63, 1) infinite alternate; animation-delay: calc(var(--j, 0) * -14s - 3.5s); }
   .luna-esf { animation: luna-prof 14s linear infinite; animation-delay: calc(var(--j, 0) * -14s); }
   .mod:has(.est[data-on]) .luna, .mod:has(.est[data-on]) .luna-sis,
-  .luna-sis:has(a.luna-nom:hover), .luna-sis:has(a.luna-nom:hover) .luna,
-  .luna-sis:has(a.luna-nom:focus-visible), .luna-sis:has(a.luna-nom:focus-visible) .luna,
-  .mod:has(.est[data-on]) .luna-esf, .luna:has(a.luna-nom:hover) .luna-esf, .luna:has(a.luna-nom:focus-visible) .luna-esf { animation-play-state: paused; }
+  .luna-sis:has(.luna:hover), .luna-sis:has(.luna:hover) .luna, .luna-sis:has(.luna:focus-visible), .luna-sis:has(.luna:focus-visible) .luna,
+  .mod:has(.est[data-on]) .luna-esf, .luna:hover .luna-esf, .luna:focus-visible .luna-esf { animation-play-state: paused; }
 }
 @media (max-width: 640px), (max-height: 540px) {
   .lunas { position: relative; width: auto; height: auto; display: flex; gap: 8px; padding: 6px 0 0 62px; }
@@ -612,5 +614,6 @@ a.luna-nom:hover, a.luna-nom:focus-visible { color: var(--text); border-color: v
   .luna { display: inline-flex; align-items: center; gap: 6px; }
   .luna-esf { position: relative; width: 14px; height: 14px; animation: none !important; }
   .luna-nom::before { content: none; }
-  .luna-nom { position: static; transform: none; }
+  .luna::after { content: none; }
+  .luna-nom { position: static; transform: none; opacity: 1; translate: none; pointer-events: auto; }   /* sin cursor en móvil: siempre visible */
 }
