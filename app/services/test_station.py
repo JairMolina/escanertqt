@@ -10,11 +10,15 @@ STAGES = ("queued", "running")
 # v1.4.54: el agente de la Raspberry (Pruebas automáticas) también se anuncia como puente BLE y agente; Pruebas TQT
 # no debe elegirlo ni usar su Bluetooth/serial. Solo pruebas_auto lo maneja.
 RASPBERRY = "Raspberry · Pruebas automáticas"
+# station_create guarda «<cuenta> · <nombre[:29]>»: se reconoce por este fragmento (y por el banco vigente).
+RASPBERRY_LIKE = "%Raspberry · Pruebas autom%"
 
 
 def es_raspberry(c, sid):
-    r = c.execute("SELECT name FROM stm32_stations WHERE id=?", (sid,)).fetchone()
-    return bool(r) and r["name"] == RASPBERRY
+    if c.execute("SELECT 1 FROM stm32_stations WHERE id=? AND name LIKE ?", (sid, RASPBERRY_LIKE)).fetchone():
+        return True
+    banco = c.execute("SELECT 1 FROM sqlite_master WHERE name='tqt_resistencia_banco'").fetchone()
+    return bool(banco and c.execute("SELECT 1 FROM tqt_resistencia_banco WHERE station=?", (sid,)).fetchone())
 
 
 def no_raspberry(c, sid):

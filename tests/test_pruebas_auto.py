@@ -171,10 +171,6 @@ class PruebasAuto(unittest.TestCase):
         self.assertEqual(pa.leer(c["id"])["estado"], "detenida")
         self.assertIsNone(pa.banco("otra@test.mx")["ocupacion"])
 
-
-if __name__ == "__main__":
-    unittest.main()
-
     def test_pruebas_tqt_no_usa_la_raspberry(self):
         """v1.4.54: la Raspberry se anuncia como puente BLE; Pruebas TQT no la lista ni la usa (ni BLE ni pruebas)."""
         from app.services import native_ble
@@ -187,3 +183,7 @@ if __name__ == "__main__":
         win = stm.station_create("Banco TQT Windows", "operador@test.mx")
         s.claim(win["id"], {"ble_bridge": 1})
         self.assertIn(win["id"], [x["id"] for x in native_ble.stations("operador@test.mx")])
+
+
+if __name__ == "__main__":
+    unittest.main()

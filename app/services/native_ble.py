@@ -27,7 +27,7 @@ def stations(operator):
     with db.get_db() as c:
         return [dict(id=r['station'], name=r['name'], online=time.time()-r['seen'] < 15,
                      **json.loads(r['state'])) for r in c.execute(
-            'SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.owner=? AND s.revoked_at IS NULL AND s.name<>?', (operator, tests.RASPBERRY))
+            'SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.owner=? AND s.revoked_at IS NULL AND s.name NOT LIKE ?', (operator, tests.RASPBERRY_LIKE))
             if json.loads(r['state']).get('ble_bridge') == 1]
 
 
