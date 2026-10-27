@@ -131,7 +131,7 @@ def registrar_banco(operador, admin=False):
                 raise Ocupado(occ)
         if c.execute("SELECT 1 FROM tqt_resistencia WHERE estado IN ('activa','pausada')").fetchone():
             raise ValueError("Hay una campaña activa o pausada: deténla antes de reinstalar el agente.")
-    st = stm.station_create("Raspberry · Pruebas automáticas", operador)
+    st = stm.station_create(ts.RASPBERRY, operador)
     with db.transaction() as c:
         c.execute("INSERT INTO tqt_resistencia_banco(clave,station,creado,operador) VALUES(?,?,?,?) "
                   "ON CONFLICT(clave) DO UPDATE SET station=excluded.station,creado=excluded.creado,operador=excluded.operador,"

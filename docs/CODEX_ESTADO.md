@@ -4,6 +4,8 @@ Actualizado:2026-10-27. Código de referencia:a1ea3d57d6907ef668e0d0156567a14edf
 
 ## Avance reportado
 
+Claude v1.4.54: Pruebas TQT ya no lista ni usa la Raspberry de Pruebas automáticas como puente Bluetooth ni como agente (test_station.RASPBERRY/no_raspberry; antes el escaneo/conexión BLE podía hacerse con el Bluetooth de la Raspberry). v1.4.53: scroll del esquema de Diagrama.
+
 Claude v1.4.52: Pruebas automáticas con sesiones separadas (la Raspberry es de una cuenta a la vez; pantalla «Raspberry ocupada», 409 con quién la usa; cada cuenta ve solo sus campañas; admin «Detener y liberar») y rediseño de Diagrama (sec_diagrama.css/js, diagrama_svg.js; datos y lógica sin cambios).
 
 Claude, v1.4.51 (1.4.50 sin usar; rama luna-pruebas-automaticas sobre 1.4.49; publicada antes como «v1.4.51» y desplegada en b7e9554): luna «Pruebas automáticas» en /inicio y submódulo /pruebas-automaticas: campañas de resistencia que repiten las 14 etapas de Pruebas TQT en UN banco, la Raspberry de la DYMO (tablas tqt_resistencia, tqt_resistencia_ciclos, tqt_resistencia_banco; services/pruebas_auto.py encadena en test_station.claim). Agente de pruebas para Linux: iniciar.sh, candado fcntl, puerto serie by-id recordado, subida de agent.log a petición. Logs .txt por ciclo, campaña y agente. No libera tarjetas ni cambia estados de fabricación.

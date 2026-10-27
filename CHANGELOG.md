@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.54 — 2026-10-27
+- **Pruebas TQT ya no usa la Raspberry de Pruebas automáticas.** El agente de la Raspberry se anuncia como puente Bluetooth y como agente (igual que el de Windows) y quedaba registrado a nombre de quien descargó su ZIP; por eso Pruebas TQT lo listaba en «Puente Bluetooth Windows» (lo elegía solo si era el único en línea: el escaneo/conexión de R1/R2 se hacía con el Bluetooth de la Raspberry) y en el modo agente (lista `/stations` sin filtro de dueño). Ahora `RASPBERRY`/`no_raspberry` en `test_station.py` la excluyen de `/web/ble/stations` y `/stations`, y rechazan crear pruebas, comandos manuales y comandos BLE de Pruebas TQT sobre ella; Pruebas automáticas la sigue manejando. Prueba nueva `test_pruebas_tqt_no_usa_la_raspberry`.
+
 ## v1.4.53 — 2026-10-27
 - **Diagrama: el scroll del esquema funciona.** El lienzo tenía `overscroll-behavior: contain` y `max-height: 700px`: sin zoom no había nada que desplazar y aun así la rueda no pasaba a la página (sobre el esquema no se movía nada); con zoom atrapaba la rueda en un scroll vertical interno. Ahora el lienzo solo se desplaza en horizontal (rueda horizontal, Shift+rueda o barra) y la rueda vertical siempre mueve la página. Con zoom, además, se arrastra con el ratón (cursor de mano); un arrastre no selecciona el cable. Medido en Chrome: rueda vertical sobre el esquema mueve la página 300 px con zoom 100 % y 175 %, rueda horizontal desplaza el lienzo y un arrastre de 200 px lo mueve 200 px.
 

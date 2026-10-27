@@ -112,13 +112,15 @@ def stations():
                 **json.loads(r["state"]),
             )
             for r in c.execute(
-                "SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.revoked_at IS NULL"
+                "SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.revoked_at IS NULL AND s.name<>?", (svc.RASPBERRY,)
             )
         ]
 
 
 @router.post("/commands")
 def commands(body: Command):
+    with db.get_db() as c:
+        run(svc.no_raspberry, c, body.station_id)
     return run(svc.command, body.station_id, body.action, body.model_dump())
 
 

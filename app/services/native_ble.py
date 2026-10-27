@@ -27,7 +27,7 @@ def stations(operator):
     with db.get_db() as c:
         return [dict(id=r['station'], name=r['name'], online=time.time()-r['seen'] < 15,
                      **json.loads(r['state'])) for r in c.execute(
-            'SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.owner=? AND s.revoked_at IS NULL', (operator,))
+            'SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.owner=? AND s.revoked_at IS NULL AND s.name<>?', (operator, tests.RASPBERRY))
             if json.loads(r['state']).get('ble_bridge') == 1]
 
 
@@ -54,6 +54,7 @@ def prepare(operator, body):
         raise ValueError('Comando Bluetooth no permitido.')
     with db.transaction() as c:
         station = tests.stm.require_station(c, sid)
+        tests.no_raspberry(c, sid)
         if not station or station['owner'] != operator:
             raise ValueError('El puente pertenece a otro operador.')
         p = c.execute('SELECT seen,state FROM tqt_test_presence WHERE station=?', (sid,)).fetchone()

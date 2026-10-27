@@ -174,3 +174,16 @@ class PruebasAuto(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_pruebas_tqt_no_usa_la_raspberry(self):
+        """v1.4.54: la Raspberry se anuncia como puente BLE; Pruebas TQT no la lista ni la usa (ni BLE ni pruebas)."""
+        from app.services import native_ble
+        s.claim(self.st["id"], {"ble_bridge": 1, "serial_connected": True})
+        self.assertNotIn(self.st["id"], [x["id"] for x in native_ble.stations("operador@test.mx")])
+        with self.assertRaisesRegex(ValueError, "Raspberry"):
+            native_ble.prepare("operador@test.mx", {"station_id": self.st["id"], "operation": "scan", "role": "R1", "request_id": "x"})
+        with self.assertRaisesRegex(ValueError, "Raspberry"):
+            s.create(self.st["id"], self.t["id"], "operador@test.mx", True)
+        win = stm.station_create("Banco TQT Windows", "operador@test.mx")
+        s.claim(win["id"], {"ble_bridge": 1})
+        self.assertIn(win["id"], [x["id"] for x in native_ble.stations("operador@test.mx")])

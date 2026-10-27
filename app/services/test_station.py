@@ -7,6 +7,21 @@ from app.services import stm32_programming as stm
 STAGES = ("queued", "running")
 
 
+# v1.4.54: el agente de la Raspberry (Pruebas automáticas) también se anuncia como puente BLE y agente; Pruebas TQT
+# no debe elegirlo ni usar su Bluetooth/serial. Solo pruebas_auto lo maneja.
+RASPBERRY = "Raspberry · Pruebas automáticas"
+
+
+def es_raspberry(c, sid):
+    r = c.execute("SELECT name FROM stm32_stations WHERE id=?", (sid,)).fetchone()
+    return bool(r) and r["name"] == RASPBERRY
+
+
+def no_raspberry(c, sid):
+    if es_raspberry(c, sid):
+        raise ValueError("Ese agente es la Raspberry de Pruebas automáticas; Pruebas TQT usa el banco o puente de Windows.")
+
+
 def norm(value):
     return re.sub(r"[^A-Z0-9]", "", str(value or "").upper())
 
@@ -130,6 +145,7 @@ def create(sid, tid, operator, confirmed):
         )
     with db.transaction() as c:
         stm.require_station(c, sid)
+        no_raspberry(c, sid)
         p = c.execute(
             "SELECT seen,state FROM tqt_test_presence WHERE station=?", (sid,)
         ).fetchone()
