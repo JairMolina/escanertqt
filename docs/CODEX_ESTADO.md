@@ -14,3 +14,7 @@ Recargar web y, cuando se vaya a programar, instalar solo un agente nuevo usando
 ## Evidencia
 
 122Python aisladas+9Node+15gruposPlaywrightPASS,0JSerrors,móvil390sin desborde,ComposeQA/diffcorrectos. Backup /backups/predeploy_1.4.47_20261027_092049.db,integrity_checkok,SHA256d51ad4340fb1e321341685fb46e7b4ce067e2167ec6ef37b0551403b7fa44b11. Producción tqt runninghealthy,APP_VERSION1.4.47,quick_checkok,health interno/público ok:true,loginHTTP200/1.4.47. Antes/después coinciden94trabajosSTM32,50pruebas,239comandos,446PCB,100tarjetas,1883escaneos,20agentesrevocados,0vigentes,1bancoweb. Cloudflared sin reiniciar. CMcheckpoint/memoria y ECCbackend/seguridad/verificación;sin secretos o bases en Git/CM.
+
+## Corrección preparada — indicador de vigencia STM32,1.4.48
+
+El panel histórico ahora compara FW registrado con el último aprobado del mismoHW: naranja si anterior, verde si verificado y vigente. Comparación compartida con lista, independiente del selector;beta no cuenta.19gruposPlaywright y11PythonPASS;JS/ComposeQA/diffOK. Ver STM32_INDICADOR_VIGENCIA.md. Producción sigue1.4.47/454add0;pendiente autorización expresa del despliegue de esta corrección.

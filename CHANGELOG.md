@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.48 — 2026-10-27
+- Programación STM32 R1/R3: el panel de la última grabación verificada pasa a naranja si su FW es anterior al último aprobado para ese HW. Una grabación verificada ya no implica que el firmware esté actualizado.
+- Lista y panel comparten la comparación de versiones; se muestran el aviso «Desactualizada» y las versiones instalada/vigente. Cambiar el firmware a programar no modifica el estado registrado. Beta y otro hardware no determinan la vigencia; sin catálogo confirmado no se asegura que esté actualizada.
+
 ## v1.4.47 — 2026-10-27
 - Cierre de mantenimiento sobre `main` 1.4.46: las mejoras de agentes ya estaban integradas; se conserva la cuenta web asociada al agente, el actor real de cada operación, el botón de borrado seguro y los historiales.
 - Verificado el retiro previo de 20 agentes físicos en el servidor. Se completó la limpieza pendiente de esta laptop: cuatro procesos detenidos, seis arranques automáticos retirados y siete carpetas conservadas en respaldo privado local, fuera de Git y memoria.

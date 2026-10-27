@@ -8,7 +8,23 @@ window.TQTSTM32 = function (host, ctx) {
     let selectedFirmware = null, firmwareRequest = 0, uploadOpen = false, observed = null;
     const firmwareSelect = h('select', { class: 'input', id: ID + '-fw', disabled: true });
     const firmwareHint = h('p', { class: 'hint', 'aria-live': 'polite' }, 'Cargando firmware…');
-    let firmwareItems = [];
+    let firmwareItems = [], firmwareCatalogueKnown = false;
+    const hwKey = hw => String(hw || '').replace(/^V/i, '').replace(/\./g, '');
+    function newerVersion(a, b) {
+        const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+        for (let i = 0; i < Math.max(x.length, y.length); i++) {
+            if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+        }
+        return false;
+    }
+    function firmwareState(installed, hw, items) {
+        let latest = null;
+        items.forEach(f => {
+            if ((f.release_status || 'aprobado') === 'aprobado' && hwKey(f.hw) === hwKey(hw) && (!latest || newerVersion(f.fw, latest))) latest = f.fw;
+        });
+        const state = !installed ? 'unprogrammed' : !latest || !/^\d+(\.\d+)*$/.test(installed) ? 'unknown' : newerVersion(latest, installed) ? 'outdated' : 'updated';
+        return { state, latest };
+    }
     const approveBtn = h('button', { class: 'btn', type: 'button', hidden: true, onclick: () => {
         const f = firmwareItems.find(x => x.id === selectedFirmware);
         if (!f || f.release_status !== 'beta' || busy) return;
@@ -46,14 +62,17 @@ window.TQTSTM32 = function (host, ctx) {
         const verified = actual?.source === 'verified_programming';
         const hasRecord = !!actual?.firmware;
         const unconfirmed = !!actual?.current_unconfirmed;
-        const baseLabel = unconfirmed ? 'Sin verificación actual' : verified ? 'Última programación verificada' : hasRecord ? 'Último registrado' : 'Sin verificar';
-        const colour = k === 'err' ? 'err' : busy ? 'warn' : verified && !unconfirmed ? 'ok' : hasRecord || unconfirmed ? 'warn' : 'bad';
+        const currency = firmwareState(actual?.firmware, actual?.hardware || selectedPcb?.version, firmwareCatalogueKnown ? firmwareItems : []);
+        const outdated = currency.state === 'outdated';
+        const baseLabel = unconfirmed ? 'Sin verificación actual' : outdated ? 'Desactualizada · ' + (verified ? 'última programación verificada' : 'último registrado') : verified ? 'Última programación verificada' : hasRecord ? 'Último registrado' : 'Sin verificar';
+        const colour = k === 'err' ? 'err' : busy ? 'warn' : verified && !unconfirmed && currency.state === 'updated' ? 'ok' : hasRecord || unconfirmed ? 'warn' : 'bad';
         const date = actual?.verified_at ? new Date(actual.verified_at * 1000).toLocaleString('es-MX') : actual?.recorded_at || 'No disponible';
         window.TQTProgEstado.pintar(estadoBox, Object.assign({
             estado: colour, etiqueta: busy ? 'Programando · ' + baseLabel.toLowerCase() : baseLabel,
             conexion: 'Agente J-Link' + (opt && opt.value ? ' · ' + (opt.dataset.name || opt.textContent) + (opt.dataset.online === 'true' ? ' (conectado)' : ' (desconectado)') : ' · sin estación elegida')
         }, extra || {}, {
             fw: actual?.firmware || 'sin verificar', hw: actual?.hardware || '',
+            instalado: hasRecord ? actual.firmware : '', vigente: hasRecord ? currency.latest || '' : '',
             firmwareLabel: verified ? 'Último FW verificado' : 'FW / HW registrados',
             nombre: actual?.nombre || '', nombreLabel: verified ? 'Nombre en Flash verificada' : 'Nombre registrado',
             id_r: actual?.id_r || '', mac_r: actual?.mac_r || '', uid: actual?.uid || '',
@@ -221,15 +240,17 @@ window.TQTSTM32 = function (host, ctx) {
         const hw = selectedPcb?.version || '';
         const r = await api('/api/stm32/firmwares?tipo=' + K + '&hw=' + encodeURIComponent(hw));
         if (!alive || n !== firmwareRequest) return;
-        if (!r.ok) { firmwareHint.textContent = r.error; firmwareSelect.replaceChildren(); enable(); return; }
+        if (!r.ok) { firmwareCatalogueKnown = false; firmwareHint.textContent = r.error; firmwareSelect.replaceChildren(); enable(); if (observed) setLuz(luzState, luzExtra); return; }
         const d = r.data;
         firmwareItems = d.items;
+        firmwareCatalogueKnown = true;
         if (busy && activeFirmware) selectedFirmware = activeFirmware;
         else if (reset || !d.items.some(f => f.id === selectedFirmware)) selectedFirmware = d.default_id;
         firmwareSelect.replaceChildren(...d.items.map(f => h('option', { value: f.id }, 'FW ' + f.fw + ' · HW ' + f.hw + ' · ' + f.sha256.slice(0, 8) + (f.release_status === 'beta' ? ' · BETA · solo pruebas' : ' · Aprobado') + (f.id === d.default_id ? ' · más reciente aprobado' : ''))));
         firmwareSelect.value = selectedFirmware || '';
         firmwareHint.textContent = d.items.length ? 'Por defecto se usa la versión aprobada más alta compatible. Las BETA se eligen manualmente y no cuentan como actualización pendiente.' : 'No hay firmware compatible con esta placa. Sube un HEX para su hardware.';
         enable();
+        if (observed) setLuz(luzState, luzExtra);
     }
     firmwareSelect.addEventListener('change', () => {
         selectedFirmware = firmwareSelect.value;
@@ -373,13 +394,9 @@ window.TQTSTM32 = function (host, ctx) {
         if (!alive || n !== listN) return;
         if (!r.ok) { list.replaceChildren(T.banner('bad', 'alert', r.error)); return; }
         // v1.4.19: estatus por tarjeta como en R2 (FW guardado vs. el más alto compatible con su HW)
-        const vnum = v => String(v || '').split('.').map(x => parseInt(x, 10) || 0);
-        const mayor = (a, b) => { const x = vnum(a), y = vnum(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
-        const ultimo = {};
-        (cat.ok ? cat.data.items : []).forEach(f => { if (f.release_status === 'beta') return; const hw = String(f.hw).replace(/\./g, ''); if (!ultimo[hw] || mayor(f.fw, ultimo[hw])) ultimo[hw] = f.fw; });
         const badge = p => {
-            const vig = ultimo[String(p.version).replace(/\./g, '')], s = !p.firmware ? 'unprogrammed' : vig && mayor(vig, p.firmware) ? 'outdated' : 'updated';
-            return h('span', { class: 'prog-r2-state', dataset: { s }, title: 'Instalado: ' + (p.firmware || 'sin firmware') + ' · vigente: ' + (vig || '—') }, { unprogrammed: 'Sin programar', outdated: 'Desactualizada', updated: 'Actualizada' }[s]);
+            const { state: s, latest: vig } = firmwareState(p.firmware, p.version, cat.ok ? cat.data.items : []);
+            return h('span', { class: 'prog-r2-state', dataset: { s }, title: 'Instalado: ' + (p.firmware || 'sin firmware') + ' · vigente: ' + (vig || '—') }, { unprogrammed: 'Sin programar', outdated: 'Desactualizada', updated: 'Actualizada', unknown: 'FW por verificar' }[s]);
         };
         list.replaceChildren(...r.data.items.map(p => h('button', { class: 'prog-item', type: 'button', onclick: () => choose(p), disabled: busy,
             'aria-pressed': String(!!selectedPcb && selectedPcb.id === p.id), dataset: { id: p.id } },
