@@ -1,4 +1,5 @@
 """App FastAPI principal: rutas REST, WebSocket, archivos estáticos y ciclo de vida."""
+import hashlib
 import os
 import re
 import secrets
@@ -270,7 +271,7 @@ app.include_router(validacion.router)
 app.include_router(validacion.agent_router)
 app.include_router(test_station.router)
 app.include_router(test_station.agent_router)
-app.include_router(pruebas_auto.router)   # v1.4.xx: luna Pruebas automáticas
+app.include_router(pruebas_auto.router)   # v1.4.51: luna Pruebas automáticas
 app.include_router(dymo_remoto.router)   # v1.4.2: DYMO compartida (Raspberry)
 app.include_router(plataforma.router)   # v1.4.12: cuentas por módulo desde el portal
 app.include_router(activos.router)      # v1.4.14: módulo Impresora (activos con etiqueta DYMO + QR)
@@ -285,7 +286,7 @@ for _r in costeo.routers:                # v1.4.34: Costos (cotizador) por módu
 
 def _pagina_acceso(request: Request, archivo: str) -> HTMLResponse:
     html = (settings.STATIC_DIR / archivo).read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
-    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, html)
+    html = _VER_ESTATICO.sub(_ver_estatico, html)
     resp = HTMLResponse(html, headers={"Cache-Control": "no-store"})
     if not request.cookies.get("tqt_cid"):   # misma marca anónima que /login para el límite de intentos
         resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")
@@ -377,6 +378,21 @@ async def serve_impresora():
 
 
 _VER_ESTATICO = re.compile(r"""(/static/[\w./-]+\.(?:js|css))(?:\?v=[\w.]*)?(?=["'])""")
+_HUELLAS = {}
+
+
+def _ver_estatico(m):
+    """v1.4.51: `?v=<versión>.<huella>`: la huella (sha1 corto del contenido) cambia con el archivo aunque APP_VERSION no
+    suba; sin ella el navegador (max-age 4 h) seguía con el JS/CSS anterior tras desplegar sin cambiar de versión."""
+    ruta = m.group(1)
+    f = settings.STATIC_DIR / ruta[len("/static/"):]
+    try:
+        clave = (str(f), f.stat().st_mtime_ns)
+    except OSError:
+        return ruta + "?v=" + settings.APP_VERSION
+    if clave not in _HUELLAS:
+        _HUELLAS[clave] = hashlib.sha1(f.read_bytes()).hexdigest()[:8]
+    return ruta + "?v=" + settings.APP_VERSION + "." + _HUELLAS[clave]
 
 
 def _serve_file(file_path: Path, fallback_path: Path = None):
@@ -387,7 +403,7 @@ def _serve_file(file_path: Path, fallback_path: Path = None):
         target = settings.STATIC_DIR / "index.html"
     if target.suffix != ".html":
         return FileResponse(target, headers={"Cache-Control": "no-cache"})
-    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, target.read_text(encoding="utf-8")).replace("__VERSION__", settings.APP_VERSION)
+    html = _VER_ESTATICO.sub(_ver_estatico, target.read_text(encoding="utf-8")).replace("__VERSION__", settings.APP_VERSION)
     return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
@@ -429,7 +445,7 @@ async def serve_escaner():
 
 @app.get("/pruebas-automaticas", include_in_schema=False)
 async def serve_pruebas_auto():
-    """v1.4.xx: luna Pruebas automáticas de Escáner TQT: campañas de resistencia de firmware en un banco (Raspberry)."""
+    """v1.4.51: luna Pruebas automáticas de Escáner TQT: campañas de resistencia de firmware en un banco (Raspberry)."""
     return _serve_file(settings.STATIC_DIR / "pruebas_auto.html")
 
 
@@ -454,7 +470,7 @@ async def serve_admin(request: Request):
 async def serve_invitacion():
     """Activar una cuenta invitada (el token viaja en el #fragmento: nunca llega a registros del servidor ni del proxy)."""
     html = (settings.STATIC_DIR / "invitacion.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
-    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, html)
+    html = _VER_ESTATICO.sub(_ver_estatico, html)
     resp = HTMLResponse(html)
     resp.headers["Cache-Control"] = "no-store"
     return resp
@@ -464,7 +480,7 @@ async def serve_invitacion():
 async def serve_login(request: Request):
     """Pantalla de acceso (correo y contraseña). Es la única página pública."""
     html = (settings.STATIC_DIR / "login.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
-    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, html)
+    html = _VER_ESTATICO.sub(_ver_estatico, html)
     resp = HTMLResponse(html)   # la versión se inyecta aquí para que la pantalla de acceso siempre muestre la que corre
     resp.headers["Cache-Control"] = "no-store"
     if not request.cookies.get("tqt_cid"):   # marca anónima de este equipo, para el límite de intentos fallidos
@@ -487,7 +503,7 @@ async def modulos(request: Request):
 async def serve_inicio(request: Request):
     """Portal de módulos (público): Escáner TQT es un módulo más de la plataforma."""
     html = (settings.STATIC_DIR / "inicio.html").read_text(encoding="utf-8").replace("__VERSION__", settings.APP_VERSION)
-    html = _VER_ESTATICO.sub(lambda m: m.group(1) + "?v=" + settings.APP_VERSION, html)
+    html = _VER_ESTATICO.sub(_ver_estatico, html)
     resp = HTMLResponse(html, headers={"Cache-Control": "no-store"})
     if not request.cookies.get("tqt_cid"):   # v1.4.13: el núcleo I+D tiene ingreso propio; misma marca anónima que /login para el límite de intentos
         resp.set_cookie("tqt_cid", secrets.token_hex(12), max_age=31536000, httponly=True, secure=True, samesite="strict", path="/")

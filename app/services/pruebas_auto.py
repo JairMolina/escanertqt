@@ -1,4 +1,4 @@
-"""v1.4.xx · Pruebas automáticas (luna de Escáner TQT): campañas de resistencia de firmware.
+"""v1.4.51 · Pruebas automáticas (luna de Escáner TQT): campañas de resistencia de firmware.
 
 Una campaña deja una tarjeta armada conectada a un agente de Pruebas TQT (p. ej. la Raspberry de la DYMO) y repite la
 MISMA secuencia de 14 etapas de Pruebas TQT N veces. Cada ciclo es una ejecución normal de `tqt_test_runs` (mismo

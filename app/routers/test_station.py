@@ -65,7 +65,7 @@ class WebIdentity(BaseModel):
 class Installer(BaseModel):
     name: str = Field(default="Banco de pruebas local", max_length=60, min_length=1)
     ble_only: bool = False
-    puerto_serie: str | None = Field(default=None, max_length=120, pattern=r"^/dev/[A-Za-z0-9_./:+-]+$|^COM[0-9]{1,3}$")   # v1.4.xx: banco fijo
+    puerto_serie: str | None = Field(default=None, max_length=120, pattern=r"^/dev/[A-Za-z0-9_./:+-]+$|^COM[0-9]{1,3}$")   # v1.4.51: banco fijo
 
 
 class NativeBleCommand(BaseModel):
@@ -308,7 +308,7 @@ def zip_agente(req, st, ble_only, puerto_serie, nombre):
 @agent_router.post("/claim")
 def claim(body: dict, st=Depends(station_token)):
     res = run(svc.claim, st["id"], body)
-    if pruebas_auto.pide_log(st["id"]):   # v1.4.xx: la web de Pruebas automáticas pidió el agent.log
+    if pruebas_auto.pide_log(st["id"]):   # v1.4.51: la web de Pruebas automáticas pidió el agent.log
         res = dict(res, subir_log=True)
     return res
 

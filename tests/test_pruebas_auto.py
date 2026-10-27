@@ -1,4 +1,4 @@
-"""v1.4.xx · Pruebas automáticas: el servidor encadena ciclos de Pruebas TQT y cierra la campaña con reglas seguras."""
+"""v1.4.51 · Pruebas automáticas: el servidor encadena ciclos de Pruebas TQT y cierra la campaña con reglas seguras."""
 import _aislamiento as iso
 import unittest
 from app.database import db, inventario as inv

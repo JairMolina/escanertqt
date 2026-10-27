@@ -11,7 +11,7 @@ from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
 
 
-AGENT_VERSION = "1.4.xx-pruebas-auto"   # v1.4.xx: se muestra en /pruebas-automaticas
+AGENT_VERSION = "1.4.51-pruebas-auto"   # v1.4.51: se muestra en /pruebas-automaticas
 LOG_MAX = 256 * 1024                      # cola de agent.log que se sube cuando la web la pide
 
 
@@ -277,8 +277,17 @@ class Bridge:
             )
             self.active = None
 
+    def serial_alive(self):
+        """Conectado DE VERDAD: al desconectar el USB el hilo RX se detiene pero pyserial sigue diciendo is_open."""
+        return self.serial.connected and self.serial._running.is_set()
+
     def auto_serial(self):
-        """v1.4.xx (banco fijo, p. ej. Raspberry): con `serial_port` en config.json se conecta solo y reintenta cada 10 s."""
+        """v1.4.51 (banco fijo, p. ej. Raspberry): con `serial_port` en config.json se conecta solo y reintenta cada 10 s."""
+        if self.serial.connected and not self.serial_alive() and not self.engine.running:
+            print("Puerto serie perdido (USB desconectado); se cierra para reconectar.", flush=True)
+            self.serial.disconnect()
+            self.latest = {}
+            self.ready = ""
         port = self.auto_port
         if not port or self.cfg.get("ble_only") or self.serial.connected or self.engine.running:
             return
@@ -314,7 +323,7 @@ class Bridge:
             with path.open("rb") as f:
                 f.seek(max(0, path.stat().st_size - LOG_MAX))
                 text = f.read().decode("utf-8", "replace")
-        self.api("agent-log", {"texto": text or "(agent.log vacío: el agente se inició sin --background)"})
+        self.api("agent-log", {"texto": text or "(agent.log vacío)"})
 
     def loop(self):
         while True:
@@ -324,7 +333,7 @@ class Bridge:
                 state = {
                     "ble_bridge": 1,
                     "ble_only": bool(self.cfg.get('ble_only')),
-                    "serial_connected": self.serial.connected,
+                    "serial_connected": self.serial_alive(),
                     "port": self.serial.port_name,
                     "ble_address": self.ble.address,
                     "running": self.engine.running,
@@ -388,7 +397,7 @@ def main():
         url.scheme == "http" and url.hostname in ("127.0.0.1", "localhost")
     ):
         raise ValueError("Solo HTTPS o HTTP de loopback local.")
-    if __import__("os").name != "nt":   # v1.4.xx: Linux/Raspberry; un solo agente por estación (candado de archivo)
+    if __import__("os").name != "nt":   # v1.4.51: Linux/Raspberry; un solo agente por estación (candado de archivo)
         import fcntl
 
         candado = (path.parent / ".agent.lock").open("w")
@@ -405,6 +414,8 @@ def main():
         mutex = k.CreateMutexW(None, False, "Local\\TQTTests_" + cfg["id"])
         if not mutex or ctypes.get_last_error() == 183:
             raise RuntimeError("Esta estación ya está iniciada.")
+    print(time.strftime("%Y-%m-%d %H:%M:%S"), "Agente", AGENT_VERSION, "iniciado en", socket.gethostname(),
+          "(" + platform.system() + " " + platform.machine() + ")", "->", cfg["server"], flush=True)
     Bridge(cfg, path.parent / "evidence").loop()
 
 

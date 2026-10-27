@@ -27,7 +27,10 @@ class TestVersionEstaticos(unittest.TestCase):
         for ruta in ("/monitor", "/login", "/inicio", "/"):
             html = self.c.get(ruta).text
             vs = set(re.findall(r"/static/[\w./-]+\.(?:js|css)\?v=([\w.]+)", html))
-            self.assertEqual(vs, {settings.APP_VERSION}, ruta)
+            self.assertTrue(vs, ruta)
+            # v1.4.51: <versión>.<huella de 8 hex del contenido>: cambia con el archivo aunque no suba APP_VERSION
+            patron = re.compile(re.escape(settings.APP_VERSION) + r"\.[0-9a-f]{8}$")
+            self.assertTrue(all(patron.match(v) for v in vs), (ruta, vs))
         self.assertIn("image/", self.c.get("/favicon.ico").headers["content-type"])   # los binarios no se reescriben
 
     def test_lote_cuenta_placas(self):

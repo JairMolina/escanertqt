@@ -1,4 +1,4 @@
-"""v1.4.xx · API de Pruebas automáticas: campañas de resistencia de firmware en UN banco, la Raspberry (Linux)."""
+"""v1.4.51 · API de Pruebas automáticas: campañas de resistencia de firmware en UN banco, la Raspberry (Linux)."""
 
 import time
 from typing import Literal

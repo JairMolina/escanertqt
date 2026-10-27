@@ -247,7 +247,7 @@ def claim(sid, state):
                 "UPDATE tqt_test_commands SET state='running' WHERE id=?", (r["id"],)
             )
             return {"command": dict(r)}
-        from app.services import pruebas_auto   # v1.4.xx: campañas de resistencia (import tardío: pruebas_auto usa este módulo)
+        from app.services import pruebas_auto   # v1.4.51: campañas de resistencia (import tardío: pruebas_auto usa este módulo)
         pruebas_auto.programar(c, sid, state, now)
         r = c.execute(
             "SELECT * FROM tqt_test_runs WHERE station=? AND state='queued' ORDER BY created LIMIT 1",

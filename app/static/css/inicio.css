@@ -557,7 +557,7 @@ body::before {
 :root[data-theme="light"] .cc-panel { box-shadow: 0 24px 60px -24px rgba(13, 22, 48, .55); }
 @media (max-width: 640px), (max-height: 540px) { .nucleo { margin-bottom: 52px; } }
 
-/* v1.4.48 · Lunas: satélites de un módulo (Pruebas automáticas en Escáner TQT). Órbita elíptica de 48×16 px con dos vaivenes
+/* v1.4.51 · Lunas: satélites de un módulo (Pruebas automáticas en Escáner TQT). Órbita elíptica de 48×16 px con dos vaivenes
    senoidales desfasados un cuarto (X en .luna-sis, Y en .luna); de 0 a 50 % pasa por delante (abajo) y de 50 a 100 % por detrás. */
 .mod .est { z-index: 1; }
 .lunas { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }

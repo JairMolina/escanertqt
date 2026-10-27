@@ -1,5 +1,5 @@
 #!/bin/sh
-# v1.4.xx: arranque en Linux (Raspberry del banco de resistencia). Crea la venv, instala pyserial/bleak y deja el agente
+# v1.4.51: arranque en Linux (Raspberry del banco de resistencia). Crea la venv, instala pyserial/bleak y deja el agente
 # en segundo plano; diagnóstico en agent.log. Requisitos: python3-venv, BlueZ y el usuario en el grupo dialout.
 set -e
 cd "$(dirname "$0")"
