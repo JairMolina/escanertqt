@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.61 — 2026-10-27
+- **Skytec ya no espera la R3.** El botón «Crear candados en Skytec» de Tarjetas aparece en cuanto R1 y R2 están programadas (con MAC y firmware), también en «Falta R3 · R1 y R2 programadas». La marca «· Skytec» se ve en ese estado y en los completos.
+
 ## v1.4.60 — 2026-10-27
 - **Tarjetas: estado «Skytec» y botón «Crear candados en Skytec».** Cada alta (desde «Imprimir etiquetas» o desde Tarjetas) se guarda en la tabla nueva `skytec_candados` (tarjeta, ranura, nombre, MAC; se crea sola al iniciar). Una tarjeta con R1 y R2 registradas con su MAC vigente muestra «Completa · programada · Skytec». Si se cambia una placa, deja de contar. Las completas o validadas sin candado tienen el botón bajo «Pruebas e historial de esta tarjeta», que no exige prueba aprobada y avisa del resultado de cada ranura. Endpoint `POST /api/tarjetas/{id}/skytec`.
 - **Pruebas TQT muestra la versión del agente.** La línea del agente o puente dice «agente <versión> (actualizado)» o «(viejo; actual …)». El aviso de agente viejo deja de salir en cuanto la cuenta tiene uno con la versión actual, aunque el viejo siga en línea.

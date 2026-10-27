@@ -83,10 +83,9 @@
                         h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => guardar() }, icon('check'), 'Guardar'),
                         h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { if (!gab.value) { toast('Elige Quintalock o Translock antes de marcar la entrega', { kind: 'bad' }); gab.focus(); return; } guardar({ fecha_real: hoy() }); } }, icon('box'), 'Marcar entregada hoy')));
             }
-            // v1.4.60: las completas y programadas sin candado en Skytec se pueden dar de alta desde aquí (R1 y R2).
+            // v1.4.61: el candado solo necesita R1 y R2 programadas (con MAC y firmware); no espera la R3.
             function botonSkytec(t) {
-                const e = T.estadoTarjeta(t);
-                if (e.key !== 'completa' || !(e.programada || e.validada) || t.skytec) return null;
+                if (!T.r1r2Programadas(t) || t.skytec) return null;
                 const out = h('p', { class: 'hint', 'aria-live': 'polite' });
                 const b = h('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
                     b.disabled = true; out.className = 'hint'; out.textContent = 'Creando candados de R1 y R2 en Skytec…';
