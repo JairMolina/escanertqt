@@ -176,6 +176,15 @@
     function estadoTxt(m) { return bloqueado(m) ? 'Sin acceso' : (ESTADOS[m.estado] || esc(m.estado)); }
     var CANDADO = '<svg class="cand" viewBox="0 0 24 24" focusable="false"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>';
 
+    /* Lunas: submódulos que orbitan su estrella (fuera del botón). Con `url` y acceso al módulo son enlaces. */
+    function lunasHtml(ls, entra) {
+        if (!Array.isArray(ls) || !ls.length) return '';
+        return '<span class="lunas">' + ls.slice(0, 3).map(function (l, j, a) {
+            return '<span class="luna-sis" style="--j:' + (j / a.length) + '"><span class="luna"><i class="luna-esf" aria-hidden="true"></i>' +
+                (entra && destino(l && l.url) ? '<a class="luna-nom" href="' + esc(l.url) + '">' + esc(l.nombre) + '</a>'
+                    : '<span class="luna-nom">' + esc(l && l.nombre) + '</span>') + '</span></span>';
+        }).join('') + '</span>';
+    }
     function construir(mods) {
         // disponibles primero (estable): la estrella principal es la primera y el recorrido con flechas empieza ahí
         var base = mods.map(function (m, i) { return { m: m, i: i }; });
@@ -192,7 +201,8 @@
                 '<span class="astro" aria-hidden="true"><i class="halo"></i><i class="onda"></i><svg class="ico" viewBox="0 0 24 24" focusable="false">' + (ICONOS[m.icono] || ICONOS.caja) + '</svg>' + (sin ? CANDADO : '') + '</span>' +
                 '<span class="rot"><span class="nom" id="mn' + n + '">' + esc(m.nombre) + '</span><span class="tag" id="mt' + n + '"><i aria-hidden="true"></i>' + estadoTxt(m) + '</span></span>' +
                 '<span class="desc" id="md' + n + '">' + esc(m.descripcion) + (sin ? ' ' + MSG_SIN : '') + '</span>' +
-                (entra ? '<span class="go" aria-hidden="true">Entrar</span>' : '') + '</button>';
+                (entra ? '<span class="go" aria-hidden="true">Entrar</span>' : '') + '</button>' +
+                lunasHtml(m.lunas, entra);
             listaEl.appendChild(li);
             items.push({ m: m, li: li, btn: li.firstChild, orb: null, off: 0, x: 0, y: 0, acento: acentoOk(m.acento), sin: sin });
         });
@@ -387,13 +397,15 @@
 
     /* ---- eventos de las estrellas (delegados en la lista) ---- */
     function itemDe(el) { var b = el.closest && el.closest('.est'); return b ? items[+b.dataset.i] : null; }
+    // hover: la estrella o su luna enlazada (detiene la órbita para poder pulsar la luna)
+    function itemHov(el) { var a = el.closest && el.closest('a.luna-nom'), li = a && a.closest('.mod'); return li ? items.filter(function (x) { return x.li === li; })[0] || null : itemDe(el); }
     listaEl.addEventListener('pointerover', function (e) {
         if (e.pointerType === 'touch') return;
-        var it = itemDe(e.target); if (it && !it.btn.contains(e.relatedTarget)) entrarHover(items.indexOf(it));
+        var it = itemHov(e.target); if (it && !it.li.contains(e.relatedTarget)) entrarHover(items.indexOf(it));
     });
     listaEl.addEventListener('pointerout', function (e) {
         if (e.pointerType === 'touch') return;
-        var it = itemDe(e.target); if (it && !it.btn.contains(e.relatedTarget)) salirHover();
+        var it = itemHov(e.target); if (it && !it.li.contains(e.relatedTarget)) salirHover();
     });
     listaEl.addEventListener('click', function (e) {
         var it = itemDe(e.target); if (!it) return;

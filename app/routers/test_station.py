@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from app.routers.stm32 import station_token, operator, run
 from app.services import test_station as svc, stm32_programming as stm
-from app.services import native_ble
+from app.services import native_ble, pruebas_auto
 from app.database import db
 
 router = APIRouter(prefix="/api/validacion/tqt", tags=["Pruebas TQT"])
@@ -65,6 +65,7 @@ class WebIdentity(BaseModel):
 class Installer(BaseModel):
     name: str = Field(default="Banco de pruebas local", max_length=60, min_length=1)
     ble_only: bool = False
+    puerto_serie: str | None = Field(default=None, max_length=120, pattern=r"^/dev/[A-Za-z0-9_./:+-]+$|^COM[0-9]{1,3}$")   # v1.4.xx: banco fijo
 
 
 class NativeBleCommand(BaseModel):
@@ -213,8 +214,8 @@ def get_events(jid: str, after: int = Query(0, ge=0)):
     return [{"seq": r["seq"], "data": json.loads(r["data"])} for r in rows]
 
 
-@router.get("/runs/{jid}/log")
-def log(jid: str):
+def texto_log(jid):
+    """LOG original completo de una ejecución (o, si no llegó, las líneas de log de sus eventos)."""
     svc.read(jid)
     with db.get_db() as c:
         rows = c.execute(
@@ -234,6 +235,12 @@ def log(jid: str):
             if json.loads(r["data"]).get("kind") == "log"
         )
     )
+    return text
+
+
+@router.get("/runs/{jid}/log")
+def log(jid: str):
+    text = texto_log(jid)
     return Response(
         text,
         media_type="text/plain; charset=utf-8",
@@ -274,6 +281,10 @@ def inventory(tid: int):
 def installer(body: Installer, req: Request):
     svc.init()
     st = stm.station_create(body.name, operator(req))
+    return zip_agente(req, st, body.ble_only, body.puerto_serie, f'TQT_Pruebas_{st["id"]}.zip')
+
+
+def zip_agente(req, st, ble_only, puerto_serie, nombre):
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as z:
         root = Path(__file__).resolve().parents[2] / "station/test_station"
@@ -282,13 +293,13 @@ def installer(body: Installer, req: Request):
                 z.write(f, f.relative_to(root))
         z.writestr(
             "config.json",
-            json.dumps(dict(server=str(req.base_url).rstrip("/"), ble_only=body.ble_only, **st), indent=2),
+            json.dumps(dict(server=str(req.base_url).rstrip("/"), ble_only=ble_only, **({"serial_port": puerto_serie} if puerto_serie else {}), **st), indent=2),
         )
     return Response(
         stream.getvalue(),
         media_type="application/zip",
         headers={
-            "Content-Disposition": f'attachment; filename="TQT_Pruebas_{st["id"]}.zip"',
+            "Content-Disposition": f'attachment; filename="{nombre}"',
             "Cache-Control": "no-store",
         },
     )
@@ -296,7 +307,19 @@ def installer(body: Installer, req: Request):
 
 @agent_router.post("/claim")
 def claim(body: dict, st=Depends(station_token)):
-    return run(svc.claim, st["id"], body)
+    res = run(svc.claim, st["id"], body)
+    if pruebas_auto.pide_log(st["id"]):   # v1.4.xx: la web de Pruebas automáticas pidió el agent.log
+        res = dict(res, subir_log=True)
+    return res
+
+
+class AgentLog(BaseModel):
+    texto: str = Field(max_length=400_000)
+
+
+@agent_router.post("/agent-log")
+def agent_log(body: AgentLog, st=Depends(station_token)):
+    return run(pruebas_auto.guardar_log, st["id"], body.texto)
 
 
 @agent_router.post("/commands/{jid}/result")

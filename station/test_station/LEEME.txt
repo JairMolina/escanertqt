@@ -4,3 +4,10 @@ config.json contiene una credencial privada: no compartir ni publicar.
 El agente usa conexiones salientes, sin puertos entrantes. HTTP permitido solo para localhost/127.0.0.1; HTTPS en otros destinos.
 Mantiene evidencia y reportes pendientes en evidence/. Una falla de red no repite pruebas ni comandos; reiniciar deja la prueba interrumpida y exige revisar físicamente antes de repetir.
 La secuencia automática restablece ajustes del firmware y mueve el perno. Debe confirmarse en la web con el banco libre.
+
+Raspberry / Linux (banco de resistencia, v1.4.xx)
+- Requisitos: python3-venv, BlueZ (Bluetooth) y el usuario en el grupo dialout (sudo usermod -aG dialout $USER; cerrar sesión).
+- Extrae el ZIP en una carpeta privada (chmod 700) y ejecuta: sh iniciar.sh. Detener: pkill -f "agent.py --config".
+- Si se descargó con puerto serie, config.json trae "serial_port" y el agente se conecta solo; si no, conéctalo desde la web.
+- Arranque al encender (opcional): crontab -e y añade la línea  @reboot sh /ruta/a/la/carpeta/iniciar.sh
+- Convive con el agente de la DYMO: son procesos y credenciales distintos.

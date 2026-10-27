@@ -10,3 +10,4 @@
 
 # Los parches preservan el espacio exacto del codigo de origen.
 docs/*.patch -whitespace
+*.sh text eol=lf

@@ -1,6 +1,6 @@
 """Outbound Windows bridge. The original 0.6.3 engine owns serial/BLE timing."""
 
-import argparse, json, sqlite3, threading, time, urllib.request, urllib.parse, ssl
+import argparse, json, os, platform, socket, sqlite3, threading, time, urllib.request, urllib.parse, ssl
 import urllib.error
 from pathlib import Path
 from dataclasses import asdict
@@ -9,6 +9,25 @@ from tqtstation.serial_port import SerialLink
 from tqtstation.ble import BLELink
 from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
+
+
+AGENT_VERSION = "1.4.xx-pruebas-auto"   # v1.4.xx: se muestra en /pruebas-automaticas
+LOG_MAX = 256 * 1024                      # cola de agent.log que se sube cuando la web la pide
+
+
+def serial_ports():
+    """Puertos con nombre estable: en Linux, /dev/serial/by-id/... apunta al ttyUSB/ttyACM real (no cambia al reconectar)."""
+    from serial.tools.list_ports import comports
+    by_id = {}
+    base = Path("/dev/serial/by-id")
+    if base.is_dir():
+        for link in base.iterdir():
+            by_id[os.path.realpath(link)] = str(link)
+    return [
+        {"device": p.device, "by_id": by_id.get(os.path.realpath(p.device), ""),
+         "description": p.description if p.description and p.description != "n/a" else "", "hwid": p.hwid or ""}
+        for p in sorted(comports(), key=lambda x: x.device)
+    ]
 
 
 def norm(x):
@@ -41,6 +60,10 @@ class Bridge:
         self.original_send = self.serial.send
         self.serial.send = self.safe_send
         self.command_thread = None
+        self.port_file = self.folder.parent / "puerto_serie.txt"
+        remembered = self.port_file.read_text(encoding="utf-8").strip() if self.port_file.exists() else ""
+        self.auto_port = remembered or cfg.get("serial_port") or ""
+        self.ports_cache, self.ports_at = [], 0
 
     def safe_send(self, data):
         if self.engine.running and data in (
@@ -179,13 +202,18 @@ class Bridge:
             elif action == "ports":
                 result = self.serial.ports()
             elif action == "connect_serial":
-                if data["port"] not in self.serial.ports():
-                    raise ValueError("El COM no existe en esta laptop.")
+                reales = {os.path.realpath(x) for x in self.serial.ports()}
+                if data["port"] not in self.serial.ports() and os.path.realpath(data["port"]) not in reales:
+                    raise ValueError("El puerto serie no existe en este equipo.")
                 self.latest = {}
                 self.ready = ""
                 self.serial.connect(data["port"], 57600)
+                self.auto_port = data["port"]   # se recuerda: tras reinicio o desconexión del USB vuelve a este puerto
+                self.port_file.write_text(data["port"], encoding="utf-8")
                 result = {"port": data["port"]}
             elif action == "disconnect_serial":
+                self.auto_port = ""   # desconexión manual: no reconectar solo
+                self.port_file.unlink(missing_ok=True)
                 self.serial.disconnect()
                 self.latest = {}
                 self.ready = ""
@@ -249,10 +277,50 @@ class Bridge:
             )
             self.active = None
 
+    def auto_serial(self):
+        """v1.4.xx (banco fijo, p. ej. Raspberry): con `serial_port` en config.json se conecta solo y reintenta cada 10 s."""
+        port = self.auto_port
+        if not port or self.cfg.get("ble_only") or self.serial.connected or self.engine.running:
+            return
+        if self.command_thread and self.command_thread.is_alive():
+            return
+        if time.time() - getattr(self, "_auto_try", 0) < 10:
+            return
+        self._auto_try = time.time()
+        try:
+            self.latest = {}
+            self.ready = ""
+            self.serial.connect(port, 57600)
+            print("Puerto serie conectado:", port, flush=True)
+        except Exception as e:
+            msg = port + ": " + str(e)
+            if msg != getattr(self, "_auto_err", ""):   # sin repetir el mismo aviso cada 10 s en agent.log
+                print("Puerto serie no disponible:", msg, flush=True)
+            self._auto_err = msg
+
+    def ports(self):
+        if time.time() - self.ports_at > 10:
+            try:
+                self.ports_cache = serial_ports()
+            except Exception as e:
+                print("No se pudieron listar los puertos:", str(e), flush=True)
+            self.ports_at = time.time()
+        return self.ports_cache
+
+    def upload_log(self):
+        path = self.folder.parent / "agent.log"
+        text = ""
+        if path.exists():
+            with path.open("rb") as f:
+                f.seek(max(0, path.stat().st_size - LOG_MAX))
+                text = f.read().decode("utf-8", "replace")
+        self.api("agent-log", {"texto": text or "(agent.log vacío: el agente se inició sin --background)"})
+
     def loop(self):
         while True:
             try:
                 self.flush()
+                self.auto_serial()
                 state = {
                     "ble_bridge": 1,
                     "ble_only": bool(self.cfg.get('ble_only')),
@@ -263,8 +331,15 @@ class Bridge:
                     "run_id": self.active,
                     "fields": self.latest,
                     "card": self.ready,
+                    "agent_version": AGENT_VERSION,
+                    "platform": platform.system() + " " + platform.machine(),
+                    "host": socket.gethostname(),
+                    "auto_port": self.auto_port,
+                    "ports": self.ports(),
                 }
                 job = self.api("claim", state)
+                if job.get("subir_log"):
+                    self.upload_log()
                 if job.get("cancel") and self.engine.running:
                     self.engine.stop()
                 if job.get("run") and not self.cfg.get('ble_only'):
@@ -313,6 +388,14 @@ def main():
         url.scheme == "http" and url.hostname in ("127.0.0.1", "localhost")
     ):
         raise ValueError("Solo HTTPS o HTTP de loopback local.")
+    if __import__("os").name != "nt":   # v1.4.xx: Linux/Raspberry; un solo agente por estación (candado de archivo)
+        import fcntl
+
+        candado = (path.parent / ".agent.lock").open("w")
+        try:
+            fcntl.flock(candado, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise RuntimeError("Esta estación ya está iniciada.")
     if __import__("os").name == "nt":
         import ctypes
 

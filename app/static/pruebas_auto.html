@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0A1020">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <meta name="color-scheme" content="dark light">
+    <title>Pruebas automáticas · Escáner TQT</title>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('tqt.tema')==='light'?'light':'dark'}catch(e){document.documentElement.dataset.theme='dark'}</script>
+    <link rel="stylesheet" href="/static/css/app.css?v=__VERSION__">
+    <link rel="stylesheet" href="/static/css/pruebas_auto.css?v=__VERSION__">
+</head>
+<body>
+<div class="app pa">
+    <header class="pa-top">
+        <a class="btn btn-ghost btn-sm" href="/inicio">← Módulos</a>
+        <div class="pa-titulo">
+            <h1>Pruebas automáticas</h1>
+            <p class="pa-sub">Escáner TQT · banco de resistencia de firmware en la Raspberry (Linux)</p>
+        </div>
+        <span class="pa-ver" title="Versión de la web">v__VERSION__</span>
+        <button class="btn btn-ghost btn-sm pa-tema" id="tema" type="button" aria-label="Cambiar a modo claro">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path id="temaIco" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d=""/></svg>
+        </button>
+    </header>
+
+    <ol class="pa-pasos" aria-label="Pasos">
+        <li data-paso="1"><span>1</span>Agente</li>
+        <li data-paso="2"><span>2</span>Raspberry</li>
+        <li data-paso="3"><span>3</span>Puerto</li>
+        <li data-paso="4"><span>4</span>Campaña</li>
+        <li data-paso="5"><span>5</span>Seguimiento y logs</li>
+    </ol>
+
+    <main class="pa-main">
+        <section class="panel pad stack" id="p1" aria-labelledby="h1p">
+            <h2 class="silk" id="h1p"><span class="n">1</span> Agente en la Raspberry</h2>
+            <p id="p1Estado" class="hint" aria-live="polite"></p>
+            <details class="pa-instalar" id="p1Det">
+                <summary id="p1Sum">Descargar e instalar el agente</summary>
+                <form id="fInst" class="pa-form">
+                    <div class="field"><label for="iPuerto">Puerto serie de la R1 (opcional)</label>
+                        <input class="input mono" id="iPuerto" maxlength="120" placeholder="/dev/ttyUSB0" autocomplete="off">
+                        <span class="hint">Si no lo sabes, déjalo vacío y elígelo en el paso 3 cuando la Raspberry esté en línea.</span></div>
+                    <button class="btn btn-primary" type="submit">Descargar agente (.zip)</button>
+                    <ol class="pa-cmds">
+                        <li>Copia el ZIP a la Raspberry y descomprímelo: <code>unzip TQT_Pruebas_Raspberry.zip -d ~/tqt-pruebas &amp;&amp; chmod 700 ~/tqt-pruebas</code></li>
+                        <li>Una sola vez: <code>sudo apt install python3-venv bluez &amp;&amp; sudo usermod -aG dialout $USER</code> (cierra sesión después).</li>
+                        <li>Arranca: <code>sh ~/tqt-pruebas/iniciar.sh</code>. Al encender: <code>crontab -e</code> → <code>@reboot sh ~/tqt-pruebas/iniciar.sh</code></li>
+                    </ol>
+                    <p class="hint">Descargar un agente nuevo lo convierte en el banco y deja sin uso al anterior.</p>
+                </form>
+            </details>
+        </section>
+
+        <section class="panel pad stack" id="p2" aria-labelledby="h2p">
+            <h2 class="silk" id="h2p"><span class="n">2</span> Raspberry</h2>
+            <dl class="pa-dl" id="p2Datos" aria-live="polite"></dl>
+        </section>
+
+        <section class="panel pad stack" id="p3" aria-labelledby="h3p">
+            <h2 class="silk" id="h3p"><span class="n">3</span> Puerto serie de la R1</h2>
+            <p id="p3Actual" class="hint" aria-live="polite"></p>
+            <div class="field"><label for="pPuerto">Puertos USB detectados en la Raspberry</label>
+                <div class="pa-fila">
+                    <select class="input" id="pPuerto"></select>
+                    <button class="btn btn-primary btn-sm" id="pConectar" type="button">Conectar</button>
+                    <button class="btn btn-sm" id="pDesconectar" type="button">Desconectar</button>
+                </div></div>
+            <p class="hint">El puerto elegido se recuerda: tras reiniciar la Raspberry o desconectar el USB, el agente vuelve a él solo.</p>
+            <p id="pMsg" class="hint" role="status"></p>
+        </section>
+
+        <section class="panel pad stack" id="p4" aria-labelledby="h4p">
+            <h2 class="silk" id="h4p"><span class="n">4</span> Nueva campaña</h2>
+            <form id="fNueva" class="pa-form">
+                <div class="pa-2">
+                    <div class="field"><label for="cNombre">Nombre</label><input class="input" id="cNombre" maxlength="80" required placeholder="Resistencia FW 4.4 beta"></div>
+                    <div class="field"><label for="cFw">Firmware que se valida</label><input class="input" id="cFw" maxlength="80" required placeholder="FW 4.4 beta"></div>
+                </div>
+                <div class="field"><label for="cBusca">Tarjeta armada (R1 + R2) conectada a la Raspberry</label>
+                    <input class="input" id="cBusca" type="search" placeholder="Número de tarjeta o nombre de la R1" autocomplete="off">
+                    <div id="cTarjetas" class="pa-opciones" role="listbox" aria-label="Tarjetas encontradas"></div></div>
+                <div class="pa-2">
+                    <div class="field"><label for="cCiclos">Ciclos</label><input class="input mono" id="cCiclos" type="number" min="1" max="1000" value="50" required></div>
+                    <div class="field"><label for="cPausa">Pausa entre ciclos (s)</label><input class="input mono" id="cPausa" type="number" min="0" max="3600" value="60" required></div>
+                </div>
+                <label class="pa-check"><input type="checkbox" id="cDetener" checked> Detener la campaña en el primer ciclo fallido</label>
+                <label class="pa-check"><input type="checkbox" id="cConf" required> Confirmo la tarjeta física y el banco libre: cada ciclo restablece ajustes y mueve el perno.</label>
+                <button class="btn btn-primary" type="submit">Iniciar campaña</button>
+                <p id="nMsg" class="hint" role="status"></p>
+            </form>
+        </section>
+
+        <section class="panel pad stack pa-ancho" id="p5" aria-labelledby="h5p">
+            <h2 class="silk" id="h5p"><span class="n">5</span> Seguimiento y logs</h2>
+            <div id="campanas" class="pa-lista"></div>
+            <div class="pa-log">
+                <div class="pa-log-h">
+                    <b>Log del agente (agent.log de la Raspberry)</b>
+                    <span id="lMeta" class="hint"></span>
+                    <div class="pa-acc">
+                        <button class="btn btn-sm" id="lPedir" type="button">Traer log</button>
+                        <a class="btn btn-sm btn-ghost" id="lBajar" href="/api/pruebas-auto/agente/log.txt" download>Descargar .txt</a>
+                    </div>
+                </div>
+                <pre id="lTexto" class="pa-pre" tabindex="0" aria-label="Últimas líneas del log del agente"></pre>
+            </div>
+        </section>
+    </main>
+</div>
+<script src="/static/js/common.js?v=__VERSION__"></script>
+<script src="/static/js/pruebas_auto.js?v=__VERSION__"></script>
+</body>
+</html>

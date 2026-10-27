@@ -556,3 +556,43 @@ body::before {
 }
 :root[data-theme="light"] .cc-panel { box-shadow: 0 24px 60px -24px rgba(13, 22, 48, .55); }
 @media (max-width: 640px), (max-height: 540px) { .nucleo { margin-bottom: 52px; } }
+
+/* v1.4.48 · Lunas: satélites de un módulo (Pruebas automáticas en Escáner TQT). Órbita elíptica de 48×16 px con dos vaivenes
+   senoidales desfasados un cuarto (X en .luna-sis, Y en .luna); de 0 a 50 % pasa por delante (abajo) y de 50 a 100 % por detrás. */
+.mod .est { z-index: 1; }
+.lunas { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+.lunas::before { content: ""; position: absolute; left: -48px; top: -16px; width: 96px; height: 32px; border-radius: 50%;
+                 border: 1px dashed color-mix(in srgb, var(--a) 70%, var(--line-2)); opacity: .8; }
+.luna-sis { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 2; transform: translateX(42px); }
+.luna { position: absolute; left: -5.5px; top: -5.5px; width: 11px; height: 11px; transform: translateY(8px); }
+.luna-esf { position: absolute; inset: 0; border-radius: 50%;
+            background: radial-gradient(circle at 62% 64%, rgba(0,0,0,.22) 0 13%, transparent 15%),
+                        radial-gradient(circle at 38% 70%, rgba(0,0,0,.16) 0 9%, transparent 11%),
+                        radial-gradient(circle at 34% 30%, #FBF6EA 0, #CFC8B8 45%, #77705F 82%, #3F3A31 100%);
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--a) 35%, transparent), 0 0 10px color-mix(in srgb, var(--a) 45%, transparent); }
+.luna-nom { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); white-space: nowrap;
+            font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--muted);
+            padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--bg) 70%, transparent);
+            border: 1px solid color-mix(in srgb, var(--a) 30%, var(--line)); }
+a.luna-nom { pointer-events: auto; text-decoration: none; cursor: pointer; }
+a.luna-nom:hover, a.luna-nom:focus-visible { color: var(--text); border-color: var(--a); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--a) 45%, transparent); }
+.est[data-on] ~ .lunas .luna-nom { color: var(--text); border-color: color-mix(in srgb, var(--a) 60%, var(--line)); }
+@keyframes luna-x { from { transform: translateX(48px); } to { transform: translateX(-48px); } }
+@keyframes luna-y { from { transform: translateY(-16px); } to { transform: translateY(16px); } }
+@keyframes luna-capa { 0%, 49% { z-index: 2; opacity: 1; } 51%, 99% { z-index: 0; opacity: .5; } 100% { z-index: 2; opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .luna-sis { animation: luna-x 7s cubic-bezier(.37, 0, .63, 1) infinite alternate, luna-capa 14s linear infinite;
+              animation-delay: calc(var(--j, 0) * -14s); }
+  .luna { animation: luna-y 7s cubic-bezier(.37, 0, .63, 1) infinite alternate; animation-delay: calc(var(--j, 0) * -14s - 3.5s); }
+  .mod:has(.est[data-on]) .luna, .mod:has(.est[data-on]) .luna-sis,
+  .luna-sis:has(a.luna-nom:hover), .luna-sis:has(a.luna-nom:hover) .luna,
+  .luna-sis:has(a.luna-nom:focus-visible), .luna-sis:has(a.luna-nom:focus-visible) .luna { animation-play-state: paused; }
+}
+@media (max-width: 640px), (max-height: 540px) {
+  .lunas { position: relative; width: auto; height: auto; display: flex; gap: 8px; padding: 6px 0 0 62px; }
+  .lunas::before { content: none; }
+  .luna-sis, .luna { position: relative; left: auto; top: auto; width: auto; height: auto; animation: none !important; opacity: 1; transform: none; }
+  .luna { display: inline-flex; align-items: center; gap: 6px; }
+  .luna-esf { position: relative; width: 11px; height: 11px; }
+  .luna-nom { position: static; transform: none; }
+}

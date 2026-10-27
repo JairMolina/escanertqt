@@ -21,7 +21,7 @@ from app.database import db
 from app.routers import admin, api, auth, correo_excel, escaner_remoto, ws, excel_dymo, inventario, inventario_tqtr
 from app.services import admin_auth, usuarios
 from app.routers import stm32, validacion
-from app.routers import test_station, esp32, dymo_remoto, plataforma, activos, tpms, antijammer, speedlocker, sigfox, caiquen, costeo
+from app.routers import test_station, pruebas_auto, esp32, dymo_remoto, plataforma, activos, tpms, antijammer, speedlocker, sigfox, caiquen, costeo
 from app.ssl_cert import ensure_ssl_certificates
 from app import modulos as modulos_cat
 
@@ -270,6 +270,7 @@ app.include_router(validacion.router)
 app.include_router(validacion.agent_router)
 app.include_router(test_station.router)
 app.include_router(test_station.agent_router)
+app.include_router(pruebas_auto.router)   # v1.4.xx: luna Pruebas automáticas
 app.include_router(dymo_remoto.router)   # v1.4.2: DYMO compartida (Raspberry)
 app.include_router(plataforma.router)   # v1.4.12: cuentas por módulo desde el portal
 app.include_router(activos.router)      # v1.4.14: módulo Impresora (activos con etiqueta DYMO + QR)
@@ -424,6 +425,12 @@ async def serve_consultar():
 async def serve_escaner():
     """Escáner remoto: el celular se vincula a la consola de escritorio (QR) y le envía lo que escanea (v1.3.43)."""
     return _serve_file(settings.STATIC_DIR / "escaner.html")
+
+
+@app.get("/pruebas-automaticas", include_in_schema=False)
+async def serve_pruebas_auto():
+    """v1.4.xx: luna Pruebas automáticas de Escáner TQT: campañas de resistencia de firmware en un banco (Raspberry)."""
+    return _serve_file(settings.STATIC_DIR / "pruebas_auto.html")
 
 
 @app.get("/monitor", include_in_schema=False)

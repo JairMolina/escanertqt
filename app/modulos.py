@@ -10,7 +10,8 @@ ESCANER_TQT = "escaner-tqt"
 
 MODULOS: List[Dict[str, Any]] = [
     {"id": ESCANER_TQT, "nombre": "Escáner TQT", "descripcion": "Recepción, emparejado, programación y entrega de tarjetas TQT.",
-     "icono": "chip", "url": "/", "login": "/login", "estado": "disponible", "acento": "#D9A441"},
+     "icono": "chip", "url": "/", "login": "/login", "estado": "disponible", "acento": "#D9A441",
+     "lunas": [{"id": "pruebas-automaticas", "nombre": "Pruebas automáticas", "url": "/pruebas-automaticas"}]},   # v1.4.xx: luna (submódulo)
     {"id": "speedlocker", "nombre": "SpeedLocker", "descripcion": "Control y seguimiento de equipos SpeedLocker.",
      "icono": "candado", "url": "/speedlocker", "login": "/speedlocker/acceso", "estado": "disponible", "acento": "#38BDF8"},   # v1.4.32
     {"id": "skudo-antijammer", "nombre": "Skudo AntiJammer", "descripcion": "Producción y pruebas de equipos Skudo AntiJammer.",
