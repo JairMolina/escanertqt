@@ -219,3 +219,5 @@ Evidencia: 115Python+9Node+16Playwright PASS en QA aislada; Compose/buildOK. Bac
 2026-10-27:1.4.47/23a7d8d publicada enmain y desplegada;partió de1.4.46/04676c5 que ya contenía agentes.20revocados/0vigentes comprobados,limpieza local4procesos/6arranques/7carpetas conrespaldo.122Python+9Node+15UI PASS,healthy,DB/inventario/historial sin cambios. Evidencia DESPLIEGUE_1.4.47.md. Sin hardware ni aprobaciónbeta.
 
 2026-10-27:1.4.48/códigof608baf desplegada con autorización;panelSTM32 ahora naranja siFWanterioralúltimoaprobado,comparación compartidaconlista.19UI+11PythonPASS,healthy,DB/historial sin cambios.0054FW4.4verde/0055FW4.3naranja frentevigente4.4. Catálogo ya4.4aprobado;sin cambiosFW ni banco físico. Evidencia STM32_INDICADOR_VIGENCIA.md.
+
+2026-10-27:1.4.49/códigoa1ea3d5 publicada ydesplegada conautorización;Diagrama debajoComandos,HW20/30,datos/6JPEGconhash,consulta/localreview sinAPIwrites.13UI+16Node+7PythonPASS;healthy,quick_checkok,catálogoanónimo401. Inventarioidéntico eIDspreviospreservados;1pruebaweb/5comandosnuevos concurrentes terminada. Ver DIAGRAMA_TQT.md.

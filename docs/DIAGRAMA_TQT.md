@@ -29,4 +29,16 @@ ui-ux-pro-max y design-system para navegación, tokens, foco/teclado y reutiliza
 
 ## Estado
 
-Base main/producción2fa6fd2, web1.4.48, comprobadas limpias al comenzar. Preparada1.4.49 en rama `codex/diagrama-tqt-20261027`, QAaislada `http://127.0.0.1:18089/monitor#/diagrama`. Pendiente autorización expresa para desplegar según AGENTS.md; no se modifica producción antes de recibirla. No se programó hardware ni se cambiaron servicios compartidos.
+Base main/producción2fa6fd2, web1.4.48, comprobadas limpias al comenzar. Preparada1.4.49 en rama `codex/diagrama-tqt-20261027`, QAaislada `http://127.0.0.1:18089/monitor#/diagrama`. La autorización expresa fue recibida y se desplegó1.4.49;resultado debajo. No se programó hardware ni se cambiaron servicios compartidos.
+
+## Despliegue verificado — 2026-10-27
+
+El usuario autorizó expresamente desplegar Diagrama. Publicado código a1ea3d57d6907ef668e0d0156567a14edfe26243 en main sobre2fa6fd2;fast-forward de OrangePi y recreación exclusiva de tqt. Imagen vigente reutilizada(sin cambios de dependencias;app montada en lectura). Cloudflared continuó activo.
+
+Respaldo previo /backups/predeploy_1.4.49_20261027_101445.db,integrity_checkok,SHA256c1bf8508650af65b601314e31b14964afb7703a65fd51eb812a5eb94826ec335. Se comprobó0trabajos activos al respaldar. Después apareció actividad concurrente legítima:ejecución web303f0a06 creada16:14:56UTC,terminada16:16:29UTC,con5comandos nuevos respecto al respaldo. La comparación por conteos estrictos se amplió para comprobar conservación de todas las claves previas,permitiendo esos nuevos registros;no se intervino ni se volvió a ejecutar esa prueba.
+
+Comprobado:1.4.49,tqt runninghealthy,SQLite quick_checkok,health interno/públicook:true,loginHTTP200/version1.4.49,catálogo anónimoHTTP401. InventarioPCB ytarjetas idénticos al respaldo,todos losIDs históricos previos conservados. Conteos observados finales94trabajosSTM32,51pruebas,244comandos,446PCB,100tarjetas,1886escaneos,22registros deestaciones(incluidos lógicos).
+
+Los7archivos de la función enGit(HTML,armazón,core,SVG,sección,CSS,catálogo) coinciden porSHA256 con los usados enproducción. Las6imágenes originales coinciden con el manifiesto. No se cambiaron aprobacionesFW,puertos,credenciales ni configuraciónCloudflare. Las pruebas físicas concurrentes pertenecen al flujo existente;Diagrama no envía comandos ni escribe resultados.
+
+Abrir https://inventariotqt.site/monitor#/diagrama yrecargarCtrl+F5. Gestión muestraDiagrama debajo deComandos. Revisión local guarda solo en ese navegador;JSONexportadonoesunresultado dePruebasTQT. Se guardóGit/memoria;fuenteHTMLy capturaoriginalno se transmitieron aMiniPCni se añadieron aGit(únicamente los datos y láminas necesarios para la integración solicitada).

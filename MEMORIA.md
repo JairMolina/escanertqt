@@ -2,20 +2,22 @@
 
 ## Estado vigente — 2026-10-27
 
-Web1.4.48 desplegada y verificada enmain, código f608baf, sobre1.4.47/454add0.
-Panel STM32 R1/R3 y lista comparan FW registrado con el último aprobado del
-mismoHW:naranja si anterior,verde si verificado/vigente. Selector independiente;
-beta/otroHW no elevanvigencia;sin referencia confirmada noaseguraractualizada.
-Producción0054verificada4.4/vigente4.4verde;0055verificada4.3/vigente4.4naranja.
-FW4.4 ya figura aprobado en catálogo;esta tarea no lo aprobó ni probó hardware.
-19gruposPlaywright+11PythonPASS;coloresCSScomprobados,móvil390,0JSerrors;
-ComposeQA/JSsyntax/diffOK. Producciónhealthy/quick_checkok/login1.4.48.
-Backup y evidencia en docs/STM32_INDICADOR_VIGENCIA.md;inventario/historial
-sin cambios. Agentes:limpieza local anterior completa(4procesos/6arranques/
-7carpetas respaldadas),20registros físicos revocados verificados antes;
-no repetirlimpieza. Nuevo agente usa cuentaweb,operator guardaactorreal.
+Web1.4.49 publicada enmain ydesplegada conautorización,códigoa1ea3d5,
+sobre1.4.48/2fa6fd2. Diagrama debajo deComandos:secciónnativa con
+armazón/fuentes/temas,HW20/HW30,6grupos,SVG/fichas,búsqueda,comparación,
+láminas yAK7V. Datos19/18referencias y6JPEG delHTML conservados conhash;
+noiframe ni appindependiente. Consultor puedeleer;marcasporHW solo en
+navegador/exportJSON,no escribenPruebasTQT ni inventario.0accioneshardware.
+13gruposPlaywright+16Node+7PythonPASS;claro/oscuro1440/1024/390,0errores,
+permisos/confidencialidad,export/recarga ydesmontaje comprobados.
+Producciónhealthy/quick_checkok/login1.4.49;catálogoanónimo401;archivosGit
+=servidor y6JPEGverificados. Inventarioidéntico eIDshistóricos preservados;
+1pruebaweb/5comandosnuevos concurrentes terminó;no fue ejecutada porDiagrama.
+Backup/evidencia docs/DIAGRAMA_TQT.md. Abrir /monitor#/diagrama,Ctrl+F5.
+Se conserva correcciónSTM32vigencia:0054FW4.4verde,0055FW4.3naranja frente
+vigenteaprobado4.4. Esta tarea no cambiaaprobacionesFW ni prueba tarjetas.
 OrangePi porMiniPc aorangepi@192.168.4.70,repo/home/orangepi/escanertqt;
-solo tqt recreado,cloudflared intacto. RecargarCtrl+F5 para vercorrección.
+solo tqt recreado,cloudflared intacto. Limpiezaagentes anterior completa.
 
 Aplicación Inventario TQT (JairMolina/escanertqt): FastAPI, SQLite, WebSockets y HTML/JS. Mantener separada de TQT-OrangePi, que contiene infraestructura del servidor.
 
