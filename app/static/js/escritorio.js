@@ -13,7 +13,7 @@
     const ATAJOS = { r: 'resumen', i: 'inventario', t: 'tarjetas', m: 'macs', c: 'consultar', l: 'lotes', x: 'excel', o: 'movimientos', e: 'etiquetas', a: 'admin' };
     // v1.3.44: el consultor (solo lectura) entra a la consola, pero solo a estas secciones; las demás no salen en el menú
     // y, si llega por enlace, hash o atajo, ve el aviso "Acceso restringido" y vuelve al Dashboard.
-    const SEC_CONSULTOR = new Set(['resumen', 'tarjetas', 'inventario', 'consultar', 'excel', 'comandos']);
+    const SEC_CONSULTOR = new Set(['resumen', 'tarjetas', 'inventario', 'consultar', 'excel', 'comandos', 'diagrama']);
     const permitida = (id) => !(T.acceso && T.acceso.rol === 'consultor') || SEC_CONSULTOR.has(id);
     const ETQ_ATAJO = {}; Object.keys(ATAJOS).forEach((k) => { ETQ_ATAJO[ATAJOS[k]] = k; });
 

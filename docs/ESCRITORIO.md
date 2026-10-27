@@ -32,6 +32,7 @@ Tokens de `app/static/css/app.css` (máscara de soldadura azul-negro, acento oro
 | | `#/etiquetas` | Etiquetas DYMO (enlace a `/dymo`, integrado por la etapa 4) |
 | | `#/excel` | Sincronizar/exportar Excel del lote |
 | | `#/admin` | Administración (borrados, contraseña): enlace a `/admin` con el mismo armazón (etapa 4) |
+| | `#/diagrama` | Diagrama de referencia HW20/HW30 debajo de Comandos: conexiones, originales, comparación, AK7V y revisión local exportable; sin cambios al inventario ni al historial de pruebas |
 `/monitor?lote=<id>` deja ese lote seleccionado; `/monitor#/consultar?codigo=<texto>` abre la consulta.
 
 ## Contrato del armazón (`app/static/js/escritorio.js`, lo crea la etapa 2)

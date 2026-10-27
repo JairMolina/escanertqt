@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.49 — 2026-10-27
+- Nueva sección «Diagrama» debajo de Comandos, integrada en la consola con sus fuentes, temas, cabecera y navegación. Consulta disponible también para las cuentas de consulta.
+- Referencia HW20/HW30: selección de grupos y conexiones, búsqueda, ficha del cable, esquema interactivo, láminas originales ampliables, comparación de versiones y tabla AK7V. Conserva datos e imágenes del HTML aportado y su trazabilidad.
+- Revisión personal por hardware, guardada en este navegador y exportable a JSON. No programa hardware ni escribe resultados en el historial de pruebas de producción.
+
 ## v1.4.48 — 2026-10-27
 - Programación STM32 R1/R3: el panel de la última grabación verificada pasa a naranja si su FW es anterior al último aprobado para ese HW. Una grabación verificada ya no implica que el firmware esté actualizado.
 - Lista y panel comparten la comparación de versiones; se muestran el aviso «Desactualizada» y las versiones instalada/vigente. Cambiar el firmware a programar no modifica el estado registrado. Beta y otro hardware no determinan la vigencia; sin catálogo confirmado no se asegura que esté actualizada.
