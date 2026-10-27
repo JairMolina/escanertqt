@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.59 — 2026-10-27
+- **Inicio: los módulos son planetas, no esferas.** Cada uno conserva su color de acento y alterna 3 tipos: gigante con bandas y anillo inclinado (la mitad trasera del anillo queda oculta tras el disco), rocoso con continentes y cráteres, y bandas con tormenta ovalada. Todos tienen lado nocturno, reflejo y atmósfera. Se quitó la cruz de rayos de «estrella». Los módulos apagados se ven desaturados; en móvil no cambia (lista con icono). Solo `app/static/css/inicio.css`.
+
 ## v1.4.58 — 2026-10-27
 - **Pruebas TQT da de alta los candados en Skytec al imprimir etiquetas.** Con un armado aprobado, «Imprimir etiquetas» registra en Skytec (Gestión de Translock › Candados) 2 candados, R1 y R2: nombre = identificador = nombre completo (`TQT_R1_V30_0029`), su MAC y la marca «TQT Nueva versión» (id 8). Bajo el botón se muestra «Candado creado en Skytec correctamente» o el error de cada uno. Reimprimir no duplica: si el identificador o la MAC ya existen, avisa «ya estaba registrado». Servicio `app/services/skytec.py` (urllib, timeout de 20 s), endpoint `POST /api/validacion/tqt/tarjetas/{id}/skytec`, que exige la última prueba aprobada. Credenciales solo en `.env`: `TQT_SKYTEC_USER` / `TQT_SKYTEC_PASSWORD`; si faltan, se informa y no se registra nada. Pruebas: `tests/test_skytec.py` (sin red).
 - **Programación R2: «Actualizar por Bluetooth» se habilita tras instalar la base genérica.** Antes el selector se quedaba en «Base genérica XXXX · USB» y el botón seguía deshabilitado. Ahora se propone el firmware OTA y el panel muestra en la fila «En la placa» lo que respondió la tarjeta (FW, nombre XXXX y MAC, sin asignar). La BD no cambia hasta que la OTA queda verificada.

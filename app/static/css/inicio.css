@@ -170,6 +170,66 @@ body::before {
 .est:focus-visible .astro { outline: 2px solid var(--accent-text); outline-offset: 7px; }
 .est:focus-visible .nom { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .est[data-cargando] .astro { opacity: .7; }
+/* v1.4.59: planetas, no esferas. Mismo color de acento (--a) con superficie, lado nocturno y atmósfera.
+   Tres tipos alternados: gigante con bandas y anillo (3n+1), rocoso con continentes y cráteres (3n+2) y bandas con tormenta (3n). */
+.mod .astro {
+  --oscuro: color-mix(in srgb, var(--a) 55%, #000);
+  --claro: color-mix(in srgb, var(--a) 55%, #fff);
+  border: 0;
+  background:
+    radial-gradient(circle at 30% 26%, rgba(255,255,255,.5) 0, rgba(255,255,255,0) 26%),
+    var(--sup, none),
+    radial-gradient(circle at 36% 32%, var(--claro) 0, var(--a) 48%, var(--oscuro) 100%);
+  box-shadow:
+    inset calc(var(--d) * -.2) calc(var(--d) * -.1) calc(var(--d) * .28) rgba(0,0,0,.6),
+    inset 1px 1px 2px rgba(255,255,255,.35),
+    0 0 0 1.5px color-mix(in srgb, var(--a) 30%, transparent),
+    0 0 calc(var(--d) * .45) color-mix(in srgb, var(--a) 40%, transparent);
+}
+/* gigante gaseoso: bandas inclinadas como el anillo */
+.mod:nth-child(3n+1) .astro {
+  --sup: linear-gradient(-16deg,
+    transparent 0 14%, color-mix(in srgb, var(--oscuro) 55%, transparent) 14% 20%, transparent 20% 31%,
+    color-mix(in srgb, var(--claro) 45%, transparent) 31% 37%, color-mix(in srgb, var(--oscuro) 40%, transparent) 37% 45%,
+    transparent 45% 56%, color-mix(in srgb, var(--oscuro) 50%, transparent) 56% 61%, color-mix(in srgb, var(--claro) 40%, transparent) 61% 70%,
+    transparent 70% 79%, color-mix(in srgb, var(--oscuro) 45%, transparent) 79% 85%, transparent 85%);
+}
+/* rocoso: continentes irregulares y cráteres */
+.mod:nth-child(3n+2) .astro {
+  --sup:
+    radial-gradient(circle at 66% 64%, color-mix(in srgb, var(--oscuro) 70%, transparent) 0 7%, transparent 9%),
+    radial-gradient(circle at 30% 70%, color-mix(in srgb, var(--oscuro) 55%, transparent) 0 5%, transparent 7%),
+    radial-gradient(ellipse 30% 20% at 42% 44%, color-mix(in srgb, var(--oscuro) 45%, transparent) 0 60%, transparent 100%),
+    radial-gradient(ellipse 24% 32% at 70% 34%, color-mix(in srgb, var(--claro) 35%, transparent) 0 55%, transparent 100%),
+    radial-gradient(ellipse 34% 16% at 34% 82%, color-mix(in srgb, var(--oscuro) 40%, transparent) 0 55%, transparent 100%);
+}
+/* bandas finas con una gran tormenta ovalada */
+.mod:nth-child(3n) .astro {
+  --sup:
+    radial-gradient(ellipse 17% 10% at 62% 60%, color-mix(in srgb, var(--claro) 80%, transparent) 0 35%, color-mix(in srgb, var(--oscuro) 75%, transparent) 55%, transparent 100%),
+    repeating-linear-gradient(4deg, transparent 0 9%, color-mix(in srgb, var(--oscuro) 32%, transparent) 9% 13%, transparent 13% 18%, color-mix(in srgb, var(--claro) 28%, transparent) 18% 21%);
+}
+/* anillo: la mitad trasera solo asoma fuera del disco; la delantera cruza por encima */
+.mod .astro::before, .mod .astro::after { width: auto; height: auto; background: none; opacity: 0; transform: none; }
+.mod:nth-child(3n+1) .astro::before, .mod:nth-child(3n+1) .astro::after {
+  left: 50%; top: 50%; width: calc(var(--d) * 2); height: calc(var(--d) * .56); border-radius: 50%; opacity: .9;
+  border: calc(var(--d) * .07) solid color-mix(in srgb, var(--claro) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--oscuro) 45%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--oscuro) 35%, transparent);
+  transform: translate(-50%, -50%) rotate(-16deg);
+}
+.mod:nth-child(3n+1) .astro::before {
+  -webkit-mask: radial-gradient(circle calc(var(--d) * .5) at 50% 50%, transparent 98%, #000 100%);
+          mask: radial-gradient(circle calc(var(--d) * .5) at 50% 50%, transparent 98%, #000 100%);
+}
+.mod:nth-child(3n+1) .astro::after { clip-path: inset(50% 0 0 0); }
+.est[data-on] .astro::before, .est[data-on] .astro::after { opacity: 0; }
+.mod:nth-child(3n+1) .est[data-on] .astro::before, .mod:nth-child(3n+1) .est[data-on] .astro::after { opacity: 1; }
+.mod:not([data-estado="disponible"]) .astro { background:
+    radial-gradient(circle at 30% 26%, rgba(255,255,255,.25) 0, rgba(255,255,255,0) 26%), var(--sup, none),
+    radial-gradient(circle at 36% 32%, var(--claro) 0, var(--a) 48%, var(--oscuro) 100%);
+  filter: saturate(.45) brightness(.72); box-shadow: inset calc(var(--d) * -.2) calc(var(--d) * -.1) calc(var(--d) * .28) rgba(0,0,0,.6); }
+.mod:nth-child(3n+1):not([data-estado="disponible"]) .astro::before, .mod:nth-child(3n+1):not([data-estado="disponible"]) .astro::after { opacity: .45; }
+.mod[data-estado="mantenimiento"] .astro { outline: 1.5px dashed color-mix(in srgb, var(--a) 45%, var(--line-2)); outline-offset: 3px; }
 
 /* ---------- ficha de detalle ---------- */
 .ficha { position: absolute; left: 0; top: 0; z-index: 5; width: min(304px, calc(100% - 16px)); visibility: hidden; pointer-events: none; transition: visibility 0s linear var(--t-rapida); }
