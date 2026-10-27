@@ -70,7 +70,11 @@
 .diag-explorer {display:grid;grid-template-columns:minmax(0,1fr) 340px;align-items:start;gap:16px;}
 .diag-zoom {gap:4px;}
 .diag-zoom .btn {min-width:44px;padding:0 12px;}
-.diag-canvas {overflow:auto;overscroll-behavior:contain;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-2);margin:12px 0;max-height:700px;}
+/* v1.4.53: el lienzo solo se desplaza en horizontal; la rueda vertical siempre pasa a la página (antes overscroll-behavior:contain
+   y max-height la atrapaban y, sin zoom, la rueda sobre el esquema no movía nada). Con zoom también se arrastra con el ratón. */
+.diag-canvas {overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-2);margin:12px 0;}
+.diag-canvas[data-pan] {cursor:grab;}
+.diag-canvas[data-arrastre] {cursor:grabbing;user-select:none;}
 .diag-canvas:focus-visible {outline-offset:-2px;}
 .diag-drawing {min-width:640px;max-width:none;}
 .diag-canvas svg {max-width:none;}

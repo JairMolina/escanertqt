@@ -132,6 +132,24 @@ montar(host,ctx){
   const a=document.createElement('a');a.href=url;a.download='TQT_Diagrama_HW'+state.hw+'_revision.json';a.click();
   setTimeout(()=>{URL.revokeObjectURL(url);urls.delete(url);},1000);
  }
+ // v1.4.53: con zoom, arrastrar el esquema lo desplaza; un arrastre no cuenta como clic sobre un cable
+ let pan=null,panMovio=false;
+ const lienzo=()=>app.querySelector('.diag-canvas');
+ const marcarPan=()=>{const c=lienzo();if(c)c.toggleAttribute('data-pan',c.scrollWidth>c.clientWidth+1);};
+ new MutationObserver(marcarPan).observe(app,{childList:true,subtree:true});addEventListener('resize',marcarPan);
+ app.addEventListener('pointerdown',e=>{
+  const c=e.target.closest('.diag-canvas');if(!c||e.button!==0||e.pointerType!=='mouse'||c.scrollWidth<=c.clientWidth+1)return;
+  pan={c,x:e.clientX,sl:c.scrollLeft,id:e.pointerId};panMovio=false;
+ });
+ app.addEventListener('pointermove',e=>{
+  if(!pan||e.pointerId!==pan.id)return;const dx=e.clientX-pan.x;
+  if(!panMovio&&Math.abs(dx)<5)return;
+  if(!panMovio){panMovio=true;pan.c.setAttribute('data-arrastre','');pan.c.setPointerCapture(e.pointerId);}
+  pan.c.scrollLeft=pan.sl-dx;
+ });
+ const finPan=()=>{if(pan){pan.c.removeAttribute('data-arrastre');pan=null;}};
+ app.addEventListener('pointerup',finPan);app.addEventListener('pointercancel',finPan);
+ app.addEventListener('click',e=>{if(panMovio){panMovio=false;e.stopPropagation();e.preventDefault();}},true);
  app.addEventListener('click',e=>{
   const el=e.target.closest('button,[data-wire]');if(!el||!data)return;
   if(el.dataset.hw){state.hw=el.dataset.hw;state.zoom=1;render();return;}
