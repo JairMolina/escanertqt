@@ -223,6 +223,7 @@ button.brand-sub:hover { color: var(--text); }
 .hint { font-size: 13px; color: var(--muted); }
 .hint.err { color: var(--bad); }
 .hint.ok { color: var(--ok); }
+.hint.bad { color: var(--bad); }
 .hint.warn { color: var(--warn); }
 /* Administración › Cuentas: módulos por cuenta (v1.4.11) */
 .mchips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 140px; }

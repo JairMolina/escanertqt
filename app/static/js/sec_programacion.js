@@ -354,7 +354,9 @@
             }
             firmwareSelect.replaceChildren(...r.data.items.map(f => h('option', { value: f.id, dataset: { ota: String(f.ota_protocol || 0),bootstrap:f.bootstrap?'1':'0' } },
                 `FW ${f.fw}` + (f.hw ? ` · HW ${f.hw}` : '') + (f.bootstrap ? ' · Base genérica XXXX · USB' : f.ota_protocol ? ' · OTA' : '') + (f.id === r.data.default_id ? ' · más reciente' : ''))));
-            firmwareSelect.value = !reset && r.data.items.some(f => f.id === selected) ? selected : (r.data.default_id || '');
+            // v1.4.58: tras instalar la base genérica se propone el firmware OTA (nunca la base) para habilitar «Actualizar por Bluetooth».
+            const otaDef = r.data.items.find(f => f.ota_protocol && !f.bootstrap && f.id === r.data.default_id)?.id || r.data.items.find(f => f.ota_protocol && !f.bootstrap)?.id;
+            firmwareSelect.value = !reset && r.data.items.some(f => f.id === selected) ? selected : (reset === 'ota' && otaDef) || r.data.default_id || '';
             firmwareHint.textContent = tipo === 'R1' ? (r.data.items.length ? `ESP32_BLE_SERIAL FW ${r.data.items[0].fw}: es el mismo para todas las R1 (el nombre BLE lo graba el STM32). Se verifica solo la MAC.` : 'Falta el firmware fijo de la R1 en el servidor (firmware/esp32_r1).')
                 : r.data.items.length ? 'El nombre se toma de la R2 elegida; HW y FW se leen del archivo. Puedes elegir una versión anterior.' : 'No hay firmware compatible con el hardware de esta R2.';
             if (!r1Gate.ok) firmwareHint.textContent = r1Gate.motivo;
@@ -596,7 +598,8 @@
                     resultado.hidden=false;
                     resultado.replaceChildren(T.banner('info','info','Base genérica4.0 instalada y leída: '+leido.nombre+'. Aún no está asignada ni marcada como programada.'),
                         h('p',{class:'hint'},'Libera los contactos, deja la R2 alimentada y pulsa Actualizar por Bluetooth para asignar '+pcb.nombre+' e instalar el firmware elegido.'));
-                    await loadFirmwares();return;
+                    S.leidoBase = { id: pcb.id, nombre: leido.nombre, mac, firmware: leido.firmware };
+                    await loadFirmwares('ota'); pintarDatos(); return;
                 }
 
                 const cuerpo = { mac }; if (!esR2 && fw.firmwareId) cuerpo.firmware_id = fw.firmwareId;   // R1: solo MAC; pcb.firmware es el del STM32
@@ -657,7 +660,7 @@
                             (timing.elapsed >= 3 && done < total ? ` · Restan aproximadamente ${eta}` : '');
                     },
                     committing: value => { S.otaCommitting = value; enableFirmware(); } }, recovery);
-                S.tarjeta = result.pcb;
+                S.tarjeta = result.pcb; S.leidoBase = null;
                 await refreshR2States();
                 escribir('OTA verificada ✓ · FW ' + result.fw);
                 otaProgress.textContent = 'Actualización y nuevo arranque verificados · FW ' + result.fw;
@@ -741,6 +744,16 @@
             pintarDetalle();
             pintarLista();
         }
+        function pintarDatos() {
+            const p = S.tarjeta; if (!p) return;
+            const hw = String(p.version || ''), base = S.leidoBase?.id === p.id ? S.leidoBase : null;
+            const filas = [['Nombre ' + p.tipo, String(p.nombre || '').replace(/-/g, '_')],
+                ['ID', p.id_tarjeta_num ? String(p.id_tarjeta_num).padStart(4, '0') : '—'], ['MAC', p.mac ? String(p.mac).toUpperCase() : 'sin MAC'],
+                ['HW', hw.length > 1 ? hw[0] + '.' + hw.slice(1) : hw || '—'], ['Firmware', p.firmware || 'sin firmware']];
+            // v1.4.58: lo que respondió la placa tras la base genérica (aún sin asignar; no se guarda en BD).
+            if (base) filas.push(['En la placa', `FW ${base.firmware} · ${base.nombre} · ${base.mac} (base genérica; falta Actualizar por Bluetooth)`]);
+            datosDl.replaceChildren(...filas.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)]));
+        }
         function pintarDetalle() {
                         enableFirmware();
             vacio.querySelector('b').textContent = 'Elige una ' + S.tipoEsp;
@@ -750,10 +763,7 @@
             const p = S.tarjeta;
             cabecera.replaceChildren(T.tipoChip(p.tipo), h('span', { class: 'prog-nm' }, p.nombre),
                 h('span', { class: 'dim' }, p.id_tarjeta_num ? 'Tarjeta #' + String(p.id_tarjeta_num).padStart(4, '0') : 'Suelta'));
-            const hw = String(p.version || ''), filas = [['Nombre ' + p.tipo, String(p.nombre || '').replace(/-/g, '_')],
-                ['ID', p.id_tarjeta_num ? String(p.id_tarjeta_num).padStart(4, '0') : '—'], ['MAC', p.mac ? String(p.mac).toUpperCase() : 'sin MAC'],
-                ['HW', hw.length > 1 ? hw[0] + '.' + hw.slice(1) : hw || '—'], ['Firmware', p.firmware || 'sin firmware']];
-            datosDl.replaceChildren(...filas.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)]));
+            pintarDatos();
             resetPasos(); relleno.style.width = '0'; resultado.hidden = true;
         }
 

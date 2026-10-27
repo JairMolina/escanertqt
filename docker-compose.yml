@@ -19,6 +19,8 @@ services:
       TQT_SMTP_PASSWORD: ${TQT_SMTP_PASSWORD:-}
       TQT_SMTP_FROM: ${TQT_SMTP_FROM:-}
       TQT_SMTP_FROM_NAME: ${TQT_SMTP_FROM_NAME:-Inventario TQT}
+      TQT_SKYTEC_USER: ${TQT_SKYTEC_USER:-}              # alta de candados en Skytec al imprimir etiquetas; vacío = desactivado
+      TQT_SKYTEC_PASSWORD: ${TQT_SKYTEC_PASSWORD:-}
     volumes:
       - tqt_db:/data/db                       # SQLite (WAL) en volumen nativo de Docker: seguro
       - ./excel_mensual:/data/excel_mensual   # Excel mensuales, visibles en Windows

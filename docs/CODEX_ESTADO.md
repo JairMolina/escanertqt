@@ -4,6 +4,7 @@ Actualizado:2026-10-27. Código de referencia:a1ea3d57d6907ef668e0d0156567a14edf
 
 ## Avance reportado
 
+Claude v1.4.58: alta automática de candados R1/R2 en Skytec al imprimir etiquetas (TQT_SKYTEC_* en .env); R2 habilita «Actualizar por Bluetooth» tras la base genérica. Pendiente: verificar el alta real en Skytec con credenciales en el servidor.
 Claude v1.4.57: aviso en Pruebas TQT a cuentas con agente/puente viejo (agentes/desactualizados); Raspberry en agente 1.4.56.
 
 Claude v1.4.56: agentes y puentes BLE de Pruebas TQT separados por cuenta (test_station.propia; cancelar solo dueño/admin); agente con keep-alive HTTPS (comandos BLE ya no vencen por handshakes lentos; send 20 s); sin confirm() en Pruebas automáticas. Pendiente: re-descargar el puente de cada laptop y actualizar el agente de la Raspberry.

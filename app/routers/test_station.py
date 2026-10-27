@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from app.routers.stm32 import station_token, operator, run
 from app.services import test_station as svc, stm32_programming as stm
-from app.services import native_ble, pruebas_auto, usuarios
+from app.services import native_ble, pruebas_auto, skytec, usuarios
 from app.database import db
 
 router = APIRouter(prefix="/api/validacion/tqt", tags=["Pruebas TQT"])
@@ -216,6 +216,22 @@ def cancel(jid: str, req: Request):
         "ok": True,
         "detail": "Cancelación solicitada; el firmware puede finalizar el movimiento actual.",
     }
+
+
+@router.post("/tarjetas/{tarjeta_id}/skytec")
+def alta_skytec(tarjeta_id: int, req: Request):
+    """v1.4.58: al imprimir etiquetas de un armado aprobado, registra R1 y R2 como candados en Skytec."""
+    operator(req)
+    from app.routers.excel_dymo import _exigir_aprobada  # import diferido: evita ciclos
+    _exigir_aprobada(tarjeta_id)
+    tarjeta = db.get_tarjeta_by_id(tarjeta_id)
+    if not tarjeta:
+        raise HTTPException(404, "Tarjeta no encontrada.")
+    try:
+        items = skytec.alta_armado(tarjeta)
+    except (skytec.SkytecNoConfigurado, skytec.SkytecError) as e:
+        raise HTTPException(503, str(e))
+    return {"ok": all(i["estado"] != "error" for i in items), "items": items}
 
 
 @router.get("/runs/{jid}/events")

@@ -145,7 +145,8 @@
       sumCount = h("span", { class: "tqt-sum-count" }, "0/14"),
       sumFacts = h("dl", { class: "tqt-facts" }),
       sumActions = h("div", { class: "row wrap" }),
-      printOut = h("p", { class: "hint", "aria-live": "polite" });
+      printOut = h("p", { class: "hint", "aria-live": "polite" }),
+      skyOut = h("p", { class: "hint", "aria-live": "polite" });
     const summary = h(
       "section",
       { class: "prog-panel tqt-card tqt-summary", "data-k": "muted", "aria-label": "Resultado de la ejecución actual" },
@@ -153,6 +154,7 @@
       sumFacts,
       sumActions,
       printOut,
+      skyOut,
     );
     const printBtn = h("button", { class: "btn btn-primary", type: "button", onclick: printLabels }, "Imprimir etiquetas");
     const reportBtn = h("button", { class: "btn", type: "button", onclick: () => lastRun && openReport(lastRun.id) }, "Ver reporte completo");
@@ -859,7 +861,7 @@
         else if (s.state === "ejecutando") setStep(i, "no_verificado", "Interrumpida sin resultado final");
       });
       printTarjeta = null;
-      printOut.textContent = "";
+      printOut.textContent = skyOut.textContent = "";
       if (r?.tarjeta_id && r.result === "aprobado") {
         const t = await api("/api/tarjetas/" + r.tarjeta_id);
         printTarjeta = t.ok ? t.data : null;
@@ -884,6 +886,7 @@
         return;
       }
       printBtn.disabled = true;
+      const sky = altaSkytec(printTarjeta);
       printOut.textContent = "Imprimiendo etiquetas de la tarjeta " + cardNum(printTarjeta) + "…";
       try {
         // v1.4.0: el clic es un gesto del operador; sin DYMO Connect se usa el diálogo de impresión del navegador.
@@ -900,8 +903,24 @@
       } catch (e) {
         printOut.textContent = "Error al imprimir: " + (e?.message || e) + ". Puedes reintentar.";
       } finally {
+        await sky;
         printBtn.disabled = false;
       }
+    }
+    // v1.4.58: cada armado impreso se registra en Skytec (2 candados: R1 y R2). Reimprimir no duplica.
+    async function altaSkytec(t) {
+      skyOut.className = "hint";
+      skyOut.textContent = "Skytec: registrando candados de R1 y R2…";
+      const r = await api("/api/validacion/tqt/tarjetas/" + t.id + "/skytec", { method: "POST", body: {} });
+      if (!r.ok) {
+        skyOut.className = "hint bad";
+        skyOut.textContent = "Skytec: no se crearon los candados. " + (r.error || "Sin detalle") + " Puedes reintentar con «Reimprimir etiquetas».";
+        return;
+      }
+      const txt = { creado: "Candado creado en Skytec correctamente", ya_existia: "ya estaba registrado en Skytec", error: "ERROR" };
+      skyOut.className = r.data.ok ? "hint ok" : "hint bad";
+      skyOut.textContent = r.data.items.map((i) => i.slot + " " + i.nombre + " (" + i.mac + "): " + txt[i.estado] + (i.estado === "error" ? " — " + i.detalle : "")).join(" · ")
+        + (r.data.ok ? "." : ". Puedes reintentar con «Reimprimir etiquetas».");
     }
     // ---------------------------------------------------------------- sensores
     function paintSensors(fields) {
@@ -976,7 +995,7 @@
       lastSeq = 0;
       events = [];
       liveLog.textContent = "";
-      printOut.textContent = "";
+      printOut.textContent = skyOut.textContent = "";
       printBtn.textContent = "Imprimir etiquetas";
       reportHost.replaceChildren();
       resetSteps();
