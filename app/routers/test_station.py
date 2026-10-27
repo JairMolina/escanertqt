@@ -114,6 +114,8 @@ def stations():
             for r in c.execute(
                 "SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.revoked_at IS NULL AND s.name NOT LIKE ?", (svc.RASPBERRY_LIKE,)
             )
+            # v1.4.55: un puente «solo BLE» no ejecuta pruebas ni abre el COM; no se ofrece como agente
+            if not json.loads(r["state"]).get("ble_only")
         ]
 
 

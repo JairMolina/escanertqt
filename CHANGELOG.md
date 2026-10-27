@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.55 — 2026-10-27
+- **Pruebas TQT (modo agente): un puente «solo BLE» ya no se ofrece como agente.** Verificado en producción con v1.4.54: la Raspberry ya no aparece en `/stations` ni en `/web/ble/stations`, pero `/stations` (sin filtro de dueño) mostraba el puente «Bluetooth TQT Windows (solo BLE)» de otra cuenta como único agente en línea, y la página lo elegía como «Agente Windows» aunque no abre el COM ni ejecuta pruebas. Ahora `/stations` omite las estaciones con `ble_only`. Prueba nueva `test_lista_de_agentes_sin_raspberry_ni_puentes_solo_ble` (falla sin el cambio). Agente de la Raspberry actualizado por SSH a 1.4.51-pruebas-auto (respaldo en `~/tqt-pruebas-respaldo-20261027-1435`).
+
 ## v1.4.54 — 2026-10-27
 - **Pruebas TQT ya no usa la Raspberry de Pruebas automáticas.** El agente de la Raspberry se anuncia como puente Bluetooth y como agente (igual que el de Windows) y quedaba registrado a nombre de quien descargó su ZIP; por eso Pruebas TQT lo listaba en «Puente Bluetooth Windows» (lo elegía solo si era el único en línea: el escaneo/conexión de R1/R2 se hacía con el Bluetooth de la Raspberry) y en el modo agente (lista `/stations` sin filtro de dueño). Ahora `RASPBERRY_LIKE`/`no_raspberry` en `test_station.py` (por fragmento del nombre, porque `station_create` lo guarda como «<cuenta> · Raspberry · Pruebas automátic», y por el banco vigente) la excluyen de `/web/ble/stations` y `/stations`, y rechazan crear pruebas, comandos manuales y comandos BLE de Pruebas TQT sobre ella; Pruebas automáticas la sigue manejando. Prueba nueva `test_pruebas_tqt_no_usa_la_raspberry`.
 

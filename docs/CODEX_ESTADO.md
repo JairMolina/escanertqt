@@ -4,6 +4,8 @@ Actualizado:2026-10-27. Código de referencia:a1ea3d57d6907ef668e0d0156567a14edf
 
 ## Avance reportado
 
+Claude v1.4.55: /stations de Pruebas TQT omite puentes «solo BLE» (verificado en producción 1.4.54: la Raspberry ya no aparece). Agente de la Raspberry actualizado a 1.4.51-pruebas-auto.
+
 Claude v1.4.54: Pruebas TQT ya no lista ni usa la Raspberry de Pruebas automáticas como puente Bluetooth ni como agente (test_station.RASPBERRY/no_raspberry; antes el escaneo/conexión BLE podía hacerse con el Bluetooth de la Raspberry). v1.4.53: scroll del esquema de Diagrama.
 
 Claude v1.4.52: Pruebas automáticas con sesiones separadas (la Raspberry es de una cuenta a la vez; pantalla «Raspberry ocupada», 409 con quién la usa; cada cuenta ve solo sus campañas; admin «Detener y liberar») y rediseño de Diagrama (sec_diagrama.css/js, diagrama_svg.js; datos y lógica sin cambios).

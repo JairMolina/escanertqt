@@ -185,5 +185,19 @@ class PruebasAuto(unittest.TestCase):
         self.assertIn(win["id"], [x["id"] for x in native_ble.stations("operador@test.mx")])
 
 
+    def test_lista_de_agentes_sin_raspberry_ni_puentes_solo_ble(self):
+        """v1.4.55: /stations (modo agente de Pruebas TQT) no ofrece la Raspberry ni un puente «solo BLE» de otra laptop."""
+        from starlette.testclient import TestClient
+        from app.main import app
+        s.claim(self.st["id"], {"ble_bridge": 1})
+        puente = stm.station_create("Bluetooth TQT Windows (solo BLE)", "otra@test.mx")
+        s.claim(puente["id"], {"ble_bridge": 1, "ble_only": True})
+        banco = stm.station_create("Banco TQT Windows", "otra@test.mx")
+        s.claim(banco["id"], {"ble_bridge": 1, "ble_only": False})
+        ids = [x["id"] for x in TestClient(app).get("/api/validacion/tqt/stations").json()]
+        self.assertIn(banco["id"], ids)
+        self.assertNotIn(puente["id"], ids)
+        self.assertNotIn(self.st["id"], ids)
+
 if __name__ == "__main__":
     unittest.main()
