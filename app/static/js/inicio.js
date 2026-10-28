@@ -960,7 +960,9 @@
    aparece el crédito. Son botones pequeños en los márgenes (no tapan módulos); un toque fuera de orden reinicia la cuenta. */
 (function () {
     'use strict';
-    var POS = [[3.5, 30], [96.5, 22], [95.5, 60], [4.5, 74], [50, 97]];   // % de ancho / alto, en orden de destello
+    // % de ancho / alto, en orden de destello. En móvil (lista) van pegadas al borde, en el margen de 16 px, para no tapar las tarjetas.
+    var movil = matchMedia('(max-width: 640px)').matches;
+    var POS = movil ? [[2, 30], [98, 22], [98, 58], [2, 74], [98, 92]] : [[3.5, 30], [96.5, 22], [95.5, 60], [4.5, 74], [50, 97]];
     var capa = document.createElement('div'), paso = 0, reinicio = 0;
     capa.className = 'egg-capa'; capa.setAttribute('aria-hidden', 'true');
     POS.forEach(function (p, i) {

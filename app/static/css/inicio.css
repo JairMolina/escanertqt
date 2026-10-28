@@ -685,6 +685,7 @@ a.luna:focus-visible .luna-nom { box-shadow: 0 0 0 2px color-mix(in srgb, var(--
 .egg-est::before { content: ""; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%;
                    background: var(--text); opacity: .55; box-shadow: 0 0 3px color-mix(in srgb, var(--text) 60%, transparent);
                    animation: egg-destello 10s ease-in-out infinite; animation-delay: calc(var(--n) * 1.4s + 2s); }
+@media (max-width: 640px) { .egg-est { width: 22px; height: 22px; margin: -11px 0 0 -11px; } }   /* móvil: área de toque dentro del margen */
 .egg-est.egg-ok::before { background: var(--accent); opacity: .9; box-shadow: 0 0 6px var(--accent); animation: none; }
 @keyframes egg-destello { 0%, 9%, 100% { transform: scale(1); opacity: .55; } 4% { transform: scale(2.1); opacity: 1; box-shadow: 0 0 8px var(--text); } }
 @media (prefers-reduced-motion: reduce) { @keyframes egg-destello { 0%, 9%, 100% { opacity: .55; } 4% { opacity: 1; } } }
