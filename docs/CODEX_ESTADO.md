@@ -8,6 +8,10 @@ Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530
 
 Main incluye los avances de otros colaboradores: Pruebas automáticas por cuenta y Raspberry, exclusión de Raspberry de bancos normales, agentes/puentes BLE por cuenta y avisos de actualización, sincronización Skytec y rediseño de Diagrama. No volver a desplegar 1.4.49 ni el checkout documental antiguo. Las notas anteriores de despliegue 1.4.51 pendiente están superadas por esta comprobación de producción; las pruebas físicas y la configuración de Skytec no se revalidaron hoy.
 
+## Claude v1.4.66 (main, sin desplegar)
+
+Rediseño de /pruebas-automaticas con el lenguaje visual de Pruebas TQT: preparar el banco, campaña en curso con 14 etapas en 4 bloques, sensores y botones de detener, registro en vivo e historial con «Repetir». Solo pruebas_auto.html, .css y .js. Chip de canal por etapa (terminal serial / Bluetooth → R1/R2) y barra fija con Detener. Evidencia: unittest 41 OK y node --check; capturas con API simulada; sin probar con la Raspberry real.
+
 ## Claude v1.4.65 (main 233d0f3, sin desplegar)
 
 R2 BLE: la posición debe sostenerse 1.5 s seguidos con un Status nuevo antes de aprobar; si rebota, queda «AVISO SENSOR» en el log. Antes se tomaba la trama en caché, que podía ser la del rebote, y fallaba con «no se mantuvo estable». Pruebas automáticas: panel «En curso», `GET /campanas/{id}/vivo` y `detener_ahora`. AGENT_VERSION 1.4.65.

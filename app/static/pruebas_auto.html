@@ -12,129 +12,228 @@
     <link rel="stylesheet" href="/static/css/pruebas_auto.css?v=__VERSION__">
 </head>
 <body>
+<!-- Rediseño con el lenguaje visual de Pruebas TQT: preparar el banco (3 tarjetas), campaña en curso o nueva,
+     registro en vivo y log del agente a la derecha, historial abajo. -->
 <div class="app pa">
     <header class="pa-top">
-        <a class="btn btn-ghost btn-sm" href="/inicio">← Módulos</a>
-        <div class="pa-titulo">
-            <h1>Pruebas automáticas</h1>
-            <p class="pa-sub">Escáner TQT · banco de resistencia de firmware en la Raspberry (Linux)</p>
-        </div>
+        <a class="btn pa-btn-ghost" href="/inicio"><span class="pa-i" data-i="back" aria-hidden="true"></span>Módulos</a>
+        <div class="pa-chip" id="chipBanco" data-k="pend"><span class="pa-dot" aria-hidden="true"></span><span id="chipTxt">Consultando el banco…</span></div>
         <div class="pa-uso" id="enUso" hidden>
-            <span class="pa-dot" data-k="ok" aria-hidden="true"></span><span id="enUsoTxt">Raspberry en uso por ti</span>
-            <button class="btn btn-sm btn-ghost" id="liberar" type="button">Liberar</button>
+            <span class="pa-dot" data-k="ok" aria-hidden="true"></span><span id="enUsoTxt">En uso por ti</span>
+            <button class="btn pa-link" id="liberar" type="button">Liberar</button>
         </div>
         <span class="pa-ver" title="Versión de la web">v__VERSION__</span>
-        <button class="btn btn-ghost btn-sm pa-tema" id="tema" type="button" aria-label="Cambiar a modo claro">
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path id="temaIco" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d=""/></svg>
+        <button class="btn pa-btn-ghost pa-tema" id="tema" type="button" aria-label="Cambiar a modo claro">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path id="temaIco" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d=""/></svg>
         </button>
     </header>
 
-    <ol class="pa-pasos" aria-label="Pasos">
-        <li data-paso="1"><span>1</span>Agente</li>
-        <li data-paso="2"><span>2</span>Raspberry</li>
-        <li data-paso="3"><span>3</span>Puerto</li>
-        <li data-paso="4"><span>4</span>Campaña</li>
-        <li data-paso="5"><span>5</span>Seguimiento y logs</li>
-    </ol>
-
     <main class="pa-main">
-        <section class="panel pad stack" id="p1" aria-labelledby="h1p">
-            <h2 class="silk" id="h1p"><span class="n">1</span> Agente en la Raspberry</h2>
-            <p id="p1Estado" class="hint" aria-live="polite"></p>
-            <details class="pa-instalar" id="p1Det">
-                <summary id="p1Sum">Descargar e instalar el agente</summary>
-                <form id="fInst" class="pa-form">
-                    <div class="field"><label for="iPuerto">Puerto serie de la R1 (opcional)</label>
-                        <input class="input mono" id="iPuerto" maxlength="120" placeholder="/dev/ttyUSB0" autocomplete="off">
-                        <span class="hint">Si no lo sabes, déjalo vacío y elígelo en el paso 3 cuando la Raspberry esté en línea.</span></div>
-                    <!-- v1.4.64: un solo comando en la Raspberry; se instala en segundo plano y el avance sale aquí -->
-                    <button class="btn btn-primary" type="submit">Generar comando de instalación</button>
+        <header class="pa-page-head">
+            <span class="pa-eyebrow">Escáner TQT · Banco de resistencia</span>
+            <h1>Pruebas automáticas</h1>
+            <p>Ciclos repetidos de las 14 etapas sobre una tarjeta armada, ejecutados por la Raspberry del banco.</p>
+        </header>
+
+        <!-- Preparar el banco: agente, Raspberry y puerto de la R1 -->
+        <section class="pa-prep" id="prep" aria-labelledby="hPrep" data-listo="false">
+            <div class="pa-prep-head">
+                <h2 id="hPrep">Preparar el banco</h2>
+                <p class="pa-prep-res" id="prepRes" aria-live="polite" data-k="pend"><span class="pa-i" data-i="loader" aria-hidden="true"></span><span id="prepResTxt">Consultando…</span></p>
+            </div>
+            <div class="pa-conns">
+                <article class="pa-conn-card" id="cAgente" data-k="pend">
+                    <span class="pa-conn-icon" aria-hidden="true"><span class="pa-i" data-i="pulse"></span></span>
+                    <div class="pa-conn-body">
+                        <h3>Agente de pruebas</h3>
+                        <p class="pa-conn"><span class="pa-dot" aria-hidden="true"></span><span id="aEstado">—</span></p>
+                        <p class="hint" id="aHint"></p>
+                    </div>
+                    <div class="pa-conn-main">
+                        <button class="btn" id="iAbrir" type="button" aria-expanded="false" aria-controls="instPanel"><span class="pa-i" data-i="download" aria-hidden="true"></span><span id="iAbrirTxt">Instalar agente</span></button>
+                    </div>
+                </article>
+                <article class="pa-conn-card" id="cRasp" data-k="pend">
+                    <span class="pa-conn-icon" aria-hidden="true"><span class="pa-i" data-i="board"></span></span>
+                    <div class="pa-conn-body">
+                        <h3>Raspberry</h3>
+                        <p class="pa-conn"><span class="pa-dot" aria-hidden="true"></span><span id="rEstado">—</span></p>
+                        <p class="hint" id="rHint"></p>
+                    </div>
+                </article>
+                <article class="pa-conn-card pa-conn-puerto" id="cPuerto" data-k="pend">
+                    <span class="pa-conn-icon" aria-hidden="true"><span class="pa-i" data-i="cable"></span></span>
+                    <div class="pa-conn-body">
+                        <h3>Puerto serie de la R1</h3>
+                        <p class="pa-conn"><span class="pa-dot" aria-hidden="true"></span><span id="p3Actual">—</span></p>
+                        <div class="pa-conn-sec" id="pSec">
+                            <button class="btn pa-link" id="pCambiar" type="button" aria-expanded="false" aria-controls="pFila">Cambiar puerto</button>
+                            <button class="btn pa-link" id="pDesconectar" type="button">Desconectar</button>
+                        </div>
+                        <div class="pa-pfila" id="pFila">
+                            <label class="pa-sr" for="pPuerto">Puertos USB detectados en la Raspberry</label>
+                            <select class="input" id="pPuerto"></select>
+                            <button class="btn btn-primary" id="pConectar" type="button">Conectar</button>
+                        </div>
+                        <p class="hint" id="pMsg" role="status"></p>
+                    </div>
+                </article>
+            </div>
+
+            <!-- Instalar o actualizar el agente: un comando de un solo uso; el avance llega aquí -->
+            <div class="pa-inst-panel" id="instPanel" hidden>
+                <form id="fInst" class="pa-inst-form">
+                    <ol class="pa-inst-pasos">
+                        <li><b>Genera el comando.</b> Si ya sabes el puerto de la R1, escríbelo; si no, déjalo vacío y conéctalo después en «Puerto serie de la R1».</li>
+                        <li><b>Pégalo en la terminal de la Raspberry</b> (por SSH). Descarga, instala y arranca el agente en segundo plano, también al encenderla.</li>
+                        <li><b>Espera el aviso «✓ Todo correcto».</b> Si falta algo del sistema (python3-venv, permisos del puerto), el mensaje dice el comando exacto. Después el agente se actualiza solo.</li>
+                    </ol>
+                    <div class="pa-inst-fila">
+                        <div class="field"><label for="iPuerto">Puerto serie de la R1 (opcional)</label>
+                            <input class="input" id="iPuerto" maxlength="120" placeholder="/dev/ttyUSB0" autocomplete="off" spellcheck="false"></div>
+                        <button class="btn btn-primary" type="submit"><span class="pa-i" data-i="play" aria-hidden="true"></span>Generar comando de instalación</button>
+                    </div>
                     <div class="pa-cmd" id="iCmdBox" hidden>
-                        <p class="hint">Pega este comando en la terminal de la Raspberry (por SSH). Sirve <b>una sola vez</b> y caduca <span id="iCmdExp">en 15 min</span>.</p>
-                        <div class="pa-fila">
+                        <p class="hint">Sirve <b>una sola vez</b> y caduca <span id="iCmdExp">en 15 min</span>.</p>
+                        <div class="pa-cmd-fila">
                             <code class="pa-cmdtxt" id="iCmd"></code>
-                            <button class="btn btn-sm" id="iCopiar" type="button">Copiar</button>
+                            <button class="btn" id="iCopiar" type="button">Copiar</button>
                         </div>
                     </div>
                     <p class="pa-inst" id="iAvance" aria-live="polite" hidden></p>
-                    <ol class="pa-cmds">
-                        <li>Pulsa «Generar comando de instalación» y pégalo en la Raspberry: descarga, instala y arranca el agente solo, en segundo plano (también al encenderla).</li>
-                        <li>Aquí verás «Instalando…» por etapas hasta «✓ Todo correcto». Si falta algo del sistema (python3-venv, permisos del puerto), el mensaje dice el comando exacto.</li>
-                        <li>Después el agente se actualiza solo.</li>
-                    </ol>
-                    <p class="hint">Reinstalar conserva el mismo banco (sus campañas y registros). <a href="#" id="iSh">Descargar el instalador (.sh)</a> si prefieres copiarlo a mano y correr <code>sh instalar_tqt_pruebas.sh</code>.</p>
+                    <p class="hint">Reinstalar conserva el mismo banco (sus campañas y registros). ¿Prefieres hacerlo a mano? <a href="#" id="iSh">Descarga el instalador (.sh)</a> y corre <code>sh instalar_tqt_pruebas.sh</code>.</p>
                 </form>
-            </details>
-        </section>
-
-        <section class="panel pad stack" id="p2" aria-labelledby="h2p">
-            <h2 class="silk" id="h2p"><span class="n">2</span> Raspberry</h2>
-            <dl class="pa-dl" id="p2Datos" aria-live="polite"></dl>
-        </section>
-
-        <section class="panel pad stack" id="p3" aria-labelledby="h3p">
-            <h2 class="silk" id="h3p"><span class="n">3</span> Puerto serie de la R1</h2>
-            <p id="p3Actual" class="hint" aria-live="polite"></p>
-            <div class="field"><label for="pPuerto">Puertos USB detectados en la Raspberry</label>
-                <div class="pa-fila">
-                    <select class="input" id="pPuerto"></select>
-                    <button class="btn btn-primary btn-sm" id="pConectar" type="button">Conectar</button>
-                    <button class="btn btn-sm" id="pDesconectar" type="button">Desconectar</button>
-                </div></div>
-            <p class="hint">El puerto elegido se recuerda: tras reiniciar la Raspberry o desconectar el USB, el agente vuelve a él solo.</p>
-            <p id="pMsg" class="hint" role="status"></p>
-        </section>
-
-        <section class="panel pad stack" id="p4" aria-labelledby="h4p">
-            <h2 class="silk" id="h4p"><span class="n">4</span> Nueva campaña</h2>
-            <form id="fNueva" class="pa-form">
-                <div class="pa-2">
-                    <div class="field"><label for="cNombre">Nombre</label><input class="input" id="cNombre" maxlength="80" required placeholder="Resistencia FW 4.4 beta"></div>
-                    <div class="field"><label for="cFw">Firmware que se valida</label><input class="input" id="cFw" maxlength="80" required placeholder="FW 4.4 beta"></div>
-                </div>
-                <div class="field"><label for="cBusca">Tarjeta armada (R1 + R2) conectada a la Raspberry</label>
-                    <input class="input" id="cBusca" type="search" placeholder="Número de tarjeta o nombre de la R1" autocomplete="off">
-                    <div id="cTarjetas" class="pa-opciones" role="listbox" aria-label="Tarjetas encontradas"></div></div>
-                <div class="pa-2">
-                    <div class="field"><label for="cCiclos">Ciclos</label><input class="input mono" id="cCiclos" type="number" min="1" max="1000" value="50" required></div>
-                    <div class="field"><label for="cPausa">Pausa entre ciclos (s)</label><input class="input mono" id="cPausa" type="number" min="0" max="3600" value="60" required></div>
-                </div>
-                <label class="pa-check"><input type="checkbox" id="cDetener" checked> Detener la campaña en el primer ciclo fallido</label>
-                <label class="pa-check"><input type="checkbox" id="cConf" required> Confirmo la tarjeta física y el banco libre: cada ciclo restablece ajustes y mueve el perno.</label>
-                <button class="btn btn-primary" type="submit">Iniciar campaña</button>
-                <p id="nMsg" class="hint" role="status"></p>
-            </form>
-        </section>
-
-        <section class="panel pad stack pa-ancho" id="p5" aria-labelledby="h5p">
-            <h2 class="silk" id="h5p"><span class="n">5</span> Seguimiento y logs</h2>
-            <!-- v1.4.65: campaña en curso: ciclo, etapa, sensores, últimas líneas y Detener -->
-            <div id="vivo" class="pa-vivo" aria-live="polite" hidden></div>
-            <div id="campanas" class="pa-lista"></div>
-            <div class="pa-log">
-                <div class="pa-log-h">
-                    <b>Log del agente (agent.log de la Raspberry)</b>
-                    <span id="lMeta" class="hint"></span>
-                    <div class="pa-acc">
-                        <button class="btn btn-sm" id="lPedir" type="button">Traer log</button>
-                        <a class="btn btn-sm btn-ghost" id="lBajar" href="/api/pruebas-auto/agente/log.txt" download>Descargar .txt</a>
-                    </div>
-                </div>
-                <pre id="lTexto" class="pa-pre" tabindex="0" aria-label="Últimas líneas del log del agente"></pre>
             </div>
+        </section>
+
+        <div class="pa-work">
+            <div class="pa-col">
+                <!-- Campaña en curso (activa o pausada) -->
+                <section class="pa-run" id="vivo" aria-labelledby="vNombre" hidden>
+                    <div class="pa-run-head">
+                        <div class="pa-run-top">
+                            <span class="pa-eyebrow" id="vEyebrow">Campaña en curso</span>
+                            <span class="pa-badge" id="vEstado" data-k="run">Activa</span>
+                        </div>
+                        <h2 id="vNombre">—</h2>
+                        <p class="pa-run-meta" id="vMeta"></p>
+                        <div class="pa-acc pa-run-acc">
+                            <button class="btn" id="vPausa" type="button" data-a="pausar"><span class="pa-i" data-i="pause" aria-hidden="true"></span><span>Pausar</span></button>
+                            <button class="btn" id="vDetener" type="button" data-a="detener" title="Termina el ciclo actual y no inicia otro"><span class="pa-i" data-i="stop" aria-hidden="true"></span>Detener al terminar el ciclo</button>
+                            <button class="btn pa-btn-danger" id="vAhora" type="button" data-a="detener_ahora" title="Cancela el ciclo en curso; el firmware termina el movimiento actual"><span class="pa-i" data-i="alert" aria-hidden="true"></span><span>Detener ahora</span></button>
+                            <span class="pa-acc-links">
+                            <a class="btn pa-link" id="vLogTxt" href="#" download><span class="pa-i" data-i="download" aria-hidden="true"></span>LOG de la campaña .txt</a>
+                            <button class="btn pa-link" id="vVerCiclos" type="button"><span class="pa-i" data-i="list" aria-hidden="true"></span>Ver ciclos</button>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="pa-metrics" aria-live="polite">
+                        <div class="pa-ciclo-big">
+                            <span class="pa-met-lbl">Ciclo</span>
+                            <b><span id="vCiclo">0</span><small> de <span id="vTotal">0</span></small></b>
+                        </div>
+                        <dl class="pa-met-grid">
+                            <div><dt>Aprobados</dt><dd class="pa-ok" id="vAprob">0</dd></div>
+                            <div><dt>Fallidos</dt><dd class="pa-bad" id="vFall">0</dd></div>
+                            <div><dt>No verificados</dt><dd class="pa-warn" id="vNv">0</dd></div>
+                            <div><dt>Duración media</dt><dd id="vMedia">—</dd></div>
+                            <div><dt>Restante (estimado)</dt><dd id="vResta">—</dd></div>
+                        </dl>
+                        <div class="pa-barra" id="vBarra" role="img" aria-label="Sin ciclos todavía"></div>
+                        <p class="hint" id="vEstim"></p>
+                    </div>
+
+                    <div class="pa-etapa" id="vEtapa" data-k="pend" aria-live="polite">
+                        <span class="pa-etapa-ico" aria-hidden="true"><span class="pa-i" data-i="loader"></span></span>
+                        <div>
+                            <p class="pa-etapa-n" id="vEtapaN">—</p>
+                            <p class="pa-etapa-t" id="vEtapaT">—</p>
+                            <p class="hint" id="vEtapaD"></p>
+                            <p class="pa-etapa-canal" id="vEtapaC"></p>
+                        </div>
+                    </div>
+
+                    <div class="pa-groups" id="vGrupos" aria-label="Etapas del ciclo"></div>
+
+                    <div class="pa-sens-wrap">
+                        <h3 class="pa-h3">Sensores de la R1</h3>
+                        <div class="pa-sens" id="vSens"></div>
+                    </div>
+                </section>
+
+                <!-- Nueva campaña (sin campaña en curso) -->
+                <section class="pa-run" id="nueva" aria-labelledby="hNueva">
+                    <div class="pa-run-head">
+                        <div class="pa-title"><span class="pa-i" data-i="play" aria-hidden="true"></span><h2 id="hNueva">Nueva campaña</h2></div>
+                        <p class="pa-run-meta">Repite las 14 etapas el número de ciclos que indiques, con una pausa entre ciclos.</p>
+                    </div>
+                    <form id="fNueva" class="pa-form" novalidate>
+                        <div class="pa-2">
+                            <div class="field"><label for="cNombre">Nombre</label><input class="input" id="cNombre" maxlength="80" required placeholder="Resistencia FW 4.4 beta"></div>
+                            <div class="field"><label for="cFw">Firmware que se valida</label><input class="input" id="cFw" maxlength="80" required placeholder="FW 4.4 beta"></div>
+                        </div>
+                        <div class="field"><label for="cBusca">Tarjeta armada (R1 + R2) conectada a la Raspberry</label>
+                            <input class="input" id="cBusca" type="search" placeholder="Número de tarjeta o nombre de la R1" autocomplete="off">
+                            <div id="cTarjetas" class="pa-opciones" role="listbox" aria-label="Tarjetas encontradas"></div></div>
+                        <div class="pa-2">
+                            <div class="field"><label for="cCiclos">Ciclos</label><input class="input" id="cCiclos" type="number" min="1" max="1000" value="50" required inputmode="numeric"></div>
+                            <div class="field"><label for="cPausa">Pausa entre ciclos (s)</label><input class="input" id="cPausa" type="number" min="0" max="3600" value="60" required inputmode="numeric"></div>
+                        </div>
+                        <label class="pa-check"><input type="checkbox" id="cDetener" checked> Detener la campaña en el primer ciclo fallido</label>
+                        <label class="pa-check"><input type="checkbox" id="cConf"> Confirmo la tarjeta física y el banco libre: cada ciclo restablece ajustes y mueve el perno.</label>
+                        <p class="pa-req" id="nReq" hidden><span class="pa-i" data-i="alert" aria-hidden="true"></span><span id="nReqTxt"></span></p>
+                        <div class="pa-acc">
+                            <button class="btn btn-primary pa-btn-lg" id="nIniciar" type="submit"><span class="pa-i" data-i="play" aria-hidden="true"></span>Iniciar campaña</button>
+                        </div>
+                        <p id="nMsg" class="hint" role="status"></p>
+                    </form>
+                </section>
+            </div>
+
+            <aside class="pa-col" aria-label="Registros">
+                <section class="pa-panel" aria-labelledby="hReg">
+                    <div class="pa-panel-head">
+                        <div class="pa-title"><span class="pa-i" data-i="pulse" aria-hidden="true"></span><h2 id="hReg">Registro en vivo</h2></div>
+                        <span class="hint" id="vLogMeta"></span>
+                    </div>
+                    <pre id="vLogPre" class="pa-term" tabindex="0" aria-label="Últimas líneas del ciclo en curso">Sin campaña en curso. Aquí aparecen las líneas del ciclo mientras corre.</pre>
+                </section>
+                <section class="pa-panel" aria-labelledby="hAg">
+                    <div class="pa-panel-head">
+                        <div class="pa-title"><span class="pa-i" data-i="list" aria-hidden="true"></span><h2 id="hAg">Log del agente</h2></div>
+                        <span id="lMeta" class="hint"></span>
+                    </div>
+                    <p class="hint pa-panel-note">agent.log de la Raspberry: arranque, conexión del puerto y errores del agente.</p>
+                    <div class="pa-acc">
+                        <button class="btn" id="lPedir" type="button"><span class="pa-i" data-i="refresh" aria-hidden="true"></span>Traer log</button>
+                        <a class="btn pa-link" id="lBajar" href="/api/pruebas-auto/agente/log.txt" download><span class="pa-i" data-i="download" aria-hidden="true"></span>Descargar .txt</a>
+                    </div>
+                    <pre id="lTexto" class="pa-term pa-term-alto" tabindex="0" aria-label="Últimas líneas del log del agente"></pre>
+                </section>
+            </aside>
+        </div>
+
+        <section class="pa-hist" aria-labelledby="hHist">
+            <div class="pa-hist-head">
+                <div class="pa-title"><span class="pa-i" data-i="clock" aria-hidden="true"></span><h2 id="hHist">Historial de campañas</h2></div>
+                <span class="pa-count" id="hCuenta">0</span>
+            </div>
+            <div id="campanas" class="pa-lista"></div>
         </section>
     </main>
 </div>
 <div class="pa-ocupada" id="ocupada" role="alertdialog" aria-modal="true" aria-labelledby="ocTit" aria-describedby="ocTxt" hidden>
     <div class="pa-ocupada-caja">
-        <svg class="pa-ocupada-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5zM12 15v2"/></svg>
+        <span class="pa-ocupada-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5zM12 15v2"/></svg></span>
+        <span class="pa-eyebrow">Pruebas automáticas</span>
         <h2 id="ocTit">Raspberry ocupada</h2>
-        <p id="ocTxt">Los puertos de la Raspberry los está usando <b id="ocQuien"></b> desde <span id="ocDesde"></span></p>
+        <p id="ocTxt">Los puertos de la Raspberry los está usando <b id="ocQuien"></b> desde <span id="ocDesde"></span>.</p>
         <p class="pa-ocupada-que" id="ocQue"></p>
         <p class="hint">Esta pantalla se quita sola cuando la Raspberry quede libre. Cada cuenta ve solo sus propias campañas.</p>
         <div class="pa-acc">
             <a class="btn btn-primary" id="ocVolver" href="/inicio">Volver a módulos</a>
-            <button class="btn btn-danger" id="ocForzar" type="button" hidden>Detener y liberar (administrador)</button>
+            <button class="btn pa-btn-danger" id="ocForzar" type="button" hidden>Detener y liberar (administrador)</button>
         </div>
     </div>
 </div>

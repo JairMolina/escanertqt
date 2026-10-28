@@ -1,5 +1,29 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.66 — 2026-10-28
+- **Pruebas automáticas: rediseño con el estilo de Pruebas TQT.** Solo cambian `pruebas_auto.html`, `.css` y `.js`; la API y la lógica de las pruebas no cambian. La página queda así:
+  - **Barra superior:** estado del banco (Raspberry, agente, puerto) y «en uso por ti · Liberar».
+  - **«Preparar el banco»:** 3 tarjetas (agente con Instalar/Actualizar, Raspberry, puerto R1) que dicen qué falta y se compactan cuando todo está listo.
+  - **«Campaña en curso»:**
+    - ciclo N de M, barra de resultados, duración media y tiempo restante estimado;
+    - la etapa actual destacada y las 14 etapas en 4 bloques plegables;
+    - mosaico de sensores;
+    - botones Pausar/Reanudar, «Detener al terminar el ciclo», «Detener ahora» (confirmación en dos pasos), LOG y Ver ciclos.
+    - Sin campaña activa, ese lugar lo ocupa el formulario «Nueva campaña».
+  - **A la derecha:** «Registro en vivo» y el log del agente.
+  - **Abajo:** historial con ciclos desplegables, LOG por ciclo y «Repetir», que precarga el formulario.
+  - **Overlay «Raspberry ocupada»:** rediseñado.
+
+  «Iniciar campaña» se deshabilita, con el motivo, si no hay agente o la Raspberry está sin señal.
+
+  **Por dónde va cada etapa.** Cada una lleva su chip de canal, que también sale en la etapa actual:
+  - «Terminal serial → R1» en las etapas 1–6;
+  - «Bluetooth → R1» en las 7–11;
+  - «Bluetooth · cambia a R2» en la 12;
+  - «Bluetooth → R2» en las 13–14.
+
+  **Barra fija abajo mientras hay campaña activa o pausada.** Muestra ciclo, etapa y canal, con «Detener al terminar el ciclo» y «Detener ahora»; se ve aunque bajes por la página. Agente 1.4.66 sin cambios de código: solo acompaña la versión.
+
 ## v1.4.65 — 2026-10-28
 - **Pruebas TQT / Pruebas automáticas: R2 ya no falla por un rebote del sensor.** En la etapa «R2 BLE · PPON, nuevo err=13» el motor llegaba bien (ON 0 · OFF 1, err=13) y una trama después el sensor de apertura rebotaba un instante (ON 0 · OFF 0) antes de volver a OFF 1. La comprobación tomaba la última trama en caché, justo la del rebote, y daba «Posición de R2 no se mantuvo estable». Ahora la posición tiene que sostenerse 1.5 s seguidos y confirmarse con un Status nuevo; si a los 10 s sigue cambiando, falla. Cada rebote queda en el log como «AVISO SENSOR» para revisar la alineación del imán y del sensor. La prueba `test_r2_rebote_del_sensor_al_llegar_se_tolera_y_avisa` reproduce el caso real: falla sin el cambio y pasa con él. Agente 1.4.65: el puente de Windows y la Raspberry con 1.4.64 se actualizan solos.
 - **Pruebas automáticas: panel «En curso» y «Detener ahora».** El paso 5 muestra la campaña activa:

@@ -1,17 +1,34 @@
 /* pruebas_auto.js - Pruebas automáticas (luna de Escáner TQT): campañas de resistencia en UN banco, la Raspberry.
-   5 pasos: 1 agente · 2 Raspberry en línea · 3 puerto serie · 4 campaña · 5 seguimiento y logs.
-   API: /api/pruebas-auto (banco, agente, puerto, campañas, logs .txt). Refresca cada 5 s con la pestaña visible. */
+   Pantalla: preparar el banco (agente · Raspberry · puerto R1) → campaña en curso o nueva campaña → registro en vivo,
+   log del agente e historial. API: /api/pruebas-auto (banco, agente, puerto, campañas, logs .txt).
+   Refresco: banco y campañas cada 5 s; /vivo cada 2 s solo con campaña activa; nada con la pestaña oculta. */
 (function () {
     'use strict';
     var T = window.TQT, $ = function (id) { return document.getElementById(id); }, esc = T.esc;
     var ESTADO = { activa: 'Activa', pausada: 'Pausada', terminada: 'Terminada', fallida: 'Fallida', detenida: 'Detenida' };
+    var ESTADO_K = { activa: 'run', pausada: 'warn', terminada: 'ok', fallida: 'bad', detenida: 'pend' };
     var RES = { aprobado: 'Aprobado', aprobado_con_advertencias: 'Aprobado con advertencias', fallido: 'Fallido', no_verificado: 'No verificado' };
     var SOL = 'M12 3v2M12 19v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M3 12h2M19 12h2M5.6 18.4 7 17M17 7l1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z';
     var LUNA = 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z';
-    var tarjeta = null, abierta = null, banco = null, esperaLog = 0, puertoElegido = '';
+    var REDUCIDO = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var tarjeta = null, abierta = null, banco = null, esperaLog = 0, puertoElegido = '', cambiarPuerto = false, instAuto = false;
+    var campLista = [], detCache = {}, repetirNum = '', listoBanco = null;
 
-    /* v1.4.52: sesiones separadas. La Raspberry es de una sola cuenta a la vez: si la usa otra, la API responde 409 con
-       quién la tiene y la página se tapa con «Raspberry ocupada» hasta que se libere (entonces se toma sola). */
+    function fecha(s) { return s ? new Date(s * 1000).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—'; }
+    function hora(s) { return new Date(s * 1000).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+    function hace(s) { if (!s) return 'nunca'; var d = Math.max(0, Date.now() / 1000 - s); return d < 60 ? 'hace ' + Math.round(d) + ' s' : d < 3600 ? 'hace ' + Math.round(d / 60) + ' min' : fecha(s); }
+    function dur(s) {
+        s = Math.max(0, Math.round(s));
+        if (s < 60) return s + ' s';
+        if (s < 3600) return Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : '');
+        return Math.floor(s / 3600) + ' h ' + String(Math.round((s % 3600) / 60)).padStart(2, '0') + ' min';
+    }
+    // escribe solo si cambió: evita parpadeo, pérdida de foco y avisos repetidos de lectores de pantalla
+    function setHTML(el, html) { if (el._h !== html) { el._h = html; el.innerHTML = html; } }
+    function setTxt(el, t) { if (el.textContent !== t) el.textContent = t; }
+
+    /* ---- sesiones separadas: la Raspberry es de una sola cuenta a la vez. Si la usa otra, la API responde 409 con
+       quién la tiene y la página se tapa con «Raspberry ocupada» hasta que se libere (entonces se toma sola). ---- */
     var ocupadaVisible = false, tomando = false;
     function api(url, opts) {
         return T.api(url, opts).then(function (r) {
@@ -50,7 +67,7 @@
         ocultarOcupada();
         if (!o) tomar();   // libre: se reserva para esta cuenta
         $('enUso').hidden = !o;
-        $('enUsoTxt').textContent = 'Raspberry en uso por ti' + (o && o.campana ? ' · campaña en curso' : '');
+        setTxt($('enUsoTxt'), 'En uso por ti' + (o && o.campana ? ' · campaña en curso' : ''));
         $('liberar').disabled = !!(o && o.campana);
         $('liberar').title = o && o.campana ? 'Detén tu campaña para liberar la Raspberry' : 'Deja la Raspberry libre para otra cuenta';
     }
@@ -60,7 +77,7 @@
             location.href = '/inicio';
         });
     });
-    // v1.4.56: confirmación en dos pasos dentro de la pantalla (sin confirm() nativo)
+    // confirmación en dos pasos dentro de la pantalla (sin confirm() nativo)
     $('ocForzar').addEventListener('click', function () {
         var bt = $('ocForzar');
         if (!bt.dataset.seguro) {
@@ -75,9 +92,6 @@
         });
     });
 
-    function fecha(s) { return s ? new Date(s * 1000).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'medium' }) : '—'; }
-    function hace(s) { if (!s) return 'nunca'; var d = Math.max(0, Date.now() / 1000 - s); return d < 60 ? 'hace ' + Math.round(d) + ' s' : d < 3600 ? 'hace ' + Math.round(d / 60) + ' min' : fecha(s); }
-
     /* ---- tema claro/oscuro (misma preferencia que el resto de Escáner TQT: tqt.tema) ---- */
     function pintarTema() {
         var claro = T.currentTheme() === 'light';
@@ -87,55 +101,96 @@
     $('tema').addEventListener('click', function () { T.toggleTheme(); pintarTema(); });
     pintarTema();
 
-    function pasos(listo) {
-        var actual = 0;
-        document.querySelectorAll('.pa-pasos li').forEach(function (li) {
-            var n = +li.dataset.paso, ok = !!listo[n];
-            li.toggleAttribute('data-ok', ok);
-            if (!ok && !actual) { actual = n; li.setAttribute('aria-current', 'step'); } else li.removeAttribute('aria-current');
-        });
+    /* ---- preparar el banco: agente, Raspberry y puerto ---- */
+    function abrirInst(v) {
+        $('instPanel').hidden = !v;
+        $('iAbrir').setAttribute('aria-expanded', String(v));
+        $('prep').dataset.listo = String(!v && !!(listoBanco && listoBanco.listo));
     }
+    $('iAbrir').addEventListener('click', function () {
+        var abrir = $('instPanel').hidden; abrirInst(abrir);
+        if (abrir) $('iPuerto').focus();
+    });
 
-    /* ---- pasos 1-3: banco, Raspberry y puerto ---- */
     function pintarBanco(b) {
         banco = b;
-        var e = b.estado || {}, en = b.registrado && b.en_linea;
-        $('p1Estado').innerHTML = b.registrado
-            ? 'Agente registrado el ' + esc(fecha(b.creado)) + (en ? ' · <b class="pa-ok">en línea</b>' : ' · <b class="pa-bad">sin señal</b> (' + esc(hace(b.visto)) + ')')
-            : 'Aún no hay agente para la Raspberry. Descárgalo e instálalo.';
-        $('p1Sum').textContent = b.registrado ? 'Reinstalar o actualizar el agente (mismo banco)' : 'Instalar el agente en la Raspberry';
-        if (!b.registrado) $('p1Det').open = true;
+        var e = b.estado || {}, reg = !!b.registrado, en = reg && !!b.en_linea, conectado = en && !!e.serial_connected, run = !!e.running;
+        var ver = e.agent_version || '';
+        // nombre corto del puerto: /dev/ttyUSB0 en vez de la ruta larga by-id (la ruta completa queda en el title)
+        var psL = Array.isArray(e.ports) ? e.ports : [], pAct = conectado ? e.port : e.auto_port;
+        var pM = psL.find(function (x) { return pAct && (x.by_id === pAct || x.device === pAct); });
+        var pCorto = pAct ? (pM ? pM.device : String(pAct).split('/').pop()) : '';
 
-        var filas = b.registrado ? [
-            ['Estado', en ? (e.running ? 'Probando' : 'En línea') : 'Sin señal'],
-            ['Última señal', hace(b.visto)],
-            ['Equipo', e.host || '—'],
-            ['Sistema', e.platform || '—'],
-            ['Versión del agente', e.agent_version || 'anterior a Pruebas automáticas (reinstala)'],
-        ] : [['Estado', 'Esperando la instalación del paso 1']];
-        $('p2Datos').innerHTML = filas.map(function (f) { return '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>'; }).join('');
-        $('p2').dataset.k = en ? 'ok' : 'bad';
+        // agente
+        var cA = $('cAgente');
+        cA.dataset.k = !reg ? 'warn' : !en ? 'bad' : ver ? 'ok' : 'warn';
+        cA.querySelector('.pa-conn').dataset.k = cA.dataset.k;
+        setTxt($('aEstado'), !reg ? 'Sin instalar' : (en ? 'En línea' : 'Sin señal') + (ver ? ' · versión ' + ver : ''));
+        setTxt($('aHint'), !reg ? 'Instálalo con un solo comando en la Raspberry; aquí verás el avance.'
+            : !ver ? 'Versión anterior a Pruebas automáticas: actualízalo.'
+            : en ? 'Registrado el ' + fecha(b.creado) + '. Se actualiza solo.'
+            : 'Última señal ' + hace(b.visto) + '. Revisa que la Raspberry esté encendida y con red.');
+        setTxt($('iAbrirTxt'), reg ? 'Actualizar' : 'Instalar agente');
+        $('iAbrir').title = reg ? 'Reinstala o actualiza el agente; conserva el mismo banco' : 'Genera el comando de instalación para la Raspberry';
+        if (!reg && !instAuto) { instAuto = true; abrirInst(true); }
 
-        var conectado = en && e.serial_connected;
-        $('p3Actual').innerHTML = !en ? 'La Raspberry debe estar en línea para ver sus puertos.'
-            : conectado ? 'Conectado a <code>' + esc(e.port) + '</code>' : e.auto_port ? 'Reintentando <code>' + esc(e.auto_port) + '</code>…' : 'Sin puerto conectado.';
+        // Raspberry
+        var cR = $('cRasp');
+        cR.dataset.k = en ? 'ok' : reg ? 'bad' : 'pend';
+        cR.querySelector('.pa-conn').dataset.k = cR.dataset.k;
+        setTxt($('rEstado'), en ? (run ? 'En línea · ejecutando un ciclo' : 'En línea') : reg ? 'Sin señal · ' + hace(b.visto) : 'Esperando al agente');
+        setTxt($('rHint'), reg ? [e.host, e.platform].filter(Boolean).join(' · ') + (en ? ' · última señal ' + hace(b.visto) : '')
+            : 'Aparece aquí cuando el agente se conecte por primera vez.');
+
+        // puerto de la R1
+        var cP = $('cPuerto');
+        cP.dataset.k = conectado ? 'ok' : en ? 'warn' : 'pend';
+        cP.querySelector('.pa-conn').dataset.k = cP.dataset.k;
+        setHTML($('p3Actual'), !en ? 'Disponible cuando la Raspberry esté en línea'
+            : conectado ? 'Conectado a <code title="' + esc(e.port) + '">' + esc(pCorto) + '</code>' + (pM && pM.description ? ' · ' + esc(pM.description) : '')
+            : e.auto_port ? 'Reintentando <code title="' + esc(e.auto_port) + '">' + esc(pCorto) + '</code>…' : 'Sin puerto conectado: elige uno y pulsa Conectar');
         var sel = $('pPuerto'), ps = Array.isArray(e.ports) ? e.ports : [];
         if (document.activeElement !== sel) {
             var prev = puertoElegido || e.port || e.auto_port || '';
-            sel.innerHTML = ps.length ? ps.map(function (p) {
+            setHTML(sel, ps.length ? ps.map(function (p) {
                 var v = p.by_id || p.device, nom = p.device + (p.description ? ' · ' + p.description : '') + (p.by_id ? ' · ' + p.by_id.split('/').pop() : '');
                 return '<option value="' + esc(v) + '">' + esc(nom) + '</option>';
-            }).join('') : '<option value="">' + (en ? 'No hay puertos USB serie: conecta la R1 a la Raspberry' : '—') + '</option>';
+            }).join('') : '<option value="">' + (en ? 'No hay puertos USB serie: conecta la R1 a la Raspberry' : '—') + '</option>');
             ps.forEach(function (p) { if (prev && (prev === p.device || prev === p.by_id)) sel.value = p.by_id || p.device; });
         }
-        $('pConectar').disabled = !en || !ps.length || !!e.running;
-        $('pDesconectar').disabled = !conectado || !!e.running;
-        return { 1: b.registrado, 2: en, 3: conectado };
+        $('pFila').hidden = !en || (conectado && !cambiarPuerto);
+        $('pSec').hidden = !conectado;
+        $('pCambiar').setAttribute('aria-expanded', String(cambiarPuerto));
+        $('pCambiar').textContent = cambiarPuerto ? 'Cancelar cambio' : 'Cambiar puerto';
+        $('pConectar').disabled = !en || !ps.length || run;
+        $('pConectar').title = !en ? 'La Raspberry está sin señal' : !ps.length ? 'No hay puertos USB serie detectados' : run ? 'Espera a que termine el ciclo en curso' : 'Conecta el agente a este puerto';
+        $('pDesconectar').disabled = !conectado || run;
+        $('pDesconectar').title = run ? 'Espera a que termine el ciclo en curso' : 'Suelta el puerto serie de la R1';
+        $('pCambiar').disabled = run;
+
+        // chip de la barra superior
+        var chip = $('chipBanco');
+        chip.dataset.k = !reg ? 'warn' : en ? 'ok' : 'bad';
+        setTxt($('chipTxt'), !reg ? 'Sin agente en la Raspberry'
+            : en ? 'Raspberry en línea' + (ver ? ' · agente ' + ver : '') + ' · ' + (conectado ? pCorto : 'sin puerto')
+            : 'Raspberry sin señal · ' + hace(b.visto));
+
+        // resumen
+        var faltan = [];
+        if (!reg) faltan.push('instalar el agente');
+        else if (!en) faltan.push('que la Raspberry vuelva a estar en línea');
+        else if (!conectado) faltan.push('conectar el puerto de la R1');
+        var res = $('prepRes');
+        res.dataset.k = faltan.length ? 'warn' : 'ok';
+        setTxt($('prepResTxt'), faltan.length ? 'Falta ' + faltan.join(' y ') + '.' : 'Banco listo: agente en línea y puerto de la R1 conectado.');
+        listoBanco = { reg: reg, en: en, conectado: conectado, run: run, listo: !faltan.length };
+        $('prep').dataset.listo = String(!faltan.length && $('instPanel').hidden);
+        return listoBanco;
     }
 
     function cargarBanco() {
         return api('/api/pruebas-auto/banco').then(function (r) {
-            if (!r.ok) { $('p1Estado').textContent = r.error; return {}; }
+            if (!r.ok) { $('chipBanco').dataset.k = 'bad'; setTxt($('chipTxt'), r.error || 'No se pudo consultar el banco'); return null; }
             pintarOcupacion(r.data);
             var l = pintarBanco(r.data);
             if (esperaLog && r.data.log_ts && r.data.log_ts * 1000 >= esperaLog) { esperaLog = 0; verLog(); }
@@ -144,6 +199,7 @@
     }
 
     $('pPuerto').addEventListener('change', function () { puertoElegido = this.value; });
+    $('pCambiar').addEventListener('click', function () { cambiarPuerto = !cambiarPuerto; if (banco) pintarBanco(banco); if (cambiarPuerto) $('pPuerto').focus(); });
     function puerto(accion) {
         $('pMsg').textContent = accion === 'conectar' ? 'Conectando…' : 'Desconectando…';
         api('/api/pruebas-auto/puerto', { method: 'POST', body: { accion: accion, puerto: accion === 'conectar' ? $('pPuerto').value : '' } }).then(function (r) {
@@ -154,7 +210,8 @@
                     var st = c.ok && c.data.state;
                     if (st === 'done' || st === 'error') {
                         var err = c.data.result && c.data.result.error;
-                        $('pMsg').textContent = err ? err : accion === 'conectar' ? 'Puerto conectado.' : 'Puerto desconectado.';
+                        $('pMsg').textContent = err ? err : accion === 'conectar' ? 'Puerto conectado. El agente vuelve a él solo tras reiniciar la Raspberry o reconectar el USB.' : 'Puerto desconectado.';
+                        if (!err) cambiarPuerto = false;
                         refrescar();
                     } else if (++n < 20) setTimeout(sondeo, 700); else $('pMsg').textContent = 'La Raspberry no respondió; revisa el log del agente.';
                 });
@@ -164,8 +221,8 @@
     $('pConectar').addEventListener('click', function () { puerto('conectar'); });
     $('pDesconectar').addEventListener('click', function () { puerto('desconectar'); });
 
-    /* v1.4.64: instalación en segundo plano. Se genera un comando de un solo uso (curl … | sh) para la Raspberry; el
-       instalador reporta sus etapas y aquí se ve «Instalando…» hasta que el agente nuevo está en línea («✓ Todo correcto»). */
+    /* ---- instalación en segundo plano: comando de un solo uso (curl … | sh) para la Raspberry; el instalador reporta
+       sus etapas y aquí se ve «Instalando…» hasta que el agente nuevo está en línea («✓ Todo correcto»). ---- */
     var instSeq = 0;
     var ETAPA = { extrayendo: 'copiando archivos', python: 'preparando Python', dependencias: 'instalando pyserial y bleak',
         arrancando: 'arrancando el agente', listo: 'instalado; esperando a que se conecte' };
@@ -183,8 +240,11 @@
                     if (previo === null) previo = !!e.listo;
                     if (nuevo && e.etapa === 'error') { avance('bad', 'No se pudo instalar: ' + (e.mensaje || 'revisa ~/tqt-pruebas-instalar.log') + '. Corrígelo y genera otro comando.'); return; }
                     if (e.listo && (nuevo || !previo)) {
-                        avance('ok', '✓ Todo correcto: agente ' + (e.agent_version || '') + ' en línea en la Raspberry y listo para usar. Sigue con el paso 3.');
-                        $('iCmdBox').hidden = true; $('p1Det').open = false; refrescar();
+                        avance('ok', '✓ Todo correcto: agente ' + (e.agent_version || '') + ' en línea en la Raspberry y listo para usar. Sigue con el puerto de la R1.');
+                        $('iCmdBox').hidden = true;
+                        T.toast('Agente instalado y en línea.', { kind: 'ok' });
+                        setTimeout(function () { abrirInst(false); }, 4000);
+                        refrescar();
                         return;
                     }
                     if (nuevo && ETAPA[e.etapa]) avance('run', 'Instalando… ' + ETAPA[e.etapa] + '.' + (e.mensaje && e.etapa !== 'listo' ? ' ' + e.mensaje : ''));
@@ -225,7 +285,11 @@
             }, function (err) { avance('bad', String(err.message || err)); });
     });
 
-    /* ---- paso 4: campaña ---- */
+    /* ---- nueva campaña ---- */
+    function elegirTarjeta(b) {
+        tarjeta = b ? b._t : null;
+        $('cTarjetas').querySelectorAll('.pa-op').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); });
+    }
     var buscar = T.debounce(function () {
         var q = $('cBusca').value.trim();
         if (!q) { $('cTarjetas').innerHTML = ''; return; }
@@ -233,150 +297,375 @@
             var l = r.ok ? r.data : [];
             $('cTarjetas').innerHTML = l.length ? l.map(function (t) {
                 return '<button type="button" role="option" class="pa-op" data-id="' + t.id + '" aria-selected="' + (tarjeta && tarjeta.id === t.id) + '">' +
-                    '<b>Tarjeta ' + esc(t.id_tarjeta_num) + '</b> · ' + esc(t.r1) + ' + ' + esc(t.r2) + (t.firmware ? ' · FW ' + esc(t.firmware) : '') + '</button>';
+                    '<b>Tarjeta ' + esc(t.id_tarjeta_num) + '</b><small>' + esc(t.r1) + ' + ' + esc(t.r2) + (t.firmware ? ' · FW ' + esc(t.firmware) : '') + '</small></button>';
             }).join('') : '<p class="hint">' + (r.ok ? 'Sin tarjetas armadas con R1 y R2 y sus MAC.' : esc(r.error)) + '</p>';
             l.forEach(function (t) { var b = $('cTarjetas').querySelector('[data-id="' + t.id + '"]'); if (b) b._t = t; });
+            if (repetirNum) {   // «Repetir»: se elige sola la misma tarjeta
+                var t = l.find(function (x) { return String(x.id_tarjeta_num) === repetirNum; });
+                repetirNum = '';
+                if (t) elegirTarjeta($('cTarjetas').querySelector('[data-id="' + t.id + '"]'));
+            }
         });
     }, 250);
-    $('cBusca').addEventListener('input', function () { tarjeta = null; buscar(); });
-    $('cTarjetas').addEventListener('click', function (e) {
-        var b = e.target.closest('.pa-op'); if (!b) return;
-        tarjeta = b._t;
-        $('cTarjetas').querySelectorAll('.pa-op').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); });
-    });
+    $('cBusca').addEventListener('input', function () { tarjeta = null; repetirNum = ''; buscar(); });
+    $('cTarjetas').addEventListener('click', function (e) { var b = e.target.closest('.pa-op'); if (b) elegirTarjeta(b); });
+    function pintarReq(l) {
+        var bt = $('nIniciar'), req = $('nReq'), msg = '', k = 'warn', bloquea = false;
+        if (!l) return;
+        if (!l.reg) { msg = 'Instala el agente en la Raspberry («Instalar agente», arriba) para poder iniciar una campaña.'; bloquea = true; }
+        else if (!l.en) { msg = 'La Raspberry está sin señal: no se puede iniciar una campaña hasta que vuelva a estar en línea.'; bloquea = true; }
+        else if (!l.conectado) { msg = 'El puerto de la R1 no está conectado: la campaña esperará a que lo conectes.'; k = 'info'; }
+        req.hidden = !msg; req.dataset.k = k; setTxt($('nReqTxt'), msg);
+        bt.disabled = bloquea;
+        bt.title = bloquea ? msg : 'Crea la campaña; la Raspberry empieza el primer ciclo en cuanto esté libre y con el puerto conectado';
+    }
     $('fNueva').addEventListener('submit', function (e) {
         e.preventDefault();
         var msg = $('nMsg');
-        if (!tarjeta) { msg.textContent = 'Elige una tarjeta de la lista.'; $('cBusca').focus(); return; }
+        if (!$('cNombre').value.trim()) { msg.textContent = 'Escribe un nombre para la campaña.'; $('cNombre').focus(); return; }
+        if (!$('cFw').value.trim()) { msg.textContent = 'Escribe el firmware que se valida.'; $('cFw').focus(); return; }
+        if (!tarjeta) { msg.textContent = 'Busca y elige la tarjeta de la lista.'; $('cBusca').focus(); return; }
+        if (!$('cConf').checked) { msg.textContent = 'Confirma la tarjeta física y el banco libre.'; $('cConf').focus(); return; }
         msg.textContent = 'Creando…';
         api('/api/pruebas-auto/campanas', { method: 'POST', body: {
             nombre: $('cNombre').value, firmware: $('cFw').value, tarjeta_id: tarjeta.id,
             ciclos: +$('cCiclos').value, pausa_s: +$('cPausa').value, detener_en_falla: $('cDetener').checked, physical_confirmed: $('cConf').checked,
         } }).then(function (r) {
             msg.textContent = r.ok ? 'Campaña creada: la Raspberry empieza el primer ciclo en cuanto esté libre y con el puerto conectado.' : r.error;
-            if (r.ok) { $('cConf').checked = false; abierta = r.data.id; refrescar(); }
+            if (r.ok) { $('cConf').checked = false; refrescar(); }
         });
     });
-
-    /* ---- paso 5: campañas y logs ---- */
-    function barra(c) {
-        var k = c.conteo, tot = Math.max(c.ciclos, 1);
-        return '<div class="pa-barra" role="img" aria-label="' + k.aprobados + ' aprobados, ' + k.fallidos + ' fallidos, ' + k.no_verificados + ' no verificados de ' + c.ciclos + '">' +
-            '<i data-k="ok" style="width:' + (100 * k.aprobados / tot) + '%"></i><i data-k="bad" style="width:' + (100 * k.fallidos / tot) + '%"></i>' +
-            '<i data-k="warn" style="width:' + (100 * k.no_verificados / tot) + '%"></i><i data-k="run" style="width:' + (100 * k.en_curso / tot) + '%"></i></div>';
+    function repetir(id) {
+        var c = campLista.find(function (x) { return String(x.id) === String(id); }); if (!c) return;
+        $('cNombre').value = c.nombre || ''; $('cFw').value = c.firmware || '';
+        $('cCiclos').value = c.ciclos || 50; $('cPausa').value = c.pausa_s != null ? c.pausa_s : 60;
+        $('cDetener').checked = !!c.detener_en_falla; $('cConf').checked = false;
+        tarjeta = null; $('cTarjetas').innerHTML = '';
+        if (c.tarjeta && c.tarjeta.id_tarjeta_num != null) { repetirNum = String(c.tarjeta.id_tarjeta_num); $('cBusca').value = repetirNum; buscar(); }
+        $('nMsg').textContent = 'Datos de «' + c.nombre + '» cargados. Revisa la tarjeta, confirma el banco y pulsa «Iniciar campaña».';
+        $('nueva').scrollIntoView({ behavior: REDUCIDO ? 'auto' : 'smooth', block: 'start' });
+        $('cNombre').focus({ preventScroll: true });
     }
+
+    /* ---- historial de campañas ---- */
+    function barra(k, ciclos) {
+        var tot = Math.max(ciclos, 1);
+        return '<i data-k="ok" style="width:' + (100 * k.aprobados / tot) + '%"></i><i data-k="bad" style="width:' + (100 * k.fallidos / tot) + '%"></i>' +
+            '<i data-k="warn" style="width:' + (100 * k.no_verificados / tot) + '%"></i><i data-k="run" style="width:' + (100 * k.en_curso / tot) + '%"></i>';
+    }
+    function barraLbl(k, ciclos) { return k.aprobados + ' aprobados, ' + k.fallidos + ' fallidos, ' + k.no_verificados + ' no verificados de ' + ciclos + ' ciclos'; }
     function campanas() {
         return api('/api/pruebas-auto/campanas').then(function (r) {
             var l = r.ok && Array.isArray(r.data) ? r.data : [];
-            $('campanas').innerHTML = l.length ? l.map(function (c) {
-                var k = c.conteo, act = c.estado === 'activa' || c.estado === 'pausada';
-                return '<article class="pa-camp" data-estado="' + esc(c.estado) + '">' +
-                    '<div class="pa-camp-h"><div><b>' + esc(c.nombre) + '</b> <span class="pa-estado">' + esc(ESTADO[c.estado] || c.estado) + '</span>' +
-                    '<div class="hint">' + esc(c.firmware) + ' · Tarjeta ' + esc(c.tarjeta ? c.tarjeta.id_tarjeta_num : '?') + ' · ' + esc(c.operador) + ' · ' + esc(fecha(c.creado)) + '</div></div>' +
-                    '<div class="pa-acc">' +
-                    (c.estado === 'activa' ? '<button class="btn btn-sm" data-a="pausar" data-id="' + c.id + '">Pausar</button>' : '') +
-                    (c.estado === 'pausada' ? '<button class="btn btn-sm" data-a="reanudar" data-id="' + c.id + '">Reanudar</button>' : '') +
-                    (act ? '<button class="btn btn-sm btn-danger" data-a="detener" data-id="' + c.id + '">Detener</button>' : '') +
-                    (k.hechos ? '<a class="btn btn-sm btn-ghost" href="/api/pruebas-auto/campanas/' + c.id + '/log.txt" download>LOG .txt</a>' : '') +
-                    '<button class="btn btn-sm btn-ghost" data-ver="' + c.id + '" aria-expanded="' + (abierta === c.id) + '">Ciclos</button></div></div>' +
-                    barra(c) +
-                    '<div class="hint">' + k.hechos + ' de ' + c.ciclos + ' ciclos · ' + k.aprobados + ' aprobados · ' + k.fallidos + ' fallidos · ' + k.no_verificados + ' no verificados' +
-                    (k.en_curso ? ' · 1 en curso' : '') + (c.motivo ? ' · ' + esc(c.motivo) : '') + '</div>' +
-                    '<div class="pa-ciclos" id="d' + c.id + '"></div></article>';
-            }).join('') : '<p class="hint">' + (r.ok ? 'Aún no hay campañas.' : esc(r.error)) + '</p>';
-            if (abierta) detalle(abierta);
+            campLista = l;
             var act = l.find(function (c) { return c.estado === 'activa' || c.estado === 'pausada'; });
-            vivoId = act ? act.id : null; vivoCamp = act || null;
-            if (act) pintarVivo(); else $('vivo').hidden = true;
-            return l.length > 0;
+            setTxt($('hCuenta'), String(l.length));
+            setHTML($('campanas'), l.length ? l.map(function (c) {
+                var k = c.conteo, vivo = c.estado === 'activa' || c.estado === 'pausada', id = esc(c.id);
+                return '<article class="pa-camp" data-estado="' + esc(c.estado) + '">' +
+                    '<div class="pa-camp-h"><div class="pa-camp-t"><div><b>' + esc(c.nombre) + '</b><span class="pa-badge" data-k="' + (ESTADO_K[c.estado] || 'pend') + '">' +
+                    esc(vivo ? (c.estado === 'activa' ? 'En curso' : 'Pausada') : ESTADO[c.estado] || c.estado) + '</span></div>' +
+                    '<p class="pa-camp-meta">' + esc(c.firmware) + ' · Tarjeta ' + esc(c.tarjeta ? c.tarjeta.id_tarjeta_num : '?') + (c.tarjeta && c.tarjeta.nombre ? ' (' + esc(c.tarjeta.nombre) + ')' : '') +
+                    ' · ' + esc(c.operador) + ' · ' + esc(fecha(c.creado)) + '</p></div>' +
+                    '<div class="pa-acc">' +
+                    (k.hechos ? '<a class="btn pa-link" href="/api/pruebas-auto/campanas/' + id + '/log.txt" download><span class="pa-i" data-i="download" aria-hidden="true"></span>LOG .txt</a>' : '') +
+                    '<button class="btn" type="button" data-ver="' + id + '" aria-expanded="' + (abierta === String(c.id)) + '" aria-controls="d' + id + '"><span class="pa-i" data-i="list" aria-hidden="true"></span>Ciclos</button>' +
+                    (vivo ? '' : '<button class="btn" type="button" data-rep="' + id + '"' + (act ? ' disabled title="Termina o detén la campaña en curso para repetir otra"' : ' title="Carga estos mismos datos en «Nueva campaña»"') +
+                        '><span class="pa-i" data-i="repeat" aria-hidden="true"></span>Repetir</button>') +
+                    '</div></div>' +
+                    '<div class="pa-barra" role="img" aria-label="' + barraLbl(k, c.ciclos) + '">' + barra(k, c.ciclos) + '</div>' +
+                    '<div class="pa-res"><span><b>' + k.hechos + '</b> de ' + c.ciclos + ' ciclos</span>' +
+                    '<span class="pa-ok"><b>' + k.aprobados + '</b> aprobados</span><span class="pa-bad"><b>' + k.fallidos + '</b> fallidos</span>' +
+                    '<span class="pa-warn"><b>' + k.no_verificados + '</b> no verificados</span>' +
+                    '<span>Pausa ' + esc(c.pausa_s) + ' s · ' + (c.detener_en_falla ? 'se detiene al primer fallo' : 'sigue aunque falle') + '</span></div>' +
+                    (c.motivo ? '<p class="pa-motivo">' + esc(c.motivo) + '</p>' : '') +
+                    '<div class="pa-ciclos" id="d' + id + '">' + (abierta === String(c.id) && detCache[c.id] ? detCache[c.id] : '') + '</div></article>';
+            }).join('') : '<p class="pa-vacio">' + (r.ok ? 'Aún no hay campañas. Crea la primera con «Nueva campaña».' : esc(r.error)) + '</p>');
+            if (abierta) detalle(abierta);
+            vivoId = act ? String(act.id) : null; vivoCamp = act || null;
+            $('vivo').hidden = !act; $('nueva').hidden = !!act;
+            if (act) { pintarCabecera(act); cargarDetVivo(); pintarVivo(); }
+            else { vivoDet = null; setHTML($('vLogPre'), 'Sin campaña en curso. Aquí aparecen las líneas del ciclo mientras corre.'); setTxt($('vLogMeta'), ''); }
+            return true;
         });
+    }
+    function tablaCiclos(det) {
+        return det.length ? '<table class="pa-tabla"><thead><tr><th scope="col">Ciclo</th><th scope="col">Resultado</th><th scope="col">Inicio</th><th scope="col">Fin</th><th scope="col">Duración</th><th scope="col">LOG</th></tr></thead><tbody>' +
+            det.map(function (x) {
+                var fin = x.state === 'finished' || x.state === 'interrupted';
+                var res = x.state === 'queued' ? 'En cola' : x.state === 'running' ? 'Probando' : (RES[x.result] || x.result || (x.state === 'interrupted' ? 'Interrumpido' : '—'));
+                return '<tr><td>' + x.n + '</td><td data-r="' + esc(x.result || x.state) + '">' + esc(res) + '</td><td>' + fecha(x.created) + '</td><td>' +
+                    (fin ? fecha(x.updated) : '—') + '</td><td>' + (fin && x.updated && x.created ? dur(x.updated - x.created) : '—') + '</td><td>' +
+                    (fin ? '<a href="/api/pruebas-auto/ciclos/' + esc(x.run) + '/log.txt" download>.txt</a>' : '') + '</td></tr>';
+            }).join('') + '</tbody></table>' : '<p class="hint">Esperando el primer ciclo.</p>';
     }
     function detalle(id) {
-        var box = $('d' + id); if (!box) return;
-        api('/api/pruebas-auto/campanas/' + id).then(function (r) {
+        return api('/api/pruebas-auto/campanas/' + id).then(function (r) {
+            var box = $('d' + id); if (!box) return;
             if (!r.ok) { box.textContent = r.error; return; }
-            box.innerHTML = r.data.ciclos_detalle.length ? '<table class="pa-tabla"><thead><tr><th>Ciclo</th><th>Resultado</th><th>Inicio</th><th>Fin</th><th>LOG</th></tr></thead><tbody>' +
-                r.data.ciclos_detalle.map(function (x) {
-                    var res = x.state === 'queued' ? 'En cola' : x.state === 'running' ? 'Probando' : (RES[x.result] || x.result || '—');
-                    return '<tr><td>' + x.n + '</td><td data-r="' + esc(x.result || x.state) + '">' + esc(res) + '</td><td>' + fecha(x.created) + '</td><td>' +
-                        (x.state === 'finished' || x.state === 'interrupted' ? fecha(x.updated) : '—') + '</td><td>' +
-                        (x.state === 'finished' || x.state === 'interrupted' ? '<a href="/api/pruebas-auto/ciclos/' + esc(x.run) + '/log.txt" download>.txt</a>' : '') + '</td></tr>';
-                }).join('') + '</tbody></table>' : '<p class="hint">Esperando el primer ciclo.</p>';
+            detCache[id] = tablaCiclos(r.data.ciclos_detalle || []);
+            if (abierta === String(id)) setHTML(box, detCache[id]);
         });
     }
-    /* v1.4.65: «En curso»: qué hace la campaña ahora (ciclo, etapa de las 14, sensores S29 y últimas líneas)
-       y los dos botones de detener. Se refresca cada 2 s mientras haya campaña activa. */
-    var vivoId = null, vivoCamp = null, PASOS = [], ST = { aprobado: 'ok', fallido: 'bad', no_verificado: 'warn', ejecutando: 'run' };
-    fetch('/static/js/test_station_contract.json?v=1400').then(function (r) { return r.json(); }).then(function (d) { PASOS = d.step_names || []; }).catch(function () {});
-    function pos(sn) { return !sn ? '—' : sn.ON === '1' && sn.OFF === '0' ? 'cerrado' : sn.ON === '0' && sn.OFF === '1' ? 'abierto' : 'en movimiento / indeterminado'; }
-    function pintarVivo() {
-        if (!vivoId) return;
-        var id = vivoId, c = vivoCamp;
-        api('/api/pruebas-auto/campanas/' + id + '/vivo').then(function (r) {
-            if (id !== vivoId) return;
-            var box = $('vivo');
-            if (!r.ok) { box.hidden = false; box.textContent = r.error; return; }
-            var v = r.data, ci = v.ciclo, p = v.pasos || {}, idx = -1;
-            Object.keys(p).forEach(function (k) { if (p[k].estado === 'ejecutando') idx = +k; });
-            var hechas = Object.keys(p).filter(function (k) { return p[k].estado !== 'ejecutando'; }).length;
-            var etapa = idx >= 0 ? 'Etapa ' + (idx + 1) + ' de 14 · ' + (PASOS[idx] || '') + (p[idx].detalle ? ' — ' + p[idx].detalle : '')
-                : ci && ci.state === 'queued' ? 'Ciclo en cola: esperando a la Raspberry…'
-                : ci && ci.state === 'running' ? 'Preparando el ciclo…'
-                : v.estado === 'pausada' ? 'Pausada: no se encola otro ciclo hasta reanudar.' : 'Entre ciclos (pausa configurada).';
-            var sn = v.sensores;
-            box.hidden = false;
-            box.dataset.k = v.estado;
-            box.innerHTML =
-                '<div class="pa-vivo-h"><div><span class="pa-eyebrow">' + (v.estado === 'pausada' ? 'Pausada' : 'En curso') + '</span>' +
-                '<b>' + esc(c ? c.nombre : '') + '</b> · ciclo ' + (ci ? ci.n : 0) + ' de ' + (v.ciclos || '?') + '</div>' +
-                '<div class="pa-acc">' +
-                '<button class="btn btn-sm" data-a="detener" data-id="' + id + '" title="Termina el ciclo actual y no inicia otro">Detener al terminar el ciclo</button>' +
-                '<button class="btn btn-sm btn-danger" data-a="detener_ahora" data-id="' + id + '" title="Cancela el ciclo en curso; el firmware termina el movimiento actual">Detener ahora</button>' +
-                '</div></div>' +
-                '<p class="pa-vivo-etapa">' + esc(etapa) + '</p>' +
-                '<ol class="pa-vivo-pasos" aria-label="Etapas del ciclo">' + (PASOS.length ? PASOS : new Array(14).fill('')).map(function (n, i) {
-                    var e = p[i] ? p[i].estado : 'pendiente';
-                    return '<li data-k="' + (ST[e] || 'pend') + '" title="' + esc((i + 1) + '. ' + n + (p[i] && p[i].detalle ? ' — ' + p[i].detalle : '')) + '">' + (i + 1) + '</li>';
-                }).join('') + '</ol>' +
-                '<div class="hint">' + hechas + ' de 14 etapas terminadas en este ciclo' + (sn ? ' · Perno ' + pos(sn) + ' (ON ' + esc(sn.ON) + ' · OFF ' + esc(sn.OFF) + ') · MOV ' + esc(sn.MOV) + ' · err ' + esc(sn.err) + ' · origen PB ' + esc(sn.PB) : '') + '</div>' +
-                (v.log && v.log.length ? '<pre class="pa-vivo-log">' + esc(v.log.map(function (x) { return x.replace(/^\S+T(\d\d:\d\d:\d\d)\.\d+\S*\s\|\s/, '$1 · '); }).join('\n')) + '</pre>' : '');
-        });
-    }
-    $('vivo').addEventListener('click', function (e) {
-        var b = e.target.closest('button[data-a]'); if (!b) return;
-        if (b.dataset.a === 'detener_ahora' && !b.dataset.seguro) {   // confirmación en dos pasos, sin confirm()
-            b.dataset.seguro = '1'; b.textContent = 'Confirmar: cancelar el ciclo en curso';
-            setTimeout(function () { delete b.dataset.seguro; b.textContent = 'Detener ahora'; }, 6000);
-            return;
-        }
-        b.disabled = true;
-        api('/api/pruebas-auto/campanas/' + b.dataset.id + '/accion', { method: 'POST', body: { accion: b.dataset.a } }).then(function (r) {
-            T.toast(r.ok ? (b.dataset.a === 'detener_ahora' ? 'Campaña detenida; se canceló el ciclo en curso.' : 'Campaña detenida; el ciclo actual termina y no se inicia otro.') : r.error, { kind: r.ok ? 'ok' : 'bad' });
-            refrescar();
-        });
-    });
-    setInterval(function () { if (!document.hidden && vivoId) pintarVivo(); }, 2000);
     $('campanas').addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
         if (b.dataset.ver) {
-            abierta = abierta === b.dataset.ver ? null : b.dataset.ver;
-            b.setAttribute('aria-expanded', String(abierta === b.dataset.ver));
-            if (abierta) detalle(abierta); else $('d' + b.dataset.ver).innerHTML = '';
+            var id = b.dataset.ver;
+            abierta = abierta === id ? null : id;
+            b.setAttribute('aria-expanded', String(abierta === id));
+            if (abierta) detalle(id); else setHTML($('d' + id), '');
             return;
         }
-        if (!b.dataset.a) return;
+        if (b.dataset.rep) repetir(b.dataset.rep);
+    });
+
+    /* ---- campaña en curso: ciclo, métricas y estimación, etapa actual, 14 etapas en 4 bloques, sensores y registro ---- */
+    var vivoId = null, vivoCamp = null, vivoDet = null, PASOS = [], HELP = {}, ERRS = {};
+    var ST = { aprobado: 'ok', fallido: 'bad', no_verificado: 'nv', ejecutando: 'run' };
+    var ST_TXT = { ok: 'Aprobada', bad: 'Falló', nv: 'No verificada', run: 'En curso', pend: 'Pendiente' };
+    var GRUPOS = [
+        { t: 'Identificación y estado inicial', i: [0, 1] },
+        { t: 'R1 por serial', i: [2, 3, 4, 5] },
+        { t: 'R1 por Bluetooth', i: [6, 7, 8, 9, 10] },
+        { t: 'R2 por Bluetooth', i: [11, 12, 13] },
+    ];
+    var LBL = {
+        ON: { 0: 'Cierre inactivo', 1: 'Cierre activo' },
+        OFF: { 0: 'Apertura inactiva', 1: 'Apertura activa' },
+        PB: { 0: 'Sistema', 1: 'Serial / plataforma', 2: 'Bluetooth' },
+        TQT: { 0: 'En espera', 1: 'Abriendo', 2: 'Abierto', 3: 'Cerrando', 4: 'Cerrado', 5: 'Error' },
+    };
+    var grupoAuto = -1, ultimoVivo = null;
+    /* v1.4.66: por dónde va cada etapa. 1–6: terminal serial a R1 (la Raspberry escribe por el USB-serial);
+       7–11: Bluetooth a R1; 12: cambia de R1 a R2; 13–14: Bluetooth a R2 (R1 solo observa por serial). */
+    function canal(i) {
+        if (i <= 5) return { c: 'serial', t: i <= 1 ? 'Terminal serial · R1' : 'Terminal serial → R1', title: 'Comando por el puerto serie (USB) de la Raspberry a la R1' };
+        if (i <= 10) return { c: 'ble', t: i === 6 ? 'Bluetooth · conecta R1' : 'Bluetooth → R1', title: 'Comando por el Bluetooth de la Raspberry a la R1; la confirmación llega por serial' };
+        return { c: 'ble', t: i === 11 ? 'Bluetooth · cambia a R2' : 'Bluetooth → R2', title: 'Comando por el Bluetooth de la Raspberry a la R2; la R1 lo reporta por serial' };
+    }
+    function chipCanal(i) {
+        var k = canal(i);
+        return '<span class="pa-canal" data-c="' + k.c + '" title="' + esc(k.title) + '"><span class="pa-i" data-i="' + (k.c === 'serial' ? 'cable' : 'bluetooth') + '" aria-hidden="true"></span>' + esc(k.t) + '</span>';
+    }
+    function nombrePaso(i) { return (PASOS[i] || 'Etapa ' + (i + 1)); }
+    function nombreCorto(i) { return nombrePaso(i).replace(/^R[12] (serial|BLE) · /, ''); }
+    function construirGrupos() {
+        $('vGrupos').innerHTML = GRUPOS.map(function (g, gi) {
+            return '<details class="pa-group" id="g' + gi + '" data-k="pend"><summary>' +
+                '<span class="pa-group-num" aria-hidden="true">' + String(gi + 1).padStart(2, '0') + '</span>' +
+                '<span class="pa-group-title"><b>' + esc(g.t) + '</b><small>Etapas ' + (g.i[0] + 1) + '–' + (g.i[g.i.length - 1] + 1) + '</small></span>' +
+                '<span class="pa-group-count" id="gc' + gi + '">0/' + g.i.length + '</span></summary>' +
+                '<ol class="pa-steps">' + g.i.map(function (i) {
+                    return '<li class="pa-step" id="st' + i + '" data-k="pend"><span class="pa-ind" data-n="' + (i + 1) + '" aria-hidden="true"></span>' +
+                        '<div class="pa-step-body"><div class="pa-step-top"><span class="pa-step-name-wrap"><span class="pa-step-name">' + (i + 1) + '. ' + esc(nombreCorto(i)) + '</span>' + chipCanal(i) + '</span>' +
+                        '<span class="pa-step-state">Pendiente</span></div><span class="pa-step-detail"></span></div></li>';
+                }).join('') + '</ol></details>';
+        }).join('');
+        grupoAuto = -1;
+        if (ultimoVivo) pintarEtapas(ultimoVivo);
+    }
+    construirGrupos();
+    fetch('/static/js/test_station_contract.json?v=1400').then(function (r) { return r.json(); }).then(function (d) {
+        PASOS = d.step_names || []; HELP = d.help || {}; ERRS = d.errors || {}; construirGrupos();
+    }).catch(function () {});
+
+    function pintarCabecera(c) {
+        var k = c.conteo, pausada = c.estado === 'pausada';
+        $('vivo').dataset.k = c.estado;
+        setTxt($('vNombre'), c.nombre);
+        setTxt($('vEyebrow'), pausada ? 'Campaña en pausa' : 'Campaña en curso');
+        var est = $('vEstado'); est.dataset.k = pausada ? 'warn' : 'run'; setTxt(est, pausada ? 'Pausada' : 'Activa');
+        setTxt($('vMeta'), 'Tarjeta ' + (c.tarjeta ? c.tarjeta.id_tarjeta_num : '?') + (c.tarjeta && c.tarjeta.nombre ? ' (' + c.tarjeta.nombre + ')' : '') +
+            ' · ' + c.firmware + ' · ' + c.operador + ' · iniciada ' + fecha(c.creado) + ' · pausa ' + c.pausa_s + ' s' + (c.detener_en_falla ? ' · se detiene al primer fallo' : ''));
+        var bp = $('vPausa');
+        if (!bp.disabled) {
+            bp.dataset.a = pausada ? 'reanudar' : 'pausar';
+            bp.querySelector('.pa-i').dataset.i = pausada ? 'play' : 'pause';
+            setTxt(bp.querySelector('span:last-child'), pausada ? 'Reanudar' : 'Pausar');
+            bp.title = pausada ? 'Vuelve a encolar ciclos' : 'Termina el ciclo actual y no encola otro hasta reanudar';
+        }
+        $('vLogTxt').href = '/api/pruebas-auto/campanas/' + encodeURIComponent(c.id) + '/log.txt';
+        $('vLogTxt').hidden = !k.hechos;
+        setTxt($('vTotal'), String(c.ciclos));
+        setTxt($('vAprob'), String(k.aprobados)); setTxt($('vFall'), String(k.fallidos)); setTxt($('vNv'), String(k.no_verificados));
+        var b = $('vBarra'); setHTML(b, barra(k, c.ciclos)); b.setAttribute('aria-label', barraLbl(k, c.ciclos));
+        estimar();
+    }
+    function cargarDetVivo() {
+        var id = vivoId;
+        api('/api/pruebas-auto/campanas/' + id).then(function (r) {
+            if (id !== vivoId || !r.ok) return;
+            vivoDet = r.data.ciclos_detalle || [];
+            if (abierta === id) { detCache[id] = tablaCiclos(vivoDet); var box = $('d' + id); if (box) setHTML(box, detCache[id]); }
+            estimar();
+        });
+    }
+    // estimación: duración media de los ciclos terminados + la pausa configurada por cada ciclo que falta
+    function estimar() {
+        var c = vivoCamp; if (!c) return;
+        var det = vivoDet || [], ahora = Date.now() / 1000;
+        var fin = det.filter(function (x) { return (x.state === 'finished' || x.state === 'interrupted') && x.updated > x.created; });
+        if (!fin.length) { setTxt($('vMedia'), '—'); setTxt($('vResta'), '—'); setTxt($('vEstim'), 'La estimación de tiempo aparece al terminar el primer ciclo.'); return; }
+        var media = fin.reduce(function (s, x) { return s + (x.updated - x.created); }, 0) / fin.length;
+        var enCurso = det.find(function (x) { return x.state === 'running'; });
+        var faltan = Math.max(0, c.ciclos - c.conteo.hechos - (enCurso ? 1 : 0));
+        var resta = faltan * (media + (+c.pausa_s || 0)) + (enCurso ? Math.max(0, media - (ahora - enCurso.created)) : 0);
+        setTxt($('vMedia'), dur(media));
+        setTxt($('vResta'), resta > 0 ? '≈ ' + dur(resta) : 'último ciclo');
+        setTxt($('vEstim'), c.estado === 'pausada' ? 'En pausa: la estimación corre de nuevo al reanudar.'
+            : 'Estimación con la media de ' + fin.length + (fin.length === 1 ? ' ciclo' : ' ciclos') + ' y la pausa de ' + c.pausa_s + ' s · fin aproximado ' +
+              new Date((ahora + resta) * 1000).toLocaleString('es-MX', { weekday: 'short', hour: '2-digit', minute: '2-digit' }));
+    }
+    function pintarEtapas(v) {
+        var p = v.pasos || {}, idxRun = -1;
+        for (var i = 0; i < 14; i++) {
+            var li = $('st' + i); if (!li) continue;
+            var e = p[i] ? (ST[p[i].estado] || 'pend') : 'pend';
+            if (e === 'run') idxRun = i;
+            li.dataset.k = e;
+            setTxt(li.querySelector('.pa-step-state'), ST_TXT[e]);
+            setTxt(li.querySelector('.pa-step-detail'), p[i] && p[i].detalle ? p[i].detalle : '');
+            li.title = (i + 1) + '. ' + nombrePaso(i);
+        }
+        GRUPOS.forEach(function (g, gi) {
+            var ks = g.i.map(function (i) { return p[i] ? (ST[p[i].estado] || 'pend') : 'pend'; });
+            var hechos = ks.filter(function (k) { return k === 'ok' || k === 'nv' || k === 'bad'; }).length;
+            var k = ks.indexOf('bad') >= 0 ? 'bad' : ks.indexOf('run') >= 0 ? 'run' : hechos === ks.length ? 'ok' : 'pend';
+            var d = $('g' + gi); d.dataset.k = k;
+            setTxt($('gc' + gi), hechos + '/' + ks.length);
+            if (k === 'bad' && !d.dataset.auto) { d.open = true; d.dataset.auto = '1'; }
+        });
+        // abre solo el bloque que se está ejecutando (y cierra el que se abrió solo antes); lo que abra la persona se respeta
+        var gRun = idxRun < 0 ? -1 : GRUPOS.findIndex(function (g) { return g.i.indexOf(idxRun) >= 0; });
+        if (gRun >= 0 && gRun !== grupoAuto) {
+            if (grupoAuto >= 0 && $('g' + grupoAuto).dataset.k !== 'bad') $('g' + grupoAuto).open = false;
+            $('g' + gRun).open = true; grupoAuto = gRun;
+        }
+        return idxRun;
+    }
+    function pintarSensores(sn) {
+        if (!sn) { setHTML($('vSens'), '<p class="hint">Sin lectura de sensores todavía.</p>'); return; }
+        var on = sn.ON, off = sn.OFF;
+        var perno = on === '1' && off === '0' ? ['cerrado', 'Perno cerrado'] : on === '0' && off === '1' ? ['abierto', 'Perno abierto']
+            : on === '1' && off === '1' ? ['err', 'Conflicto: ambos sensores activos'] : ['mov', 'En movimiento o sin confirmar'];
+        function tile(key, nombre, sub, err) {
+            var v = sn[key] == null || sn[key] === '' ? '—' : String(sn[key]);
+            return '<dl class="pa-sensor"' + (err ? ' data-k="err"' : '') + ' title="' + esc(HELP[key] || key) + '"><dt>' + esc(nombre) + '</dt><dd>' + esc(v) + '</dd><small>' + esc(sub || '') + '</small></dl>';
+        }
+        var err = String(sn.err == null ? '' : sn.err);
+        setHTML($('vSens'),
+            '<dl class="pa-sensor pa-perno" data-k="' + perno[0] + '" title="Posición deducida de los sensores ON (cierre) y OFF (apertura)"><dt>Posición del perno</dt><dd>' + esc(perno[1]) + '</dd>' +
+            '<small>ON ' + esc(on == null ? '—' : on) + ' · OFF ' + esc(off == null ? '—' : off) + '</small></dl>' +
+            tile('ON', 'ON · sensor de cierre', LBL.ON[on]) +
+            tile('OFF', 'OFF · sensor de apertura', LBL.OFF[off]) +
+            tile('TQT', 'TQT · estado', LBL.TQT[sn.TQT], sn.TQT === '5') +
+            tile('MOV', 'MOV · movimientos', 'Contador de movimientos') +
+            tile('err', 'err · último error', ERRS[err] || (err ? 'Código ' + err : 'Sin lectura'), err === '3' || err === '4') +
+            tile('PB', 'PB · origen', LBL.PB[sn.PB]));
+    }
+    function pintarLog(v, ci) {
+        var pre = $('vLogPre'), abajo = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 8;
+        var l = v.log || [];
+        setHTML(pre, l.length ? l.map(function (x) {
+            var m = /^\S+T(\d\d:\d\d:\d\d)\.?\d*\S*\s\|\s(.*)$/.exec(x);
+            var t = m ? '<span class="t">' + m[1] + '</span> ' : '', txt = m ? m[2] : x;
+            return '<span' + (/fall|error|✗/i.test(txt) ? ' class="e"' : '') + '>' + t + esc(txt) + '</span>';
+        }).join('\n') : 'Esperando las primeras líneas del ciclo…');
+        if (abajo) pre.scrollTop = pre.scrollHeight;
+        setTxt($('vLogMeta'), (ci ? 'Ciclo ' + ci.n + ' · ' : '') + 'actualizado ' + hora(Date.now() / 1000));
+    }
+    function pintarVivo() {
+        if (!vivoId) return;
+        var id = vivoId;
+        api('/api/pruebas-auto/campanas/' + id + '/vivo').then(function (r) {
+            if (id !== vivoId) return;
+            if (!r.ok) { setTxt($('vEtapaN'), ''); setTxt($('vEtapaT'), r.error || 'No se pudo leer la campaña.'); $('vEtapa').dataset.k = 'bad'; return; }
+            var v = r.data, ci = v.ciclo, p = v.pasos || {};
+            ultimoVivo = v;
+            setTxt($('vCiclo'), String(ci ? ci.n : 0));
+            if (v.ciclos) setTxt($('vTotal'), String(v.ciclos));
+            var idx = pintarEtapas(v), fallo = -1;
+            Object.keys(p).forEach(function (k) { if (p[k].estado === 'fallido') fallo = +k; });
+            var box = $('vEtapa');
+            if (idx >= 0) {
+                box.dataset.k = 'run';
+                setTxt($('vEtapaN'), 'Etapa ' + (idx + 1) + ' de 14 · ' + GRUPOS.find(function (g) { return g.i.indexOf(idx) >= 0; }).t);
+                setTxt($('vEtapaT'), nombrePaso(idx));
+                setTxt($('vEtapaD'), p[idx].detalle || '');
+                $('vEtapaC').innerHTML = chipCanal(idx);
+            } else if (fallo >= 0 && ci && ci.state === 'running') {
+                box.dataset.k = 'bad';
+                setTxt($('vEtapaN'), 'Ciclo ' + ci.n + ' · etapa ' + (fallo + 1) + ' falló');
+                setTxt($('vEtapaT'), nombrePaso(fallo));
+                setTxt($('vEtapaD'), p[fallo].detalle || '');
+                $('vEtapaC').innerHTML = chipCanal(fallo);
+            } else {
+                $('vEtapaC').innerHTML = '';
+                box.dataset.k = 'pend';
+                setTxt($('vEtapaN'), ci ? 'Ciclo ' + ci.n : 'Sin ciclos todavía');
+                setTxt($('vEtapaT'), ci && ci.state === 'queued' ? 'Ciclo en cola: esperando a la Raspberry…'
+                    : ci && ci.state === 'running' ? 'Preparando el ciclo…'
+                    : v.estado === 'pausada' ? 'Pausada: no se encola otro ciclo hasta reanudar.' : 'Entre ciclos (pausa configurada).');
+                setTxt($('vEtapaD'), v.motivo || '');
+            }
+            pintarSensores(v.sensores);
+            pintarBarra(v, ci, idx);
+            pintarLog(v, ci);
+            estimar();
+        });
+    }
+    /* v1.4.66: barra fija con «Detener ahora» y «Detener al terminar el ciclo», visible al desplazarse */
+    function pintarBarra(v, ci, idx) {
+        var bar = $('vBarra');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'vBarra'; bar.className = 'pa-stopbar'; bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', 'Detener la campaña');
+            bar.innerHTML = '<div class="pa-stopbar-txt"><b id="vBarraT"></b><span id="vBarraS"></span></div>' +
+                '<button class="btn" type="button" data-a="detener" title="Termina el ciclo actual y no inicia otro"><span class="pa-i" data-i="stop" aria-hidden="true"></span><span>Detener al terminar el ciclo</span></button>' +
+                '<button class="btn pa-btn-danger" type="button" data-a="detener_ahora" title="Cancela el ciclo en curso; el firmware termina el movimiento actual"><span class="pa-i" data-i="alert" aria-hidden="true"></span><span>Detener ahora</span></button>';
+            $('vivo').appendChild(bar);   // dentro de #vivo: usa el mismo manejador de clics y se oculta con él
+            document.querySelector('.pa-main') && document.querySelector('.pa-main').classList.add('pa-main-pad');
+        }
+        setTxt($('vBarraT'), (v.estado === 'pausada' ? 'Pausada' : 'En curso') + ' · ciclo ' + (ci ? ci.n : 0) + ' de ' + (v.ciclos || '?'));
+        setTxt($('vBarraS'), idx >= 0 ? 'Etapa ' + (idx + 1) + ' de 14 · ' + nombrePaso(idx) + ' · ' + canal(idx).t : (ci && ci.state === 'queued' ? 'Ciclo en cola' : 'Entre ciclos'));
+    }
+    var ACC_OK = {
+        pausar: 'Campaña pausada: el ciclo actual termina y no se encola otro hasta reanudar.',
+        reanudar: 'Campaña reanudada.',
+        detener: 'Campaña detenida; el ciclo actual termina y no se inicia otro.',
+        detener_ahora: 'Campaña detenida; se canceló el ciclo en curso.',
+    };
+    $('vivo').addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-a]'); if (!b || !vivoId) return;
+        var a = b.dataset.a, lbl = b.querySelector('span:last-child');
+        if (a === 'detener_ahora' && !b.dataset.seguro) {   // confirmación en dos pasos, sin confirm()
+            b.dataset.seguro = '1'; lbl.textContent = 'Confirmar: cancelar el ciclo en curso';
+            setTimeout(function () { delete b.dataset.seguro; lbl.textContent = 'Detener ahora'; }, 6000);
+            return;
+        }
+        delete b.dataset.seguro; if (a === 'detener_ahora') lbl.textContent = 'Detener ahora';
         b.disabled = true;
-        api('/api/pruebas-auto/campanas/' + b.dataset.id + '/accion', { method: 'POST', body: { accion: b.dataset.a } }).then(function (r) {
-            if (!r.ok) T.toast(r.error, { kind: 'bad' });
+        api('/api/pruebas-auto/campanas/' + encodeURIComponent(vivoId) + '/accion', { method: 'POST', body: { accion: a } }).then(function (r) {
+            b.disabled = false;
+            T.toast(r.ok ? ACC_OK[a] : r.error, { kind: r.ok ? 'ok' : 'bad' });
             refrescar();
         });
     });
+    $('vVerCiclos').addEventListener('click', function () {
+        if (!vivoId) return;
+        abierta = vivoId;
+        campanas().then(function () {
+            var box = $('d' + vivoId); if (!box) return;
+            box.closest('.pa-camp').scrollIntoView({ behavior: REDUCIDO ? 'auto' : 'smooth', block: 'start' });
+        });
+    });
 
+    /* ---- log del agente ---- */
     function verLog() {
         api('/api/pruebas-auto/agente/log').then(function (r) {
             if (!r.ok) { $('lMeta').textContent = r.error; return; }
             var pre = $('lTexto'), abajo = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 8;
-            pre.textContent = r.data.texto ? r.data.texto.split('\n').slice(-400).join('\n') : 'Sin log todavía. Pulsa «Traer log».';
+            pre.textContent = r.data.texto ? r.data.texto.split('\n').slice(-400).join('\n') : '';
             if (abajo) pre.scrollTop = pre.scrollHeight;
             $('lMeta').textContent = r.data.ts ? 'Recibido ' + hace(r.data.ts) : '';
         });
@@ -390,8 +679,10 @@
     });
 
     function refrescar() {
-        Promise.all([cargarBanco(), campanas()]).then(function (v) { var l = v[0] || {}; l[4] = v[1]; l[5] = v[1]; pasos(l); });
+        return Promise.all([cargarBanco(), campanas()]).then(function (v) { pintarReq(v[0]); });
     }
     refrescar(); verLog();
     setInterval(function () { if (!document.hidden) refrescar(); }, 5000);
+    setInterval(function () { if (!document.hidden && vivoId) pintarVivo(); }, 2000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) refrescar(); });
 })();
