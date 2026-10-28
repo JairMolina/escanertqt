@@ -1,5 +1,16 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.67 — 2026-10-28
+- **Pruebas automáticas: se aplican todos los ciclos.** Antes, cualquier ciclo «no verificado» o interrumpido cortaba la campaña aunque no se hubiera marcado «detener en falla». Ahora la campaña solo se corta así si se marcó esa opción o si hay 3 ciclos seguidos sin verificar.
+- **Motor de pruebas (agente 1.4.67): espera el err viejo.** La R1 conserva su último err (13/14) hasta unos 2 min. Antes, si el ciclo siguiente lo encontraba todavía activo, se marcaba «no verificado: err ya estaba activo». Ahora espera hasta 150 s, pidiendo un Status cada 5 s, a que la R1 lo limpie, y sigue. Prueba `test_r2_espera_que_r1_limpie_err_anterior`.
+- **La campaña sigue aunque salgas de la página o cambies de módulo**, porque la ejecuta la Raspberry; la página ahora lo dice.
+- **«Liberar» ya no te saca de Pruebas automáticas.** La Raspberry queda libre para otra cuenta, sigues viendo la página y el botón pasa a «Usar la Raspberry».
+- **Historial agrupado por tarjeta y plegable.**
+  - Cada tarjeta muestra el total de campañas, aprobados y fallidos, y si tiene una campaña en curso; cada campaña también es plegable, con sus ciclos y LOG dentro.
+  - Hay un buscador por nombre de prueba, firmware o tarjeta.
+  - Lo que abres o cierras se mantiene entre refrescos.
+- **Log del agente: botón «Limpiar».** Vacía la vista y desde ahí solo muestra las líneas nuevas; se recuerda en este navegador. «Mostrar todo» lo deshace. No borra nada en la Raspberry y el .txt sigue completo.
+
 ## v1.4.66 — 2026-10-28
 - **Pruebas automáticas: rediseño con el estilo de Pruebas TQT.** Solo cambian `pruebas_auto.html`, `.css` y `.js`; la API y la lógica de las pruebas no cambian. La página queda así:
   - **Barra superior:** estado del banco (Raspberry, agente, puerto) y «en uso por ti · Liberar».

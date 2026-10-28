@@ -8,6 +8,17 @@ Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530
 
 Main incluye los avances de otros colaboradores: Pruebas automáticas por cuenta y Raspberry, exclusión de Raspberry de bancos normales, agentes/puentes BLE por cuenta y avisos de actualización, sincronización Skytec y rediseño de Diagrama. No volver a desplegar 1.4.49 ni el checkout documental antiguo. Las notas anteriores de despliegue 1.4.51 pendiente están superadas por esta comprobación de producción; las pruebas físicas y la configuración de Skytec no se revalidaron hoy.
 
+## Claude v1.4.67 (main, sin desplegar)
+
+- **Campañas:** un ciclo no verificado ya no corta la campaña, salvo con «detener en falla» o 3 ciclos seguidos.
+- **Motor:** espera hasta 150 s a que R1 limpie el err viejo antes de R2.
+- **Página:**
+  - «Liberar» sin salir de la página;
+  - historial agrupado por tarjeta y plegable, con buscador;
+  - «Limpiar» en el log del agente.
+
+AGENT 1.4.67. Evidencia: test_pruebas_auto 22 OK y test_engine_fake 5 OK; el caso del err viejo y el de 3 no verificados tienen pruebas.
+
 ## Claude v1.4.66 (main, sin desplegar)
 
 Rediseño de /pruebas-automaticas con el lenguaje visual de Pruebas TQT: preparar el banco, campaña en curso con 14 etapas en 4 bloques, sensores y botones de detener, registro en vivo e historial con «Repetir». Solo pruebas_auto.html, .css y .js. Chip de canal por etapa (terminal serial / Bluetooth → R1/R2) y barra fija con Detener. Evidencia: unittest 41 OK y node --check; capturas con API simulada; sin probar con la Raspberry real.

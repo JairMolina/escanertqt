@@ -127,4 +127,24 @@ class TestWorkflow(unittest.TestCase):
             texto=''.join(p.read_text(encoding='utf-8') for p in Path(tmp).glob('*.log'))
             self.assertIn('AVISO SENSOR',texto)
 
+    def test_r2_espera_que_r1_limpie_err_anterior(self):
+        """v1.4.67: si R1 aún trae err=13 del ciclo anterior, se espera a que lo limpie en vez de «no verificado»."""
+        class ErrViejo(Fixture):
+            def send(self,raw):
+                if raw.decode().strip()=='$SMSG=Status' and self.active_ble=='11:22:33:44:55:66' and self.values['err']=='13' and not getattr(self,'r2_movio',False):
+                    self.values['err']='0'   # R1 limpia el err viejo al cabo de un rato
+                super().send(raw)
+            def move(self,cmd,origin):
+                if origin==3: self.r2_movio=True
+                super().move(cmd,origin)
+        fx=ErrViejo();fx.values['ON']='1';fx.values['OFF']='0';fx.values['err']='13'   # cerrado: R2 empieza con PPON (err=13)
+        st=TestStation(FakeSerial(fx),FakeBLE(fx),lambda *a:None)
+        fx.station=st;st.repeat_verify_s=.08
+        with tempfile.TemporaryDirectory() as tmp:
+            st.output_dir=Path(tmp);st.start('COM_FAKE')
+            st._run_thread.join(60)
+            self.assertEqual(st.report['result'],'aprobado',st.report.get('issue'))
+            texto=''.join(p.read_text(encoding='utf-8') for p in Path(tmp).glob('*.log'))
+            self.assertIn('se espera a que lo limpie',texto)
+
 if __name__=='__main__':unittest.main()

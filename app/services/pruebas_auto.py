@@ -372,8 +372,25 @@ def programar(c, sid, state, now):
         return None
     if ult:
         if ult["result"] not in APROBADOS and ult["result"] != "fallido":
-            _cerrar(c, cid, "detenida", f"Ciclo {n} no verificado o interrumpido: revisa la tarjeta y el banco antes de repetir.", now)
-            return None
+            # v1.4.67: un ciclo no verificado/interrumpido ya no corta siempre la campaña: solo si se pidió detener en falla
+            # o si se repite 3 veces seguidas (banco o tarjeta con un problema que no se corrige solo).
+            seguidos = 0
+            for r in c.execute("SELECT r.result FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run "
+                               "WHERE x.campana=? ORDER BY x.n DESC LIMIT 3", (cid,)):
+                if r["result"] in APROBADOS or r["result"] == "fallido":
+                    break
+                seguidos += 1
+            if camp["detener_en_falla"] or seguidos >= 3:
+                _cerrar(c, cid, "detenida", f"Ciclo {n} no verificado o interrumpido" + (" (3 seguidos)" if seguidos >= 3 else "")
+                        + ": revisa la tarjeta y el banco antes de repetir.", now)
+                return None
+            if n >= camp["ciclos"]:
+                k = _conteo(c, cid)
+                _cerrar(c, cid, "terminada" if not (k["fallidos"] or k["no_verificados"]) else "fallida",
+                        f"{k['aprobados']} de {n} ciclos aprobados.", now)
+                return None
+            if now - ult["updated"] < camp["pausa_s"]:
+                return None
         if ult["result"] == "fallido" and camp["detener_en_falla"]:
             _cerrar(c, cid, "fallida", f"Ciclo {n} fallido.", now)
             return None

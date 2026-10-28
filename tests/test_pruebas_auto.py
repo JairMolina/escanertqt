@@ -111,6 +111,22 @@ class PruebasAuto(unittest.TestCase):
         with db.get_db() as cx:
             self.assertEqual(cx.execute("SELECT cancel FROM tqt_test_runs WHERE id=?", (rid,)).fetchone()[0], 1)
 
+    def test_no_verificado_sigue_sin_detener_en_falla_y_corta_a_los_3(self):
+        """v1.4.67: sin «detener en falla» un ciclo no verificado no corta la campaña; 3 seguidos sí."""
+        c = self.campana(ciclos=5, detener=False)
+        for i in range(3):
+            job = s.claim(self.st["id"], LIBRE)
+            self.assertIn("run", job, "ciclo %d encolado" % (i + 1))
+            r = self.report(True); r["result"] = "no_verificado"
+            r["steps"] = [{"name": str(k), "state": "aprobado" if k < 12 else "no_verificado"} for k in range(14)]
+            s.finish(self.st["id"], job["run"]["id"], r)
+            if i < 2:
+                self.assertEqual(pa.leer(c["id"])["estado"], "activa")
+        self.assertEqual(s.claim(self.st["id"], LIBRE), {})
+        d = pa.leer(c["id"])
+        self.assertEqual((d["estado"], len(d["ciclos_detalle"])), ("detenida", 3))
+        self.assertIn("3 seguidos", d["motivo"])
+
     def test_exige_confirmacion_fisica(self):
         with self.assertRaises(ValueError):
             pa.crear("x", "fw", self.t["id"], 1, 0, True, "op", False)

@@ -436,3 +436,23 @@
   .pa-stopbar-txt { flex-basis: 100%; }
   .pa-stopbar .btn { flex: 1 1 auto; }
 }
+
+/* v1.4.67: historial por tarjeta y campañas plegables */
+.pa-hist-head { flex-wrap: wrap; }
+.pa-hbusca { flex: 1 1 260px; max-width: 420px; margin-left: auto; }
+.pa-tgrupo { border: 1px solid var(--line); border-radius: 12px; background: var(--tq-s3); overflow: hidden; }
+.pa-tgrupo + .pa-tgrupo { margin-top: 10px; }
+.pa-tgrupo > summary { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; list-style: none; }
+.pa-tgrupo > summary::-webkit-details-marker, .pa-camp > summary::-webkit-details-marker { display: none; }
+.pa-tg-ico { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); flex: none; color: var(--accent); }
+.pa-tg-t { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pa-tg-t small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pa-tg-res { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.pa-chev { width: 14px; height: 14px; flex: none; transition: transform .15s; color: var(--tq-subtle); }
+details[open] > summary > .pa-chev { transform: rotate(90deg); }
+.pa-tg-body { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.pa-camp > summary { cursor: pointer; list-style: none; }
+.pa-camp > summary.pa-camp-h { align-items: center; }
+.pa-camp-body { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+@media (max-width: 640px) { .pa-tg-res { white-space: normal; } .pa-hbusca { max-width: none; margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .pa-chev { transition: none; } }

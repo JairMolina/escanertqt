@@ -65,16 +65,23 @@
         var o = b.ocupacion;
         if (o && !o.mio) { mostrarOcupada(o, b.admin); $('enUso').hidden = true; return; }
         ocultarOcupada();
-        if (!o) tomar();   // libre: se reserva para esta cuenta
-        $('enUso').hidden = !o;
-        setTxt($('enUsoTxt'), 'En uso por ti' + (o && o.campana ? ' · campaña en curso' : ''));
+        if (!o && !liberada) tomar();   // libre: se reserva para esta cuenta (salvo que la acabes de liberar)
+        $('enUso').hidden = !o && !liberada;
+        // v1.4.67: tras «Liberar» te quedas en la página; el botón pasa a «Usar la Raspberry»
+        setTxt($('enUsoTxt'), o ? 'En uso por ti' + (o.campana ? ' · campaña en curso' : '') : 'Raspberry libre');
+        setTxt($('liberar'), o ? 'Liberar' : 'Usar la Raspberry');
         $('liberar').disabled = !!(o && o.campana);
-        $('liberar').title = o && o.campana ? 'Detén tu campaña para liberar la Raspberry' : 'Deja la Raspberry libre para otra cuenta';
+        $('liberar').title = o && o.campana ? 'Detén tu campaña para liberar la Raspberry'
+            : o ? 'Deja la Raspberry libre para otra cuenta (sigues en esta página)' : 'Vuelve a reservar la Raspberry para tu cuenta';
     }
+    var liberada = false;
     $('liberar').addEventListener('click', function () {
+        if (liberada) { liberada = false; tomar(); setTimeout(refrescar, 400); return; }
         api('/api/pruebas-auto/banco/liberar', { method: 'POST' }).then(function (r) {
             if (!r.ok) { T.toast(r.error, { kind: 'bad' }); return; }
-            location.href = '/inicio';
+            liberada = true;
+            T.toast('Raspberry liberada: otra cuenta ya puede usarla. Puedes seguir aquí viendo el historial.');
+            refrescar();
         });
     });
     // confirmación en dos pasos dentro de la pantalla (sin confirm() nativo)
@@ -359,28 +366,8 @@
             var l = r.ok && Array.isArray(r.data) ? r.data : [];
             campLista = l;
             var act = l.find(function (c) { return c.estado === 'activa' || c.estado === 'pausada'; });
-            setTxt($('hCuenta'), String(l.length));
-            setHTML($('campanas'), l.length ? l.map(function (c) {
-                var k = c.conteo, vivo = c.estado === 'activa' || c.estado === 'pausada', id = esc(c.id);
-                return '<article class="pa-camp" data-estado="' + esc(c.estado) + '">' +
-                    '<div class="pa-camp-h"><div class="pa-camp-t"><div><b>' + esc(c.nombre) + '</b><span class="pa-badge" data-k="' + (ESTADO_K[c.estado] || 'pend') + '">' +
-                    esc(vivo ? (c.estado === 'activa' ? 'En curso' : 'Pausada') : ESTADO[c.estado] || c.estado) + '</span></div>' +
-                    '<p class="pa-camp-meta">' + esc(c.firmware) + ' · Tarjeta ' + esc(c.tarjeta ? c.tarjeta.id_tarjeta_num : '?') + (c.tarjeta && c.tarjeta.nombre ? ' (' + esc(c.tarjeta.nombre) + ')' : '') +
-                    ' · ' + esc(c.operador) + ' · ' + esc(fecha(c.creado)) + '</p></div>' +
-                    '<div class="pa-acc">' +
-                    (k.hechos ? '<a class="btn pa-link" href="/api/pruebas-auto/campanas/' + id + '/log.txt" download><span class="pa-i" data-i="download" aria-hidden="true"></span>LOG .txt</a>' : '') +
-                    '<button class="btn" type="button" data-ver="' + id + '" aria-expanded="' + (abierta === String(c.id)) + '" aria-controls="d' + id + '"><span class="pa-i" data-i="list" aria-hidden="true"></span>Ciclos</button>' +
-                    (vivo ? '' : '<button class="btn" type="button" data-rep="' + id + '"' + (act ? ' disabled title="Termina o detén la campaña en curso para repetir otra"' : ' title="Carga estos mismos datos en «Nueva campaña»"') +
-                        '><span class="pa-i" data-i="repeat" aria-hidden="true"></span>Repetir</button>') +
-                    '</div></div>' +
-                    '<div class="pa-barra" role="img" aria-label="' + barraLbl(k, c.ciclos) + '">' + barra(k, c.ciclos) + '</div>' +
-                    '<div class="pa-res"><span><b>' + k.hechos + '</b> de ' + c.ciclos + ' ciclos</span>' +
-                    '<span class="pa-ok"><b>' + k.aprobados + '</b> aprobados</span><span class="pa-bad"><b>' + k.fallidos + '</b> fallidos</span>' +
-                    '<span class="pa-warn"><b>' + k.no_verificados + '</b> no verificados</span>' +
-                    '<span>Pausa ' + esc(c.pausa_s) + ' s · ' + (c.detener_en_falla ? 'se detiene al primer fallo' : 'sigue aunque falle') + '</span></div>' +
-                    (c.motivo ? '<p class="pa-motivo">' + esc(c.motivo) + '</p>' : '') +
-                    '<div class="pa-ciclos" id="d' + id + '">' + (abierta === String(c.id) && detCache[c.id] ? detCache[c.id] : '') + '</div></article>';
-            }).join('') : '<p class="pa-vacio">' + (r.ok ? 'Aún no hay campañas. Crea la primera con «Nueva campaña».' : esc(r.error)) + '</p>');
+            pintarHistorial();
+            if (!r.ok) setHTML($('campanas'), '<p class="pa-vacio">' + esc(r.error) + '</p>');
             if (abierta) detalle(abierta);
             vivoId = act ? String(act.id) : null; vivoCamp = act || null;
             $('vivo').hidden = !act; $('nueva').hidden = !!act;
@@ -389,6 +376,61 @@
             return true;
         });
     }
+    /* v1.4.67: historial agrupado por tarjeta (plegable) y cada campaña plegable; búsqueda por nombre de prueba o tarjeta.
+       Lo abierto se recuerda entre refrescos (Set por id). Por defecto se abre la tarjeta y la campaña en curso. */
+    var abiertasT = new Set(), abiertasC = new Set(), tocados = new Set();
+    function tarjetaDe(c) { return c.tarjeta && c.tarjeta.id_tarjeta_num != null ? String(c.tarjeta.id_tarjeta_num) : '?'; }
+    function campanaHTML(c, act) {
+        var k = c.conteo, vivo = c.estado === 'activa' || c.estado === 'pausada', id = esc(c.id);
+        var abierta_ = abiertasC.has(String(c.id)) || (!tocados.has('c' + c.id) && vivo);
+        return '<details class="pa-camp" data-estado="' + esc(c.estado) + '" data-cid="' + id + '"' + (abierta_ ? ' open' : '') + '>' +
+            '<summary class="pa-camp-h"><div class="pa-camp-t"><div><b>' + esc(c.nombre) + '</b><span class="pa-badge" data-k="' + (ESTADO_K[c.estado] || 'pend') + '">' +
+            esc(vivo ? (c.estado === 'activa' ? 'En curso' : 'Pausada') : ESTADO[c.estado] || c.estado) + '</span></div>' +
+            '<p class="pa-camp-meta">' + k.hechos + ' de ' + c.ciclos + ' ciclos · <span class="pa-ok">' + k.aprobados + ' ✓</span> · <span class="pa-bad">' + k.fallidos + ' ✗</span>' +
+            (k.no_verificados ? ' · <span class="pa-warn">' + k.no_verificados + ' sin verificar</span>' : '') + ' · ' + esc(fecha(c.creado)) + '</p></div>' +
+            '<span class="pa-i pa-chev" data-i="chev" aria-hidden="true"></span></summary>' +
+            '<div class="pa-camp-body">' +
+            '<p class="pa-camp-meta">' + esc(c.firmware) + ' · ' + (c.tarjeta && c.tarjeta.nombre ? esc(c.tarjeta.nombre) + ' · ' : '') + esc(c.operador) + '</p>' +
+            '<div class="pa-barra" role="img" aria-label="' + barraLbl(k, c.ciclos) + '">' + barra(k, c.ciclos) + '</div>' +
+            '<div class="pa-res"><span>Pausa ' + esc(c.pausa_s) + ' s · ' + (c.detener_en_falla ? 'se detiene al primer fallo' : 'sigue aunque falle') + '</span></div>' +
+            (c.motivo ? '<p class="pa-motivo">' + esc(c.motivo) + '</p>' : '') +
+            '<div class="pa-acc">' +
+            (k.hechos ? '<a class="btn pa-link" href="/api/pruebas-auto/campanas/' + id + '/log.txt" download><span class="pa-i" data-i="download" aria-hidden="true"></span>LOG .txt</a>' : '') +
+            '<button class="btn" type="button" data-ver="' + id + '" aria-expanded="' + (abierta === String(c.id)) + '" aria-controls="d' + id + '"><span class="pa-i" data-i="list" aria-hidden="true"></span>Ciclos</button>' +
+            (vivo ? '' : '<button class="btn" type="button" data-rep="' + id + '"' + (act ? ' disabled title="Termina o detén la campaña en curso para repetir otra"' : ' title="Carga estos mismos datos en «Nueva campaña»"') +
+                '><span class="pa-i" data-i="repeat" aria-hidden="true"></span>Repetir</button>') +
+            '</div>' +
+            '<div class="pa-ciclos" id="d' + id + '">' + (abierta === String(c.id) && detCache[c.id] ? detCache[c.id] : '') + '</div></div></details>';
+    }
+    function pintarHistorial() {
+        var l = campLista || [], q = ($('hBusca') ? $('hBusca').value : '').trim().toLowerCase();
+        var act = l.find(function (c) { return c.estado === 'activa' || c.estado === 'pausada'; });
+        var f = q ? l.filter(function (c) {
+            return (c.nombre + ' ' + c.firmware + ' ' + tarjetaDe(c) + ' ' + (c.tarjeta && c.tarjeta.nombre || '')).toLowerCase().indexOf(q) >= 0;
+        }) : l;
+        setTxt($('hCuenta'), q ? f.length + ' de ' + l.length : String(l.length));
+        var grupos = {}, orden = [];
+        f.forEach(function (c) { var t = tarjetaDe(c); if (!grupos[t]) { grupos[t] = []; orden.push(t); } grupos[t].push(c); });
+        setHTML($('campanas'), orden.length ? orden.map(function (t) {
+            var cs = grupos[t], ult = cs[0], hayVivo = cs.some(function (c) { return c.estado === 'activa' || c.estado === 'pausada'; });
+            var ap = cs.reduce(function (a, c) { return a + c.conteo.aprobados; }, 0), fa = cs.reduce(function (a, c) { return a + c.conteo.fallidos; }, 0);
+            var abierto = abiertasT.has(t) || (!tocados.has('t' + t) && (hayVivo || !!q || orden.length === 1));
+            return '<details class="pa-tgrupo" data-t="' + esc(t) + '"' + (abierto ? ' open' : '') + '><summary>' +
+                '<span class="pa-tg-ico"><span class="pa-i" data-i="board" aria-hidden="true"></span></span>' +
+                '<span class="pa-tg-t"><b>Tarjeta ' + esc(t) + '</b><small>' + esc(ult.tarjeta && ult.tarjeta.nombre || '') + '</small></span>' +
+                '<span class="pa-tg-res">' + cs.length + ' campaña' + (cs.length === 1 ? '' : 's') + ' · <span class="pa-ok">' + ap + ' ✓</span> · <span class="pa-bad">' + fa + ' ✗</span>' +
+                (hayVivo ? ' · <span class="pa-badge" data-k="run">En curso</span>' : ' · última ' + esc(ESTADO[ult.estado] || ult.estado).toLowerCase()) + '</span>' +
+                '<span class="pa-i pa-chev" data-i="chev" aria-hidden="true"></span></summary>' +
+                '<div class="pa-tg-body">' + cs.map(function (c) { return campanaHTML(c, act); }).join('') + '</div></details>';
+        }).join('') : '<p class="pa-vacio">' + (q ? 'Ninguna campaña coincide con «' + esc(q) + '».' : 'Aún no hay campañas. Crea la primera con «Nueva campaña».') + '</p>');
+    }
+    // recordar lo que el usuario abre/cierra (el evento toggle no burbujea: se captura)
+    $('campanas').addEventListener('toggle', function (e) {
+        var d = e.target;
+        if (d.classList.contains('pa-tgrupo')) { tocados.add('t' + d.dataset.t); d.open ? abiertasT.add(d.dataset.t) : abiertasT.delete(d.dataset.t); }
+        else if (d.classList.contains('pa-camp')) { tocados.add('c' + d.dataset.cid); d.open ? abiertasC.add(d.dataset.cid) : abiertasC.delete(d.dataset.cid); }
+    }, true);
+    if ($('hBusca')) $('hBusca').addEventListener('input', pintarHistorial);
     function tablaCiclos(det) {
         return det.length ? '<table class="pa-tabla"><thead><tr><th scope="col">Ciclo</th><th scope="col">Resultado</th><th scope="col">Inicio</th><th scope="col">Fin</th><th scope="col">Duración</th><th scope="col">LOG</th></tr></thead><tbody>' +
             det.map(function (x) {
@@ -665,11 +707,31 @@
         api('/api/pruebas-auto/agente/log').then(function (r) {
             if (!r.ok) { $('lMeta').textContent = r.error; return; }
             var pre = $('lTexto'), abajo = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 8;
-            pre.textContent = r.data.texto ? r.data.texto.split('\n').slice(-400).join('\n') : '';
+            var txt = r.data.texto || '';
+            logTexto = txt;
+            var mk = marcaLog(), desde = 0;
+            if (mk) { var i = txt.lastIndexOf(mk); desde = i >= 0 ? i + mk.length : 0; }
+            var vis = txt.slice(desde).replace(/^\n+/, '');
+            $('lTodo').hidden = !mk;
+            pre.textContent = vis ? vis.split('\n').slice(-400).join('\n') : (mk ? 'Vista limpia. Aquí aparecerán las líneas nuevas del agente (pulsa «Traer log»).' : '');
             if (abajo) pre.scrollTop = pre.scrollHeight;
             $('lMeta').textContent = r.data.ts ? 'Recibido ' + hace(r.data.ts) : '';
         });
     }
+    /* v1.4.67: «Limpiar» vacía la vista: se recuerda el final actual del log (en este navegador) y solo se muestran las
+       líneas nuevas. «Mostrar todo» lo deshace. No borra nada en la Raspberry ni en el servidor (el .txt sigue completo). */
+    var logTexto = '', CLAVE_LOG = 'pa.log.limpio';
+    function marcaLog() { try { return localStorage.getItem(CLAVE_LOG) || ''; } catch (e) { return ''; } }
+    $('lLimpiar').addEventListener('click', function () {
+        var mk = logTexto.slice(-240);
+        try { if (mk) localStorage.setItem(CLAVE_LOG, mk); } catch (e) { /* sin almacenamiento: solo se vacía ahora */ }
+        $('lTexto').textContent = 'Vista limpia. Aquí aparecerán las líneas nuevas del agente (pulsa «Traer log»).';
+        $('lTodo').hidden = false;
+    });
+    $('lTodo').addEventListener('click', function () {
+        try { localStorage.removeItem(CLAVE_LOG); } catch (e) { /* nada */ }
+        verLog();
+    });
     $('lPedir').addEventListener('click', function () {
         api('/api/pruebas-auto/agente/log', { method: 'POST' }).then(function (r) {
             if (!r.ok) { T.toast(r.error, { kind: 'bad' }); return; }

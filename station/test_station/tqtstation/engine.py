@@ -287,7 +287,18 @@ class TestStation:
         self._position(before)
         self._require(before.position != expected, f'R2 no producirá transición: ya {expected}')
         if before.number('err') == code:
-            raise NoVerification(f'err={code} ya estaba activo antes de R2, no es evidencia nueva')
+            # v1.4.67: la R1 conserva el último err hasta ~2 min (p. ej. el del ciclo anterior). Antes el ciclo quedaba
+            # «no verificado» al instante; ahora se espera a que lo limpie, pidiendo Status cada 5 s, y se sigue.
+            self.log(f'ESPERANDO: R1 aún reporta err={code} de antes; se espera a que lo limpie (hasta 150 s)')
+            hasta = time.monotonic() + 150
+            while before.number('err') == code and time.monotonic() < hasta:
+                if self.cancel.is_set(): raise Interrupted('Cancelada')
+                time.sleep(5)
+                before = self._fresh_status(timeout=12, max_age=0)
+            if before.number('err') == code:
+                raise NoVerification(f'err={code} siguió activo 150 s antes de R2, no es evidencia nueva')
+            self._position(before)
+            self._require(before.position != expected, f'R2 no producirá transición: ya {expected}')
         cursor = self._checkpoint()
         self.ble.send(cmd)
         until = time.monotonic() + 32

@@ -117,6 +117,7 @@
                         </div>
                         <h2 id="vNombre">—</h2>
                         <p class="pa-run-meta" id="vMeta"></p>
+                        <p class="hint">La campaña la ejecuta la Raspberry: sigue aunque cierres esta página o cambies de módulo. Vuelve cuando quieras para ver el avance.</p>
                         <div class="pa-acc pa-run-acc">
                             <button class="btn" id="vPausa" type="button" data-a="pausar"><span class="pa-i" data-i="pause" aria-hidden="true"></span><span>Pausar</span></button>
                             <button class="btn" id="vDetener" type="button" data-a="detener" title="Termina el ciclo actual y no inicia otro"><span class="pa-i" data-i="stop" aria-hidden="true"></span>Detener al terminar el ciclo</button>
@@ -208,6 +209,8 @@
                     <div class="pa-acc">
                         <button class="btn" id="lPedir" type="button"><span class="pa-i" data-i="refresh" aria-hidden="true"></span>Traer log</button>
                         <a class="btn pa-link" id="lBajar" href="/api/pruebas-auto/agente/log.txt" download><span class="pa-i" data-i="download" aria-hidden="true"></span>Descargar .txt</a>
+                        <button class="btn pa-link" id="lLimpiar" type="button" title="Vacía la vista; solo se mostrarán las líneas nuevas (no borra el log de la Raspberry)"><span class="pa-i" data-i="x" aria-hidden="true"></span>Limpiar</button>
+                        <button class="btn pa-link" id="lTodo" type="button" hidden>Mostrar todo</button>
                     </div>
                     <pre id="lTexto" class="pa-term pa-term-alto" tabindex="0" aria-label="Últimas líneas del log del agente"></pre>
                 </section>
@@ -218,7 +221,10 @@
             <div class="pa-hist-head">
                 <div class="pa-title"><span class="pa-i" data-i="clock" aria-hidden="true"></span><h2 id="hHist">Historial de campañas</h2></div>
                 <span class="pa-count" id="hCuenta">0</span>
+                <label class="sr-only" for="hBusca">Buscar campañas</label>
+                <input class="input pa-hbusca" id="hBusca" type="search" placeholder="Buscar por nombre de prueba, firmware o tarjeta" autocomplete="off">
             </div>
+            <p class="hint pa-panel-note">Agrupado por tarjeta. Abre una tarjeta para ver sus campañas y una campaña para ver sus ciclos y LOG.</p>
             <div id="campanas" class="pa-lista"></div>
         </section>
     </main>
