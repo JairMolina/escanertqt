@@ -47,13 +47,22 @@
                     <div class="field"><label for="iPuerto">Puerto serie de la R1 (opcional)</label>
                         <input class="input mono" id="iPuerto" maxlength="120" placeholder="/dev/ttyUSB0" autocomplete="off">
                         <span class="hint">Si no lo sabes, déjalo vacío y elígelo en el paso 3 cuando la Raspberry esté en línea.</span></div>
-                    <button class="btn btn-primary" type="submit">Descargar agente (.zip)</button>
+                    <!-- v1.4.64: un solo comando en la Raspberry; se instala en segundo plano y el avance sale aquí -->
+                    <button class="btn btn-primary" type="submit">Generar comando de instalación</button>
+                    <div class="pa-cmd" id="iCmdBox" hidden>
+                        <p class="hint">Pega este comando en la terminal de la Raspberry (por SSH). Sirve <b>una sola vez</b> y caduca <span id="iCmdExp">en 15 min</span>.</p>
+                        <div class="pa-fila">
+                            <code class="pa-cmdtxt" id="iCmd"></code>
+                            <button class="btn btn-sm" id="iCopiar" type="button">Copiar</button>
+                        </div>
+                    </div>
+                    <p class="pa-inst" id="iAvance" aria-live="polite" hidden></p>
                     <ol class="pa-cmds">
-                        <li>Copia el ZIP a la Raspberry y descomprímelo: <code>unzip TQT_Pruebas_Raspberry.zip -d ~/tqt-pruebas &amp;&amp; chmod 700 ~/tqt-pruebas</code></li>
-                        <li>Una sola vez: <code>sudo apt install python3-venv bluez &amp;&amp; sudo usermod -aG dialout $USER</code> (cierra sesión después).</li>
-                        <li>Arranca: <code>sh ~/tqt-pruebas/iniciar.sh</code>. Al encender: <code>crontab -e</code> → <code>@reboot sh ~/tqt-pruebas/iniciar.sh</code></li>
+                        <li>Pulsa «Generar comando de instalación» y pégalo en la Raspberry: descarga, instala y arranca el agente solo, en segundo plano (también al encenderla).</li>
+                        <li>Aquí verás «Instalando…» por etapas hasta «✓ Todo correcto». Si falta algo del sistema (python3-venv, permisos del puerto), el mensaje dice el comando exacto.</li>
+                        <li>Después el agente se actualiza solo.</li>
                     </ol>
-                    <p class="hint">Descargar un agente nuevo lo convierte en el banco y deja sin uso al anterior.</p>
+                    <p class="hint">Reinstalar conserva el mismo banco (sus campañas y registros). <a href="#" id="iSh">Descargar el instalador (.sh)</a> si prefieres copiarlo a mano y correr <code>sh instalar_tqt_pruebas.sh</code>.</p>
                 </form>
             </details>
         </section>

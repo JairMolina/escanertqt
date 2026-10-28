@@ -1,9 +1,10 @@
 # Estado de Codex: TQT-Web
 
-Actualizado:2026-10-27. Código de referencia:a1ea3d57d6907ef668e0d0156567a14edfe26243.
+Actualizado:2026-10-28. Código de referencia:a1ea3d57d6907ef668e0d0156567a14edfe26243.
 
 ## Avance reportado
 
+Claude v1.4.64: inventario TQTR con un solo relevador (R1+R2+R3) y sensores incluidos en el actuador (migración _migrar_1464); rediseño visual de Pruebas TQT sin cambios de lógica (sin commit).
 Claude v1.4.63: easter egg en /inicio (5 estrellas en orden → crédito jairmolina.dev).
 Claude v1.4.62: Skytec sin error falso (timeout 120 s y confirmación en lista) y botón Sincronizar Skytec en Tarjetas.
 Claude v1.4.61: botón y marca Skytec con R1 y R2 programadas (sin esperar R3).

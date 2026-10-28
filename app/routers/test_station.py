@@ -1,6 +1,7 @@
 """Authenticated operator API and outbound-only Windows station API."""
 
-import io, json, time, zipfile
+import io, json, secrets, threading, time, zipfile
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
@@ -8,7 +9,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from app.routers.stm32 import station_token, operator, run
 from app.services import test_station as svc, stm32_programming as stm
-from app.services import native_ble, pruebas_auto, skytec, usuarios
+from app.services import native_ble, pruebas_auto, skytec, usuarios, instalador_windows
 from app.database import db
 
 router = APIRouter(prefix="/api/validacion/tqt", tags=["Pruebas TQT"])
@@ -66,14 +67,16 @@ class Installer(BaseModel):
     name: str = Field(default="Banco de pruebas local", max_length=60, min_length=1)
     ble_only: bool = False
     puerto_serie: str | None = Field(default=None, max_length=120, pattern=r"^/dev/[A-Za-z0-9_./:+-]+$|^COM[0-9]{1,3}$")   # v1.4.51: banco fijo
+    formato: Literal["zip", "cmd"] = "zip"   # v1.4.64: «cmd» = instalador autoextraíble de doble clic
+    station_id: str | None = Field(default=None, pattern="^[a-f0-9]{24}$")   # v1.4.64: reinstalar la misma estación
 
 
 class NativeBleCommand(BaseModel):
     station_id: str = Field(pattern='^[a-f0-9]{24}$')
     request_id: str = Field(pattern='^[a-f0-9]{32}$')
     operation: Literal['scan', 'connect', 'send', 'disconnect']
-    role: Literal['R1', 'R2']
-    tarjeta_id: int = Field(gt=0)
+    role: Literal['R1', 'R2'] | None = None   # v1.4.64: opcional solo para «scan» (lista lo que ve el puente)
+    tarjeta_id: int | None = Field(default=None, gt=0)
     run_id: str | None = Field(default=None, pattern='^[a-f0-9]{32}$')
     mac: str | None = Field(default=None, max_length=32)
     command: Literal['PPON', 'POFF'] | None = None
@@ -313,23 +316,51 @@ def inventory(tid: int):
 @router.post("/installer")
 def installer(body: Installer, req: Request):
     svc.init()
-    st = stm.station_create(body.name, operator(req))
-    return zip_agente(req, st, body.ble_only, body.puerto_serie, f'TQT_Pruebas_{st["id"]}.zip')
+    yo = operator(req)
+    st = None
+    if body.station_id:   # v1.4.64: misma estación (id, nombre y dueño) con token nuevo; nunca la de otra cuenta ni la Raspberry
+        with db.get_db() as c:
+            reutilizable = not svc.es_raspberry(c, body.station_id)
+        st = stm.station_rotate(body.station_id, yo) if reutilizable else None
+    if st is None:
+        st = stm.station_create(body.name, yo)
+    if body.formato == "cmd":
+        zip_bytes = paquete_agente(dict(server=str(req.base_url).rstrip("/"), ble_only=body.ble_only,
+                                        **({"serial_port": body.puerto_serie} if body.puerto_serie else {}), **st))
+        nombre, datos = instalador_windows.construir(zip_bytes, st["id"], body.ble_only)
+        return Response(datos, media_type="application/octet-stream", headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"', "Cache-Control": "no-store",
+            "X-TQT-Station": st["id"]})
+    res = zip_agente(req, st, body.ble_only, body.puerto_serie, f'TQT_Pruebas_{st["id"]}.zip')
+    res.headers["X-TQT-Station"] = st["id"]
+    return res
 
 
-def zip_agente(req, st, ble_only, puerto_serie, nombre):
+def paquete_agente(config=None):
+    """ZIP de station/test_station (sin tests ni cachés). Con config, añade config.json (lleva el token)."""
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as z:
         root = Path(__file__).resolve().parents[2] / "station/test_station"
-        for f in root.rglob("*"):
-            if f.is_file() and "__pycache__" not in f.parts and "tests" not in f.parts:
-                z.write(f, f.relative_to(root))
-        z.writestr(
-            "config.json",
-            json.dumps(dict(server=str(req.base_url).rstrip("/"), ble_only=ble_only, **({"serial_port": puerto_serie} if puerto_serie else {}), **st), indent=2),
-        )
+        for f in sorted(root.rglob("*")):
+            rel = f.relative_to(root)
+            if (f.is_file() and "__pycache__" not in rel.parts and "tests" not in rel.parts and ".venv" not in rel.parts
+                    and "evidence" not in rel.parts and rel.suffix != ".db"
+                    and rel.name not in ("config.json", "agent.log", "puerto_serie.txt", ".agent.lock")):
+                z.write(f, rel)
+        if config is not None:
+            z.writestr("config.json", json.dumps(config, indent=2))
+    return stream.getvalue()
+
+
+def config_agente(req, st, ble_only, puerto_serie):
+    return dict(server=str(req.base_url).rstrip("/"), ble_only=ble_only,
+                **({"serial_port": puerto_serie} if puerto_serie else {}), **st)
+
+
+def zip_agente(req, st, ble_only, puerto_serie, nombre):
+    datos = paquete_agente(config_agente(req, st, ble_only, puerto_serie))
     return Response(
-        stream.getvalue(),
+        datos,
         media_type="application/zip",
         headers={
             "Content-Disposition": f'attachment; filename="{nombre}"',
@@ -338,9 +369,83 @@ def zip_agente(req, st, ble_only, puerto_serie, nombre):
     )
 
 
+@agent_router.get("/package")
+def agent_package(st=Depends(station_token)):
+    """v1.4.64: autoactualización del agente Windows: el mismo paquete SIN config.json (el token no viaja)."""
+    return Response(paquete_agente(), media_type="application/zip", headers={
+        "Content-Disposition": 'attachment; filename="TQT_Agente_paquete.zip"', "Cache-Control": "no-store"})
+
+
+# v1.4.64: avance del instalador .cmd (corre oculto): lo reporta con el token de su config.json y la web lo consulta.
+# En memoria: es solo un aviso de progreso; si el servidor se reinicia, la web sigue con la presencia del agente.
+INSTALACION = {}
+ETAPAS = ("extrayendo", "python", "dependencias", "arrancando", "listo", "error")
+
+
+class InstallProgress(BaseModel):
+    etapa: Literal["extrayendo", "python", "dependencias", "arrancando", "listo", "error"]
+    mensaje: str = Field("", max_length=500)
+
+
+@agent_router.post("/install-progress")
+def install_progress(body: InstallProgress, st=Depends(station_token)):
+    INSTALACION[st["id"]] = dict(etapa=body.etapa, mensaje=body.mensaje, ts=time.time())
+    return {"ok": True}
+
+
+# v1.4.64: instalador .sh de la Raspberry por «curl … | sh»: código de UN solo uso que caduca a los 15 min (en memoria).
+# Sin sesión ni Bearer: el middleware ya deja pasar /api/stm32/agent/ y aquí el código aleatorio es la credencial.
+INSTALADORES_SH = {}
+INSTALADOR_SH_S = 15 * 60
+_instaladores_lock = threading.Lock()
+
+
+def guardar_instalador_sh(datos, ahora=None):
+    """Guarda el .sh y devuelve (codigo, expira). Purga los caducados."""
+    ahora = ahora or time.time()
+    codigo = secrets.token_urlsafe(24)
+    with _instaladores_lock:
+        for k in [k for k, v in INSTALADORES_SH.items() if v[0] <= ahora]:
+            INSTALADORES_SH.pop(k, None)
+        INSTALADORES_SH[codigo] = (ahora + INSTALADOR_SH_S, datos)
+    return codigo, ahora + INSTALADOR_SH_S
+
+
+@agent_router.get("/instalar/{codigo}.sh")
+def instalar_sh(codigo: str):
+    with _instaladores_lock:
+        v = INSTALADORES_SH.pop(codigo, None)   # un solo uso: se borra al servirlo
+    if not v or v[0] <= time.time():
+        raise HTTPException(404, "Comando de instalación caducado o ya usado; genera otro en la página.")
+    return Response(v[1], media_type="text/x-shellscript; charset=utf-8", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/installer/{sid}/estado")
+def installer_estado(sid: str, req: Request):
+    """Estado para la página: etapa del instalador + presencia/versión del agente de ESA estación (solo la propia)."""
+    yo = operator(req)
+    with db.get_db() as c:
+        run(svc.propia, c, sid, yo)
+        r = c.execute("SELECT p.seen,p.state FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station "
+                      "WHERE p.station=? AND s.revoked_at IS NULL", (sid,)).fetchone()
+    st = json.loads(r["state"]) if r else {}
+    online = bool(r) and time.time() - r["seen"] < 15
+    servidor = _version_servidor()
+    return dict(**INSTALACION.get(sid, {"etapa": "", "mensaje": "", "ts": 0}), online=online,
+                agent_version=st.get("agent_version") or "", servidor_version=servidor,
+                listo=online and (not servidor or st.get("agent_version") == servidor))
+
+
+@lru_cache(maxsize=1)
+def _version_servidor():
+    return svc.agente_actual()
+
+
 @agent_router.post("/claim")
 def claim(body: dict, st=Depends(station_token)):
     res = run(svc.claim, st["id"], body)
+    if isinstance(res, dict):   # v1.4.64: el agente Windows se autoactualiza si su AGENT_VERSION difiere
+        res = dict(res, agent_version=_version_servidor())
     if pruebas_auto.pide_log(st["id"]):   # v1.4.51: la web de Pruebas automáticas pidió el agent.log
         res = dict(res, subir_log=True)
     return res

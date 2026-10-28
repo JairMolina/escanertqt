@@ -108,3 +108,16 @@
 .pa-ocupada-que { font-family: var(--font-mono); font-size: 13px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); overflow-wrap: anywhere; }
 .pa-ocupada .pa-acc { justify-content: center; margin-top: 6px; }
 @media (max-width: 760px) { .pa-uso #enUsoTxt { display: none; } }
+
+/* v1.4.64: instalación con un comando y avance */
+.pa-cmd { display: flex; flex-direction: column; gap: 6px; }
+.pa-cmdtxt { flex: 1 1 auto; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2, var(--surface));
+  font-size: 12px; overflow-wrap: anywhere; user-select: all; }
+.pa-inst { margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; line-height: 1.45; }
+.pa-inst[data-k="run"] { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.pa-inst[data-k="run"]::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: -1px;
+  border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: pa-gira .8s linear infinite; }
+.pa-inst[data-k="ok"] { border-color: var(--ok); color: var(--ok); }
+.pa-inst[data-k="bad"] { border-color: var(--bad); color: var(--bad); }
+@keyframes pa-gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pa-inst[data-k="run"]::before { animation: none; } }

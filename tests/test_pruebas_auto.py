@@ -16,7 +16,7 @@ class PruebasAuto(unittest.TestCase):
         self.t = iso.crear_par(iso.nuevo_lote()["id"], version="30")
         inv.set_mac(self.t["r1"]["id"], iso.mac_unica())
         inv.set_mac(self.t["r2"]["id"], iso.mac_unica())
-        self.st = pa.registrar_banco("operador@test.mx")   # la Raspberry: único banco del submódulo
+        self.st = pa.registrar_banco("operador@test.mx", nuevo=True)   # la Raspberry: único banco (aislado por test)
         with db.get_db() as c:
             self.d = s.snapshot(self.t["id"], c)
 
@@ -217,6 +217,7 @@ class PruebasAuto(unittest.TestCase):
         actual = s.agente_actual()
         self.assertRegex(actual, r"^1\.4\.")
         yo = "aviso-%s@test.mx" % self.t["id"]
+        self.assertEqual((s.desactualizados(yo)["estaciones"], s.desactualizados(yo)["sin_agente"]), ([], True))   # v1.4.64: sin ninguno también avisa
         s.claim(self.st["id"], {"ble_bridge": 1, "agent_version": "viejo"})
         ajeno = stm.station_create("Bluetooth TQT Windows (solo BLE)", "otra-" + yo)
         s.claim(ajeno["id"], {"ble_bridge": 1, "ble_only": True})
@@ -228,9 +229,86 @@ class PruebasAuto(unittest.TestCase):
         nuevo = stm.station_create("Bluetooth TQT Windows (solo BLE)", yo)
         s.claim(nuevo["id"], {"ble_bridge": 1, "ble_only": True, "agent_version": actual})
         self.assertEqual(s.desactualizados(yo)["estaciones"], [])   # v1.4.60: con uno actualizado ya no se avisa
+        self.assertFalse(s.desactualizados(yo)["sin_agente"])
         with db.get_db() as c:
             c.execute("UPDATE tqt_test_presence SET seen=seen-60 WHERE station=?", (viejo["id"],))
         self.assertEqual(s.desactualizados(yo)["estaciones"], [])
+
+    # ---- v1.4.64: instalador de la Raspberry por comando ----
+    def test_reinstalar_reutiliza_la_estacion_del_banco(self):
+        otra = pa.registrar_banco("operador@test.mx")
+        self.assertEqual(otra["id"], self.st["id"])
+        self.assertNotEqual(otra["token"], self.st["token"])
+        self.assertEqual(stm.station_auth(self.st["token"])["id"], self.st["id"])   # el token previo sigue valiendo
+        self.assertEqual(pa.banco()["station"], self.st["id"])
+        self.assertEqual(pa.registrar_banco("jefe@test.mx", True)["id"], self.st["id"])   # el admin también reutiliza
+        with db.get_db() as c:
+            c.execute("UPDATE tqt_resistencia_banco SET ocupado_por=NULL")
+        ajena = pa.registrar_banco("otra@test.mx")   # banco de otra cuenta: se crea una estación nueva
+        self.assertNotEqual(ajena["id"], self.st["id"])
+
+    def test_comando_de_un_solo_uso_y_caduca(self):
+        import io, json, time, zipfile
+        from starlette.testclient import TestClient
+        from app.main import app
+        from app.routers import test_station as rts
+        from app.services import instalador_linux, usuarios
+        yo = usuarios.CUENTAS_INICIALES[0]
+        yo = yo["email"] if isinstance(yo, dict) else yo
+        mio = pa.registrar_banco(yo, nuevo=True)
+        cli = TestClient(app)   # sesión automática de la primera cuenta (ver _aislamiento)
+        z0 = cli.post("/api/pruebas-auto/agente", json={})   # compatibilidad: ZIP por defecto, misma estación
+        self.assertEqual((z0.status_code, z0.headers["content-type"], z0.headers["x-tqt-station"]),
+                         (200, "application/zip", mio["id"]))
+        sh = cli.post("/api/pruebas-auto/agente", json={"formato": "sh", "puerto_serie": "/dev/ttyUSB0"})
+        self.assertEqual(sh.status_code, 200, sh.text)
+        self.assertEqual(sh.headers["x-tqt-station"], mio["id"])
+        self.assertIn("text/x-shellscript", sh.headers["content-type"])
+        self.assertIn("instalar_tqt_pruebas.sh", sh.headers["content-disposition"])
+        self.assertNotIn(b"\r", sh.content)
+        z = zipfile.ZipFile(io.BytesIO(instalador_linux.extraer_zip(sh.content)))
+        cfg = json.loads(z.read("config.json"))
+        self.assertEqual((cfg["id"], cfg["serial_port"], cfg["ble_only"]), (mio["id"], "/dev/ttyUSB0", False))
+        self.assertNotIn(cfg["token"].encode(), sh.content)   # el token solo viaja dentro del ZIP
+        self.assertIn("agent.py", z.namelist())
+        self.assertIn("--fondo", instalador_linux.script_fondo(sh.content))
+        r = cli.post("/api/pruebas-auto/agente", json={"formato": "comando"})
+        self.assertEqual(r.status_code, 200, r.text)
+        d = r.json()
+        self.assertEqual(set(d), {"comando", "expira", "station"})
+        self.assertEqual(d["station"], mio["id"])
+        self.assertAlmostEqual(d["expira"], time.time() + 900, delta=30)
+        self.assertRegex(d["comando"], r"^curl -fsSL 'http://testserver/api/stm32/agent/tests/instalar/[A-Za-z0-9_-]{32}\.sh' \| sh$")
+        ruta = d["comando"].split("'")[1].replace("http://testserver", "")
+        self.assertEqual(cli.get("/api/pruebas-auto/agente/instalacion").json()["etapa"], "")
+        anon = iso.cliente_sin_sesion(app, https=False)   # sin sesión ni Bearer
+        primero = anon.get(ruta)
+        self.assertEqual(primero.status_code, 200)
+        self.assertTrue(primero.content.startswith(b"#!/bin/sh"))
+        self.assertEqual(json.loads(zipfile.ZipFile(io.BytesIO(instalador_linux.extraer_zip(primero.content)))
+                                    .read("config.json"))["id"], mio["id"])
+        self.assertEqual(anon.get(ruta).status_code, 404)   # un solo uso
+        self.assertEqual(anon.get("/api/stm32/agent/tests/package").status_code, 401)   # sin Bearer no hay otra ruta
+        self.assertEqual(anon.get("/api/pruebas-auto/agente/instalacion").status_code, 401)
+        codigo, _ = rts.guardar_instalador_sh(b"x", ahora=1.0)   # caducó hace mucho
+        self.assertEqual(anon.get(f"/api/stm32/agent/tests/instalar/{codigo}.sh").status_code, 404)
+
+    def test_instalacion_devuelve_etapa_y_listo(self):
+        from app.routers import test_station as rts
+        rts.INSTALACION.pop(self.st["id"], None)
+        d = pa.instalacion(rts.INSTALACION, "1.4.64", "operador@test.mx")
+        self.assertEqual((d["etapa"], d["en_linea"], d["listo"]), ("", False, False))
+        rts.install_progress(rts.InstallProgress(etapa="dependencias", mensaje="pip"), st={"id": self.st["id"]})
+        s.claim(self.st["id"], {"agent_version": "1.4.63"})
+        d = pa.instalacion(rts.INSTALACION, "1.4.64", "operador@test.mx")
+        self.assertEqual((d["etapa"], d["mensaje"], d["en_linea"], d["listo"]), ("dependencias", "pip", True, False))
+        self.assertEqual(set(d), {"etapa", "mensaje", "ts", "en_linea", "agent_version", "servidor_version", "listo"})
+        s.claim(self.st["id"], {"agent_version": "1.4.64"})
+        self.assertTrue(pa.instalacion(rts.INSTALACION, "1.4.64", "operador@test.mx")["listo"])
+        self.campana()   # otra cuenta con la Raspberry ocupada: 409 como el log
+        with self.assertRaises(pa.Ocupado):
+            pa.instalacion(rts.INSTALACION, "1.4.64", "otra@test.mx")
+
 
 if __name__ == "__main__":
     unittest.main()

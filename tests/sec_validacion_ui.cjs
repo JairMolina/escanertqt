@@ -91,6 +91,7 @@ const T42 = { id: 42, id_tarjeta_num: "0042", r1: { nombre: "TQT_R1_V30_0042", v
 const T44 = { ...T42, id: 44, id_tarjeta_num: "0044" };
 const runRow = { id: "run1", tarjeta_id: 44, requested_card: 42, state: "finished", result: "aprobado", origin: "web", station: "web-abc", created: 1000, updated: 1100, operator: "op", inventory: { id_tarjeta_num: "0044", nombre: "TQT_R1_V30_0044", mac_r1: "AA", mac_r2: "BB" }, report: { inventory_check: { state: "coincide" }, source_report: { steps: Array.from({ length: 14 }, () => ({ state: "aprobado" })) } } };
 async function api(p) {
+  if (p.startsWith("/api/consulta?codigo=")) return p.endsWith("NADA") ? { ok: true, data: {} } : { ok: true, data: { tarjeta: T42 } };
   if (p.startsWith("/api/tarjetas?")) return { ok: true, data: { items: [T42], total: 1 } };
   if (p === "/api/tarjetas/42") return { ok: true, data: T42 };
   if (p === "/api/tarjetas/44") return { ok: true, data: T44 };
@@ -134,22 +135,42 @@ eval(fs.readFileSync(path.join(__dirname, "../app/static/js/sec_validacion.js"),
   const first = lis()[0];
   assert.ok(lis().every((li) => li.dataset.k === "pend"));
   await new Promise((r) => setTimeout(r, 10));
-  const header = host.querySelector('.tqt-header');
-  assert.ok(header && header.children.length === 3, 'tres paneles superiores');
-  assert.ok(header.children[1].textContent.includes('ON serial'), 'manual serial junto al puerto');
-  assert.ok(header.children[2].textContent.includes('ON BLE'), 'manual BLE junto a su conexión');
-  const side = host.querySelector('.tqt-side');
-  assert.ok(side.children[1].className.includes('tqt-history-panel'), 'historial antes de detalles R1/R2');
-  assert.ok(side.children[2].className.includes('tqt-inventory-panel'));
-  const cardBtn = host.querySelector(".tqt-cardbtn");
+  // v1.4.63: franja «Tarjeta en prueba» + dos conexiones compactas + rutina | resultado + historial/registro abajo.
+  const cur = host.querySelector('.tqt-current');
+  assert.ok(cur && host.children[0].tagName === 'HEADER' && host.children[1] === cur, 'encabezado y franja «Tarjeta en prueba» arriba');
+  assert.ok(cur.querySelector('.tqt-pick-panel') && cur.querySelector('.tqt-inventory-panel'), 'selector y datos R1/R2 en la franja');
+  assert.ok(!cur.querySelector('.tqt-cur-pick').hidden, 'sin tarjeta elegida, el selector se muestra directo');
+  const conns = host.querySelector('.tqt-conns');
+  assert.ok(conns && conns.children.length === 2, 'dos conexiones superiores');
+  assert.ok(conns.children[0].textContent.includes('Elegir puerto serial'), 'puerto serial con su botón principal');
+  assert.ok(conns.children[1].textContent.includes('Preparar puente Bluetooth'), 'puente Bluetooth');
+  assert.ok(conns.children[1].textContent.includes('Elegir dispositivo'), 'v1.4.64: elegir dispositivo Bluetooth');
+  assert.ok(host.querySelector('.tqt-manual').textContent.includes('ON BLE') && host.querySelector('.tqt-manual').textContent.includes('ON serial'), 'ON/OFF serial y BLE en «Controles manuales»');
+  assert.strictEqual(host.querySelectorAll('.tqt-group').length, 4, '14 etapas en 4 bloques');
+  const aside = host.querySelector('.tqt-aside');
+  assert.ok(aside.children[0].className.includes('tqt-status-panel'), 'estado de la ejecución arriba de la columna derecha');
+  const sumSec = aside.children[0].querySelector('.tqt-summary');
+  assert.deepStrictEqual(sumSec.children.map((c) => c.className), ['tqt-sum-head', 'tqt-facts', 'row wrap', 'hint', 'hint'], 'el resumen conserva exactamente su contenido');
+  const sens = host.children[host.children.indexOf(host.querySelector('.tqt-work')) + 1];
+  assert.ok(sens.className === 'prog-panel tqt-card' && sens.querySelector('.tqt-sensors'), 'sensores a todo lo ancho bajo la rutina');
+  const bottom = host.querySelector('.tqt-bottom');
+  assert.ok(bottom.children[0].className.includes('tqt-history-panel') && bottom.children[1].className.includes('tqt-livewrap'));
+  // v1.4.64: el listado de tarjetas vive en el modal «Elige la tarjeta en prueba» (lote + una o varias)
+  host.querySelectorAll("button").find((b) => b.textContent.includes("Ver tarjetas del lote")).click();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.strictEqual(sheetOpts.title, "Elige la tarjeta en prueba", "modal de tarjetas");
+  assert.ok(!sheetOpts.body.querySelector("select") && sheetOpts.body.querySelector(".tqt-pick-chk"), "sin selector de lote propio (usa el de la consola) y con casillas");
+  assert.ok(sheetOpts.actions.some((a) => a.label === "Cerrar"), "el modal se puede cerrar");
+  const cardBtn = sheetOpts.body.querySelector(".tqt-cardbtn");
   assert.ok(cardBtn, "listado de tarjetas");
   assert.ok(cardBtn.textContent.includes('R1') && cardBtn.textContent.includes('#0042'));
-  const search = host.querySelectorAll('input').find(e => e.id === 'tqt-search');
+  const search = [...host.querySelectorAll('input'), ...sheetOpts.body.querySelectorAll('input')].find(e => e.id === 'tqt-search');
   search.value = '42';
   search.listeners.keydown[0]({ key: 'Enter', preventDefault() {} });
   await new Promise((r) => setTimeout(r, 10));
   assert.ok(host.textContent.includes("Versión anterior · objetivo 4.10"), "semáforo naranja R1 (4.9 < 4.10)");
   assert.ok(host.textContent.includes("Vigente"), "semáforo verde R2");
+  assert.ok(cur.querySelector(".tqt-cur-pick").hidden, "al elegir tarjeta el selector se pliega");
   const start = host.querySelectorAll("button").find((b) => b.textContent === "Iniciar las 14 etapas");
   assert.ok(!start.disabled, "Iniciar habilitado sin casilla de confirmación");
   start.click();
@@ -160,6 +181,7 @@ eval(fs.readFileSync(path.join(__dirname, "../app/static/js/sec_validacion.js"),
   assert.strictEqual(ident, true);
   assert.strictEqual(lis()[0], first, "las filas no se reconstruyen");
   assert.ok(lis().every((li) => li.dataset.k === "ok"));
+  assert.ok(host.querySelectorAll(".tqt-group-count").every((c) => { const [x, y] = c.textContent.split("/"); return x === y; }), "contadores de bloque completos");
   assert.ok(lis()[0].textContent.includes("Último ON 1 · OFF 0"), "último par ON/OFF por etapa");
   assert.ok(host.textContent.includes("Aprobada") && host.textContent.includes("14/14"));
   const print = host.querySelectorAll("button").find((b) => b.textContent === "Imprimir etiquetas");
@@ -184,6 +206,11 @@ eval(fs.readFileSync(path.join(__dirname, "../app/static/js/sec_validacion.js"),
   await new Promise((r) => setTimeout(r, 20));
   assert.ok(host2.textContent.includes("Agente Windows: Laptop banco · en línea"));
   assert.ok(host2.textContent.includes("Serial: conectado · COM3 (agente)"));
+  // v1.4.64: botón de escaneo (celular) → escaneo(código) responde {ok, texto} a la consola
+  const rs = await sec2.escaneo("PCB_TQT-R1-0042");
+  assert.ok(rs.ok && rs.texto.includes("#0042"), "escaneo elige la tarjeta: " + JSON.stringify(rs));
+  const rn = await sec2.escaneo("NADA");
+  assert.ok(!rn.ok && rn.texto, "escaneo sin tarjeta responde el motivo");
   assert.ok(!host2.querySelectorAll("input").some((i) => i.attrs.type === "checkbox"), "sin casilla de confirmación");
   sec2.desmontar();
   console.log("sec_validacion_ui: OK");

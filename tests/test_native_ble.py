@@ -101,5 +101,129 @@ class BridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'otra MAC'): execute(ble, lambda: payload)
         self.assertEqual(events[-1], ('send', 'PPON'))
 
+    # v1.4.64: «Elegir dispositivo» — escaneo sin MAC ni tarjeta, solo con el puente propio.
+    def test_scan_without_mac_role_or_card_and_owner_enforced(self):
+        b = dict(station_id=self.station, request_id=secrets.token_hex(16), operation='scan')
+        with self.assertRaisesRegex(ValueError, 'operador'): svc.prepare('other@test.mx', dict(b))
+        jid = self.claim(b)
+        auth = svc.authorize(self.station, jid)
+        self.assertEqual((auth['operation'], auth['address']), ('scan', None))
+        with self.assertRaises(ValueError): svc.result('other@test.mx', jid)
+        nb = dict(b, request_id=secrets.token_hex(16), operation='connect')
+        with self.assertRaisesRegex(ValueError, 'inválida|tarjeta'): svc.prepare(self.op, nb)
+
+    def test_connect_still_requires_inventory_mac(self):
+        b = self.body(); b['mac'] = 'AA:BB:CC:DD:EE:FF'
+        with self.assertRaisesRegex(ValueError, 'inventario'): svc.prepare(self.op, b)
+
+    def test_agent_scan_lists_named_devices_tqt_first(self):
+        from tqtstation.ble import ordenar_escaneo
+        lista = ordenar_escaneo([dict(name='Auriculares', address='A', rssi=-40),
+                                 dict(name='TQT-R2', address='B', rssi=-80),
+                                 dict(name='TQT-R1', address='C', rssi=-60)])
+        self.assertEqual([d['address'] for d in lista], ['C', 'B', 'A'])
+        class Ble:
+            address = ''
+            def scan_all(self): return lista
+        payload = dict(operation='scan', address=None, command=None, deadline=time.time()+20)
+        self.assertEqual(execute(Ble(), lambda: payload), lista)
+
+
+class InstallerTests(unittest.TestCase):
+    """v1.4.64: reinstalar conserva la estación (id/nombre/dueño) con token nuevo; .cmd autoextraíble; paquete OTA."""
+
+    @classmethod
+    def setUpClass(cls):
+        from fastapi.testclient import TestClient
+        from app.main import app
+        from app.services import usuarios
+        cls.client = TestClient(app, base_url='https://testserver')
+        cls.op = usuarios.validar_sesion(iso._token_pruebas())['email']
+
+    def post(self, **body):
+        return self.client.post('/api/validacion/tqt/installer', json=dict(name='Laptop', ble_only=True, **body))
+
+    def test_reuse_own_station_rotates_token_and_keeps_id(self):
+        import io, zipfile
+        st = stm.station_create('Mi laptop', self.op.upper())
+        r = self.post(station_id=st['id'])
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers['X-TQT-Station'], st['id'])
+        cfg = json.loads(zipfile.ZipFile(io.BytesIO(r.content)).read('config.json'))
+        self.assertEqual((cfg['id'], cfg['name'], cfg['owner']), (st['id'], st['name'], st['owner']))
+        self.assertNotEqual(cfg['token'], st['token'])
+        # el instalador anterior sigue valiendo (descargado antes, abierto después) y el nuevo también
+        self.assertEqual(stm.station_auth(st['token'])['id'], st['id'])
+        self.assertEqual(stm.station_auth(cfg['token'])['id'], st['id'])
+        stm.revoke_stations([st['id']], self.op, administrator=True)
+        for tk in (st['token'], cfg['token']):
+            with self.assertRaises(Exception): stm.station_auth(tk)   # revocar invalida todos
+
+    def test_install_progress_y_estado(self):
+        st = stm.station_create('Progreso', self.op)
+        h = {'Authorization': 'Bearer ' + st['token']}
+        self.assertEqual(self.client.post('/api/stm32/agent/tests/install-progress', json={'etapa': 'dependencias'}, headers=h).status_code, 200)
+        self.assertEqual(self.client.post('/api/stm32/agent/tests/install-progress', json={'etapa': 'otra'}, headers=h).status_code, 422)
+        e = self.client.get('/api/validacion/tqt/installer/' + st['id'] + '/estado').json()
+        self.assertEqual((e['etapa'], e['online'], e['listo']), ('dependencias', False, False))
+        ajena = stm.station_create('Ajena', 'otra-cuenta@test.mx')
+        self.assertNotEqual(self.client.get('/api/validacion/tqt/installer/' + ajena['id'] + '/estado').status_code, 200)
+
+    def test_foreign_or_revoked_station_creates_new(self):
+        ajena = stm.station_create('Ajena', 'otra-cuenta@test.mx')
+        r = self.post(station_id=ajena['id'])
+        self.assertNotEqual(r.headers['X-TQT-Station'], ajena['id'])
+        self.assertEqual(stm.station_auth(ajena['token'])['id'], ajena['id'])   # su token no se tocó
+        propia = stm.station_create('Revocada', self.op)
+        stm.revoke_stations([propia['id']], self.op)
+        self.assertNotEqual(self.post(station_id=propia['id']).headers['X-TQT-Station'], propia['id'])
+        self.assertEqual(len(self.post().headers['X-TQT-Station']), 24)
+
+    def test_cmd_format_embeds_zip_with_config(self):
+        import io, zipfile
+        from app.services import instalador_windows as iw
+        r = self.post(formato='cmd')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('TQT_Puente_Bluetooth.cmd', r.headers['content-disposition'])
+        self.assertTrue(r.headers['content-type'].startswith('application/octet-stream'))
+        self.assertTrue(r.content.startswith(b'@echo off\r\n'))
+        self.assertNotIn(b'\n', r.content.replace(b'\r\n', b''))
+        self.assertIn(b'::TQT_ZIP_BASE64\r\n', r.content)
+        z = zipfile.ZipFile(io.BytesIO(iw.extraer_zip(r.content)))
+        cfg = json.loads(z.read('config.json'))
+        self.assertEqual(cfg['id'], r.headers['X-TQT-Station'])
+        self.assertTrue(cfg['ble_only'])
+        self.assertIn('agent.py', z.namelist())
+        ps = iw.script_ps(r.content)
+        self.assertIn(r'TQT\PuenteBluetooth', ps)
+        self.assertNotIn(cfg['token'], ps)   # el token solo viaja dentro de config.json
+        self.assertIn('TQT_Agente_Pruebas.cmd', self.client.post('/api/validacion/tqt/installer', json=dict(
+            formato='cmd')).headers['content-disposition'])
+
+    def test_claim_announces_version_and_package_has_no_config(self):
+        import io, zipfile
+        st = stm.station_create('OTA', self.op)
+        h = {'Authorization': 'Bearer ' + st['token']}
+        r = self.client.post('/api/stm32/agent/tests/claim', json=dict(ble_bridge=1, ble_only=True), headers=h)
+        self.assertEqual(r.json()['agent_version'], runs.agente_actual())
+        self.assertEqual(runs.agente_actual(), '1.4.64')
+        p = self.client.get('/api/stm32/agent/tests/package', headers=h)
+        self.assertEqual(p.status_code, 200)
+        names = zipfile.ZipFile(io.BytesIO(p.content)).namelist()
+        self.assertIn('agent.py', names)
+        self.assertNotIn('config.json', names)
+        self.assertFalse(any(n.startswith('tests/') for n in names))
+        self.assertEqual(self.client.get('/api/stm32/agent/tests/package').status_code, 401)
+
+    def test_http_scan_accepts_missing_mac_and_rejects_other_account(self):
+        mine = stm.station_create('Puente', self.op)['id']
+        runs.claim(mine, dict(ble_bridge=1, ble_only=True, serial_connected=False, running=False))
+        body = dict(station_id=mine, request_id=secrets.token_hex(16), operation='scan')
+        self.assertEqual(self.client.post('/api/validacion/tqt/web/ble/commands', json=body).status_code, 200)
+        other = stm.station_create('Ajeno', 'otra-cuenta@test.mx')['id']
+        runs.claim(other, dict(ble_bridge=1, ble_only=True, serial_connected=False, running=False))
+        r = self.client.post('/api/validacion/tqt/web/ble/commands', json=dict(body, station_id=other, request_id=secrets.token_hex(16)))
+        self.assertEqual(r.status_code, 400)
+
 
 if __name__ == '__main__': unittest.main()

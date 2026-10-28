@@ -8,7 +8,9 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from app.database import db
-from app.routers.test_station import texto_log, zip_agente
+from app.routers.test_station import (INSTALACION, _version_servidor, config_agente, guardar_instalador_sh,
+                                      paquete_agente, texto_log, zip_agente)
+from app.services import instalador_linux
 from app.services import pruebas_auto as svc
 from app.services import test_station as ts
 from app.services import usuarios
@@ -23,6 +25,7 @@ def _txt(texto, nombre):
 
 class Agente(BaseModel):
     puerto_serie: str | None = Field(default=None, max_length=120, pattern=r"^/dev/[A-Za-z0-9_./:+-]+$")
+    formato: Literal["zip", "sh", "comando"] = "zip"   # v1.4.64
 
 
 class Puerto(BaseModel):
@@ -88,9 +91,27 @@ def liberar(req: Request):
 
 @router.post("/agente")
 def agente(body: Agente, req: Request):
-    """ZIP del agente para la Raspberry; lo registra como EL banco del submódulo."""
+    """Agente de la Raspberry (EL banco del submódulo). v1.4.64: reutiliza la estación del banco (mismo id, token nuevo).
+    formato «zip» (como antes), «sh» (instalador autoextraíble) o «comando» (curl … | sh con código de un solo uso)."""
     st = run(svc.registrar_banco, *quien(req))
-    return zip_agente(req, st, False, body.puerto_serie, "TQT_Pruebas_Raspberry.zip")
+    INSTALACION.pop(st["id"], None)   # el avance de una instalación anterior no cuenta para esta
+    if body.formato == "zip":
+        res = zip_agente(req, st, False, body.puerto_serie, "TQT_Pruebas_Raspberry.zip")
+        res.headers["X-TQT-Station"] = st["id"]
+        return res
+    nombre, datos = instalador_linux.construir(paquete_agente(config_agente(req, st, False, body.puerto_serie)), st["id"])
+    if body.formato == "sh":
+        return Response(datos, media_type="text/x-shellscript", headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"', "Cache-Control": "no-store", "X-TQT-Station": st["id"]})
+    codigo, expira = guardar_instalador_sh(datos)
+    url = f"{str(req.base_url).rstrip('/')}/api/stm32/agent/tests/instalar/{codigo}.sh"
+    return {"comando": f"curl -fsSL '{url}' | sh", "expira": expira, "station": st["id"]}
+
+
+@router.get("/agente/instalacion")
+def instalacion(req: Request):
+    """v1.4.64: avance del instalador de la Raspberry y si su agente ya está en línea con la versión del servidor."""
+    return run(svc.instalacion, INSTALACION, _version_servidor(), *quien(req))
 
 
 @router.post("/puerto")

@@ -15,6 +15,13 @@ class FoundDevice:
     address: str
 
 
+def ordenar_escaneo(found, limite=60):
+    """TQT primero; luego por señal (RSSI mayor) y nombre."""
+    return sorted(found, key=lambda d: ('TQT' not in d['name'].upper(),
+                                       -(d['rssi'] if d['rssi'] is not None else -999),
+                                       d['name'].upper(), d['address']))[:limite]
+
+
 class BLELink:
     def __init__(self, log):
         self.log = log
@@ -51,6 +58,28 @@ class BLELink:
                 self.devices[addr] = d
                 found.append(FoundDevice(name, addr))
         return sorted(found, key=lambda d:(d.name.upper(), d.address))
+
+    async def _scan_all(self):
+        from bleak import BleakScanner
+        result = await BleakScanner.discover(timeout=7.0, return_adv=True)
+        found = []
+        self.devices = {}
+        for d, adv in result.values():
+            name = (adv.local_name or d.name or '').strip()
+            if not name:
+                continue
+            addr = d.address.upper()
+            self.devices[addr] = d
+            rssi = getattr(adv, 'rssi', None)
+            found.append({'name': name, 'address': addr, 'rssi': rssi if isinstance(rssi, int) else None})
+        return ordenar_escaneo(found)
+
+    def scan_all(self):
+        """v1.4.64: «Elegir dispositivo» del navegador: todo lo que tiene nombre, TQT primero."""
+        self.log('Buscando todos los BLE durante 7 segundos…')
+        result = self._call(self._scan_all(), timeout=15)
+        self.log(f'BLE: {len(result)} dispositivo(s) con nombre encontrados')
+        return result
 
     def scan(self, target=None):
         self.log('Buscando BLE durante 7 segundos…')

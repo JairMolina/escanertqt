@@ -8,6 +8,8 @@ def execute(ble, authorize):
     op, address = payload['operation'], payload['address']
     if time.time() > payload['deadline']:
         raise ValueError('Comando vencido; no se ejecuta.')
+    if op == 'scan' and not address:
+        return ble.scan_all()   # v1.4.64: lista [{name, address, rssi}] para «Elegir dispositivo»
     if op == 'disconnect':
         ble.disconnect()
         return {'disconnected': True}

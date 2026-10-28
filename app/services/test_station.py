@@ -60,7 +60,8 @@ def desactualizados(operator, dias=7):
         if actual and not hay_nuevo and st.get("agent_version") != actual:
             out.append(dict(nombre=r["name"], version=st.get("agent_version") or "anterior a 1.4.51",
                             solo_ble=bool(st.get("ble_only")), en_linea=time.time() - r["seen"] < 15))
-    return {"actual": actual, "estaciones": out}
+    # v1.4.64: sin ningún agente/puente con la versión actual la web también avisa (instalar desde cero)
+    return {"actual": actual, "estaciones": out, "sin_agente": bool(actual) and not hay_nuevo}
 
 
 def norm(value):

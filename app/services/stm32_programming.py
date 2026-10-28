@@ -39,10 +39,10 @@ def init():
     # upgraded to ALTER can fail with SQLITE_BUSY_SNAPSHOT while agents poll.
     with db.get_db() as c:
         cols = {r[1] for r in c.execute('PRAGMA table_info(stm32_stations)')}
-    if cols and not {'revoked_at', 'revoked_by'} <= cols:
+    if cols and not {'revoked_at', 'revoked_by', 'tokens_previos'} <= cols:
         with db.transaction() as c:
             cols = {r[1] for r in c.execute('PRAGMA table_info(stm32_stations)')}
-            for name, kind in (('revoked_at', 'REAL'), ('revoked_by', 'TEXT')):
+            for name, kind in (('revoked_at', 'REAL'), ('revoked_by', 'TEXT'), ('tokens_previos', 'TEXT')):
                 if name not in cols:
                     c.execute(f'ALTER TABLE stm32_stations ADD COLUMN {name} {kind}')
     with db.get_db() as c:
@@ -207,11 +207,30 @@ def station_create(name, owner):
     return dict(id=sid, token=token, name=name, owner=owner)
 
 
+def station_rotate(sid, owner):
+    """v1.4.64: reinstalar el mismo puente/agente: conserva id, nombre y dueño y solo emite token nuevo.
+    Devuelve None si la estación no existe, está revocada o es de otra cuenta (entonces se crea una nueva)."""
+    init()
+    token = secrets.token_urlsafe(32)
+    with db.get_db() as c:
+        row = c.execute('SELECT * FROM stm32_stations WHERE id=? AND revoked_at IS NULL AND lower(owner)=lower(?)',
+                        (str(sid or ''), str(owner))).fetchone()
+        if not row:
+            return None
+        # el token anterior sigue valiendo (hasta 4): un instalador descargado antes que se abra después no queda en 401
+        previos = ([row['token_hash']] + json.loads(row['tokens_previos'] or '[]'))[:4]
+        c.execute('UPDATE stm32_stations SET token_hash=?, tokens_previos=? WHERE id=?',
+                  (hashlib.sha256(token.encode()).hexdigest(), json.dumps(previos), row['id']))
+    return dict(id=row['id'], token=token, name=row['name'], owner=row['owner'])
+
+
 def station_auth(token):
     init()
     with db.get_db() as c:
-        row = c.execute('SELECT * FROM stm32_stations WHERE token_hash=?',
-                        (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
+        th = hashlib.sha256(token.encode()).hexdigest()
+        row = c.execute('SELECT * FROM stm32_stations WHERE token_hash=?', (th,)).fetchone()
+        if not row:   # v1.4.64: token de un instalador anterior de la misma estación (ver station_rotate)
+            row = c.execute("SELECT s.* FROM stm32_stations s, json_each(COALESCE(s.tokens_previos,'[]')) j WHERE j.value=?", (th,)).fetchone()
     if not row:
         raise ValueError('Credencial de estación inválida.')
     if row['revoked_at'] is not None:

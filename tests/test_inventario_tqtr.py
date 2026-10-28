@@ -33,7 +33,7 @@ class TestInventarioTQTR(unittest.TestCase):
     def test_01_semilla_idempotente(self):
         d1 = svc.dashboard(db_path=self.path)
         self.assertEqual(d1["kpis"]["movimientos"], 52)  # 51 del Excel + entrada de sensores v1.3.39
-        self.assertEqual(d1["kpis"]["componentes"], 26)
+        self.assertEqual(d1["kpis"]["componentes"], 24)  # v1.4.64: 3 relevadores → 1
         svc._reiniciar_cache()
         d2 = svc.dashboard(db_path=self.path)  # segunda preparación: no duplica nada
         self.assertEqual(d2["kpis"]["movimientos"], 52)
@@ -49,7 +49,7 @@ class TestInventarioTQTR(unittest.TestCase):
         esperado = {  # descripción: (disponible, consumida, ensambles) — valores en caché del Excel
             "PCB TQT-R1 V2.0 | PRINCIPAL": (89, 21, 89),
             "Cable uso rudo 4 hilos calibre 18 | Negro": (298.5, 5.5, 597),
-            "Relevador automotriz 12 VCD | R2": (116, 44, 29),
+            "Relevador automotriz 12 VCD": (232, 88, 29),  # v1.4.64: R1 58 + R2 116 + R3 58 en un solo stock (8 por armado)
             "Cinchos de nylon": (534, 66, 89),
             "Cable calibre 22 | R3 | Rojo": (84.5, 15.5, 169),
             "Caja Quintalock Metal Reforzada": (37, 10, 37),
@@ -61,7 +61,7 @@ class TestInventarioTQTR(unittest.TestCase):
             self.assertAlmostEqual(f["disponible"], disp, places=6, msg=desc)
             self.assertAlmostEqual(f["consumida"], cons, places=6, msg=desc)
             self.assertEqual(f["ensambles"], ens, desc)
-        self.assertEqual(d["pcba_posibles"], {"R1": 29, "R2": 29, "R3": 29})
+        self.assertEqual(d["pcba_posibles"], {"R1": 29, "R2": 87, "R3": 49})  # v1.4.64: el relevador unificado cuenta en R1
         self.assertEqual(d["producto_final_posible"], 29)
         self.assertEqual((d["quintalock"], d["translock"]), (19, 16))
         self.assertEqual(d["sin_coincidencia"], [])
@@ -83,10 +83,10 @@ class TestInventarioTQTR(unittest.TestCase):
 
     def test_04_alertas_y_productos_bom(self):
         d = svc.dashboard(db_path=self.path)
-        sensor = self.comp(d, "Sensor magnético CS1-U")
-        self.assertEqual(sensor["disponible"], 40)  # v1.3.39: 73 recibidos − 33 de los 11 armados Translock ya registrados
+        sensor = self.comp(d, "Sensor magnético CS1-U")   # v1.4.64: viene con el actuador; ya no limita ni se descuenta aparte
+        self.assertEqual((sensor["en_dashboard"] if "en_dashboard" in sensor else 0, sensor["cantidad_ensamble"]), (0, 2))
         quinta = next(p for p in d["productos"] if p["producto"] == "Quinta completa | R1+R2+R3")
-        self.assertEqual((quinta["posibles"], quinta["limitante"]), (13, "Sensor magnético CS1-U"))
+        self.assertEqual((quinta["posibles"], quinta["limitante"]), (19, "Actuador lineal de 12 VCD"))
         timer = next(p for p in d["productos"] if p["producto"] == "Solo Timer | R3")
         self.assertGreater(timer["posibles"], 0)
         # stock mínimo configurable
@@ -112,12 +112,30 @@ class TestInventarioTQTR(unittest.TestCase):
             with self.assertRaises(ValueError):
                 svc.crear_registro(malo, db_path=p)
 
+    def test_15_migracion_1464_junta_consumos_de_relevadores(self):
+        """v1.4.64: una BD con consumos separados R1/R2 de relevadores queda con una sola fila por tarjeta (sumada) y un solo componente."""
+        from app.database import db
+        p = self.path
+        svc.dashboard(db_path=p)
+        with db.transaction(p) as c:   # se recrea el estado previo: 2 relevadores separados y sus consumos en la misma tarjeta
+            keep = c.execute("SELECT id FROM inv_tqtr_componentes WHERE descripcion=?", (svc.RELEVADOR,)).fetchone()["id"]
+            c.execute("UPDATE inv_tqtr_componentes SET descripcion=?, cantidad_ensamble=2 WHERE id=?", (svc.RELEVADOR + " | R1", keep))
+            r2 = c.execute("INSERT INTO inv_tqtr_componentes (grupo, categoria, descripcion, cantidad_ensamble) VALUES ('R2','x',?,4)", (svc.RELEVADOR + " | R2",)).lastrowid
+            for cid, q in ((keep, 2), (r2, 4)):
+                c.execute("INSERT INTO inv_tqtr_consumos (tarjeta_id, componente_id, origen, cantidad_estandar, cantidad_real) VALUES (777,?,'placas',?,?)", (cid, q, q))
+            c.execute("DELETE FROM inv_tqtr_meta WHERE clave='migr_1464_relevadores_sensores'")
+            svc._migrar_1464(c)
+            filas = [tuple(r) for r in c.execute("SELECT componente_id, cantidad_estandar, cantidad_real FROM inv_tqtr_consumos WHERE tarjeta_id=777")]
+            n = c.execute("SELECT COUNT(*) FROM inv_tqtr_componentes WHERE descripcion LIKE 'Relevador%'").fetchone()[0]
+        self.assertEqual(filas, [(keep, 6, 6)])
+        self.assertEqual(n, 1)
+
     def test_06_salida_de_producto_final_descuenta_bom(self):
         p = self.path
-        antes = self.comp(svc.dashboard(db_path=p), "Relevador automotriz 12 VCD | R2")["disponible"]
+        antes = self.comp(svc.dashboard(db_path=p), "Relevador automotriz 12 VCD")["disponible"]
         svc.crear_registro({"modelo": "Quinta sin timer | R1+R2", "movimiento": "Salida", "cantidad": 2}, db_path=p)
         d = svc.dashboard(db_path=p)
-        self.assertEqual(self.comp(d, "Relevador automotriz 12 VCD | R2")["disponible"], antes - 8)  # 4 por ensamble × 2
+        self.assertEqual(self.comp(d, "Relevador automotriz 12 VCD")["disponible"], antes - 12)  # (2 R1 + 4 R2) por ensamble × 2
         self.assertEqual(self.comp(d, "Caja Translock Metal Reforzada")["disponible"], 16)  # no lleva caja Translock
 
     def test_07_filtros_y_paginacion(self):
@@ -179,10 +197,10 @@ class TestInventarioTQTR(unittest.TestCase):
         # R1 593.023 − 74.58 + 90.40 = 608.843 y R3 417.201 − 13.56 + 22.60 = 426.241
         self.assertAlmostEqual(cos["armado"]["total"], 4451.144, places=3)
         g = cos["armado"]["por_grupo"]
-        for k, v in (("R1", 608.843), ("R2", 694.06), ("R3", 426.241), ("Otros", 2722)):
+        for k, v in (("R1", 608.843 + 162.8), ("R2", 694.06 - 162.8), ("R3", 426.241), ("Otros", 2722)):  # v1.4.64: el costo de los 4 relevadores de R2 pasa a la fila unificada (R1)
             self.assertAlmostEqual(g[k], v, places=3, msg=k)
         self.assertAlmostEqual(cos["por_variante"]["Quintalock"]["total"], 4451.144 - 1276 + 1450, places=3)
-        self.assertEqual(cos["sin_componente"], [])  # las 26 filas casan con el catálogo de Componentes
+        self.assertEqual(cos["sin_componente"], ["Relevador automotriz 12 VCD | R3"])  # v1.4.64: la fila R3 «no incluida» queda como referencia
         self.assertEqual(cos["componentes_sin_costo"], [])
         self.assertGreater(cos["valor_existencia"], 0)
         self.assertEqual(cos["armados_posibles"]["cantidad"], 16)  # min(producto final 29, Translock 16)
@@ -247,17 +265,17 @@ class TestConsumoTarjetas(unittest.TestCase):
     def test_01_programar_descuenta_placas_y_r3(self):
         """v1.4.6: R1+R2 con MAC y firmware descuentan placas; la R3 asignada, sus materiales."""
         from app.database import inventario as inv
-        D = ("PCB TQT-R1 V2.0 | PRINCIPAL", "Cable calibre 22 | R3 | Rojo", "Relevador automotriz 12 VCD | R2", ACT)
+        D = ("PCB TQT-R1 V2.0 | PRINCIPAL", "Cable calibre 22 | R3 | Rojo", "Relevador automotriz 12 VCD", ACT)
         base = {d: self.disp(d) for d in D}
         t = self.tarjeta(firmware=False)  # MAC sin firmware: solo la R3 asignada consume
         self.assertEqual(self.disp("PCB TQT-R1 V2.0 | PRINCIPAL"), base["PCB TQT-R1 V2.0 | PRINCIPAL"])
-        self.assertEqual(self.disp("Relevador automotriz 12 VCD | R2"), base["Relevador automotriz 12 VCD | R2"])
+        self.assertEqual(self.disp("Relevador automotriz 12 VCD"), base["Relevador automotriz 12 VCD"])
         self.assertAlmostEqual(self.disp("Cable calibre 22 | R3 | Rojo"), base["Cable calibre 22 | R3 | Rojo"] - 0.55)
         inv.set_firmware(t["pcb_r1_id"], "1.0", db_path=self.path)  # solo R1 programada: aún no
         self.assertEqual(self.disp("PCB TQT-R1 V2.0 | PRINCIPAL"), base["PCB TQT-R1 V2.0 | PRINCIPAL"])
         inv.set_firmware(t["pcb_r2_id"], "1.0", db_path=self.path)
         self.assertEqual(self.disp("PCB TQT-R1 V2.0 | PRINCIPAL"), base["PCB TQT-R1 V2.0 | PRINCIPAL"] - 1)
-        self.assertEqual(self.disp("Relevador automotriz 12 VCD | R2"), base["Relevador automotriz 12 VCD | R2"] - 4)
+        self.assertEqual(self.disp("Relevador automotriz 12 VCD"), base["Relevador automotriz 12 VCD"] - 6)  # v1.4.64: 2 R1 + 4 R2 juntos
         self.assertEqual(self.disp(ACT), base[ACT])  # sin gabinete no se toca el actuador
         f = svc.materiales_tarjeta(t["id"], db_path=self.path)
         self.assertTrue(f["editable"])
@@ -456,11 +474,11 @@ class TestV1339(unittest.TestCase):
         return next(f for f in svc.dashboard(db_path=self.path)["componentes"] if f["descripcion"] == desc)
 
     def test_01_sensores_40_e_idempotente(self):
-        self.assertEqual(self.comp("Sensor magnético CS1-U")["disponible"], 40)
+        self.assertEqual(self.comp("Sensor magnético CS1-U")["disponible"], 73)   # v1.4.64: sin BOM; los 73 recibidos ya no se descuentan aparte
         regs = svc.listar_registros(q="Ajuste v1.3.39", db_path=self.path)["items"]
         self.assertEqual([(r["movimiento"], r["cantidad"]) for r in regs], [("Entrada", 73)])
         svc._reiniciar_cache()
-        self.assertEqual(self.comp("Sensor magnético CS1-U")["disponible"], 40)  # la migración no se repite
+        self.assertEqual(self.comp("Sensor magnético CS1-U")["disponible"], 73)  # la migración no se repite
 
     def test_02_unidades_y_conversion(self):
         s = self.comp("Silicón P-53 | R1+R2")
@@ -471,7 +489,7 @@ class TestV1339(unittest.TestCase):
         self.assertTrue(all(r["unidad"] == "gramos" for r in regs))
         svc.editar_conversiones({"conv_silicon_g_por_envase": 1100}, db_path=self.path)  # factor editable: recalcula desde lo original
         self.assertEqual(self.comp("Silicón P-53 | R1+R2")["disponible"], 24 * 1100 - 4400)
-        self.assertAlmostEqual(svc.costos(db_path=self.path)["armado"]["por_grupo"]["R1"], 608.843 - 90.40 + 400 * 226 / 1100, places=3)
+        self.assertAlmostEqual(svc.costos(db_path=self.path)["armado"]["por_grupo"]["R1"], 608.843 + 162.8 - 90.40 + 400 * 226 / 1100, places=3)
         with self.assertRaises(ValueError):
             svc.editar_conversiones({"conv_catalizador_ml_por_envase": 0}, db_path=self.path)
 

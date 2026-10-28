@@ -103,7 +103,7 @@
         $('p1Estado').innerHTML = b.registrado
             ? 'Agente registrado el ' + esc(fecha(b.creado)) + (en ? ' · <b class="pa-ok">en línea</b>' : ' · <b class="pa-bad">sin señal</b> (' + esc(hace(b.visto)) + ')')
             : 'Aún no hay agente para la Raspberry. Descárgalo e instálalo.';
-        $('p1Sum').textContent = b.registrado ? 'Reinstalar el agente (genera una credencial nueva)' : 'Descargar e instalar el agente';
+        $('p1Sum').textContent = b.registrado ? 'Reinstalar o actualizar el agente (mismo banco)' : 'Instalar el agente en la Raspberry';
         if (!b.registrado) $('p1Det').open = true;
 
         var filas = b.registrado ? [
@@ -164,16 +164,65 @@
     $('pConectar').addEventListener('click', function () { puerto('conectar'); });
     $('pDesconectar').addEventListener('click', function () { puerto('desconectar'); });
 
+    /* v1.4.64: instalación en segundo plano. Se genera un comando de un solo uso (curl … | sh) para la Raspberry; el
+       instalador reporta sus etapas y aquí se ve «Instalando…» hasta que el agente nuevo está en línea («✓ Todo correcto»). */
+    var instSeq = 0;
+    var ETAPA = { extrayendo: 'copiando archivos', python: 'preparando Python', dependencias: 'instalando pyserial y bleak',
+        arrancando: 'arrancando el agente', listo: 'instalado; esperando a que se conecte' };
+    function avance(k, txt) { var el = $('iAvance'); el.hidden = !txt; el.dataset.k = k; el.textContent = txt; }
+    function cuerpoInst(formato) { return { puerto_serie: $('iPuerto').value.trim() || null, formato: formato }; }
+    function seguirInstalacion(inicio) {
+        var my = ++instSeq, hasta = Date.now() + 30 * 60000, previo = null;
+        (function sondeo() {
+            if (my !== instSeq) return;
+            if (Date.now() > hasta) { avance('bad', 'No llegó confirmación de la Raspberry. Revisa ~/tqt-pruebas-instalar.log en la Raspberry y genera otro comando.'); return; }
+            api('/api/pruebas-auto/agente/instalacion').then(function (r) {
+                if (my !== instSeq) return;
+                if (r.ok) {
+                    var e = r.data, nuevo = e.ts >= inicio - 5;   // avance de ESTA instalación
+                    if (previo === null) previo = !!e.listo;
+                    if (nuevo && e.etapa === 'error') { avance('bad', 'No se pudo instalar: ' + (e.mensaje || 'revisa ~/tqt-pruebas-instalar.log') + '. Corrígelo y genera otro comando.'); return; }
+                    if (e.listo && (nuevo || !previo)) {
+                        avance('ok', '✓ Todo correcto: agente ' + (e.agent_version || '') + ' en línea en la Raspberry y listo para usar. Sigue con el paso 3.');
+                        $('iCmdBox').hidden = true; $('p1Det').open = false; refrescar();
+                        return;
+                    }
+                    if (nuevo && ETAPA[e.etapa]) avance('run', 'Instalando… ' + ETAPA[e.etapa] + '.' + (e.mensaje && e.etapa !== 'listo' ? ' ' + e.mensaje : ''));
+                }
+                setTimeout(sondeo, 2000);
+            });
+        })();
+    }
     $('fInst').addEventListener('submit', function (e) {
         e.preventDefault();
+        var inicio = Date.now() / 1000;
+        avance('run', 'Generando el comando…');
+        api('/api/pruebas-auto/agente', { method: 'POST', body: cuerpoInst('comando') }).then(function (r) {
+            if (!r.ok) { avance('bad', r.error || 'No se pudo generar el comando.'); return; }
+            $('iCmd').textContent = r.data.comando;
+            $('iCmdExp').textContent = r.data.expira ? 'a las ' + new Date(r.data.expira * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'en 15 min';
+            $('iCmdBox').hidden = false;
+            avance('run', 'Esperando a que pegues el comando en la Raspberry…');
+            seguirInstalacion(inicio);
+        });
+    });
+    $('iCopiar').addEventListener('click', function () {
+        var txt = $('iCmd').textContent;
+        (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { T.toast('Comando copiado. Pégalo en la terminal de la Raspberry.'); },
+            function () { var r = document.createRange(); r.selectNodeContents($('iCmd')); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); T.toast('Selecciona y copia el comando (Ctrl+C).'); });
+    });
+    $('iSh').addEventListener('click', function (e) {
+        e.preventDefault();
+        var inicio = Date.now() / 1000;
         fetch('/api/pruebas-auto/agente', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Cliente': 'pruebas-auto' },
-            body: JSON.stringify({ puerto_serie: $('iPuerto').value.trim() || null }) })
-            .then(function (r) { if (!r.ok) return r.json().then(function (d) { throw new Error(d && d.detail || 'Error ' + r.status); }); return r.blob(); })
+            body: JSON.stringify(cuerpoInst('sh')) })
+            .then(function (r) { if (!r.ok) return r.json().then(function (d) { throw new Error(d && d.detail && (d.detail.mensaje || d.detail) || 'Error ' + r.status); }); return r.blob(); })
             .then(function (b) {
-                var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'TQT_Pruebas_Raspberry.zip'; a.click();
+                var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'instalar_tqt_pruebas.sh'; a.click();
                 setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
-                T.toast('Agente descargado. Instálalo en la Raspberry con los comandos de abajo.'); refrescar();
-            }, function (err) { T.toast(String(err.message || err), { kind: 'bad' }); });
+                avance('run', 'Instalador descargado. Cópialo a la Raspberry y corre: sh instalar_tqt_pruebas.sh');
+                seguirInstalacion(inicio);
+            }, function (err) { avance('bad', String(err.message || err)); });
     });
 
     /* ---- paso 4: campaña ---- */

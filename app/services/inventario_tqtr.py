@@ -183,6 +183,7 @@ def asegurar(db_path: Optional[Path] = None) -> None:
             _migrar_consumo(c)
             _migrar_1339(c)
             _migrar_1340(c)
+            _migrar_1464(c)
             _asegurar_trigger(c)
         _listas.add(clave)
 
@@ -1401,6 +1402,74 @@ def _migrar_1339(c) -> None:
                       "VALUES (?,?,?,?,?,?,?,?,?,?)", (hoy, comp["categoria"] or "Actuador y accesorios", comp["descripcion"], "Nuevo", mov, q, "piezas",
                                                      hoy if mov == "Salida" else None, "I+D", NOTA_SENSORES))
         c.execute("INSERT OR REPLACE INTO inv_tqtr_meta (clave, valor) VALUES ('migr_1339_sensores', '1')")
+
+
+RELEVADOR = "Relevador automotriz 12 VCD"
+NOTA_SENSOR_ACTUADOR = "Viene con el actuador: 2 sensores por motor. No se compra ni se descuenta aparte."
+
+
+def _migrar_1464(c) -> None:
+    """v1.4.64 (una vez): (1) los relevadores de R1, R2 y R3 pasan a ser un solo componente de inventario (stock único);
+    sus filas de Costos siguen separadas por tarjeta para que cada evento (R1+R2 programadas / R3 asignada) descuente lo suyo.
+    (2) Los sensores magnéticos llegan montados en el actuador (2 por motor): dejan de ser una línea con existencias propias."""
+    if c.execute("SELECT 1 FROM inv_tqtr_meta WHERE clave='migr_1464_relevadores_sensores'").fetchone():
+        return
+    rel = [dict(r) for r in c.execute("SELECT * FROM inv_tqtr_componentes WHERE descripcion LIKE ? ORDER BY grupo, id", (RELEVADOR + " |%",))]
+    if rel:
+        keep, otros = rel[0], [r["id"] for r in rel[1:]]
+        ids = [r["id"] for r in rel]
+        marcas = ",".join("?" * len(ids))
+        bom: Dict[int, float] = {}
+        for r in c.execute(f"SELECT producto_id, SUM(cantidad) AS q FROM inv_tqtr_bom WHERE componente_id IN ({marcas}) GROUP BY producto_id", ids):
+            bom[r["producto_id"]] = r["q"]
+        c.execute(f"DELETE FROM inv_tqtr_bom WHERE componente_id IN ({marcas})", ids)
+        for pid, q in bom.items():
+            c.execute("INSERT INTO inv_tqtr_bom (producto_id, componente_id, cantidad) VALUES (?,?,?)", (pid, keep["id"], q))
+        c.execute(f"UPDATE inv_tqtr_movimientos SET modelo=? WHERE modelo IN ({','.join('?' * len(rel))})", [RELEVADOR] + [r["descripcion"] for r in rel])
+        # Costos: un consumo por material y tarjeta (UNIQUE tarjeta_id, componente_id) → las filas «incluidas» se suman en una sola
+        # (se descuenta junto con R1+R2 programadas); las «no incluidas» se conservan como referencia sin componente.
+        cos = [dict(r) for r in c.execute(f"SELECT * FROM inv_tqtr_costos WHERE componente_id IN ({marcas}) ORDER BY grupo, id", ids)]
+        inc = [k for k in cos if k["incluido"]]
+        k0 = inc[0] if inc else None
+        if k0:
+            q = sum(k["cantidad_consumo"] if k["cantidad_consumo"] is not None else k["cantidad_armado"] for k in inc)
+            c.execute("UPDATE inv_tqtr_costos SET componente_id=?, descripcion=?, cantidad_armado=?, cantidad_consumo=NULL, origen_consumo=NULL, notas=? WHERE id=?",
+                      (keep["id"], RELEVADOR + " · " + " + ".join(k["grupo"] for k in inc), q,
+                       "Unificado v1.4.64: " + " + ".join(f"{k['grupo']} {_r(k['cantidad_armado'])}" for k in inc), k0["id"]))
+            for k in inc[1:]:
+                c.execute("UPDATE inv_tqtr_consumos SET costo_id=? WHERE costo_id=?", (k0["id"], k["id"]))
+                c.execute("DELETE FROM inv_tqtr_costos WHERE id=?", (k["id"],))
+        for k in cos:
+            if not k["incluido"]:
+                c.execute("UPDATE inv_tqtr_costos SET componente_id=NULL WHERE id=?", (k["id"],))
+        # Consumos ya registrados: por tarjeta se juntan en una fila (se suman cantidades estándar y real).
+        if _tabla_existe(c, "inv_tqtr_consumos"):
+            por_t: Dict[int, List[Dict[str, Any]]] = {}
+            for r in c.execute(f"SELECT * FROM inv_tqtr_consumos WHERE componente_id IN ({marcas}) ORDER BY origen DESC, id", ids):
+                por_t.setdefault(r["tarjeta_id"], []).append(dict(r))
+            for filas_t in por_t.values():
+                f0 = next((f for f in filas_t if f["estado"] == "activo"), filas_t[0])
+                resto = [f for f in filas_t if f["id"] != f0["id"]]
+                cuenta = [f for f in filas_t if f["estado"] == f0["estado"]]
+                for f in resto:   # primero se borran: la fila que queda pasa al componente unificado sin chocar con UNIQUE
+                    c.execute("DELETE FROM inv_tqtr_consumos WHERE id=?", (f["id"],))
+                c.execute("UPDATE inv_tqtr_consumos SET componente_id=?, costo_id=COALESCE(?, costo_id), descripcion=?, cantidad_estandar=?, cantidad_real=? WHERE id=?",
+                          (keep["id"], k0["id"] if k0 else None, RELEVADOR, sum(f["cantidad_estandar"] for f in cuenta), sum(f["cantidad_real"] for f in cuenta), f0["id"]))
+        if otros:
+            m2 = ",".join("?" * len(otros))
+            if _tabla_existe(c, "inv_tqtr_pedidos"):
+                c.execute(f"UPDATE inv_tqtr_pedidos SET componente_id=? WHERE componente_id IN ({m2})", [keep["id"]] + otros)
+            c.execute(f"DELETE FROM inv_tqtr_componentes WHERE id IN ({m2})", otros)
+        c.execute("UPDATE inv_tqtr_componentes SET descripcion=?, cantidad_ensamble=?, cantidad_lote=?, notas=? WHERE id=?",
+                  (RELEVADOR, sum(r["cantidad_ensamble"] or 0 for r in rel), sum(r["cantidad_lote"] or 0 for r in rel),
+                   "Un solo inventario para R1, R2 y R3 (" + " + ".join(f"{r['grupo']}: {_r(r['cantidad_ensamble'] or 0)}" for r in rel) + " por armado).", keep["id"]))
+    sen = c.execute("SELECT id FROM inv_tqtr_componentes WHERE descripcion LIKE 'Sensor magn%' ORDER BY id LIMIT 1").fetchone()
+    if sen:
+        c.execute("DELETE FROM inv_tqtr_bom WHERE componente_id=?", (sen["id"],))
+        c.execute("UPDATE inv_tqtr_componentes SET cantidad_ensamble=2, en_dashboard=0, notas=? WHERE id=?", (NOTA_SENSOR_ACTUADOR, sen["id"]))
+        c.execute("UPDATE inv_tqtr_costos SET incluido=0, cantidad_armado=2, cantidad_consumo=NULL WHERE componente_id=?", (sen["id"],))
+        c.execute("UPDATE inv_tqtr_componentes SET notas=? WHERE descripcion=? AND COALESCE(notas,'')=''", ("Incluye 2 sensores magnéticos CS1-U.", ACTUADOR))
+    c.execute("INSERT OR REPLACE INTO inv_tqtr_meta (clave, valor) VALUES ('migr_1464_relevadores_sensores', datetime('now','localtime'))")
 
 
 def conversiones(db_path: Optional[Path] = None) -> Dict[str, Any]:

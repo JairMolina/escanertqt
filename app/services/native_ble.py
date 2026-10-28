@@ -27,7 +27,7 @@ def stations(operator):
     with db.get_db() as c:
         return [dict(id=r['station'], name=r['name'], online=time.time()-r['seen'] < 15,
                      **json.loads(r['state'])) for r in c.execute(
-            'SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE s.owner=? AND s.revoked_at IS NULL AND s.name NOT LIKE ?', (operator, tests.RASPBERRY_LIKE))
+            'SELECT p.*,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station WHERE lower(s.owner)=lower(?) AND s.revoked_at IS NULL AND s.name NOT LIKE ?', (operator, tests.RASPBERRY_LIKE))
             if json.loads(r['state']).get('ble_bridge') == 1]
 
 
@@ -48,14 +48,17 @@ def prepare(operator, body):
     init()
     sid, op, role = body['station_id'], body['operation'], body.get('role')
     identifier = body['request_id']
-    if op not in ('scan', 'connect', 'send', 'disconnect') or role not in ('R1', 'R2'):
+    scan = op == 'scan'   # v1.4.64: «Elegir dispositivo»: lista lo que ve el puente; no toca inventario ni MAC
+    if op not in ('scan', 'connect', 'send', 'disconnect') or (role not in ('R1', 'R2') and not scan):
         raise ValueError('Operación Bluetooth inválida.')
+    if not scan and not body.get('tarjeta_id') and not body.get('run_id'):
+        raise ValueError('Falta la tarjeta para Bluetooth.')
     if op == 'send' and body.get('command') not in ('PPON', 'POFF'):
         raise ValueError('Comando Bluetooth no permitido.')
     with db.transaction() as c:
         station = tests.stm.require_station(c, sid)
         tests.no_raspberry(c, sid)
-        if not station or station['owner'] != operator:
+        if not station or str(station['owner']).lower() != str(operator).lower():
             raise ValueError('El puente pertenece a otro operador.')
         p = c.execute('SELECT seen,state FROM tqt_test_presence WHERE station=?', (sid,)).fetchone()
         state = json.loads(p['state']) if p else {}
@@ -65,10 +68,14 @@ def prepare(operator, body):
             raise ValueError('Ese agente está usando serial o una prueba propia; no se usa como puente BLE.')
         if c.execute("SELECT 1 FROM stm32_jobs WHERE station=? AND state IN ('queued','running')", (sid,)).fetchone():
             raise ValueError('La estación está programando firmware.')
-        d = _inventory(c, operator, body, op == 'disconnect')
-        address = mac(d['mac_r1' if role == 'R1' else 'mac_r2'])
-        if body.get('mac') and mac(body['mac']) != address:
-            raise ValueError('La MAC leída por serial no coincide con el inventario.')
+        if scan:
+            d, address = {'id': body.get('tarjeta_id') or 0}, None
+        else:
+            d = _inventory(c, operator, body, op == 'disconnect')
+            address = mac(d['mac_r1' if role == 'R1' else 'mac_r2'])
+            # Por seguridad connect/send/disconnect siguen exigiendo la MAC del inventario (no la del escaneo).
+            if body.get('mac') and mac(body['mac']) != address:
+                raise ValueError('La MAC leída por serial no coincide con el inventario.')
         if op == 'send':
             status = tests.parse_s29(body.get('status_raw', ''))
             if not status or mac(status.get('MAC')) != mac(d['mac_r1']) or mac(status.get('MACR')) != mac(d['mac_r2']):
@@ -109,9 +116,10 @@ def authorize(sid, identifier):
         lease = c.execute('SELECT * FROM tqt_ble_leases WHERE station=?', (sid,)).fetchone()
         if not lease or lease['id'] != payload['lease'] or time.time() > payload['deadline'] or payload.get('authorized'):
             raise ValueError('Comando Bluetooth vencido; no se ejecuta.')
-        d = _inventory(c, payload['operator'], payload['request'], payload['operation'] == 'disconnect')
-        if mac(d['mac_r1' if payload['role'] == 'R1' else 'mac_r2']) != payload['address']:
-            raise ValueError('El inventario cambió antes de ejecutar Bluetooth.')
+        if payload['operation'] != 'scan':
+            d = _inventory(c, payload['operator'], payload['request'], payload['operation'] == 'disconnect')
+            if mac(d['mac_r1' if payload['role'] == 'R1' else 'mac_r2']) != payload['address']:
+                raise ValueError('El inventario cambió antes de ejecutar Bluetooth.')
         c.execute('UPDATE tqt_ble_leases SET updated=? WHERE station=?', (time.time(), sid))
         payload['authorized'] = time.time()
         c.execute('UPDATE tqt_test_commands SET body=? WHERE id=?', (json.dumps(payload), identifier))

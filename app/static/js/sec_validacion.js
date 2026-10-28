@@ -60,6 +60,8 @@
   }
   function montar(host, ctx) {
     const { h, api, T } = ctx;
+    // v1.4.63: icono decorativo (máscara CSS en sec_validacion.css), oculto a lectores de pantalla.
+    const ic = (n) => h("span", { class: "tqt-i", "data-i": n, "aria-hidden": "true" });
     let alive = true,
       card = null, // snapshot del inventario para la prueba (/inventory)
       tarjeta = null, // objeto tarjeta de /api/tarjetas (detalle, FW, impresión)
@@ -147,6 +149,10 @@
       sumActions = h("div", { class: "row wrap" }),
       printOut = h("p", { class: "hint", "aria-live": "polite" }),
       skyOut = h("p", { class: "hint", "aria-live": "polite" });
+    // v1.4.63: cabecera «Estado de la ejecución» y métricas (derivadas de paintSummary)
+    const sumChip = h("span", { class: "badge tqt-sum-chip" }),
+      metOk = h("b", null, "0"),
+      metDur = h("b", null, "—");
     const summary = h(
       "section",
       { class: "prog-panel tqt-card tqt-summary", "data-k": "muted", "aria-label": "Resultado de la ejecución actual" },
@@ -158,23 +164,66 @@
     );
     const printBtn = h("button", { class: "btn btn-primary", type: "button", onclick: printLabels }, "Imprimir etiquetas");
     const reportBtn = h("button", { class: "btn", type: "button", onclick: () => lastRun && openReport(lastRun.id) }, "Ver reporte completo");
+    // v1.4.63: panel «Estado de la ejecución» de la propuesta; envuelve el resumen sin tocar su contenido
+    const statusPanel = h("div", { class: "tqt-status-panel" },
+      h("div", { class: "tqt-sum-top" }, h("h3", { class: "tqt-eyebrow" }, "Estado de la ejecución"), sumChip),
+      summary,
+      h("div", { class: "tqt-sum-metrics" },
+        h("div", null, h("span", null, "Etapas correctas"), metOk, h("small", null, " / 14")),
+        h("div", null, h("span", null, "Duración"), metDur)));
     printBtn.hidden = reportBtn.hidden = true;
     sumActions.append(printBtn, reportBtn);
     // ---- 14 etapas fijas (B.2)
-    const steps = h("ol", { class: "tqt-steps", "aria-label": "Etapas de la prueba automática" });
+    // v1.4.63: las 14 etapas (mismas filas, mismo orden) se agrupan en 4 bloques plegables con contador.
+    const GROUPS = [
+      { a: 0, b: 2, t: "Identificación y estado inicial" },
+      { a: 2, b: 6, t: "R1 por serial" },
+      { a: 6, b: 11, t: "R1 por Bluetooth" },
+      { a: 11, b: 14, t: "R2 por Bluetooth" },
+    ];
+    const steps = h("div", { class: "tqt-groups", role: "group", "aria-label": "Etapas de la prueba automática" });
+    GROUPS.forEach((g, gi) => {
+      g.count = h("span", { class: "tqt-group-count" }, "0/" + (g.b - g.a));
+      g.list = h("ol", { class: "tqt-steps", start: g.a + 1 });
+      g.el = h("details", { class: "tqt-group", "data-k": "pend", open: gi === 0 },
+        h("summary", null,
+          h("span", { class: "tqt-group-num", "aria-hidden": "true" }, "0" + (gi + 1)),
+          h("span", { class: "tqt-group-title" }, h("b", null, g.t), h("small", null, "Etapas " + (g.a + 1) + "–" + g.b)),
+          g.count),
+        g.list);
+      steps.append(g.el);
+    });
+    const progLabel = h("span", { class: "tqt-prog-label" }, "0 de 14 etapas completadas"),
+      runLabel = h("strong", { class: "tqt-run-label" }, "Sin iniciar");
+    let runGroup = -1;
+    function paintGroups() {
+      GROUPS.forEach((g, gi) => {
+        const st = run.steps.slice(g.a, g.b).map((s) => s.state);
+        const ok = st.filter((s) => s === "aprobado").length;
+        g.count.textContent = ok + "/" + (g.b - g.a);
+        g.el.dataset.k = st.includes("ejecutando") ? "run" : st.includes("fallido") ? "bad" : ok === st.length ? "ok" : "pend";
+        // se abre solo el bloque con la etapa en ejecución (una vez por bloque; el operador puede cerrarlo)
+        if (st.includes("ejecutando") && runGroup !== gi) { runGroup = gi; g.el.open = true; }
+      });
+      const okN = run.steps.filter((s) => s.state === "aprobado").length;
+      progLabel.textContent = okN + " de 14 etapas completadas";
+      const cur = run.steps.findIndex((s) => s.state === "ejecutando");
+      runLabel.textContent = cur >= 0 ? "En curso · etapa " + (cur + 1) : run.steps.every((s) => s.state === "pendiente") ? "Sin iniciar"
+        : okN === 14 ? "Completada" : run.steps.some((s) => s.state === "fallido") ? "Con fallas" : "Terminada";
+    }
     const rows = STEP_NAMES.map((name, i) => {
-      const ind = h("span", { class: "tqt-ind", "aria-hidden": "true" }, "○"),
-        nm = h("span", { class: "tqt-step-name" }, i + 1 + ". " + name),
+      const ind = h("span", { class: "tqt-ind", "aria-hidden": "true", "data-n": i + 1 }, "○"),
+        nm = h("span", { class: "tqt-step-name" }, h("span", { class: "sr-only" }, i + 1 + ". "), name),
         st = h("span", { class: "tqt-step-state" }, "Pendiente"),
         det = h("span", { class: "tqt-step-detail" }),
         vals = h("span", { class: "tqt-step-vals mono", title: "ON = sensor de CIERRE (1 = perno afuera/bloqueado). OFF = sensor de APERTURA (1 = perno adentro/desbloqueado). No son los comandos PPON/POFF." });
       const li = h("li", { class: "tqt-step", "data-k": "pend" }, ind,
         h("div", { class: "tqt-step-body" }, h("div", { class: "tqt-step-top" }, nm, st), det, vals));
-      steps.append(li);
+      GROUPS.find((g) => i >= g.a && i < g.b).list.append(li);
       return { li, ind, nm, st, det, vals };
     });
     const progress = h("progress", { max: 14, value: 0, "aria-label": "Etapas aprobadas" });
-    const start = h("button", { class: "btn btn-primary", type: "button", onclick: begin }, "Iniciar las 14 etapas");
+    const start = h("button", { class: "btn btn-primary", type: "button", onclick: begin }, ic("play"), "Iniciar las 14 etapas");
     const stop = h(
       "button",
       {
@@ -188,6 +237,7 @@
           message("Cancelación solicitada. El movimiento actual puede terminar.");
         },
       },
+      ic("stop"),
       "Detener prueba",
     );
     // ---- conexiones (B.11)
@@ -239,11 +289,15 @@
         button("Descargar agente de pruebas", install),
       ),
     );
-    let bleFound = "";
+    let bleFound = "", bleList = null;
     const modeHint = h("p", { class: "hint" });
     const modeBtn = button("Actualizar Bluetooth Windows", cambiarModo);
     const nativeInfo = h("p", { class: "hint tqt-native-info", "aria-live": "polite" });
     const nativeInstall = button("Preparar puente Bluetooth", () => install(true));
+    // v1.4.64: lista los dispositivos que ve el Bluetooth de esta laptop (puente o agente) y conecta el elegido
+    const instOut = h("p", { class: "tqt-inst", "aria-live": "polite", "data-k": "" });   // v1.4.64: avance del instalador
+    instOut.hidden = true;
+    const chooseBle = h("button", { class: "btn", type: "button", onclick: () => elegirDispositivo() }, ic("bluetooth"), "Elegir dispositivo");
     let nativeStationId = "", nativeReady = false;
     try { nativeStationId = localStorage.getItem("tqt.station.ble") || ""; } catch (_) {}
     const disconnectSerial = button("Desconectar serial", async () => {
@@ -258,39 +312,161 @@
       else await cmd("disconnect_ble");
     });
     const bleHint = h("p", { class: "hint" });
-    const introPanel = h("section", { class: "prog-panel tqt-card tqt-intro" },
-      h("h2", null, "Pruebas TQT"),
-      h("p", { class: "hint tqt-bench" }, "Banco de pruebas · modo seguro"), modeHint, modeBtn);
+    // v1.4.63: distribución nueva — encabezado, franja «Tarjeta en prueba», conexiones compactas,
+    // rutina | resultado, historial y registro abajo. Mismos nodos, ids y textos; solo cambia dónde se montan.
+    const introPanel = h("div", { class: "tqt-help-body" },
+      h("p", { class: "hint tqt-bench" }, "Pruebas TQT · Banco de pruebas · modo seguro"), bleHint);
+    // tarjeta de conexión: icono | nombre, estado y nota | un botón principal; secundarios discretos debajo
+    const connCard = (cls, icon, title, state, note, mainBtn, extra) => h("section", { class: "tqt-conn-card " + cls },
+      h("span", { class: "tqt-conn-icon" }, ic(icon)),
+      h("div", { class: "tqt-conn-body" }, h("h3", null, title), state, note, extra),
+      mainBtn);
+    const serialMain = h("div", { class: "tqt-conn-main" }, choosePort);   // el botón sale de la fila de webBox
+    webBox.firstElementChild.className = "tqt-conn-sec";
     webBox.firstElementChild.append(disconnectSerial);
-    const serialPanel = h("section", { class: "prog-panel tqt-card tqt-serial-panel" },
-      h("h3", null, "Puerto serial"), connSerial.el, webBox, agentBox,
-      h("div", { class: "tqt-serial-manual" }, serialManual));
-    const blePanel = h("section", { class: "prog-panel tqt-card tqt-ble-panel" },
-      h("h3", null, "Bluetooth R1 / R2"), connBle.el, bleRole,
-      h("div", { class: "row wrap" }, connectBle, disconnectBle),
-      h("div", { class: "row wrap" }, bleOn, bleOff), nativeInfo, nativeInstall, bleHint, manualOut);
-    const historyPanel = h("section", { class: "prog-panel tqt-card tqt-history-panel" },
-      h("h3", null, "Historial de la tarjeta seleccionada"), historyHost);
-    historyPanel.hidden = true;   // v1.4.20: bajo «Elige una tarjeta», solo con una tarjeta elegida
-    // v1.4.19: tarjeta arriba; intro + serial apilados en una columna; Bluetooth al lado
-    const cardPanel = h("section", { class: "prog-panel tqt-card tqt-pick-panel" },
+    const serialPanel = connCard("tqt-serial-panel", "cable", "Puerto serial", connSerial.el, modeHint, serialMain, [webBox, agentBox]);
+    const blePanel = connCard("tqt-ble-panel", "bluetooth", "Puente Bluetooth", connBle.el, [nativeInfo, instOut], h("div", { class: "tqt-conn-main" }, chooseBle, nativeInstall),
+      h("div", { class: "tqt-conn-sec" }, modeBtn));
+    const manualPanel = h("details", { class: "tqt-fold tqt-manual" },
+      h("summary", null, ic("sliders"), h("span", null, "Controles manuales"), ic("chev")),
+      h("div", { class: "tqt-fold-body" },
+        h("p", { class: "tqt-fold-label" }, "Serial"),
+        h("div", { class: "tqt-serial-manual" }, serialManual),
+        h("p", { class: "tqt-fold-label" }, "Bluetooth R1 / R2"), bleRole,
+        h("div", { class: "row wrap tqt-manual-btns" }, connectBle, disconnectBle, bleOn, bleOff), manualOut));
+    const helpPanel = h("details", { class: "tqt-fold tqt-help" },
+      h("summary", null, ic("info"), h("span", null, "Ayuda de conexión"), ic("chev")), introPanel);
+    const histName = h("span", null, "la tarjeta seleccionada"),
+      histCount = h("span", { class: "tqt-count" }, "0"),
+      logCount = h("span", { class: "tqt-count" }, "0");
+    const historyPanel = h("details", { class: "tqt-fold tqt-fold-lg tqt-history-panel" },
+      h("summary", null, ic("clock"), h("h3", null, "Historial de ", histName), histCount, ic("chev")), h("div", { class: "tqt-fold-body" }, historyHost));
+    historyPanel.hidden = true;   // v1.4.20: solo con una tarjeta elegida
+    // v1.4.64: el listado de tarjetas se elige en un modal (lote, búsqueda, una o varias tarjetas)
+    const pickRow = h("div", { class: "tqt-pick-row" }, search, button("Cargar QR / código", () => scan(search.value)));
+    const cardPanel = h("div", { class: "tqt-pick-panel" },
       h("h3", null, "Elige una tarjeta"),
       h("label", { class: "sr-only", for: "tqt-search" }, "Buscar tarjeta"),
-      h("div", { class: "tqt-pick-row" }, search, button("Cargar QR / código", () => scan(search.value))),
-      cardList, moreBtn);
+      pickRow,
+      h("button", { class: "btn tqt-pick-open", type: "button", onclick: () => openPicker() }, ic("list"), "Ver tarjetas del lote"));
+    let picker = null, cola = [];
+    const pickSel = new Map();   // id → tarjeta marcada en el modal
+    // el lote es el elegido en la consola (botón «Lote» del encabezado); sin consola, el activo de la cuenta
+    const loteVista = () => ctx.lote?.() || null;
+    const pickLoteTxt = h("b");
+    ctx.alCambiarLote?.(() => { if (picker) { pickLoteTxt.textContent = T.loteNombre?.(loteVista()) || ""; loadList(false); } });
+    const pickCount = h("span", null, "0");
+    const colaBar = h("div", { class: "tqt-cola", "aria-label": "Tarjetas por probar" });
+    colaBar.hidden = true;
+    async function openPicker() {
+      if (picker) return;
+      pickSel.clear(); pickCount.textContent = "0";
+      const lv = loteVista();
+      pickLoteTxt.textContent = lv ? T.loteNombre?.(lv) || lv.nombre || "" : "";
+      const body = h("div", { class: "tqt-picker" },
+        lv ? h("p", { class: "hint tqt-picker-lote" }, "Lote: ", pickLoteTxt, " · cámbialo con el botón «Lote» de arriba.") : null,
+        h("label", { class: "sr-only", for: "tqt-search" }, "Buscar tarjeta"), search,
+        h("p", { class: "hint" }, "Toca una tarjeta para probarla, o marca varias y pulsa «Probar seleccionadas»."),
+        cardList, moreBtn);
+      picker = T.sheet({ title: "Elige la tarjeta en prueba", body,
+        onClose: () => { picker = null; pickRow.prepend(search); },
+        actions: [
+          { label: "Cerrar", kind: "ghost", onClick: () => true },
+          { label: h("span", null, "Probar seleccionadas (", pickCount, ")"), kind: "primary", onClick: () => {
+            if (!pickSel.size) { message("Marca al menos una tarjeta.", true); return false; }
+            setCola([...pickSel.values()]); selectCard(cola[0]); return true; } },
+        ] });
+      picker.el?.classList.add("tqt-picker-sheet");
+      search.focus();
+      loadList(false);
+    }
+    function setCola(list) {
+      cola = list.length > 1 ? list : [];
+      paintCola();
+    }
+    function paintCola() {
+      colaBar.hidden = !cola.length;
+      colaBar.replaceChildren(...(cola.length ? [h("span", { class: "tqt-eyebrow" }, "Por probar (" + cola.length + ")")] : []),
+        ...cola.map((t) => h("span", { class: "tqt-cola-item" },
+          h("button", { class: "btn tqt-cola-btn", type: "button", "aria-pressed": String(String(tarjeta?.id) === String(t.id)), onclick: () => selectCard(t) }, "#" + cardNum(t)),
+          h("button", { class: "btn tqt-link tqt-cola-x", type: "button", "aria-label": "Quitar #" + cardNum(t) + " de la lista",
+            onclick: () => { cola = cola.filter((c) => c.id !== t.id); if (cola.length < 2) cola = []; paintCola(); } }, "×"))));
+    }
+    // franja «Tarjeta en prueba»: resumen de la tarjeta + Cambiar / Datos / Historial
+    const curNum = h("strong", { class: "mono tqt-cur-num" }, "—"),
+      curChips = h("span", { class: "badge tqt-cur-chip" }),
+      curMeta = h("span", { class: "tqt-cur-meta" }),
+      curInfo = h("div", { class: "tqt-cur-info" },
+        h("span", { class: "tqt-eyebrow" }, "Tarjeta en prueba"),
+        h("div", { class: "tqt-cur-title" }, curNum, curChips), curMeta),
+      pickWrap = h("div", { class: "tqt-cur-pick", id: "tqt-cur-pick" }, cardPanel),
+      dataWrap = h("div", { class: "tqt-cur-data tqt-inventory-panel", id: "tqt-cur-data" },
+        h("h3", null, "R1 y R2 · datos del inventario"), cardHost);
+    dataWrap.hidden = true;
+    const toggle = (wrap, btn, show = wrap.hidden) => { wrap.hidden = !show; btn.setAttribute("aria-expanded", String(show)); };
+    const changeBtn = h("button", { class: "btn", type: "button", "aria-controls": "tqt-cur-pick", "aria-expanded": "false",
+      onclick: () => { toggle(pickWrap, changeBtn); if (!pickWrap.hidden) search.focus(); } }, ic("change"), "Cambiar tarjeta");
+    const dataBtn = h("button", { class: "btn tqt-link", type: "button", "aria-controls": "tqt-cur-data", "aria-expanded": "false",
+      onclick: () => toggle(dataWrap, dataBtn) }, ic("info"), "Datos y objetivo");
+    const histBtnCount = h("span", { class: "tqt-paren" }, "0");
+    const histBtn = h("button", { class: "btn tqt-link", type: "button",
+      onclick: () => { historyPanel.open = true; historyPanel.scrollIntoView({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); } }, ic("clock"), "Historial ", histBtnCount);
+    const curActions = h("div", { class: "tqt-cur-actions" }, changeBtn, dataBtn, histBtn);
+    const current = h("section", { class: "tqt-current", "data-empty": "true", "aria-label": "Tarjeta en prueba" },
+      h("div", { class: "tqt-cur-head" }, h("span", { class: "tqt-cur-icon" }, ic("board")), curInfo, curActions),
+      colaBar, pickWrap, dataWrap);
+    let curShownId = null;
+    function paintCurrent() {
+      const t = tarjeta;
+      current.dataset.empty = String(!t);
+      curInfo.hidden = curActions.hidden = !t;
+      if (String(t?.id ?? "") !== String(curShownId ?? "")) {
+        curShownId = t?.id ?? null;
+        toggle(pickWrap, changeBtn, !t);   // sin tarjeta: el selector se muestra directo
+      }
+      if (!t) return;
+      curNum.textContent = cardNum(t);
+      histName.textContent = cardNum(t);
+      const roles = ["r1", "r2", "r3"].filter((k) => t[k]);
+      curChips.textContent = roles.map((k) => k.toUpperCase()).join(" + ");
+      curMeta.textContent = roles
+        .map((k) => k.toUpperCase() + " " + (t[k].version ? "V" + t[k].version : "HW —") + " · FW " + (t[k].firmware || "sin registro")).join(" · ");
+    }
+    const expandBtn = h("button", { class: "btn tqt-link tqt-expand", type: "button", "aria-expanded": "false",
+      onclick: () => { const open = !GROUPS.every((g) => g.el.open); GROUPS.forEach((g) => (g.el.open = open)); expandBtn.setAttribute("aria-expanded", String(open)); expandTxt.textContent = open ? "Contraer etapas" : "Expandir etapas"; } },
+      ic("expand"));
+    const expandTxt = h("span", null, "Expandir etapas");
+    expandBtn.append(expandTxt);
+    const reqText = h("span"), reqNote = h("p", { class: "tqt-req" }, ic("info"), reqText);
+    const routine = h("section", { class: "tqt-routine" },
+      h("div", { class: "tqt-run-head" },
+        h("div", { class: "tqt-routine-head" },
+          h("div", { class: "tqt-title" }, ic("pulse"), h("h3", null, "Rutina de validación")),
+          h("span", { class: "badge" }, "4 bloques")),
+        h("p", { class: "tqt-run-note" }, "Las 14 etapas originales, agrupadas para seguirlas mejor."),
+        h("div", { class: "tqt-run-actions" }, start, stop),
+        reqNote,
+        h("div", { class: "tqt-prog" }, h("div", { class: "tqt-prog-row" }, runLabel, progLabel), progress),
+        h("p", { class: "tqt-onoff" }, ic("sliders"), "ON = sensor de cierre · OFF = sensor de apertura (valores crudos 0/1; no son los comandos PPON/POFF).")),
+      steps,
+      h("div", { class: "tqt-routine-foot" }, h("span", null, "Una sola ejecución · mismo orden de etapas"), expandBtn));
+    const logPanel = h("details", { class: "tqt-fold tqt-fold-lg tqt-livewrap" },
+      h("summary", null, ic("list"), h("h3", null, "Registro de comandos y respuestas (en vivo)"), logCount, ic("chev")), liveLog);
+    // panel de sensores S29 sin cambios respecto a v1.4.63: los 29 campos visibles
+    const sensorsPanel = h("section", { class: "prog-panel tqt-card" }, h("h3", null, "Sensores y estados S29"), sensors);
     host.append(
-      h("div", { class: "tqt-header" }, h("div", { class: "tqt-stack" }, cardPanel, historyPanel),
-        h("section", { class: "prog-panel tqt-card tqt-inventory-panel" }, h("h3", null, "R1 y R2 · datos del inventario"), cardHost),
-        h("div", { class: "tqt-stack" }, introPanel, serialPanel), blePanel),
+      h("header", { class: "tqt-page-head" },
+        h("span", { class: "tqt-eyebrow" }, "Validación · Banco de pruebas"),
+        h("h2", null, "Pruebas TQT"),
+        h("p", null, "Una tarjeta. Sus conexiones. El resultado de cada etapa.")),
+      current,
+      h("div", { class: "tqt-conns" }, serialPanel, blePanel),
       status, announcer,
-      h("div", { class: "tqt-layout tqt-layout-full" },
-        // v1.4.20: prueba automática y resultado lado a lado (ahorra el espacio sobrante de las etapas)
-        h("div", { class: "tqt-col tqt-main" }, h("div", { class: "tqt-auto-split" },
-          h("section", { class: "prog-panel tqt-card" },
-            h("h3", null, "Prueba automática"), h("div", { class: "row wrap" }, start, stop), progress,
-            h("p", { class: "hint" }, "ON = sensor de cierre · OFF = sensor de apertura (valores crudos 0/1; no son los comandos PPON/POFF)."), steps,
-            h("details", { class: "tqt-livewrap" }, h("summary", null, "Registro de comandos y respuestas (en vivo)"), liveLog)), summary),
-          h("section", { class: "prog-panel tqt-card" }, h("h3", null, "Sensores y estados S29"), sensors))),
+      h("div", { class: "tqt-work" },
+        h("div", { class: "tqt-col tqt-main" }, routine),
+        h("aside", { class: "tqt-col tqt-aside", "aria-label": "Estado y observación" }, statusPanel, manualPanel, helpPanel)),
+      sensorsPanel,   // a todo lo ancho (horizontal), como en v1.4.63
+      h("div", { class: "tqt-bottom" }, historyPanel, logPanel),
       reportHost);
     search.id = "tqt-search";
     function button(text, fn) {
@@ -318,6 +494,7 @@
     let searchTimer = null;
     search.addEventListener("input", () => {
       clearTimeout(searchTimer);
+      if (!picker && search.value.trim()) { openPicker(); return; }   // v1.4.64: al escribir se abre el modal
       searchTimer = setTimeout(() => loadList(false), 300);
     });
     search.addEventListener("keydown", (e) => {
@@ -349,6 +526,8 @@
       }
       const q = new URLSearchParams({ limit: "20", offset: String(listOffset) });
       if (listQuery) q.set("search", listQuery);
+      const lv = loteVista();
+      if (lv?.id) q.set("lote_id", String(lv.id));
       const r = await api("/api/tarjetas?" + q);
       if (my !== listSeq || !alive) return;
       if (!r.ok) {
@@ -363,26 +542,31 @@
       moreBtn.hidden = listOffset >= (r.data.total || 0);
       if (!cardList.children.length)
         cardList.append(
-          h("li", { class: "tqt-empty" }, listQuery ? "Sin tarjetas para «" + listQuery + "» en el lote activo. Prueba con el QR o el nombre completo." : "El lote activo no tiene tarjetas."),
+          h("li", { class: "tqt-empty" }, listQuery ? "Sin tarjetas para «" + listQuery + "» en este lote. Prueba con el QR, el nombre completo u otro lote." : "Este lote no tiene tarjetas. Cambia de lote con el botón «Lote» de arriba."),
         );
     }
     function cardItem(t) {
       const b = h(
         "button",
-        { class: "tqt-cardbtn", type: "button", "aria-pressed": String(tarjeta?.id === t.id), "data-id": t.id, onclick: () => selectCard(t) },
+        { class: "tqt-cardbtn", type: "button", "aria-pressed": String(tarjeta?.id === t.id), "data-id": t.id,
+          onclick: async () => { if (await selectCard(t) !== false) { setCola([]); picker?.close(); } } },
         h("div", { class: "tqt-cardbtn-head" }, h("span", { class: "badge" }, "R1"), h("b", { class: "mono" }, t.r1?.nombre || "R1 sin registrar")),
         h("div", { class: "tqt-cardbtn-meta" }, h("span", null, window.TQT?.programada?.(window.TQT.conFw(t, "r1")) ? "Programada · FW " + window.TQT.conFw(t, "r1").firmware : "Sin programar"), h("span", null, "#" + cardNum(t))),
       );
-      return h("li", null, b);
+      const chk = h("input", { type: "checkbox", class: "tqt-pick-chk", checked: pickSel.has(t.id), "aria-label": "Marcar #" + cardNum(t),
+        onchange: () => { chk.checked ? pickSel.set(t.id, t) : pickSel.delete(t.id); pickCount.textContent = String(pickSel.size); } });
+      return h("li", { class: "tqt-pick-item" }, chk, b);
     }
     function markSelected() {
       cardList.querySelectorAll(".tqt-cardbtn").forEach((b) => b.setAttribute("aria-pressed", String(String(tarjeta?.id) === b.dataset.id)));
+      paintCola();
     }
     async function selectCard(t, opts = {}) {
       if ((active || manualBusy) && !opts.force) {
         message("Prueba en curso: la tarjeta cambia solo al confirmar la identidad detectada.", true);
         return false;
       }
+      picker?.close();   // v1.4.64: elegida la tarjeta (lista, número o QR) se cierra el modal
       const my = ++selSeq;
       tarjeta = t;
       historyPanel.hidden = !t;
@@ -390,6 +574,7 @@
       markSelected();
       cardHost.replaceChildren(h("p", { class: "hint" }, "Cargando tarjeta " + cardNum(t) + "…"));
       historyHost.replaceChildren(h("p", { class: "hint" }, "Cargando historial…"));
+      histCount.textContent = histBtnCount.textContent = "…";   // v1.4.63
       const [det, inv] = await Promise.all([api("/api/tarjetas/" + t.id), api("/api/validacion/tqt/inventory/" + t.id)]);
       if (my !== selSeq || !alive) return false; // respuesta de una selección anterior: se ignora
       tarjeta = det.ok ? det.data : t;
@@ -412,12 +597,15 @@
       const t = r.data.tarjeta || r.data.serie?.tarjeta;
       if (!t) {
         message("No hay una tarjeta emparejada para este código. Regístrala o empareja sus PCB desde Inventario; no se inventan identificadores.", true);
-        return { ok: false };
+        return { ok: false, texto: "Sin tarjeta emparejada para ese código" };
       }
+      setCola(cola.some((c) => String(c.id) === String(t.id)) ? cola : []);   // escanear una tarjeta fuera de la lista la vacía
       const ok = await selectCard(t);
-      return { ok: ok && !!card };
+      return ok && card ? { ok: true, texto: "Pruebas TQT · tarjeta #" + cardNum(tarjeta || t) + " lista" }
+        : { ok: false, texto: ok ? "Tarjeta #" + cardNum(t) + " sin datos de inventario" : "Prueba en curso: no se cambió la tarjeta" };
     }
     function paintCard(err) {
+      paintCurrent();   // v1.4.63: franja «Tarjeta en prueba»
       if (!tarjeta) {
         cardHost.replaceChildren(h("p", { class: "tqt-empty" }, "Selecciona una tarjeta del listado o escanea su QR."));
         return;
@@ -618,6 +806,72 @@
       catch (e) { message(e.message, true); }
       finally { manualBusy = false; paintWebEstado(); }
     }
+    // v1.4.64: «Elegir dispositivo» — escanea con el Bluetooth de la laptop y conecta el elegido (marca R1/R2 por MAC del inventario)
+    const macN = (v) => String(v || "").toUpperCase().replace(/[^0-9A-F]/g, "");
+    async function escanearBle() {
+      if (!web()) { bleList = null; await cmd("scan_ble", { role: bleRole.value || "R1", listar: true }); return bleList; }
+      const j = await call("/web/ble/commands", { station_id: nativeStationId, tarjeta_id: tarjeta?.id, operation: "scan", role: bleRole.value || "R1",
+        request_id: crypto.randomUUID().replace(/-/g, "") });
+      for (const until = Date.now() + 60000; Date.now() < until && alive;) {
+        const r = await call("/web/ble/commands/" + j.id);
+        if (r.state === "done" || r.state === "error") {
+          if (!r.result?.ok) throw Error(r.result?.error || "El puente no pudo escanear.");
+          return r.result.data || [];
+        }
+        await new Promise((res) => setTimeout(res, 400));
+      }
+      throw Error("El puente no respondió el escaneo.");
+    }
+    const buscandoTxt = "Buscando dispositivos con el Bluetooth de esta laptop (unos 7 s)…";
+    async function elegirDispositivo() {
+      if (active || manualBusy) return;
+      const lista = h("ul", { class: "tqt-ble-list", "aria-label": "Dispositivos Bluetooth encontrados", "aria-busy": "true" });
+      const again = h("button", { class: "btn", type: "button", onclick: () => buscar() }, ic("change"), "Buscar de nuevo");
+      const hoja = T.sheet({ title: "Elige el dispositivo Bluetooth", body: [lista, again], focus: false,
+        actions: [{ label: "Cerrar", kind: "ghost", onClick: () => true }] });
+      hoja.el?.classList.add("tqt-picker-sheet");
+      async function buscar() {
+        again.disabled = true; lista.setAttribute("aria-busy", "true");
+        lista.replaceChildren(h("li", { class: "hint" }, buscandoTxt));
+        let devs = [];
+        try { devs = (await escanearBle()) || []; }
+        catch (e) { lista.replaceChildren(h("li", { class: "tqt-empty" }, e.message)); return; }
+        finally { again.disabled = false; lista.setAttribute("aria-busy", "false"); }
+        const r1 = macN(tarjeta?.r1?.mac), r2 = macN(tarjeta?.r2?.mac);
+        const prop = (d) => [r1, r2].includes(macN(d.address)) ? 1 : 0;
+        devs.sort((a, b) => prop(b) - prop(a) || (b.rssi ?? -999) - (a.rssi ?? -999));
+        lista.replaceChildren(...(devs.length ? devs.map((d) => {
+          const m = macN(d.address), rol = m && m === r1 ? "R1" : m && m === r2 ? "R2" : "";
+          // el puente solo conecta MAC del inventario: si no es de la tarjeta actual se busca su tarjeta por MAC al elegirlo
+          return h("li", null, h("button", { class: "tqt-cardbtn tqt-ble-dev", type: "button", "data-rol": rol || null,
+            onclick: async () => { hoja.close(); await conectarElegido(d, rol); } },
+            h("div", { class: "tqt-cardbtn-head" }, h("span", { class: "badge" }, rol || "BLE"), h("b", null, d.name || "Sin nombre")),
+            h("div", { class: "tqt-cardbtn-meta" }, h("span", { class: "mono" }, d.address || "—"),
+              h("span", null, (d.rssi != null ? d.rssi + " dBm" : "") + (rol ? " · " + rol + " de la tarjeta #" + cardNum(tarjeta) : "")))));
+        }) : [h("li", { class: "tqt-empty" }, "No se encontraron dispositivos. Acerca la tarjeta encendida y busca de nuevo.")]));
+      }
+      buscar();
+    }
+    async function conectarElegido(d, rol) {
+      if (!rol) {   // otra tarjeta (o ninguna elegida): se busca la tarjeta dueña de esa MAC en todos los lotes
+        const r = await api("/api/tarjetas/by-mac/" + encodeURIComponent(d.address));
+        if (!r.ok) { message("«" + (d.name || d.address) + "» no está registrado en el inventario (ninguna R1/R2 con esa MAC); no se conecta.", true); return; }
+        if (await selectCard(r.data) === false) return;
+        const m = macN(d.address);
+        rol = m === macN(tarjeta?.r1?.mac) ? "R1" : m === macN(tarjeta?.r2?.mac) ? "R2" : "";
+        if (!rol) { message("La MAC no corresponde a la R1 ni a la R2 de la tarjeta #" + cardNum(tarjeta) + ".", true); return; }
+      }
+      const role = rol;
+      if (rol) bleRole.value = rol;
+      const pcb = role === "R1" ? tarjeta?.r1 : tarjeta?.r2;
+      if (!web()) { await cmd("connect_ble", { address: d.address }); return; }
+      manualBusy = true; updateControls();
+      try {
+        await window.TQTValWeb.conectarBle({ dispositivo: role, nombre: pcb?.nombre || d.name || role, mac: d.address });
+        message("Bluetooth conectado a " + (d.name || d.address) + " (" + role + ").");
+      } catch (e) { message(e.message, true); }
+      finally { manualBusy = false; paintWebEstado(); }
+    }
     async function conectarBluetooth() {
       if (active || manualBusy || !card) return;
       const role = bleRole.value || "R1";
@@ -671,6 +925,12 @@
         : "Este navegador no admite Web Serial. Se conserva el banco Windows como respaldo.";
       modeBtn.disabled = nativeInstall.disabled = busy;
       nativeInstall.hidden = !isWeb;
+      // con puente listo el botón principal es «Elegir dispositivo»; «Preparar» pasa a «Actualizar puente» (misma estación)
+      nativeInstall.textContent = isWeb && nativeStationId ? "Actualizar puente" : "Preparar puente Bluetooth";
+      nativeInstall.className = "btn" + (isWeb && nativeReady ? " tqt-link" : "");
+      // no exige tarjeta: al elegir un dispositivo se busca su tarjeta por MAC y se selecciona
+      chooseBle.disabled = busy || (isWeb ? !nativeReady : !curStation()?.online);
+      chooseBle.title = chooseBle.disabled ? "Conecta el puente Bluetooth de esta laptop" : "";
       bleHint.textContent = "La rutina conecta R1 por MAC y después R2 por MACR mediante Bleak, sin seleccionar dispositivos por nombre. El puente no abre el COM.";
       connectBle.disabled = disconnectBle.disabled = bleRole.disabled = busy || !card || (isWeb ? !nativeReady : !curStation()?.online);
       disconnectSerial.disabled = busy;
@@ -681,10 +941,14 @@
       const ready = isWeb ? window.TQTValWeb?.estado?.()?.serial?.estado === "ok" : !!(s?.online && s.serial_connected);
       const bridgeReady = !isWeb || !window.TQTValWeb?.usarBleWindows || nativeReady;
       start.disabled = busy || !card || !ready || !bridgeReady;
+      const falta = [!tarjeta && "elige una tarjeta", !ready && "conecta el serial", !bridgeReady && "prepara el puente Bluetooth"].filter(Boolean);
+      reqText.textContent = falta.length ? "Para iniciar: " + falta.join(falta.length > 2 ? ", " : " y ").replace(/, ([^,]*)$/, " y $1") + "." : "";
+      reqNote.hidden = busy || !falta.length;   // v1.4.63
       stop.disabled = !active;
       search.disabled = !!active;
       cardList.querySelectorAll("button").forEach((b) => (b.disabled = !!active));
       choosePort.disabled = busy;
+      choosePort.hidden = !isWeb;   // v1.4.63: fuera de webBox, se oculta igual en modo agente
       agentBox.querySelectorAll("button,select").forEach((b) => (b.disabled = busy || !s?.online));
       agentBox.querySelectorAll(".tqt-install button").forEach((b) => (b.disabled = busy));
       let dev = null, bleOk = false;
@@ -722,6 +986,7 @@
       r.ind.textContent = m.icon;
       r.st.textContent = m.txt;
       r.det.textContent = s.detail || "";
+      paintGroups();   // v1.4.63: contador y apertura del bloque
       if (s.state === "ejecutando") r.li.setAttribute("aria-current", "step");
       else r.li.removeAttribute("aria-current");
       const v = run.vals[idx];
@@ -747,6 +1012,7 @@
       const lines = (liveLog.textContent ? liveLog.textContent.split("\n") : []).slice(-400);
       lines.push(text);
       liveLog.textContent = lines.join("\n");
+      logCount.textContent = String(lines.length);   // v1.4.63
       if (/^\s*(>|TX|→)/i.test(text)) /BLE/i.test(text) ? run.commands.ble++ : run.commands.serial++;
     }
     // v1.4.0: un único manejador para eventos del agente (poll) y del motor web (onEvento); misma forma.
@@ -849,6 +1115,9 @@
       const eligible = !!r && r.result === "aprobado" && v.k === "ok";
       printBtn.hidden = !eligible;
       reportBtn.hidden = !r;
+      metOk.textContent = String(v.n);   // v1.4.63: métricas de la cabecera
+      metDur.textContent = started ? fmtDur((ended || Date.now() / 1000) - started) : "—";
+      sumChip.textContent = (active ? active.web : r ? r.origin === "web" || lastRunWeb : web()) ? "Navegador" : "Agente Windows";
     }
     async function finishRun(r) {
       lastRun = r;
@@ -974,7 +1243,8 @@
         }
         if (!result?.ok) throw Error(result?.error || "Comando sin resultado; no se repite automáticamente.");
         if (action === "ports") port.replaceChildren(...result.data.map((x) => h("option", { value: x }, x)));
-        if (action === "scan_ble") {
+        if (action === "scan_ble" && body.listar) bleList = result.data || [];
+        else if (action === "scan_ble") {
           // Windows exposes the address: choose a unique MAC match, never the first scanned TQT.
           const normalize = v => String(v || "").toUpperCase().replace(/[^0-9A-F]/g, "");
           const expected = body.role === "R2" ? tarjeta?.r2?.mac : tarjeta?.r1?.mac;
@@ -1001,6 +1271,7 @@
       lastSeq = 0;
       events = [];
       liveLog.textContent = "";
+      logCount.textContent = "0";
       printOut.textContent = skyOut.textContent = "";
       printBtn.textContent = "Imprimir etiquetas";
       reportHost.replaceChildren();
@@ -1104,6 +1375,7 @@
         if (["queued", "running"].includes(r.state)) return "En curso";
         return map[r.result] || r.result || r.state;
       };
+      histCount.textContent = histBtnCount.textContent = String(rows_.length);   // v1.4.63
       const kind = (r) => ({ aprobado: "ok", aprobado_con_advertencias: "warn", fallido: "bad" })[r.result] || "muted";
       historyHost.replaceChildren(
         rows_.length
@@ -1296,20 +1568,53 @@
       reportHost.focus({ preventScroll: true });
       reportHost.firstElementChild.scrollIntoView({ block: "start" });
     }
+    // v1.4.64: el .cmd se instala oculto; aquí se ve «Instalando…» por etapas hasta que el puente nuevo está en línea
+    let instSeq = 0;
+    const ETAPA_TXT = { extrayendo: "copiando archivos", python: "preparando Python (la primera vez puede tardar unos minutos)",
+      dependencias: "instalando bleak y pyserial", arrancando: "arrancando el puente", listo: "instalado; esperando a que se conecte" };
+    function pintarInst(k, txt) { instOut.hidden = !txt; instOut.dataset.k = k; instOut.textContent = txt; }
+    async function seguirInstalacion(sid, fname) {
+      const my = ++instSeq, t0 = Date.now() / 1000;
+      pintarInst("run", "Descargado. Abre «" + fname + "» desde las descargas del navegador: se instala solo, sin ventanas. (Si Windows avisa, «Más información» › «Ejecutar de todas formas».)");
+      let previo = null;
+      for (const hasta = Date.now() + 20 * 60000; Date.now() < hasta && alive && my === instSeq;) {
+        const r = await api("/api/validacion/tqt/installer/" + sid + "/estado");
+        if (my !== instSeq || !alive) return;
+        if (r.ok) {
+          const e = r.data, nuevo = e.ts >= t0 - 5;   // avance de ESTA instalación (no de una anterior)
+          if (previo === null) previo = !!e.listo;
+          if (nuevo && e.etapa === "error") { pintarInst("bad", "No se pudo instalar: " + (e.mensaje || "revisa agent.log") + ". Corrige y vuelve a abrir el instalador."); return; }
+          if (e.listo && (nuevo || !previo)) {
+            pintarInst("ok", "✓ Todo correcto: puente Bluetooth " + (e.agent_version || "") + " conectado y listo para usar.");
+            await refreshNative().catch(() => {});
+            setTimeout(() => { if (my === instSeq) pintarInst("", ""); }, 15000);
+            return;
+          }
+          if (nuevo && ETAPA_TXT[e.etapa]) pintarInst("run", "Instalando… " + ETAPA_TXT[e.etapa] + ".");
+        }
+        await new Promise((res) => setTimeout(res, 2000));
+      }
+      if (my === instSeq && alive) pintarInst("bad", "No llegó confirmación del puente. Si ya abriste el instalador, revisa %LOCALAPPDATA%\\TQT\\PuenteBluetooth\\agent.log.");
+    }
     async function install(bleOnly = false) {
       try {
         const response = await fetch("/api/validacion/tqt/installer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: bleOnly ? "Bluetooth TQT Windows (solo BLE)" : "Banco TQT Windows", ble_only: bleOnly === true }),
+          // v1.4.64: un solo instalador .cmd (sin descomprimir); con la estación ya guardada se reutiliza (misma sesión y dueño)
+          body: JSON.stringify({ name: bleOnly ? "Puente Bluetooth" : "Banco TQT Windows", ble_only: bleOnly === true, formato: "cmd",
+            station_id: (bleOnly ? nativeStationId : stationId) || undefined }),
         });
-        if (!response.ok) throw Error("No se pudo descargar el agente.");
+        if (!response.ok) throw Error("No se pudo descargar el instalador.");
+        const sid = response.headers.get("X-TQT-Station") || "";
         try {
-          const m = /filename="?TQT_Pruebas_([^".]+)\.zip/.exec(response.headers.get("Content-Disposition") || "");
-          if (m) { if (bleOnly) { nativeStationId = m[1]; localStorage.setItem("tqt.station.ble", m[1]); } else { saveStation(m[1]); stationId = m[1]; } }
+          if (sid) { if (bleOnly) { nativeStationId = sid; localStorage.setItem("tqt.station.ble", sid); } else { saveStation(sid); stationId = sid; } }
         } catch (e) {}
+        const fname = /filename="?([^";]+)/.exec(response.headers.get("Content-Disposition") || "")?.[1] || (bleOnly ? "TQT_Puente_Bluetooth.cmd" : "TQT_Agente_Pruebas.cmd");
+        if (!bleOnly) message("Abre «" + fname + "» desde las descargas: se instala en segundo plano y arranca solo (si Windows avisa, «Más información» › «Ejecutar de todas formas»). Después se actualiza solo.");
+        else if (sid) seguirInstalacion(sid, fname);
         const url = URL.createObjectURL(await response.blob());
-        const a = h("a", { href: url, download: "TQT_Pruebas_Windows.zip" });
+        const a = h("a", { href: url, download: fname });
         document.body.append(a);
         a.click();
         a.remove();
@@ -1358,24 +1663,32 @@
       if (alive && !active && !manualBusy) { if (web()) refreshNative().catch(() => {}); else stations().catch(() => {}); }
     }, 3000);
     // v1.4.57: aviso a quien tenga un agente o puente Bluetooth viejo (sin keep-alive ni separación por cuenta).
+    // v1.4.64: aviso al entrar mientras la cuenta no tenga un puente/agente con la versión actual (viejo o ninguno).
+    // Instalar es un solo .cmd en segundo plano; el avance se ve en la tarjeta «Puente Bluetooth».
     api("/api/validacion/tqt/agentes/desactualizados").then((r) => {
       const l = r.ok && r.data ? r.data.estaciones : [];
       if (r.ok && r.data) agenteActual = r.data.actual || "";
-      if (!alive || !l.length) return;
+      if (!alive || !(r.ok && r.data) || (!l.length && !r.data.sin_agente)) return;
+      const soloBle = !l.length || l.every((x) => x.solo_ble);
+      const que = soloBle ? "puente Bluetooth" : "agente de Pruebas TQT";
       T.sheet({
-        title: "Actualiza tu " + (l.every((x) => x.solo_ble) ? "puente Bluetooth" : "agente de Pruebas TQT"),
+        title: (l.length ? "Actualiza tu " : "Instala tu ") + que,
         body: [
-          h("p", null, "Tienes " + (l.length === 1 ? "un agente viejo" : l.length + " agentes viejos") + " (la versión actual es " + r.data.actual + "). Con la versión vieja aparece «El puente no atendió a tiempo; comando vencido sin ejecutar» y la prueba se interrumpe."),
-          h("ul", null, l.map((x) => h("li", null, x.nombre + " · " + x.version + (x.en_linea ? " · en línea" : "")))),
+          h("p", null, l.length
+            ? "Tienes " + (l.length === 1 ? "un " + que + " viejo" : l.length + " agentes viejos") + " (la versión actual es " + r.data.actual + "). Con la versión vieja aparece «El puente no atendió a tiempo; comando vencido sin ejecutar» y la prueba se interrumpe."
+            : "Esta laptop todavía no tiene el " + que + " " + r.data.actual + " en línea. Lo necesitas para conectar R1 y R2 por Bluetooth y para «Elegir dispositivo»."),
+          l.length ? h("ul", null, l.map((x) => h("li", null, x.nombre + " · " + x.version + (x.en_linea ? " · en línea" : "")))) : null,
           h("ol", null,
-            h("li", null, "Cierra el agente o puente viejo: la ventana negra de iniciar.cmd en tu laptop."),
-            h("li", null, "Aquí en Pruebas TQT pulsa «" + (l.some((x) => !x.solo_ble) ? "Descargar agente de pruebas» o «" : "") + "Preparar puente Bluetooth» y descarga el ZIP."),
-            h("li", null, "Extráelo en una carpeta nueva y ejecuta iniciar.cmd."),
-            h("li", null, "Vuelve aquí: debe decir «Bluetooth Windows: <tu cuenta> · conectado»."),
+            h("li", null, "Pulsa «" + (soloBle ? "Instalar puente Bluetooth" : "Instalar agente") + "» (abajo): se descarga un solo archivo, " + (soloBle ? "TQT_Puente_Bluetooth.cmd" : "TQT_Agente_Pruebas.cmd") + "."),
+            h("li", null, "Ábrelo desde las descargas del navegador. Se instala en segundo plano, sin ventanas, y reemplaza al viejo (no hace falta cerrarlo ni descomprimir nada). Si Windows avisa, «Más información» › «Ejecutar de todas formas»."),
+            h("li", null, "Espera en la tarjeta «Puente Bluetooth»: dice «Instalando…» y luego «✓ Todo correcto… listo para usar»."),
           ),
-          h("p", { class: "hint" }, "Cada cuenta usa solo sus propios agentes y puentes; los de otra cuenta y la Raspberry ya no aparecen. Este aviso deja de salir en cuanto tu cuenta tiene un agente o puente con la versión actual."),
+          h("p", { class: "hint" }, "Se conserva tu cuenta y, si ya tenías puente, la misma estación. Después se actualiza solo. Cada cuenta usa solo sus propios agentes y puentes; los de otra cuenta y la Raspberry no aparecen. Este aviso sale al entrar hasta que tu cuenta tenga uno con la versión actual."),
         ],
-        actions: [{ label: "Entendido", kind: "primary", onClick: () => true }],
+        actions: [
+          { label: "Ahora no", kind: "ghost", onClick: () => true },
+          { label: soloBle ? "Instalar puente Bluetooth" : "Instalar agente", kind: "primary", onClick: () => { install(soloBle); return true; } },
+        ],
       });
     }).catch(() => {});
     const tid = new URLSearchParams(location.hash.split("?")[1] || "").get("tarjeta");

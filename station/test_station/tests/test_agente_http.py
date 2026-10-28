@@ -56,5 +56,66 @@ class AgenteHttp(unittest.TestCase):
             self.b.api("revocado", {})
 
 
+class Autoactualizacion(unittest.TestCase):
+    """v1.4.64: el paquete del servidor se extrae sin tocar config/.venv/puerto/log; un intento por versión."""
+
+    def paquete(self, req="bleak\n"):
+        import io, zipfile
+        s = io.BytesIO()
+        with zipfile.ZipFile(s, "w") as z:
+            z.writestr("agent.py", "nuevo"); z.writestr("requirements.txt", req)
+            z.writestr("tqtstation/x.py", "x"); z.writestr("config.json", "MALO"); z.writestr(".venv/a", "MALO")
+        return s.getvalue()
+
+    def test_instala_sin_tocar_lo_propio(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            (base / "config.json").write_text("CFG"); (base / "requirements.txt").write_bytes(b"bleak\n")
+            self.assertFalse(agent.instalar_paquete(base, self.paquete()))
+            self.assertEqual((base / "config.json").read_text(), "CFG")
+            self.assertEqual((base / "agent.py").read_text(), "nuevo")
+            self.assertFalse((base / ".venv").exists())
+            self.assertTrue(agent.instalar_paquete(base, self.paquete("bleak\npyserial\n")))
+
+    def test_linux_decide_actualizar_y_relanza(self):
+        """v1.4.64: la Raspberry (Linux) también se autoactualiza; espera a que no haya prueba/comando/BLE."""
+        from unittest import mock
+        b = object.__new__(agent.Bridge)
+        b.update_tried, b.command_thread = set(), None
+        b.engine = mock.Mock(running=True); b.ble = mock.Mock(address="")
+        b.download = mock.Mock(return_value=b"zip")
+        b.relanzar_linux = mock.Mock(side_effect=RuntimeError("pip falló"))
+        with mock.patch.object(agent, "plataforma_actualizable", return_value="linux"), \
+                mock.patch.object(agent, "instalar_paquete", return_value=True) as inst:
+            self.assertFalse(b.maybe_update("9.9.9"))   # prueba en curso: no actualiza todavía
+            b.download.assert_not_called()
+            b.engine.running = False
+            self.assertFalse(b.maybe_update("9.9.9"))   # relanzar falló: sigue con la versión actual
+            self.assertFalse(b.maybe_update("9.9.9"))   # un intento por versión y arranque
+        inst.assert_called_once()
+        b.relanzar_linux.assert_called_once()
+        self.assertTrue(b.relanzar_linux.call_args[0][1])   # requirements cambió → pip
+
+    def test_un_intento_y_nunca_en_otro_posix(self):
+        from unittest import mock
+        b = object.__new__(agent.Bridge)
+        b.update_tried, b.command_thread = set(), None
+        b.engine = mock.Mock(running=False); b.ble = mock.Mock(address="")
+        b.download = mock.Mock(side_effect=OSError("sin red"))
+        with mock.patch.object(agent.os, "name", "posix"), mock.patch.object(agent.sys, "platform", "darwin"):
+            self.assertIsNone(agent.plataforma_actualizable())
+        with mock.patch.object(agent.sys, "platform", "linux"), mock.patch.object(agent.os, "name", "posix"):
+            self.assertEqual(agent.plataforma_actualizable(), "linux")
+        with mock.patch.object(agent, "plataforma_actualizable", return_value=None):
+            self.assertFalse(b.maybe_update("9.9.9"))
+        b.download.assert_not_called()
+        with mock.patch.object(agent.os, "name", "nt"):
+            self.assertFalse(b.maybe_update(agent.AGENT_VERSION))
+            self.assertFalse(b.maybe_update("9.9.9"))   # falla y queda registrado
+            self.assertFalse(b.maybe_update("9.9.9"))   # no reintenta en bucle
+        self.assertEqual(b.download.call_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

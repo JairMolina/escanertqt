@@ -120,9 +120,10 @@ def banco_station(c):
     return r["station"] if r else None
 
 
-def registrar_banco(operador, admin=False):
-    """Crea la credencial del agente de la Raspberry y la fija como EL banco. La anterior queda registrada (sin uso aquí);
-    se puede eliminar en Programación STM32 → agentes."""
+def registrar_banco(operador, admin=False, nuevo=False):
+    """Credencial del agente de la Raspberry fijada como EL banco. v1.4.64: si el banco vigente no está revocado y es
+    del operador (o el operador es administrador) se REUTILIZA con token nuevo (mismo id: campañas, ciclos y presencia
+    siguen ligados; los tokens anteriores siguen valiendo, ver station_rotate). Si no, o con nuevo=True, se crea otra."""
     init()
     with db.get_db() as c:
         if c.execute("SELECT 1 FROM tqt_resistencia_banco WHERE clave=?", (BANCO,)).fetchone():
@@ -131,7 +132,13 @@ def registrar_banco(operador, admin=False):
                 raise Ocupado(occ)
         if c.execute("SELECT 1 FROM tqt_resistencia WHERE estado IN ('activa','pausada')").fetchone():
             raise ValueError("Hay una campaña activa o pausada: deténla antes de reinstalar el agente.")
-    st = stm.station_create(ts.RASPBERRY, operador)
+        previo = c.execute("SELECT s.id,s.owner FROM tqt_resistencia_banco b JOIN stm32_stations s ON s.id=b.station "
+                           "WHERE b.clave=? AND s.revoked_at IS NULL", (BANCO,)).fetchone()
+    st = None
+    if previo and not nuevo and (admin or str(previo["owner"]).lower() == str(operador).lower()):
+        st = stm.station_rotate(previo["id"], previo["owner"])
+    if st is None:
+        st = stm.station_create(ts.RASPBERRY, operador)
     with db.transaction() as c:
         c.execute("INSERT INTO tqt_resistencia_banco(clave,station,creado,operador) VALUES(?,?,?,?) "
                   "ON CONFLICT(clave) DO UPDATE SET station=excluded.station,creado=excluded.creado,operador=excluded.operador,"
@@ -158,6 +165,23 @@ def banco(email=None):
             "visto": p["seen"] if p else None, "en_linea": bool(p and time.time() - p["seen"] < 15), "estado": estado,
             "log_pedido": b["log_pedido"], "log_ts": b["log_ts"], "log_bytes": len(b["log_texto"] or ""),
             "ocupacion": dict(occ, mio=occ["por"] == email) if occ else None}
+
+
+def instalacion(progreso, servidor_version, email=None, admin=False):
+    """v1.4.64: avance del instalador .sh de la estación del banco + presencia/versión de su agente. Lo ve quien puede
+    ver el banco (si otra cuenta lo ocupa → Ocupado, como el log). `progreso` = dict sid → {etapa, mensaje, ts}."""
+    init()
+    with db.get_db() as c:
+        if email:
+            _ver(c, email, admin)
+        sid = banco_station(c)
+        p = c.execute("SELECT seen,state FROM tqt_test_presence WHERE station=?", (sid,)).fetchone() if sid else None
+    st = json.loads(p["state"]) if p else {}
+    en_linea = bool(p and time.time() - p["seen"] < 15)
+    version = st.get("agent_version") or ""
+    d = (progreso.get(sid) if sid else None) or {"etapa": "", "mensaje": "", "ts": 0}
+    return {"etapa": d["etapa"], "mensaje": d["mensaje"], "ts": d["ts"], "en_linea": en_linea, "agent_version": version,
+            "servidor_version": servidor_version, "listo": en_linea and bool(version) and version == servidor_version}
 
 
 def pedir_log(email=None, admin=False):

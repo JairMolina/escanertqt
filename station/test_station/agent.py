@@ -1,6 +1,6 @@
 """Outbound Windows bridge. The original 0.6.3 engine owns serial/BLE timing."""
 
-import argparse, http.client, io, json, os, platform, socket, sqlite3, threading, time, urllib.request, urllib.parse, ssl
+import argparse, hashlib, http.client, io, json, os, platform, socket, sqlite3, subprocess, sys, threading, time, urllib.request, urllib.parse, ssl, zipfile
 import urllib.error
 from pathlib import Path
 from dataclasses import asdict
@@ -11,8 +11,44 @@ from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
 
 
-AGENT_VERSION = "1.4.56-pruebas-auto"   # se muestra en /pruebas-automaticas
+AGENT_VERSION = "1.4.64"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
 LOG_MAX = 256 * 1024                      # cola de agent.log que se sube cuando la web la pide
+# v1.4.64: la autoactualización nunca sobrescribe lo propio de esta instalación.
+PROTEGIDOS = {"config.json", "puerto_serie.txt", "agent.log", "outbox.db", ".agent.lock"}
+CARPETAS_PROTEGIDAS = {".venv", "evidence", "__pycache__"}
+CANDADO = None   # v1.4.64: candado fcntl del agente Linux (se suelta al autoactualizarse)
+
+
+def plataforma_actualizable():
+    """v1.4.64: «nt» (Windows), «linux» (Raspberry) o None (otra: no se autoactualiza)."""
+    if os.name == "nt":
+        return "nt"
+    return "linux" if sys.platform.startswith("linux") else None
+
+
+def instalar_paquete(base, raw):
+    """Extrae el ZIP del servidor sobre base sin tocar config.json/.venv/puerto_serie.txt/agent.log.
+    Devuelve True si requirements.txt cambió."""
+    base = Path(base).resolve()
+    req = base / "requirements.txt"
+    antes = hashlib.sha256(req.read_bytes()).hexdigest() if req.exists() else ""
+    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        nombres = [i for i in z.infolist() if not i.is_dir()]
+        if "agent.py" not in {i.filename for i in nombres}:
+            raise ValueError("paquete sin agent.py")
+        for info in nombres:
+            rel = Path(info.filename)
+            destino = (base / rel).resolve()
+            if base not in destino.parents:
+                raise ValueError("ruta inválida en el paquete: " + info.filename)
+            if rel.name in PROTEGIDOS or CARPETAS_PROTEGIDAS & set(rel.parts):
+                continue
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            tmp = destino.with_name(destino.name + ".nuevo")
+            tmp.write_bytes(z.read(info))
+            os.replace(tmp, destino)
+    despues = hashlib.sha256(req.read_bytes()).hexdigest() if req.exists() else ""
+    return antes != despues
 
 
 def serial_ports():
@@ -65,6 +101,77 @@ class Bridge:
         remembered = self.port_file.read_text(encoding="utf-8").strip() if self.port_file.exists() else ""
         self.auto_port = remembered or cfg.get("serial_port") or ""
         self.ports_cache, self.ports_at = [], 0
+        self.config_path = self.folder.parent / "config.json"
+        self.update_tried = set()   # v1.4.64: una sola autoactualización por versión y arranque
+
+    def download(self, path):
+        url = self.cfg["server"].rstrip("/") + "/api/stm32/agent/tests/" + path
+        rq = urllib.request.Request(url, headers={"Authorization": "Bearer " + self.cfg["token"],
+                                                  "User-Agent": "TQT-Test-Station/" + AGENT_VERSION})
+        with urllib.request.urlopen(rq, timeout=60) as r:
+            return r.read()
+
+    def maybe_update(self, version):
+        """v1.4.64: Windows y Linux (Raspberry). Si el servidor trae otra versión: paquete nuevo, pip si cambió
+        requirements, relanza con la misma config y termina. Un intento por versión; los fallos quedan en agent.log."""
+        plataforma = plataforma_actualizable()
+        linux = plataforma == "linux"
+        if not plataforma or not version or version == AGENT_VERSION or version in self.update_tried:
+            return False
+        if self.engine.running or self.ble.address or (self.command_thread and self.command_thread.is_alive()):
+            return False   # se espera a que termine la prueba/comando o se suelte el Bluetooth
+        self.update_tried.add(version)
+        base = Path(__file__).resolve().parent
+        print(time.strftime("%Y-%m-%d %H:%M:%S"), "Autoactualización", AGENT_VERSION, "->", version, flush=True)
+        try:
+            cambio_req = instalar_paquete(base, self.download("package"))
+            exe = Path(sys.executable)
+            if linux:
+                self.relanzar_linux(base, cambio_req)   # no vuelve si sale bien
+            if cambio_req:
+                py = exe.with_name("python.exe") if exe.with_name("python.exe").exists() else exe
+                r = subprocess.run([str(py), "-m", "pip", "install", "--disable-pip-version-check", "-q", "-r",
+                                    str(base / "requirements.txt")], capture_output=True, text=True, timeout=900,
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                if r.returncode != 0:
+                    raise RuntimeError("pip falló: " + (r.stderr or r.stdout)[-400:])
+            pyw = exe.with_name("pythonw.exe") if exe.with_name("pythonw.exe").exists() else exe
+            flags = (getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+                     | getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            subprocess.Popen([str(pyw), "-u", str(base / "agent.py"), "--config", str(self.config_path), "--background"],
+                             cwd=str(base), creationflags=flags, close_fds=True)
+        except Exception as e:
+            print(time.strftime("%Y-%m-%d %H:%M:%S"), "Autoactualización fallida (se sigue con", AGENT_VERSION + "):",
+                  str(e), flush=True)
+            return False
+        print(time.strftime("%Y-%m-%d %H:%M:%S"), "Autoactualización instalada; relanzando el agente.", flush=True)
+        self.serial.disconnect()
+        os._exit(0)
+
+    def relanzar_linux(self, base, cambio_req):
+        """v1.4.64 (Raspberry): pip con la misma venv si cambió requirements; suelta puerto, Bluetooth y el candado
+        fcntl y relanza con setsid (sesión nueva, sobrevive a este proceso). El nuevo espera el candado (main())."""
+        global CANDADO
+        if cambio_req:
+            r = subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q", "-r",
+                                str(base / "requirements.txt")], capture_output=True, text=True, timeout=900)
+            if r.returncode != 0:
+                raise RuntimeError("pip falló: " + (r.stderr or r.stdout)[-400:])
+        self.serial.disconnect()
+        if CANDADO is not None:
+            import fcntl
+            fcntl.flock(CANDADO, fcntl.LOCK_UN)
+        try:
+            subprocess.Popen([sys.executable, "-u", str(base / "agent.py"), "--config", str(self.config_path), "--background"],
+                             cwd=str(base), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             close_fds=True, start_new_session=True)
+        except Exception:
+            if CANDADO is not None:   # no se pudo relanzar: este proceso sigue siendo el agente
+                import fcntl
+                fcntl.flock(CANDADO, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            raise
+        print(time.strftime("%Y-%m-%d %H:%M:%S"), "Autoactualización instalada; relanzando el agente.", flush=True)
+        os._exit(0)
 
     def safe_send(self, data):
         if self.engine.running and data in (
@@ -368,6 +475,7 @@ class Bridge:
                     "ports": self.ports(),
                 }
                 job = self.api("claim", state)
+                self.maybe_update(job.get("agent_version"))
                 if job.get("subir_log"):
                     self.upload_log()
                 if job.get("cancel") and self.engine.running:
@@ -421,10 +529,16 @@ def main():
     if __import__("os").name != "nt":   # v1.4.51: Linux/Raspberry; un solo agente por estación (candado de archivo)
         import fcntl
 
-        candado = (path.parent / ".agent.lock").open("w")
-        try:
-            fcntl.flock(candado, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
+        global CANDADO
+        CANDADO = (path.parent / ".agent.lock").open("w")
+        # v1.4.64: tras autoactualizarse, el proceso viejo suelta el candado al relanzar; se espera hasta 20 s.
+        for _ in range(20):
+            try:
+                fcntl.flock(CANDADO, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                time.sleep(1)
+        else:
             raise RuntimeError("Esta estación ya está iniciada.")
     if __import__("os").name == "nt":
         import ctypes
@@ -432,12 +546,21 @@ def main():
         k = ctypes.WinDLL("kernel32", use_last_error=True)
         k.CreateMutexW.restype = ctypes.c_void_p
         k.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
-        mutex = k.CreateMutexW(None, False, "Local\\TQTTests_" + cfg["id"])
-        if not mutex or ctypes.get_last_error() == 183:
+        # v1.4.64: tras autoactualizarse, el proceso viejo suelta el mutex en un instante; se espera hasta 20 s.
+        for _ in range(20):
+            mutex = k.CreateMutexW(None, False, "Local\\TQTTests_" + cfg["id"])
+            if mutex and ctypes.get_last_error() != 183:
+                break
+            if mutex:
+                k.CloseHandle(ctypes.c_void_p(mutex))
+            time.sleep(1)
+        else:
             raise RuntimeError("Esta estación ya está iniciada.")
     print(time.strftime("%Y-%m-%d %H:%M:%S"), "Agente", AGENT_VERSION, "iniciado en", socket.gethostname(),
           "(" + platform.system() + " " + platform.machine() + ")", "->", cfg["server"], flush=True)
-    Bridge(cfg, path.parent / "evidence").loop()
+    bridge = Bridge(cfg, path.parent / "evidence")
+    bridge.config_path = path
+    bridge.loop()
 
 
 if __name__ == "__main__":
