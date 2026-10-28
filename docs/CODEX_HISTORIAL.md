@@ -221,3 +221,7 @@ Evidencia: 115Python+9Node+16Playwright PASS en QA aislada; Compose/buildOK. Bac
 2026-10-27:1.4.48/códigof608baf desplegada con autorización;panelSTM32 ahora naranja siFWanterioralúltimoaprobado,comparación compartidaconlista.19UI+11PythonPASS,healthy,DB/historial sin cambios.0054FW4.4verde/0055FW4.3naranja frentevigente4.4. Catálogo ya4.4aprobado;sin cambiosFW ni banco físico. Evidencia STM32_INDICADOR_VIGENCIA.md.
 
 2026-10-27:1.4.49/códigoa1ea3d5 publicada ydesplegada conautorización;Diagrama debajoComandos,HW20/30,datos/6JPEGconhash,consulta/localreview sinAPIwrites.13UI+16Node+7PythonPASS;healthy,quick_checkok,catálogoanónimo401. Inventarioidéntico eIDspreviospreservados;1pruebaweb/5comandosnuevos concurrentes terminada. Ver DIAGRAMA_TQT.md.
+
+## 2026-10-28 — Último Git desplegado (1.4.63)
+
+Se comprobó main 985d0d3 y servidor d63546b, ambos 1.4.63; se desplegó el ajuste móvil pendiente del portal. 13 Python, Node syntax, Compose y Playwright escritorio/móvil PASS; producción healthy, hashes públicos y locales LF idénticos, inventario/historiales preservados. Ver docs/DESPLIEGUE_1.4.63_20261028.md. El borrador de Pruebas TQT en codex/validacion-paneles-20261027 sigue incompleto/no desplegado; retomarlo sobre main actual sin perder agentes por cuenta y avances de colaboradores.

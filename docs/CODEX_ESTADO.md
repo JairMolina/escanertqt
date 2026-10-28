@@ -1,38 +1,43 @@
 # Estado de Codex: TQT-Web
 
-Actualizado:2026-10-28. Código de referencia:a1ea3d57d6907ef668e0d0156567a14edfe26243.
+Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530cb689b`, web 1.4.63.
 
-## Avance reportado
+## Estado vigente
 
-Claude v1.4.64: inventario TQTR con un solo relevador (R1+R2+R3) y sensores incluidos en el actuador (migración _migrar_1464); rediseño visual de Pruebas TQT sin cambios de lógica (sin commit).
-Claude v1.4.63: easter egg en /inicio (5 estrellas en orden → crédito jairmolina.dev).
-Claude v1.4.62: Skytec sin error falso (timeout 120 s y confirmación en lista) y botón Sincronizar Skytec en Tarjetas.
-Claude v1.4.61: botón y marca Skytec con R1 y R2 programadas (sin esperar R3).
-Claude v1.4.60: tabla skytec_candados, estado «· Skytec» y botón en Tarjetas; versión del agente visible en Pruebas TQT y aviso solo sin agente actualizado.
-Claude v1.4.59: planetas en /inicio (solo CSS).
-Claude v1.4.58: alta automática de candados R1/R2 en Skytec al imprimir etiquetas (TQT_SKYTEC_* en .env); R2 habilita «Actualizar por Bluetooth» tras la base genérica. Pendiente: verificar el alta real en Skytec con credenciales en el servidor.
-Claude v1.4.57: aviso en Pruebas TQT a cuentas con agente/puente viejo (agentes/desactualizados); Raspberry en agente 1.4.56.
+Último main comparado con Orange Pi; se aplicó el único commit pendiente d63546b → 985d0d3, ajuste móvil de estrellas del portal. Servicio tqt saludable, salud pública/interna correcta y archivos públicos iguales al código probado. Inventario e historiales conservados. No se cambió APP_VERSION ni firmware. Evidencia y respaldo: docs/DESPLIEGUE_1.4.63_20261028.md.
 
-Claude v1.4.56: agentes y puentes BLE de Pruebas TQT separados por cuenta (test_station.propia; cancelar solo dueño/admin); agente con keep-alive HTTPS (comandos BLE ya no vencen por handshakes lentos; send 20 s); sin confirm() en Pruebas automáticas. Pendiente: re-descargar el puente de cada laptop y actualizar el agente de la Raspberry.
+Main incluye los avances de otros colaboradores: Pruebas automáticas por cuenta y Raspberry, exclusión de Raspberry de bancos normales, agentes/puentes BLE por cuenta y avisos de actualización, sincronización Skytec y rediseño de Diagrama. No volver a desplegar 1.4.49 ni el checkout documental antiguo. Las notas anteriores de despliegue 1.4.51 pendiente están superadas por esta comprobación de producción; las pruebas físicas y la configuración de Skytec no se revalidaron hoy.
 
-Claude v1.4.55: /stations de Pruebas TQT omite puentes «solo BLE» (verificado en producción 1.4.54: la Raspberry ya no aparece). Agente de la Raspberry actualizado a 1.4.51-pruebas-auto.
+## Claude v1.4.64 (main, sin desplegar)
 
-Claude v1.4.54: Pruebas TQT ya no lista ni usa la Raspberry de Pruebas automáticas como puente Bluetooth ni como agente (test_station.RASPBERRY/no_raspberry; antes el escaneo/conexión BLE podía hacerse con el Bluetooth de la Raspberry). v1.4.53: scroll del esquema de Diagrama.
+Rediseño de /monitor#/validacion integrado en main por Claude, que supera el borrador `codex/validacion-paneles-20261027`: no hay que retomarlo. Incluye:
+- **Pantalla:** franja «Tarjeta en prueba», conexiones compactas, 14 etapas en 4 bloques plegables y estado de la ejecución. El resumen y los 29 sensores S29 conservan su marcado de 1.4.63; los sensores van a todo lo ancho.
+- **Selección de tarjeta:** modal «Elige la tarjeta en prueba» con el lote de la consola y selección de una o varias; el escaneo del celular responde a la consola.
+- **Puente Bluetooth:**
+  - instalador único `.cmd`, oculto y con avance en la página (`install-progress`, `installer/{id}/estado`);
+  - misma estación al reinstalar, con tokens previos válidos (`stm32_stations.tokens_previos`);
+  - autoactualización con `claim.agent_version` y `/api/stm32/agent/tests/package`;
+  - «Elegir dispositivo» (`/web/ble/commands` operation `scan`; connect sigue exigiendo la MAC del inventario);
+  - aviso al entrar para instalar o actualizar (`sin_agente`).
+- **Pruebas automáticas:** paso 1 con comando de un solo uso (`curl …/api/stm32/agent/tests/instalar/<codigo>.sh | sh`, 15 min, en memoria: un solo worker), `instalador_linux.py`, `GET /api/pruebas-auto/agente/instalacion` y autoactualización también en Linux.
+- **Inventario TQTR:** relevador único R1+R2+R3 y sensores magnéticos incluidos en el actuador (`_migrar_1464`).
+- **Versiones:** AGENT_VERSION 1.4.64.
 
-Claude v1.4.52: Pruebas automáticas con sesiones separadas (la Raspberry es de una cuenta a la vez; pantalla «Raspberry ocupada», 409 con quién la usa; cada cuenta ve solo sus campañas; admin «Detener y liberar») y rediseño de Diagrama (sec_diagrama.css/js, diagrama_svg.js; datos y lógica sin cambios).
+Evidencia: unittest 117 OK (pruebas_auto, native_ble, test_station_web, qa_version, inventario_tqtr, stm32) y `sec_validacion_ui.cjs` OK. En `station/test_station/tests` solo falla `test_reporting`, que ya fallaba. El instalador .cmd pasa el parser de PowerShell y el .sh pasa `sh -n`, con simulación de extracción. Probado en Docker local con la BD de producción 1.4.63; el puente Bluetooth se instaló y conectó en la laptop del usuario.
 
-Claude, v1.4.51 (1.4.50 sin usar; rama luna-pruebas-automaticas sobre 1.4.49; publicada antes como «v1.4.51» y desplegada en b7e9554): luna «Pruebas automáticas» en /inicio y submódulo /pruebas-automaticas: campañas de resistencia que repiten las 14 etapas de Pruebas TQT en UN banco, la Raspberry de la DYMO (tablas tqt_resistencia, tqt_resistencia_ciclos, tqt_resistencia_banco; services/pruebas_auto.py encadena en test_station.claim). Agente de pruebas para Linux: iniciar.sh, candado fcntl, puerto serie by-id recordado, subida de agent.log a petición. Logs .txt por ciclo, campaña y agente. No libera tarjetas ni cambia estados de fabricación.
+Pendiente:
+- desplegar;
+- reinstalar una vez los puentes 1.4.56 y la Raspberry con el comando nuevo;
+- probar «Elegir dispositivo» y una campaña con hardware real.
 
-Web1.4.49 publicada enmain ydesplegada conautorización expresa sobre1.4.48/2fa6fd2. Nueva secciónnativa Diagrama debajo deComandos,con armazón/temas actuales;HW20/HW30,6grupos,SVG/fichas/búsqueda,comparación,láminas/AK7V,revisionlocal/exportJSON. Siniframe ni shell duplicado;datos19/18 y6JPEG delHTML conservados conhash. Consultor puedeleer,sin privilegiosextra. Revisiones locales porHW no registranPruebasTQT. SourceoriginalSHA25671cf74e44789024439da9f2a21053dfd985794f5584221cafa15f417b93b1d73. Ver docs/DIAGRAMA_TQT.md. AjusteSTM32vigencia1.4.48 permanece;FW4.4 ya estabaaprobado,no se cambió.
+## Pendiente de Pruebas TQT
 
-## Siguiente paso
+El usuario autorizó adaptar únicamente cinco bloques de /monitor#/validacion: conexiones compactas Serial/Bluetooth, controles manuales plegables ON/OFF, las 14 etapas originales agrupadas 1–2 / 3–6 / 7–11 / 12–14, barra de tarjeta con datos/historial y selector modal real por número/nombre/QR. Conservar motor, temporización, comandos, Bluetooth Windows por MAC, resultado/S29/impresión y confirmación de identidad real.
 
-Pruebas automáticas: desplegar y vincular la Raspberry (paso 1 de /pruebas-automaticas), probar con hardware real (BLE a R2, desconexión USB a mitad de ciclo). Desplegar 1.4.51 (arreglo de reconexión USB del agente y huella ?v= en estáticos) y actualizar agent.py en la Raspberry.
+Borrador incompleto y no probado en `work/tqt-fw-beta-20261026`, rama `codex/validacion-paneles-20261027`, archivo modificado `app/static/js/sec_validacion.js`. No se desplegó ni se subió como implementación final. Retomar sobre el main más reciente conservando los cambios de agentes por cuenta, Raspberry, avisos de versión y Skytec. Faltan finalizar lógica/estilos de nuevos paneles, regresiones del motor y Playwright. No ejecutar banco físico sin coordinar tarjeta y autorización vigente para esa prueba.
 
-RecargarCtrl+F5 yabrir /monitor#/diagrama,debajo deComandos. Las marcasderevisión duran en ese navegador y puedenexportarse;no certifican tarjetas. Proximastareas partir deorigin/main y comprobar servidor antes deactualizar. No repetir limpiezadeagentes,aprobarfirmware ni ejecutar banco por estecambio. Checkoutactivo work/tqt-fw-beta-20261026,rama codex/diagrama-tqt-20261027.
+## Evidencia actual
 
-## Evidencia
+13 Python PASS (portal/permisos/versionado), Node syntax y Compose QA correctos; Playwright escritorio1440/móvil390 con secuencia de crédito, Escape, ocho módulos, sin errores JS/desborde. Comprobación pública móvil y hashes JS/CSS coincidentes. Backup íntegro, cero actividad antes de recrear, cero IDs anteriores perdidos y cero cambios en inventario. Solo tqt recreado, Cloudflared intacto.
 
-Pruebas automáticas: 10 casos tests/test_pruebas_auto.py + regresión Pruebas TQT/módulos/versión (89 OK tras rebase sobre 1.4.49); capturas 1280/390 claro/oscuro con Raspberry simulada; ZIP del agente con iniciar.sh y serial_port verificado. Sin hardware real. station/test_station/tests: 1 falla preexistente (test_reporting CSV).
-
-13gruposPlaywright+16Node+7PythonPASS;datos/imágenes conhash,fuentes/pinout conservados,permisoscatálogo/JPEG,teclado/foco,zoom,exportreal,consultor,recuperación/aborto,navegación.0JSerrors/HTTPinesperados/escriturasAPIproducción enQA. Capturas1440/1024/390,claro/oscuro revisadas,sindesborde. JSsyntax/diff/ComposeQAOK. Producciónrunninghealthy,quick_checkok,health interno/públicook:true,loginHTTP200/1.4.49,catálogoanónimo401,7archivosGit=servidor y6JPEGverificados. Backup predeploy_1.4.49_20261027_101445.db integrity_checkok,SHA256c1bf8508650af65b601314e31b14964afb7703a65fd51eb812a5eb94826ec335. Inventario idéntico/todosIDsprevios conservados;hubo1pruebaweb/5comandos nuevos concurrentes,pruebaterminada(noatribuida aDiagrama). ui-ux-pro-max/design-system parareutilización;ECCE2E/verificación yCMcheckpoint/memoria. Originales delusuario no respaldados enMiniPC/Gitpor estatarea.
+Checkout de este despliegue: `work/tqt-deploy-20261028`, rama `codex/despliegue-1-4-63-20261028`. El checkout CM registrado `work/escanertqt_publish` tiene cambios documentales propios y se conserva; no usarlo como código más reciente. Capacidades: CM estado/versión/checkpoint/memoria y ECC verificación/E2E.
