@@ -8,7 +8,11 @@ Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530
 
 Main incluye los avances de otros colaboradores: Pruebas automáticas por cuenta y Raspberry, exclusión de Raspberry de bancos normales, agentes/puentes BLE por cuenta y avisos de actualización, sincronización Skytec y rediseño de Diagrama. No volver a desplegar 1.4.49 ni el checkout documental antiguo. Las notas anteriores de despliegue 1.4.51 pendiente están superadas por esta comprobación de producción; las pruebas físicas y la configuración de Skytec no se revalidaron hoy.
 
-## Claude v1.4.64 (main, sin desplegar)
+## Claude v1.4.65 (sin commit)
+
+R2 BLE: la posición debe sostenerse 1.5 s seguidos con un Status nuevo antes de aprobar; si rebota, queda «AVISO SENSOR» en el log. Antes se tomaba la trama en caché, que podía ser la del rebote, y fallaba con «no se mantuvo estable». Pruebas automáticas: panel «En curso», `GET /campanas/{id}/vivo` y `detener_ahora`. AGENT_VERSION 1.4.65.
+
+## Claude v1.4.64 (main 0575adb, desplegada)
 
 Rediseño de /monitor#/validacion integrado en main por Claude, que supera el borrador `codex/validacion-paneles-20261027`: no hay que retomarlo. Incluye:
 - **Pantalla:** franja «Tarjeta en prueba», conexiones compactas, 14 etapas en 4 bloques plegables y estado de la ejecución. El resumen y los 29 sensores S29 conservan su marcado de 1.4.63; los sensores van a todo lo ancho.

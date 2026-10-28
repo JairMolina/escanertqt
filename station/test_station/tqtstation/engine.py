@@ -308,10 +308,45 @@ class TestStation:
                 except Exception: pass
         self._require(moved, f'R1 no observó {expected} tras {cmd} por R2')
         self._require(event, f'R1 no notificó error nuevo {code} tras {cmd} por R2')
-        after = self._fresh_status(timeout=18)
+        after = self._posicion_estable(cursor, expected)
         self._require(after.position == expected, 'Posición de R2 no se mantuvo estable')
         self._require(after.number('MOV') == before.number('MOV'), 'MOV de R1 cambió durante R2')
         return f'{cmd} → {expected}, err={code} nuevo en R1; MOV de R1 sin incremento'
+
+    def _posicion_estable(self, cursor, expected, ventana=1.5, timeout=10.0):
+        """v1.4.65: con R2 el motor lo mueve R2 (R1 queda en TQT=0) y el sensor de fin de carrera puede rebotar
+        (ON/OFF 1→0→1) al llegar. Antes se tomaba la última trama en caché, que podía ser justo el rebote.
+        Ahora la posición debe sostenerse `ventana` s seguidas (con un Status fresco al final); si a los
+        `timeout` s sigue cambiando, falla y se informa cuántos rebotes hubo."""
+        hasta = time.monotonic() + timeout
+        rebotes, desde, ultimo = 0, None, None
+        visto, sondeo = cursor, 0.0
+        while time.monotonic() < hasta:
+            if self.cancel.is_set(): raise Interrupted('Cancelada')
+            if time.monotonic() - sondeo >= 1.0:   # sin tramas espontáneas: se pide Status (1 por segundo como máximo)
+                sondeo = time.monotonic()
+                try: self.serial.send(serial_action('STATUS'))
+                except Exception: pass
+            with self.cond:
+                for kind, val in self.observations[visto:]:
+                    if kind != 'status': continue
+                    if val.position == expected:
+                        if desde is None: desde = time.monotonic()
+                    else:
+                        if desde is not None: rebotes += 1
+                        desde = None
+                    ultimo = val
+                visto = len(self.observations)
+                if desde is not None and time.monotonic() - desde >= ventana:
+                    break
+                self.cond.wait(.2)
+        if rebotes:
+            self.log(f'AVISO SENSOR: la posición {expected} rebotó {rebotes} vez/veces al llegar (R2); '
+                     'revisa la alineación del imán y del sensor de fin de carrera')
+        if desde is None or time.monotonic() - desde < ventana:
+            return ultimo or self._fresh_status(timeout=8)
+        final = self._fresh_status(timeout=8, max_age=0)   # confirmación con un Status pedido ahora
+        return final
 
     def _rename_log(self, card: str):
         safe = re.sub(r'[^A-Za-z0-9_-]', '_', card)[:64]

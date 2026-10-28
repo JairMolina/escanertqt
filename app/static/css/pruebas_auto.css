@@ -121,3 +121,18 @@
 .pa-inst[data-k="bad"] { border-color: var(--bad); color: var(--bad); }
 @keyframes pa-gira { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pa-inst[data-k="run"]::before { animation: none; } }
+
+/* v1.4.65: campaña en curso */
+.pa-vivo { border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.pa-vivo[data-k="pausada"] { border-color: var(--line); }
+.pa-vivo-h { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+.pa-eyebrow { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pa-vivo-etapa { margin: 0; font-weight: 600; }
+.pa-vivo-pasos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; }
+.pa-vivo-pasos li { text-align: center; font-size: 11px; padding: 4px 0; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pa-vivo-pasos li[data-k="ok"] { border-color: var(--ok); color: var(--ok); }
+.pa-vivo-pasos li[data-k="bad"] { border-color: var(--bad); color: var(--bad); }
+.pa-vivo-pasos li[data-k="warn"] { border-color: var(--warn, #d5a436); color: var(--warn, #d5a436); }
+.pa-vivo-pasos li[data-k="run"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.pa-vivo-log { margin: 0; max-height: 220px; overflow: auto; font-size: 11px; line-height: 1.45; padding: 8px; border-radius: 8px; border: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .pa-vivo-pasos { grid-template-columns: repeat(7, minmax(0, 1fr)); } }

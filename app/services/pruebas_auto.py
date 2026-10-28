@@ -316,9 +316,11 @@ def leer(cid, email=None, admin=False):
 
 
 def cambiar(cid, accion, operador, admin=False):
-    """pausar | reanudar | detener. Pausar/detener no cortan el ciclo en curso: termina y no se encola otro."""
+    """pausar | reanudar | detener | detener_ahora. Pausar/detener dejan terminar el ciclo en curso y no encolan otro;
+    detener_ahora (v1.4.65) además pide cancelar el ciclo en curso (el firmware termina el movimiento actual)."""
     init()
-    destino = {"pausar": ("activa", "pausada"), "reanudar": ("pausada", "activa"), "detener": (None, "detenida")}
+    destino = {"pausar": ("activa", "pausada"), "reanudar": ("pausada", "activa"), "detener": (None, "detenida"),
+               "detener_ahora": (None, "detenida")}
     if accion not in destino:
         raise ValueError("Acción no válida.")
     desde, hacia = destino[accion]
@@ -328,9 +330,12 @@ def cambiar(cid, accion, operador, admin=False):
             raise ValueError("Campaña no encontrada.")
         if r["estado"] not in ACTIVAS or (desde and r["estado"] != desde):
             raise ValueError("La campaña no está en un estado que permita esa acción.")
-        motivo = f"Detenida por {operador}." if accion == "detener" else None
+        motivo = f"Detenida por {operador}." if accion == "detener" else f"Detenida al instante por {operador}." if accion == "detener_ahora" else None
         c.execute("UPDATE tqt_resistencia SET estado=?,motivo=COALESCE(?,motivo),actualizado=? WHERE id=?",
                   (hacia, motivo, time.time(), cid))
+        if accion == "detener_ahora":
+            c.execute("UPDATE tqt_test_runs SET cancel=1 WHERE state IN ('queued','running') AND id IN "
+                      "(SELECT run FROM tqt_resistencia_ciclos WHERE campana=?)", (cid,))
     return leer(cid, operador, admin)
 
 
@@ -415,3 +420,34 @@ def ciclo_permitido(jid, email, admin=False):
                       (jid,)).fetchone()
     if not r or (r["operador"] != email and not admin):
         raise ValueError("Ciclo no encontrado.")
+
+
+def vivo(cid, email=None, admin=False):
+    """v1.4.65: estado en vivo para la página: ciclo actual, las 14 etapas (estado y detalle), última lectura S29
+    (posición, MOV, err, PB, TQT) y las últimas líneas del log del ciclo. Solo lectura."""
+    d = leer(cid, email, admin)
+    ciclos = d["ciclos_detalle"]
+    actual = next((x for x in ciclos if x["state"] in ("queued", "running")), ciclos[0] if ciclos else None)
+    out = {"estado": d["estado"], "ciclos": d.get("ciclos"), "hechos": len([x for x in ciclos if x["state"] not in ("queued", "running")]),
+           "ciclo": None, "pasos": {}, "sensores": None, "log": [], "motivo": d.get("motivo")}
+    if not actual:
+        return out
+    out["ciclo"] = {"n": actual["n"], "run": actual["run"], "state": actual["state"], "result": actual["result"],
+                    "created": actual["created"], "updated": actual["updated"]}
+    with db.get_db() as c:
+        filas = c.execute("SELECT data FROM tqt_test_events WHERE run=? ORDER BY seq", (actual["run"],)).fetchall()
+    lineas = []
+    for f in filas:
+        e = json.loads(f["data"])
+        k, a = e.get("kind"), e.get("args") or []
+        if k == "step" and len(a) >= 2:
+            out["pasos"][str(a[0])] = {"estado": a[1], "detalle": a[2] if len(a) > 2 else ""}
+        elif k == "status" and a and isinstance(a[0], dict):
+            campos = a[0].get("fields") or {}
+            out["sensores"] = {x: campos.get(x) for x in ("ON", "OFF", "TQT", "MOV", "err", "PB")}
+        elif k == "log" and a:
+            lineas.append(str(a[0]))
+        elif k == "full_log" and e.get("text"):
+            lineas = e["text"].splitlines()
+    out["log"] = [x for x in lineas if "TX SERIAL: $OK" not in x][-14:]
+    return out

@@ -11,7 +11,7 @@ from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
 
 
-AGENT_VERSION = "1.4.64"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
+AGENT_VERSION = "1.4.65"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
 LOG_MAX = 256 * 1024                      # cola de agent.log que se sube cuando la web la pide
 # v1.4.64: la autoactualización nunca sobrescribe lo propio de esta instalación.
 PROTEGIDOS = {"config.json", "puerto_serie.txt", "agent.log", "outbox.db", ".agent.lock"}

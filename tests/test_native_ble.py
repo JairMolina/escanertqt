@@ -206,7 +206,8 @@ class InstallerTests(unittest.TestCase):
         h = {'Authorization': 'Bearer ' + st['token']}
         r = self.client.post('/api/stm32/agent/tests/claim', json=dict(ble_bridge=1, ble_only=True), headers=h)
         self.assertEqual(r.json()['agent_version'], runs.agente_actual())
-        self.assertEqual(runs.agente_actual(), '1.4.64')
+        from app.config import settings
+        self.assertEqual(runs.agente_actual(), settings.APP_VERSION)   # el agente sube junto con la web
         p = self.client.get('/api/stm32/agent/tests/package', headers=h)
         self.assertEqual(p.status_code, 200)
         names = zipfile.ZipFile(io.BytesIO(p.content)).namelist()

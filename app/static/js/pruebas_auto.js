@@ -285,6 +285,9 @@
                     '<div class="pa-ciclos" id="d' + c.id + '"></div></article>';
             }).join('') : '<p class="hint">' + (r.ok ? 'Aún no hay campañas.' : esc(r.error)) + '</p>';
             if (abierta) detalle(abierta);
+            var act = l.find(function (c) { return c.estado === 'activa' || c.estado === 'pausada'; });
+            vivoId = act ? act.id : null; vivoCamp = act || null;
+            if (act) pintarVivo(); else $('vivo').hidden = true;
             return l.length > 0;
         });
     }
@@ -301,6 +304,58 @@
                 }).join('') + '</tbody></table>' : '<p class="hint">Esperando el primer ciclo.</p>';
         });
     }
+    /* v1.4.65: «En curso»: qué hace la campaña ahora (ciclo, etapa de las 14, sensores S29 y últimas líneas)
+       y los dos botones de detener. Se refresca cada 2 s mientras haya campaña activa. */
+    var vivoId = null, vivoCamp = null, PASOS = [], ST = { aprobado: 'ok', fallido: 'bad', no_verificado: 'warn', ejecutando: 'run' };
+    fetch('/static/js/test_station_contract.json?v=1400').then(function (r) { return r.json(); }).then(function (d) { PASOS = d.step_names || []; }).catch(function () {});
+    function pos(sn) { return !sn ? '—' : sn.ON === '1' && sn.OFF === '0' ? 'cerrado' : sn.ON === '0' && sn.OFF === '1' ? 'abierto' : 'en movimiento / indeterminado'; }
+    function pintarVivo() {
+        if (!vivoId) return;
+        var id = vivoId, c = vivoCamp;
+        api('/api/pruebas-auto/campanas/' + id + '/vivo').then(function (r) {
+            if (id !== vivoId) return;
+            var box = $('vivo');
+            if (!r.ok) { box.hidden = false; box.textContent = r.error; return; }
+            var v = r.data, ci = v.ciclo, p = v.pasos || {}, idx = -1;
+            Object.keys(p).forEach(function (k) { if (p[k].estado === 'ejecutando') idx = +k; });
+            var hechas = Object.keys(p).filter(function (k) { return p[k].estado !== 'ejecutando'; }).length;
+            var etapa = idx >= 0 ? 'Etapa ' + (idx + 1) + ' de 14 · ' + (PASOS[idx] || '') + (p[idx].detalle ? ' — ' + p[idx].detalle : '')
+                : ci && ci.state === 'queued' ? 'Ciclo en cola: esperando a la Raspberry…'
+                : ci && ci.state === 'running' ? 'Preparando el ciclo…'
+                : v.estado === 'pausada' ? 'Pausada: no se encola otro ciclo hasta reanudar.' : 'Entre ciclos (pausa configurada).';
+            var sn = v.sensores;
+            box.hidden = false;
+            box.dataset.k = v.estado;
+            box.innerHTML =
+                '<div class="pa-vivo-h"><div><span class="pa-eyebrow">' + (v.estado === 'pausada' ? 'Pausada' : 'En curso') + '</span>' +
+                '<b>' + esc(c ? c.nombre : '') + '</b> · ciclo ' + (ci ? ci.n : 0) + ' de ' + (v.ciclos || '?') + '</div>' +
+                '<div class="pa-acc">' +
+                '<button class="btn btn-sm" data-a="detener" data-id="' + id + '" title="Termina el ciclo actual y no inicia otro">Detener al terminar el ciclo</button>' +
+                '<button class="btn btn-sm btn-danger" data-a="detener_ahora" data-id="' + id + '" title="Cancela el ciclo en curso; el firmware termina el movimiento actual">Detener ahora</button>' +
+                '</div></div>' +
+                '<p class="pa-vivo-etapa">' + esc(etapa) + '</p>' +
+                '<ol class="pa-vivo-pasos" aria-label="Etapas del ciclo">' + (PASOS.length ? PASOS : new Array(14).fill('')).map(function (n, i) {
+                    var e = p[i] ? p[i].estado : 'pendiente';
+                    return '<li data-k="' + (ST[e] || 'pend') + '" title="' + esc((i + 1) + '. ' + n + (p[i] && p[i].detalle ? ' — ' + p[i].detalle : '')) + '">' + (i + 1) + '</li>';
+                }).join('') + '</ol>' +
+                '<div class="hint">' + hechas + ' de 14 etapas terminadas en este ciclo' + (sn ? ' · Perno ' + pos(sn) + ' (ON ' + esc(sn.ON) + ' · OFF ' + esc(sn.OFF) + ') · MOV ' + esc(sn.MOV) + ' · err ' + esc(sn.err) + ' · origen PB ' + esc(sn.PB) : '') + '</div>' +
+                (v.log && v.log.length ? '<pre class="pa-vivo-log">' + esc(v.log.map(function (x) { return x.replace(/^\S+T(\d\d:\d\d:\d\d)\.\d+\S*\s\|\s/, '$1 · '); }).join('\n')) + '</pre>' : '');
+        });
+    }
+    $('vivo').addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-a]'); if (!b) return;
+        if (b.dataset.a === 'detener_ahora' && !b.dataset.seguro) {   // confirmación en dos pasos, sin confirm()
+            b.dataset.seguro = '1'; b.textContent = 'Confirmar: cancelar el ciclo en curso';
+            setTimeout(function () { delete b.dataset.seguro; b.textContent = 'Detener ahora'; }, 6000);
+            return;
+        }
+        b.disabled = true;
+        api('/api/pruebas-auto/campanas/' + b.dataset.id + '/accion', { method: 'POST', body: { accion: b.dataset.a } }).then(function (r) {
+            T.toast(r.ok ? (b.dataset.a === 'detener_ahora' ? 'Campaña detenida; se canceló el ciclo en curso.' : 'Campaña detenida; el ciclo actual termina y no se inicia otro.') : r.error, { kind: r.ok ? 'ok' : 'bad' });
+            refrescar();
+        });
+    });
+    setInterval(function () { if (!document.hidden && vivoId) pintarVivo(); }, 2000);
     $('campanas').addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
         if (b.dataset.ver) {

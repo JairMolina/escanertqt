@@ -44,7 +44,7 @@ class Campana(BaseModel):
 
 
 class Accion(BaseModel):
-    accion: Literal["pausar", "reanudar", "detener"]
+    accion: Literal["pausar", "reanudar", "detener", "detener_ahora"]   # v1.4.65: detener_ahora corta el ciclo en curso
 
 
 def quien(req):
@@ -160,6 +160,12 @@ def crear(body: Campana, req: Request):
 @router.get("/campanas/{cid}")
 def detalle(cid: str, req: Request):
     return run(svc.leer, cid, *quien(req))
+
+
+@router.get("/campanas/{cid}/vivo")
+def vivo(cid: str, req: Request):
+    """v1.4.65: qué está haciendo la campaña ahora (ciclo, etapa, sensores y últimas líneas del log)."""
+    return run(svc.vivo, cid, *quien(req))
 
 
 @router.get("/campanas/{cid}/log.txt")

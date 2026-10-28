@@ -94,6 +94,23 @@ class PruebasAuto(unittest.TestCase):
         pa.cambiar(c["id"], "detener", "operador@test.mx")
         self.assertEqual(pa.leer(c["id"])["estado"], "detenida")
 
+    def test_detener_ahora_cancela_el_ciclo_y_vivo_informa(self):
+        """v1.4.65: «Detener ahora» pide cancelar el ciclo en curso; /vivo dice ciclo, etapas, sensores y log."""
+        c = self.campana(ciclos=3)
+        job = s.claim(self.st["id"], LIBRE)
+        rid = job["run"]["id"]
+        ev = [{"kind": "step", "args": [4, "ejecutando", ""]},
+              {"kind": "status", "args": [{"fields": {"ON": "1", "OFF": "0", "MOV": "7", "err": "0", "PB": "1", "TQT": "0"}}]},
+              {"kind": "log", "args": ["2026-10-28T12:00:00.000-06:00 | PRUEBA: R1 serial · PPON movimiento"]}]
+        s.events(self.st["id"], rid, [{"seq": i + 1, "data": d} for i, d in enumerate(ev)])
+        v = pa.vivo(c["id"], "operador@test.mx")
+        self.assertEqual((v["ciclo"]["n"], v["pasos"]["4"]["estado"], v["sensores"]["MOV"]), (1, "ejecutando", "7"))
+        self.assertTrue(v["log"][-1].endswith("PPON movimiento"))
+        pa.cambiar(c["id"], "detener_ahora", "operador@test.mx")
+        self.assertEqual(pa.leer(c["id"])["estado"], "detenida")
+        with db.get_db() as cx:
+            self.assertEqual(cx.execute("SELECT cancel FROM tqt_test_runs WHERE id=?", (rid,)).fetchone()[0], 1)
+
     def test_exige_confirmacion_fisica(self):
         with self.assertRaises(ValueError):
             pa.crear("x", "fw", self.t["id"], 1, 0, True, "op", False)

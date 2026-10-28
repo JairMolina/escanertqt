@@ -105,4 +105,26 @@ class TestWorkflow(unittest.TestCase):
             self.assertEqual(st.report['result'],'fallido')
             self.assertFalse(any(v.startswith('$SMSG=ON') or v.startswith('$SMSG=OFF') for v in commands))
 
+    def test_r2_rebote_del_sensor_al_llegar_se_tolera_y_avisa(self):
+        """v1.4.65: con R2 el sensor puede rebotar (1→0→1) justo al llegar; antes fallaba «no se mantuvo estable»."""
+        class Rebote(Fixture):
+            def move(self,cmd,origin):
+                super().move(cmd,origin)
+                if origin==3:   # R2: tras llegar, la ÚLTIMA trama es un rebote a 0/0; el siguiente Status ya vuelve a la posición
+                    self.final=(self.values['ON'],self.values['OFF'])
+                    self.values['ON']=self.values['OFF']='0';self.emit()
+            def send(self,raw):
+                if raw.decode().strip()=='$SMSG=Status' and getattr(self,'final',None):
+                    self.values['ON'],self.values['OFF']=self.final;self.final=None
+                super().send(raw)
+        fx=Rebote();logs=[]
+        st=TestStation(FakeSerial(fx),FakeBLE(fx),lambda *a:logs.append(a))
+        fx.station=st;st.repeat_verify_s=.08
+        with tempfile.TemporaryDirectory() as tmp:
+            st.output_dir=Path(tmp);st.start('COM_FAKE','11:22:33:44:55:66')
+            st._run_thread.join(30)
+            self.assertEqual(st.report['result'],'aprobado',st.report)
+            texto=''.join(p.read_text(encoding='utf-8') for p in Path(tmp).glob('*.log'))
+            self.assertIn('AVISO SENSOR',texto)
+
 if __name__=='__main__':unittest.main()

@@ -1,5 +1,16 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.65 — 2026-10-28
+- **Pruebas TQT / Pruebas automáticas: R2 ya no falla por un rebote del sensor.** En la etapa «R2 BLE · PPON, nuevo err=13» el motor llegaba bien (ON 0 · OFF 1, err=13) y una trama después el sensor de apertura rebotaba un instante (ON 0 · OFF 0) antes de volver a OFF 1. La comprobación tomaba la última trama en caché, justo la del rebote, y daba «Posición de R2 no se mantuvo estable». Ahora la posición tiene que sostenerse 1.5 s seguidos y confirmarse con un Status nuevo; si a los 10 s sigue cambiando, falla. Cada rebote queda en el log como «AVISO SENSOR» para revisar la alineación del imán y del sensor. La prueba `test_r2_rebote_del_sensor_al_llegar_se_tolera_y_avisa` reproduce el caso real: falla sin el cambio y pasa con él. Agente 1.4.65: el puente de Windows y la Raspberry con 1.4.64 se actualizan solos.
+- **Pruebas automáticas: panel «En curso» y «Detener ahora».** El paso 5 muestra la campaña activa:
+  - ciclo N de M y la etapa actual de las 14, con su detalle;
+  - las 14 etapas en colores;
+  - la última lectura (perno abierto o cerrado, ON/OFF, MOV, err, PB) y las últimas líneas del log;
+  - se refresca cada 2 s;
+  - dos botones: «Detener al terminar el ciclo» y «Detener ahora», que cancela el ciclo en curso y pide confirmar en dos pasos.
+
+  Endpoints: `GET /api/pruebas-auto/campanas/{id}/vivo` y la acción `detener_ahora`.
+
 ## v1.4.64 — 2026-10-28
 - **Inventario TQTR: un solo relevador y sensores con el actuador.** Los relevadores automotrices 12 VCD de R1, R2 y R3 pasan a ser un solo componente con stock único (las filas de Costos siguen por tarjeta; la de R3 queda como referencia sin componente). Los consumos ya registrados por tarjeta se juntan en una fila y las cantidades de armado se suman (8 por armado). Los sensores magnéticos CS1-U vienen montados en el actuador (2 por motor): dejan de descontarse aparte, de limitar los armados y de salir en el tablero; el actuador lo indica en sus notas. Migración única `_migrar_1464` (idempotente, marca `migr_1464_relevadores_sensores`).
 - **Pruebas TQT: rediseño visual.** Nueva distribución según la propuesta: encabezado, tarjeta en prueba, conexiones, etapas en 4 bloques, y estado y sensores. Solo cambia la presentación; la lógica y los endpoints no cambian.
