@@ -180,6 +180,12 @@ def log_ciclo(jid: str, req: Request):
     return _txt(run(texto_log, jid), f"ciclo_{jid[:8]}.txt")
 
 
+@router.delete("/campanas/{cid}")
+def eliminar(cid: str, req: Request):
+    """v1.4.68: quita una campaña terminada del historial (dueño o administrador)."""
+    return run(svc.eliminar, cid, *quien(req))
+
+
 @router.post("/campanas/{cid}/accion")
 def accion(cid: str, body: Accion, req: Request):
     return run(svc.cambiar, cid, body.accion, *quien(req))

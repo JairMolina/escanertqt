@@ -8,7 +8,23 @@ Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530
 
 Main incluye los avances de otros colaboradores: Pruebas automáticas por cuenta y Raspberry, exclusión de Raspberry de bancos normales, agentes/puentes BLE por cuenta y avisos de actualización, sincronización Skytec y rediseño de Diagrama. No volver a desplegar 1.4.49 ni el checkout documental antiguo. Las notas anteriores de despliegue 1.4.51 pendiente están superadas por esta comprobación de producción; las pruebas físicas y la configuración de Skytec no se revalidaron hoy.
 
-## Claude v1.4.67 (main, sin desplegar)
+## Claude v1.4.71 (main, sin desplegar; incluye 1.4.68–1.4.70)
+
+Cuenta atrás de la pausa entre ciclos en el panel y la barra fija (solo pruebas_auto.js/.html/.css).
+
+## Claude v1.4.70
+
+Solo campañas: ciclo con 14 etapas aprobadas cuyo único problema son reintentos de ACK = aprobado_con_advertencias (`resultado_ciclo`); la certificación de Pruebas TQT no cambia.
+
+## Claude v1.4.69
+
+Controles manuales de Pruebas TQT: Bluetooth sin depender del serial (validacion_web.bleManual) y mensajes separados (serialOut / manualOut).
+
+## Claude v1.4.68
+
+Historial de Pruebas automáticas con el motivo de cada fallo (etapa y detalle, desde `source_report`) y `DELETE /api/pruebas-auto/campanas/{id}`. El ciclo de prod del 2026-10-28 14:32 falló en la etapa 5: el sensor de apertura (OFF) nunca llegó a 1 tras PPON (TQT=2 con ON0/OFF0) → hardware (alineación del imán y sensor CS1-U o carrera del actuador).
+
+## Claude v1.4.67
 
 - **Campañas:** un ciclo no verificado ya no corta la campaña, salvo con «detener en falla» o 3 ciclos seguidos.
 - **Motor:** espera hasta 150 s a que R1 limpie el err viejo antes de R2.

@@ -127,6 +127,51 @@ class PruebasAuto(unittest.TestCase):
         self.assertEqual((d["estado"], len(d["ciclos_detalle"])), ("detenida", 3))
         self.assertIn("3 seguidos", d["motivo"])
 
+    def test_motivo_del_fallo_y_eliminar_campana(self):
+        """v1.4.68: el historial dice en qué etapa y por qué falló; una campaña terminada se puede eliminar."""
+        c = self.campana(ciclos=3, detener=True)
+        job = s.claim(self.st["id"], LIBRE)
+        r = self.report(False)
+        r["steps"][4] = {"name": "R1 serial · PPON movimiento", "state": "fallido", "detail": "No llegó S29 final: abierto, MOV=2, PB=1, TQT=0"}
+        for k in range(5, 14): r["steps"][k] = {"name": str(k), "state": "pendiente"}
+        s.finish(self.st["id"], job["run"]["id"], r)
+        self.assertEqual(s.claim(self.st["id"], LIBRE), {})
+        d = pa.leer(c["id"], "operador@test.mx")
+        self.assertEqual(d["estado"], "fallida")
+        self.assertIn("etapa 5", d["motivo"]); self.assertIn("No llegó S29 final", d["motivo"])
+        self.assertEqual(d["ciclos_detalle"][0]["motivo"]["etapa"], 5)
+        f = next(x for x in pa.lista("operador@test.mx") if x["id"] == c["id"])["ultimo_fallo"]
+        self.assertEqual((f["n"], f["etapa"]), (1, 5))
+        with self.assertRaises(ValueError):
+            pa.eliminar(c["id"], "otra@test.mx")
+        pa.eliminar(c["id"], "operador@test.mx")
+        self.assertFalse(any(x["id"] == c["id"] for x in pa.lista("operador@test.mx")))
+
+    def test_no_se_elimina_campana_activa(self):
+        c = self.campana(ciclos=3)
+        with self.assertRaises(ValueError):
+            pa.eliminar(c["id"], "operador@test.mx")
+
+    def test_reintentos_ack_solos_cuentan_como_aprobado_en_campana(self):
+        """v1.4.70: 14 etapas aprobadas + solo reintentos de ACK → la campaña lo cuenta como aprobado con advertencias
+        y sigue; la prueba guardada (Pruebas TQT) sigue «no_verificado»."""
+        c = self.campana(ciclos=2, detener=True)
+        job = s.claim(self.st["id"], LIBRE)
+        r = self.report(True); r["serial_health"] = dict(r["serial_health"], retries=3)
+        s.finish(self.st["id"], job["run"]["id"], r)
+        self.assertEqual(s.read(job["run"]["id"])["result"], "no_verificado")   # certificación intacta
+        d = pa.leer(c["id"], "operador@test.mx")
+        self.assertEqual((d["estado"], d["conteo"]["aprobados"], d["ciclos_detalle"][0]["result"]), ("activa", 1, "aprobado_con_advertencias"))
+        self.assertIn("run", s.claim(self.st["id"], LIBRE))   # se encola el ciclo 2
+
+    def test_reintentos_con_trama_danada_no_se_perdonan(self):
+        c = self.campana(ciclos=2, detener=True)
+        job = s.claim(self.st["id"], LIBRE)
+        r = self.report(True); r["serial_health"] = dict(r["serial_health"], retries=2, partial_warnings=1)
+        s.finish(self.st["id"], job["run"]["id"], r)
+        self.assertEqual(s.claim(self.st["id"], LIBRE), {})
+        self.assertEqual(pa.leer(c["id"], "operador@test.mx")["estado"], "detenida")
+
     def test_exige_confirmacion_fisica(self):
         with self.assertRaises(ValueError):
             pa.crear("x", "fw", self.t["id"], 1, 0, True, "op", False)

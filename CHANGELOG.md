@@ -1,5 +1,34 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.71 — 2026-10-28
+- **Pruebas automáticas: cuenta atrás entre ciclos.** Al terminar un ciclo, el panel de la campaña en curso muestra:
+  - «Pausa entre ciclos · N s» y «El ciclo N empieza en m:ss», que se actualiza cada segundo;
+  - la hora aproximada de inicio y una barra que se llena durante la pausa.
+
+  La barra fija de abajo también dice «Siguiente ciclo (N) en m:ss». Al llegar a cero muestra «Iniciando el ciclo N: esperando a la Raspberry…». Tras el último ciclo dice «cerrando la campaña» y no muestra cuenta atrás. Solo frontend: se calcula con el fin del ciclo y la pausa de la campaña.
+
+## v1.4.70 — 2026-10-28
+- **Pruebas automáticas: los reintentos de ACK ya no tiran un ciclo bueno.** Esto aplica solo a campañas, por decisión del usuario. Un ciclo cuenta como «aprobado con advertencias» y la campaña sigue si cumple todo esto:
+  - las 14 etapas aprobadas;
+  - la identidad coincide con el inventario;
+  - el único problema de comunicación fueron reintentos de ACK de la R1, sin tramas parciales o dañadas ni errores de escritura.
+
+  El resultado guardado de la prueba no cambia (`tqt_test_runs.result` sigue «no_verificado») y Pruebas TQT sigue igual de estricta para certificar y liberar tarjetas. Caso real: el ciclo del 2026-10-28 a las 14:59 pasó las 14 etapas con 3 reintentos de ACK y la campaña se detuvo. Función `pruebas_auto.resultado_ciclo`, que usan el conteo, el encadenado de ciclos, el detalle y el último fallo.
+
+## v1.4.69 — 2026-10-28
+- **Pruebas TQT › Controles manuales: las partes Serial y Bluetooth quedan separadas.**
+  - «ON/OFF BLE» con el puente de Windows ya no pide «Conecta el puerto serial». Con serial conectado se verifica antes con un S29 (MAC y motor quieto); sin serial se envía igual, porque el puente solo conecta la MAC del inventario, y avisa que hay que comprobar el movimiento a la vista.
+  - Cada parte tiene su propia línea de mensajes: «Serial · …» bajo los botones seriales y «Bluetooth · …» bajo los de Bluetooth, en lugar de una sola compartida. Serial avisa por su cuenta si está desconectado o falta elegir la tarjeta.
+
+## v1.4.68 — 2026-10-28
+- **Pruebas automáticas: por qué falló cada prueba.** Ahora se ve en tres sitios:
+  - en la línea plegada de cada campaña, el último ciclo fallido o sin verificar con su etapa y detalle;
+  - al abrirla, un recuadro «Por qué falló»;
+  - en la tabla de ciclos, una columna «Motivo».
+
+  El motivo de cierre de una campaña fallida ya dice la etapa y el detalle, no solo «Ciclo N fallido». Sale del reporte del agente (`source_report`): `pruebas_auto.motivo_ciclo`, `ultimo_fallo` en la lista y `motivo` en `ciclos_detalle`.
+- **Eliminar campaña del historial.** Hay un botón «Eliminar», con confirmación en dos pasos, en las campañas que no están en curso. Solo puede eliminarlas su dueño o un administrador. `DELETE /api/pruebas-auto/campanas/{id}` quita la campaña y su relación con los ciclos, pero las pruebas siguen en el historial de la tarjeta en Pruebas TQT. Agente 1.4.68 sin cambios de código.
+
 ## v1.4.67 — 2026-10-28
 - **Pruebas automáticas: se aplican todos los ciclos.** Antes, cualquier ciclo «no verificado» o interrumpido cortaba la campaña aunque no se hubiera marcado «detener en falla». Ahora la campaña solo se corta así si se marcó esa opción o si hay 3 ciclos seguidos sin verificar.
 - **Motor de pruebas (agente 1.4.67): espera el err viejo.** La R1 conserva su último err (13/14) hasta unos 2 min. Antes, si el ciclo siguiente lo encontraba todavía activo, se marcaba «no verificado: err ya estaba activo». Ahora espera hasta 150 s, pidiendo un Status cada 5 s, a que la R1 lo limpie, y sigue. Prueba `test_r2_espera_que_r1_limpie_err_anterior`.

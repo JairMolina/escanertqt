@@ -139,7 +139,8 @@
       historyHost = h("div"),
       reportHost = h("div"),
       liveLog = h("pre", { class: "tqt-log tqt-livelog", tabindex: 0 }),
-      manualOut = h("p", { class: "hint", "aria-live": "polite" });
+      manualOut = h("p", { class: "hint", "aria-live": "polite" }),   // mensajes de la parte Bluetooth
+      serialOut = h("p", { class: "hint", "aria-live": "polite" });   // v1.4.69: mensajes de la parte Serial (separados)
     moreBtn.hidden = true;
     // ---- resultado destacado (B.3)
     const sumDot = h("span", { class: "tqt-dot", "aria-hidden": "true" }),
@@ -331,7 +332,7 @@
       h("summary", null, ic("sliders"), h("span", null, "Controles manuales"), ic("chev")),
       h("div", { class: "tqt-fold-body" },
         h("p", { class: "tqt-fold-label" }, "Serial"),
-        h("div", { class: "tqt-serial-manual" }, serialManual),
+        h("div", { class: "tqt-serial-manual" }, serialManual), serialOut,
         h("p", { class: "tqt-fold-label" }, "Bluetooth R1 / R2"), bleRole,
         h("div", { class: "row wrap tqt-manual-btns" }, connectBle, disconnectBle, bleOn, bleOff), manualOut));
     const helpPanel = h("details", { class: "tqt-fold tqt-help" },
@@ -802,8 +803,8 @@
       if (!web()) return cmd("serial", { command: accion === "ON" ? "PPON" : "POFF" });
       if (active || manualBusy || !card) return;
       manualBusy = true; updateControls();
-      try { const r = await window.TQTValWeb.serialManual({ accion, inventory: card }); manualOut.textContent = "Serial: " + r.enviado + " · " + r.respuesta; }
-      catch (e) { message(e.message, true); }
+      try { const r = await window.TQTValWeb.serialManual({ accion, inventory: card }); serialOut.textContent = "Serial · " + accion + " → R1 · enviado " + r.enviado + " · " + r.respuesta; }
+      catch (e) { serialOut.textContent = "Serial · " + accion + " → R1 · error: " + e.message; }
       finally { manualBusy = false; paintWebEstado(); }
     }
     // v1.4.64: «Elegir dispositivo» — escanea con el Bluetooth de la laptop y conecta el elegido (marca R1/R2 por MAC del inventario)
@@ -899,16 +900,16 @@
       }
       manualBusy = true;
       updateControls();
-      manualOut.textContent = "Enviando " + accion + " a " + dispositivo + "…";
+      manualOut.textContent = "Bluetooth · enviando " + accion + " a " + dispositivo + "…";
       try {
         const pcb = dispositivo === "R1" ? tarjeta?.r1 : tarjeta?.r2;
         if (!pcb?.nombre) throw new Error("Selecciona una tarjeta con " + dispositivo + " registrada.");
         const r = await window.TQTValWeb.bleManual({ dispositivo, accion, nombre: pcb.nombre, inventory: card });
         manualOut.textContent = r?.ok
-          ? accion + " → " + dispositivo + " · enviado " + (r.enviado || "—") + " · respuesta " + (r.respuesta || "sin respuesta")
-          : accion + " → " + dispositivo + " · error: " + (r?.error || "sin respuesta");
+          ? "Bluetooth · " + accion + " → " + dispositivo + " · enviado " + (r.enviado || "—") + " · " + (r.respuesta || "sin respuesta")
+          : "Bluetooth · " + accion + " → " + dispositivo + " · error: " + (r?.error || "sin respuesta");
       } catch (e) {
-        manualOut.textContent = accion + " → " + dispositivo + " · error: " + (e?.message || e);
+        manualOut.textContent = "Bluetooth · " + accion + " → " + dispositivo + " · error: " + (e?.message || e);
       } finally {
         manualBusy = false;
         paintWebEstado();
@@ -966,6 +967,12 @@
       if (!bleOk && !busy) manualOut.textContent ||= "Bluetooth desconectado: los controles manuales se habilitan al conectar R1 o R2.";
       if (active) manualOut.textContent = "Bloqueados: la prueba automática usa el transporte.";
       else if (manualOut.textContent.startsWith("Bloqueados")) manualOut.textContent = "";
+      // v1.4.69: la parte Serial avisa por su cuenta (no se mezcla con los mensajes de Bluetooth)
+      const serOk = isWeb ? window.TQTValWeb?.estado?.()?.serial?.estado === "ok" : !!curStation()?.serial_connected;
+      if (serOk && serialOut.textContent.startsWith("Serial desconectado")) serialOut.textContent = "";
+      if (!serOk && !busy) serialOut.textContent ||= "Serial desconectado: conecta el puerto en la tarjeta «Puerto serial» para usar ON/OFF serial.";
+      if (!card && !busy && serOk) serialOut.textContent ||= "Elige la tarjeta en prueba para usar ON/OFF serial.";
+      if (card && serialOut.textContent.startsWith("Elige la tarjeta")) serialOut.textContent = "";
     }
     // ---------------------------------------------------------------- etapas, eventos y resumen
     function setStep(idx, state, detail) {

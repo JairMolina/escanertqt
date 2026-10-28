@@ -387,20 +387,29 @@
             '<summary class="pa-camp-h"><div class="pa-camp-t"><div><b>' + esc(c.nombre) + '</b><span class="pa-badge" data-k="' + (ESTADO_K[c.estado] || 'pend') + '">' +
             esc(vivo ? (c.estado === 'activa' ? 'En curso' : 'Pausada') : ESTADO[c.estado] || c.estado) + '</span></div>' +
             '<p class="pa-camp-meta">' + k.hechos + ' de ' + c.ciclos + ' ciclos · <span class="pa-ok">' + k.aprobados + ' ✓</span> · <span class="pa-bad">' + k.fallidos + ' ✗</span>' +
-            (k.no_verificados ? ' · <span class="pa-warn">' + k.no_verificados + ' sin verificar</span>' : '') + ' · ' + esc(fecha(c.creado)) + '</p></div>' +
+            (k.no_verificados ? ' · <span class="pa-warn">' + k.no_verificados + ' sin verificar</span>' : '') + ' · ' + esc(fecha(c.creado)) + '</p>' +
+            (c.ultimo_fallo ? '<p class="pa-fallo-corto">' + esc(textoFallo(c.ultimo_fallo, true)) + '</p>' : '') + '</div>' +
             '<span class="pa-i pa-chev" data-i="chev" aria-hidden="true"></span></summary>' +
             '<div class="pa-camp-body">' +
             '<p class="pa-camp-meta">' + esc(c.firmware) + ' · ' + (c.tarjeta && c.tarjeta.nombre ? esc(c.tarjeta.nombre) + ' · ' : '') + esc(c.operador) + '</p>' +
             '<div class="pa-barra" role="img" aria-label="' + barraLbl(k, c.ciclos) + '">' + barra(k, c.ciclos) + '</div>' +
             '<div class="pa-res"><span>Pausa ' + esc(c.pausa_s) + ' s · ' + (c.detener_en_falla ? 'se detiene al primer fallo' : 'sigue aunque falle') + '</span></div>' +
+            (c.ultimo_fallo ? '<div class="pa-fallo"><b>Por qué falló</b><p>' + esc(textoFallo(c.ultimo_fallo)) + '</p></div>' : '') +
             (c.motivo ? '<p class="pa-motivo">' + esc(c.motivo) + '</p>' : '') +
             '<div class="pa-acc">' +
             (k.hechos ? '<a class="btn pa-link" href="/api/pruebas-auto/campanas/' + id + '/log.txt" download><span class="pa-i" data-i="download" aria-hidden="true"></span>LOG .txt</a>' : '') +
             '<button class="btn" type="button" data-ver="' + id + '" aria-expanded="' + (abierta === String(c.id)) + '" aria-controls="d' + id + '"><span class="pa-i" data-i="list" aria-hidden="true"></span>Ciclos</button>' +
             (vivo ? '' : '<button class="btn" type="button" data-rep="' + id + '"' + (act ? ' disabled title="Termina o detén la campaña en curso para repetir otra"' : ' title="Carga estos mismos datos en «Nueva campaña»"') +
                 '><span class="pa-i" data-i="repeat" aria-hidden="true"></span>Repetir</button>') +
+            (vivo ? '' : '<button class="btn pa-link pa-del" type="button" data-del="' + id + '" title="Quita esta campaña del historial (sus pruebas siguen en el historial de la tarjeta en Pruebas TQT)"><span class="pa-i" data-i="x" aria-hidden="true"></span><span>Eliminar</span></button>') +
             '</div>' +
             '<div class="pa-ciclos" id="d' + id + '">' + (abierta === String(c.id) && detCache[c.id] ? detCache[c.id] : '') + '</div></div></details>';
+    }
+    function textoFallo(f, corto) {
+        var res = f.resultado === 'no_verificado' ? 'no verificado' : f.resultado === 'interrupted' ? 'interrumpido' : 'falló';
+        var et = f.etapa ? 'etapa ' + f.etapa + (f.nombre ? ' «' + f.nombre + '»' : '') : '';
+        return corto ? 'Ciclo ' + f.n + ' ' + res + (et ? ' en ' + et : '') + (f.detalle ? ': ' + f.detalle : '')
+            : 'Ciclo ' + f.n + ' ' + res + (et ? ' en la ' + et : '') + '. ' + (f.detalle || 'Sin detalle en el reporte; baja el LOG del ciclo.');
     }
     function pintarHistorial() {
         var l = campLista || [], q = ($('hBusca') ? $('hBusca').value : '').trim().toLowerCase();
@@ -432,12 +441,13 @@
     }, true);
     if ($('hBusca')) $('hBusca').addEventListener('input', pintarHistorial);
     function tablaCiclos(det) {
-        return det.length ? '<table class="pa-tabla"><thead><tr><th scope="col">Ciclo</th><th scope="col">Resultado</th><th scope="col">Inicio</th><th scope="col">Fin</th><th scope="col">Duración</th><th scope="col">LOG</th></tr></thead><tbody>' +
+        return det.length ? '<table class="pa-tabla"><thead><tr><th scope="col">Ciclo</th><th scope="col">Resultado</th><th scope="col">Inicio</th><th scope="col">Fin</th><th scope="col">Duración</th><th scope="col">Motivo</th><th scope="col">LOG</th></tr></thead><tbody>' +
             det.map(function (x) {
                 var fin = x.state === 'finished' || x.state === 'interrupted';
                 var res = x.state === 'queued' ? 'En cola' : x.state === 'running' ? 'Probando' : (RES[x.result] || x.result || (x.state === 'interrupted' ? 'Interrumpido' : '—'));
                 return '<tr><td>' + x.n + '</td><td data-r="' + esc(x.result || x.state) + '">' + esc(res) + '</td><td>' + fecha(x.created) + '</td><td>' +
-                    (fin ? fecha(x.updated) : '—') + '</td><td>' + (fin && x.updated && x.created ? dur(x.updated - x.created) : '—') + '</td><td>' +
+                    (fin ? fecha(x.updated) : '—') + '</td><td>' + (fin && x.updated && x.created ? dur(x.updated - x.created) : '—') + '</td><td class="pa-td-motivo">' +
+                    (x.motivo ? esc((x.motivo.etapa ? 'Etapa ' + x.motivo.etapa + ' · ' : '') + (x.motivo.detalle || x.motivo.nombre || '')) : x.state === 'interrupted' ? 'Interrumpido' : '—') + '</td><td>' +
                     (fin ? '<a href="/api/pruebas-auto/ciclos/' + esc(x.run) + '/log.txt" download>.txt</a>' : '') + '</td></tr>';
             }).join('') + '</tbody></table>' : '<p class="hint">Esperando el primer ciclo.</p>';
     }
@@ -459,6 +469,20 @@
             return;
         }
         if (b.dataset.rep) repetir(b.dataset.rep);
+        if (b.dataset.del) {
+            var lbl = b.querySelector('span:last-child');
+            if (!b.dataset.seguro) {
+                b.dataset.seguro = '1'; lbl.textContent = 'Confirmar: eliminar del historial';
+                setTimeout(function () { delete b.dataset.seguro; lbl.textContent = 'Eliminar'; }, 6000);
+                return;
+            }
+            b.disabled = true;
+            api('/api/pruebas-auto/campanas/' + encodeURIComponent(b.dataset.del), { method: 'DELETE' }).then(function (r) {
+                T.toast(r.ok ? 'Campaña eliminada del historial.' : r.error, { kind: r.ok ? 'ok' : 'bad' });
+                if (!r.ok) b.disabled = false;
+                refrescar();
+            });
+        }
     });
 
     /* ---- campaña en curso: ciclo, métricas y estimación, etapa actual, 14 etapas en 4 bloques, sensores y registro ---- */
@@ -645,11 +669,20 @@
                 $('vEtapaC').innerHTML = '';
                 box.dataset.k = 'pend';
                 setTxt($('vEtapaN'), ci ? 'Ciclo ' + ci.n : 'Sin ciclos todavía');
-                setTxt($('vEtapaT'), ci && ci.state === 'queued' ? 'Ciclo en cola: esperando a la Raspberry…'
-                    : ci && ci.state === 'running' ? 'Preparando el ciclo…'
-                    : v.estado === 'pausada' ? 'Pausada: no se encola otro ciclo hasta reanudar.' : 'Entre ciclos (pausa configurada).');
-                setTxt($('vEtapaD'), v.motivo || '');
+                // v1.4.71: entre ciclos, cuenta atrás hasta el siguiente (fin del ciclo + pausa configurada)
+                var entre = v.estado === 'activa' && ci && ci.state !== 'queued' && ci.state !== 'running' && ci.updated;
+                pausa = entre && (!v.ciclos || ci.n < v.ciclos)
+                    ? { n: ci.n + 1, hasta: (ci.updated + (+(vivoCamp && vivoCamp.pausa_s) || 0)) * 1000, seg: +(vivoCamp && vivoCamp.pausa_s) || 0 } : null;
+                if (pausa) { box.dataset.k = 'wait'; tickPausa(); }
+                else {
+                    setTxt($('vEtapaT'), ci && ci.state === 'queued' ? 'Ciclo en cola: esperando a la Raspberry…'
+                        : ci && ci.state === 'running' ? 'Preparando el ciclo…'
+                        : v.estado === 'pausada' ? 'Pausada: no se encola otro ciclo hasta reanudar.'
+                        : entre ? 'Último ciclo terminado: cerrando la campaña…' : 'Entre ciclos.');
+                    setTxt($('vEtapaD'), v.motivo || '');
+                }
             }
+            if (idx >= 0 || fallo >= 0) pausa = null;
             pintarSensores(v.sensores);
             pintarBarra(v, ci, idx);
             pintarLog(v, ci);
@@ -669,8 +702,31 @@
             document.querySelector('.pa-main') && document.querySelector('.pa-main').classList.add('pa-main-pad');
         }
         setTxt($('vBarraT'), (v.estado === 'pausada' ? 'Pausada' : 'En curso') + ' · ciclo ' + (ci ? ci.n : 0) + ' de ' + (v.ciclos || '?'));
-        setTxt($('vBarraS'), idx >= 0 ? 'Etapa ' + (idx + 1) + ' de 14 · ' + nombrePaso(idx) + ' · ' + canal(idx).t : (ci && ci.state === 'queued' ? 'Ciclo en cola' : 'Entre ciclos'));
+        setTxt($('vBarraS'), idx >= 0 ? 'Etapa ' + (idx + 1) + ' de 14 · ' + nombrePaso(idx) + ' · ' + canal(idx).t
+            : pausa ? textoPausa() : (ci && ci.state === 'queued' ? 'Ciclo en cola' : 'Entre ciclos'));
     }
+    /* v1.4.71: cuenta atrás de la pausa entre ciclos (se actualiza cada segundo sin pedir nada al servidor) */
+    var pausa = null;
+    function mmss(seg) { seg = Math.max(0, Math.round(seg)); return Math.floor(seg / 60) + ':' + String(seg % 60).padStart(2, '0'); }
+    function textoPausa() {
+        var r = (pausa.hasta - Date.now()) / 1000;
+        return r > 0 ? 'Siguiente ciclo (' + pausa.n + ') en ' + mmss(r) : 'Iniciando el ciclo ' + pausa.n + '…';
+    }
+    function tickPausa() {
+        if (!pausa) return;
+        var r = (pausa.hasta - Date.now()) / 1000;
+        setTxt($('vEtapaN'), 'Pausa entre ciclos · ' + pausa.seg + ' s');
+        setTxt($('vEtapaT'), r > 0 ? 'El ciclo ' + pausa.n + ' empieza en ' + mmss(r) : 'Iniciando el ciclo ' + pausa.n + ': esperando a la Raspberry…');
+        setTxt($('vEtapaD'), r > 0 ? 'Hacia las ' + new Date(pausa.hasta).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) +
+            '. «Detener al terminar el ciclo» evita que empiece.' : 'La Raspberry lo toma en su próxima consulta (unos segundos).');
+        var bar = $('vPausaBar');
+        if (bar) { bar.hidden = false; bar.style.width = (pausa.seg ? Math.min(100, 100 * (1 - Math.max(0, r) / pausa.seg)) : 100) + '%'; }
+        if ($('vBarraS')) setTxt($('vBarraS'), textoPausa());
+    }
+    setInterval(function () {
+        if (pausa && !document.hidden) tickPausa();
+        else if (!pausa && $('vPausaBar')) $('vPausaBar').hidden = true;
+    }, 1000);
     var ACC_OK = {
         pausar: 'Campaña pausada: el ciclo actual termina y no se encola otro hasta reanudar.',
         reanudar: 'Campaña reanudada.',

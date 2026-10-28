@@ -264,14 +264,37 @@ def crear(nombre, firmware, tid, ciclos, pausa_s, detener_en_falla, operador, co
     return leer(cid)
 
 
+def resultado_ciclo(result, report):
+    """v1.4.70 (decisión del usuario, SOLO campañas): un ciclo «no_verificado» con las 14 etapas aprobadas, identidad que
+    coincide con el inventario y cuyo único problema de comunicación fueron reintentos de ACK (sin tramas dañadas/parciales
+    ni errores de escritura) cuenta como «aprobado_con_advertencias» para la campaña. El resultado guardado de la prueba
+    (tqt_test_runs.result, el que usa Pruebas TQT para certificar/liberar) no cambia."""
+    if result != "no_verificado" or not report:
+        return result
+    try:
+        d = json.loads(report) if isinstance(report, str) else report
+    except ValueError:
+        return result
+    src = d.get("source_report") or {}
+    steps = src.get("steps") or []
+    h = src.get("serial_health") or {}
+    if (len(steps) == 14 and all(isinstance(x, dict) and x.get("state") == "aprobado" for x in steps)
+            and (d.get("inventory_check") or {}).get("state") == "coincide" and src.get("mac_comparison") != "no_coincide"
+            and int(h.get("retries", 0) or 0) > 0 and not int(h.get("partial_warnings", 0) or 0)
+            and not int(h.get("ack_errors", 0) or 0) and not int(h.get("corrupt_frames", 0) or 0)):
+        return "aprobado_con_advertencias"
+    return result
+
+
 def _conteo(c, cid):
     k = {"aprobados": 0, "fallidos": 0, "no_verificados": 0, "en_curso": 0}
-    for r in c.execute("SELECT r.state,r.result FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run WHERE x.campana=?", (cid,)):
+    for r in c.execute("SELECT r.state,r.result,r.report FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run WHERE x.campana=?", (cid,)):
+        res = resultado_ciclo(r["result"], r["report"])
         if r["state"] in ("queued", "running"):
             k["en_curso"] += 1
-        elif r["result"] in APROBADOS:
+        elif res in APROBADOS:
             k["aprobados"] += 1
-        elif r["result"] == "fallido":
+        elif res == "fallido":
             k["fallidos"] += 1
         else:
             k["no_verificados"] += 1
@@ -291,6 +314,33 @@ def _fila(c, r):
     return d
 
 
+def motivo_ciclo(report):
+    """v1.4.68: por qué falló o no se verificó un ciclo: etapa (número y nombre) y detalle, o el `issue` del reporte."""
+    try:
+        r = json.loads(report) if isinstance(report, str) else (report or {})
+    except ValueError:
+        return None
+    r = r.get("source_report") or r   # tqt_test_runs.report guarda el del agente dentro de source_report
+    for i, st in enumerate(r.get("steps") or []):
+        if st.get("state") in ("fallido", "no_verificado"):
+            return {"etapa": i + 1, "nombre": st.get("name") or "", "detalle": st.get("detail") or r.get("issue") or ""}
+    return {"etapa": None, "nombre": "", "detalle": r["issue"]} if r.get("issue") else None
+
+
+def _ultimo_fallo(c, cid):
+    r = None
+    for f in c.execute("SELECT x.n,r.result,r.state,r.report FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run "
+                       "WHERE x.campana=? AND (r.result IN ('fallido','no_verificado') OR r.state='interrupted') ORDER BY x.n DESC",
+                       (cid,)):
+        if resultado_ciclo(f["result"], f["report"]) not in APROBADOS:
+            r = f
+            break
+    if not r:
+        return None
+    m = motivo_ciclo(r["report"]) or {"etapa": None, "nombre": "", "detalle": "Ciclo interrumpido (el agente se reinició o perdió la conexión)."}
+    return dict(m, n=r["n"], resultado=r["result"] or r["state"])
+
+
 def lista(email=None):
     """v1.4.52: cada cuenta ve solo sus campañas (sesiones separadas). Sin email (uso interno): todas."""
     init()
@@ -299,7 +349,10 @@ def lista(email=None):
             filas = c.execute("SELECT * FROM tqt_resistencia WHERE operador=? ORDER BY creado DESC LIMIT 200", (email,))
         else:
             filas = c.execute("SELECT * FROM tqt_resistencia ORDER BY creado DESC LIMIT 200")
-        return [_fila(c, r) for r in filas]
+        out = [_fila(c, r) for r in filas]
+        for d in out:   # v1.4.68: por qué falló (último ciclo fallido o no verificado)
+            d["ultimo_fallo"] = _ultimo_fallo(c, d["id"])
+        return out
 
 
 def leer(cid, email=None, admin=False):
@@ -310,8 +363,15 @@ def leer(cid, email=None, admin=False):
             raise ValueError("Campaña no encontrada.")
         d = _fila(c, r)
         d["ciclos_detalle"] = [dict(x) for x in c.execute(
-            "SELECT x.n,r.id run,r.state,r.result,r.created,r.updated FROM tqt_resistencia_ciclos x "
+            "SELECT x.n,r.id run,r.state,r.result,r.created,r.updated,r.report FROM tqt_resistencia_ciclos x "
             "JOIN tqt_test_runs r ON r.id=x.run WHERE x.campana=? ORDER BY x.n DESC", (cid,))]
+        for x in d["ciclos_detalle"]:   # v1.4.68: motivo por ciclo (sin mandar el reporte completo)
+            rep = x.pop("report")
+            x["result_prueba"] = x["result"]
+            x["result"] = resultado_ciclo(x["result"], rep)   # v1.4.70: reintentos de ACK solos = con advertencias
+            x["motivo"] = (motivo_ciclo(rep) if x["result"] not in APROBADOS else
+                           {"etapa": None, "nombre": "", "detalle": "14 etapas aprobadas; reintentos de ACK en el serial (advertencia)."}
+                           if x["result_prueba"] == "no_verificado" else None)
     return d
 
 
@@ -365,8 +425,10 @@ def programar(c, sid, state, now):
     if not camp:
         return None
     cid = camp["id"]
-    ult = c.execute("SELECT x.n,r.state,r.result,r.updated FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run "
+    ult = c.execute("SELECT x.n,r.state,r.result,r.updated,r.report FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run "
                     "WHERE x.campana=? ORDER BY x.n DESC LIMIT 1", (cid,)).fetchone()
+    if ult:
+        ult = dict(ult, result=resultado_ciclo(ult["result"], ult["report"]))
     n = ult["n"] if ult else 0
     if ult and ult["state"] in ("queued", "running"):
         return None
@@ -375,9 +437,9 @@ def programar(c, sid, state, now):
             # v1.4.67: un ciclo no verificado/interrumpido ya no corta siempre la campaña: solo si se pidió detener en falla
             # o si se repite 3 veces seguidas (banco o tarjeta con un problema que no se corrige solo).
             seguidos = 0
-            for r in c.execute("SELECT r.result FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run "
+            for r in c.execute("SELECT r.result,r.report FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run "
                                "WHERE x.campana=? ORDER BY x.n DESC LIMIT 3", (cid,)):
-                if r["result"] in APROBADOS or r["result"] == "fallido":
+                if resultado_ciclo(r["result"], r["report"]) in APROBADOS or r["result"] == "fallido":
                     break
                 seguidos += 1
             if camp["detener_en_falla"] or seguidos >= 3:
@@ -392,7 +454,10 @@ def programar(c, sid, state, now):
             if now - ult["updated"] < camp["pausa_s"]:
                 return None
         if ult["result"] == "fallido" and camp["detener_en_falla"]:
-            _cerrar(c, cid, "fallida", f"Ciclo {n} fallido.", now)
+            m = motivo_ciclo(c.execute("SELECT report FROM tqt_test_runs WHERE id=(SELECT run FROM tqt_resistencia_ciclos "
+                                       "WHERE campana=? AND n=?)", (cid, n)).fetchone()["report"])
+            _cerrar(c, cid, "fallida", f"Ciclo {n} fallido" + (f" en la etapa {m['etapa']} «{m['nombre']}»: {m['detalle']}" if m and m.get("etapa")
+                    else f": {m['detalle']}" if m else "."), now)
             return None
         if n >= camp["ciclos"]:
             k = _conteo(c, cid)
@@ -468,3 +533,18 @@ def vivo(cid, email=None, admin=False):
             lineas = e["text"].splitlines()
     out["log"] = [x for x in lineas if "TX SERIAL: $OK" not in x][-14:]
     return out
+
+
+def eliminar(cid, email, admin=False):
+    """v1.4.68: borra una campaña terminada/detenida/fallida del historial (solo su dueño o un administrador). Los ciclos
+    siguen como pruebas normales en el historial de Pruebas TQT de la tarjeta; solo se quita la campaña y su relación."""
+    init()
+    with db.transaction() as c:
+        r = c.execute("SELECT estado,operador FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
+        if not r or (r["operador"] != email and not admin):
+            raise ValueError("Campaña no encontrada.")
+        if r["estado"] in ACTIVAS:
+            raise ValueError("Detén la campaña antes de eliminarla.")
+        c.execute("DELETE FROM tqt_resistencia_ciclos WHERE campana=?", (cid,))
+        c.execute("DELETE FROM tqt_resistencia WHERE id=?", (cid,))
+    return {"ok": True}

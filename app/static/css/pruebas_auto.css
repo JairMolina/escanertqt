@@ -456,3 +456,19 @@ details[open] > summary > .pa-chev { transform: rotate(90deg); }
 .pa-camp-body { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
 @media (max-width: 640px) { .pa-tg-res { white-space: normal; } .pa-hbusca { max-width: none; margin-left: 0; } }
 @media (prefers-reduced-motion: reduce) { .pa-chev { transition: none; } }
+
+/* v1.4.68: por qué falló y eliminar */
+.pa-fallo-corto { margin: 2px 0 0; font-size: 12px; color: var(--bad); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70ch; }
+.pa-fallo { border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line)); background: color-mix(in srgb, var(--bad) 8%, transparent); border-radius: 10px; padding: 10px 12px; }
+.pa-fallo b { display: block; font-size: 12px; color: var(--bad); margin-bottom: 2px; }
+.pa-fallo p { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.pa-td-motivo { max-width: 360px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.pa-del { color: var(--bad); margin-left: auto; }
+
+/* v1.4.71: cuenta atrás de la pausa entre ciclos */
+.pa-etapa[data-k="wait"] { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.pa-etapa[data-k="wait"] #vEtapaT { font-variant-numeric: tabular-nums; }
+.pa-pausa-track { height: 4px; border-radius: 4px; overflow: hidden; margin-top: 6px; background: var(--tq-soft, var(--line)); }
+.pa-pausa-track:has(i[hidden]) { display: none; }
+.pa-pausa-track i { display: block; height: 100%; background: var(--accent); transition: width 1s linear; }
+@media (prefers-reduced-motion: reduce) { .pa-pausa-track i { transition: none; } }

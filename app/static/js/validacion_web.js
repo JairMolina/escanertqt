@@ -1115,10 +1115,18 @@
         const quitar = onMonitor(e => { if (e.kind === 'log' && e.text.startsWith('RX BLE: ')) respuestas.push(e.text.slice(8)); });
         try {
             if (bleLink instanceof WindowsBleLink) {
-                if (!bleLink.connected || bleLink.dispositivo !== dispositivo) throw new Error('Conecta primero R1 o R2 por MAC.');
+                if (!bleLink.connected || bleLink.dispositivo !== dispositivo) throw new Error('Conecta primero ' + dispositivo + ' por Bluetooth (botón «Conectar Bluetooth» o «Elegir dispositivo»).');
+                // v1.4.69: el control Bluetooth no depende del serial. Con serial conectado se verifica antes con un S29
+                // (MAC y que el motor esté quieto); sin serial se envía igual: el puente ya solo conecta la MAC del inventario.
+                if (!(link && cx && st.serial.estado === 'ok')) {
+                    if (enCurso) throw new Error('Hay una operación en curso.');
+                    await bleLink.send(comando);
+                    return { ok: true, enviado: comando + ' → ' + (bleLink.nombre || dispositivo) + ' (' + bleLink.address + ')',
+                        respuesta: 'Enviado por Bluetooth. Sin serial no se lee el S29: comprueba el movimiento a la vista.' };
+                }
                 return await manualOperation(inventory, async () => {
                     await bleLink.send(comando);
-                    return { ok: true, enviado: comando + ' → ' + bleLink.address, respuesta: 'Enviado por Bluetooth Windows; verifica sensores.' };
+                    return { ok: true, enviado: comando + ' → ' + (bleLink.nombre || dispositivo) + ' (' + bleLink.address + ')', respuesta: 'Enviado por Bluetooth; verifica los sensores.' };
                 });
             }
             if (!(bleLink.connected && bleLink.dispositivo === dispositivo && (!nombre || norm(bleLink.nombre) === norm(nombre)))) {
