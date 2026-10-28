@@ -11,7 +11,7 @@ from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
 
 
-AGENT_VERSION = "1.4.72"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
+AGENT_VERSION = "1.4.73"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
 LOG_MAX = 256 * 1024                      # cola de agent.log que se sube cuando la web la pide
 # v1.4.64: la autoactualización nunca sobrescribe lo propio de esta instalación.
 PROTEGIDOS = {"config.json", "puerto_serie.txt", "agent.log", "outbox.db", ".agent.lock"}
@@ -87,6 +87,13 @@ class Bridge:
         self.ready = ""
         self.devices = []
         self.store = sqlite3.connect(folder / "outbox.db", check_same_thread=False)
+        # v1.4.73: cada línea del log se encola aquí; en la SD de la Raspberry un commit con fsync completo tardaba y
+        # frenaba el hilo serial. WAL + synchronous=NORMAL conserva la cola tras un reinicio y es mucho más rápido.
+        try:
+            self.store.execute("PRAGMA journal_mode=WAL")
+            self.store.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.DatabaseError:
+            pass
         self.store.execute(
             "CREATE TABLE IF NOT EXISTS outbox(id INTEGER PRIMARY KEY,path TEXT NOT NULL,body TEXT NOT NULL)"
         )
@@ -284,16 +291,28 @@ class Bridge:
 
     def flush(self):
         # Persistent ordered retries never repeat a command or a test run.
+        # v1.4.73: los eventos seguidos de la misma prueba viajan juntos (hasta 50 por POST) en lugar de uno por línea;
+        # el servidor ya es idempotente por seq. Otros envíos siguen uno a uno y en orden.
         for _ in range(100):
             with self.lock:
-                row = self.store.execute(
-                    "SELECT id,path,body FROM outbox ORDER BY id LIMIT 1"
-                ).fetchone()
-            if not row:
+                rows = self.store.execute(
+                    "SELECT id,path,body FROM outbox ORDER BY id LIMIT 50"
+                ).fetchall()
+            if not rows:
                 return
-            self.api(row[1], json.loads(row[2]))
+            path, ids, body = rows[0][1], [rows[0][0]], json.loads(rows[0][2])
+            if path.endswith("/events") and isinstance(body.get("items"), list):
+                for rid, p2, b2 in rows[1:]:
+                    if p2 != path:
+                        break
+                    extra = json.loads(b2).get("items")
+                    if not isinstance(extra, list):
+                        break
+                    body["items"].extend(extra)
+                    ids.append(rid)
+            self.api(path, body)
             with self.lock:
-                self.store.execute("DELETE FROM outbox WHERE id=?", (row[0],))
+                self.store.executemany("DELETE FROM outbox WHERE id=?", [(i,) for i in ids])
                 self.store.commit()
 
     def execute(self, cmd):

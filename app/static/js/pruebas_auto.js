@@ -769,11 +769,44 @@
             if (mk) { var i = txt.lastIndexOf(mk); desde = i >= 0 ? i + mk.length : 0; }
             var vis = txt.slice(desde).replace(/^\n+/, '');
             $('lTodo').hidden = !mk;
-            pre.textContent = vis ? vis.split('\n').slice(-400).join('\n') : (mk ? 'Vista limpia. Aquí aparecerán las líneas nuevas del agente (pulsa «Traer log»).' : '');
+            if (vis) pre.innerHTML = terminal(vis);
+            else pre.textContent = mk ? 'Vista limpia. Aquí aparecerán las líneas nuevas del agente (pulsa «Traer log»).' : '';
             if (abajo) pre.scrollTop = pre.scrollHeight;
             $('lMeta').textContent = r.data.ts ? 'Recibido ' + hace(r.data.ts) : '';
         });
     }
+    /* v1.4.73: terminal legible: líneas repetidas seguidas se agrupan («× 23»), color por tipo (error, conexión,
+       arranque/actualización, puerto) y opción de ocultar los reintentos de conexión con el servidor. */
+    var CLAVE_RED = 'pa.log.sinred';
+    function sinRed() { try { return localStorage.getItem(CLAVE_RED) === '1'; } catch (e) { return false; } }
+    function tipoLinea(l) {
+        if (/^Reporte\/conexión pendiente|urlopen error|timed out|Bad Gateway|name resolution/i.test(l)) return 'red';
+        if (/Traceback|Error|ERROR|RuntimeError|eliminado desde la web/.test(l)) return 'bad';
+        if (/Autoactualización|iniciado en/.test(l)) return 'ok';
+        if (/Puerto serie|puerto|BLE|Bluetooth/i.test(l)) return 'info';
+        if (/^\s+(File |\^|~)/.test(l)) return 'bad';
+        return '';
+    }
+    function terminal(txt) {
+        var lineas = txt.split('\n'), out = [], ocultas = 0, filtrar = sinRed();
+        lineas = lineas.slice(-1500);
+        for (var i = 0; i < lineas.length; i++) {
+            var l = lineas[i]; if (!l.trim()) continue;
+            var k = tipoLinea(l);
+            if (filtrar && k === 'red') { ocultas++; continue; }
+            var n = 1; while (i + 1 < lineas.length && lineas[i + 1] === l) { n++; i++; }
+            var m = /^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+(.*)$/.exec(l);
+            out.push('<span class="pa-tl" data-k="' + k + '">' + (m ? '<span class="pa-tl-ts">' + esc(m[1]) + '</span> ' + esc(m[2]) : esc(l)) +
+                (n > 1 ? ' <span class="pa-tl-rep">× ' + n + '</span>' : '') + '</span>');
+        }
+        if (ocultas) out.unshift('<span class="pa-tl" data-k="nota">' + ocultas + ' líneas de reintento de conexión ocultas</span>');
+        return out.slice(-400).join('');   // cada línea es un bloque: sin saltos extra
+    }
+    $('lRed').checked = sinRed();
+    $('lRed').addEventListener('change', function () {
+        try { localStorage.setItem(CLAVE_RED, this.checked ? '1' : '0'); } catch (e) { /* nada */ }
+        verLog();
+    });
     /* v1.4.67: «Limpiar» vacía la vista: se recuerda el final actual del log (en este navegador) y solo se muestran las
        líneas nuevas. «Mostrar todo» lo deshace. No borra nada en la Raspberry ni en el servidor (el .txt sigue completo). */
     var logTexto = '', CLAVE_LOG = 'pa.log.limpio';

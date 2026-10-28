@@ -8,7 +8,11 @@ Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530
 
 Main incluye los avances de otros colaboradores: Pruebas automáticas por cuenta y Raspberry, exclusión de Raspberry de bancos normales, agentes/puentes BLE por cuenta y avisos de actualización, sincronización Skytec y rediseño de Diagrama. No volver a desplegar 1.4.49 ni el checkout documental antiguo. Las notas anteriores de despliegue 1.4.51 pendiente están superadas por esta comprobación de producción; las pruebas físicas y la configuración de Skytec no se revalidaron hoy.
 
-## Claude v1.4.72 (main, sin desplegar)
+## Claude v1.4.73 (main, sin desplegar)
+
+Agente: `$OK` antes de registrar la línea, outbox en WAL/synchronous=NORMAL y eventos en lotes (hasta 50 por POST); espera de R2 de 32 a 60 s. Causa: en el ciclo 2 la Raspberry tardaba 1–2 s por ACK → reintentos de la R1 y cola de mensajes → «cerrado» llegó 33 s tarde. Log del agente con estilo de terminal.
+
+## Claude v1.4.72 (main 8227cf6)
 
 Etapa 12: hasta 3 escaneos BLE y búsqueda de la R2 por MACR aunque anuncie sin nombre (engine.connect_r2). Causa típica: un celular conectado a la R2 hace que deje de anunciarse.
 

@@ -301,7 +301,7 @@ class TestStation:
             self._require(before.position != expected, f'R2 no producirá transición: ya {expected}')
         cursor = self._checkpoint()
         self.ble.send(cmd)
-        until = time.monotonic() + 32
+        until = time.monotonic() + 60   # v1.4.73: antes 32 s; con el canal lento la R1 entrega su cola tarde
         last_poll = 0.0
         moved = event = False
         while time.monotonic() < until:

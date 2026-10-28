@@ -103,7 +103,7 @@ class SerialLink:
         self._wait_command_window()
         self._write(data)
 
-    def _write(self, data: bytes):
+    def _write(self, data: bytes, log: bool = True):
         with self._writer:
             is_status = data == b'$SMSG=Status\r\n'
             if is_status:
@@ -119,8 +119,9 @@ class SerialLink:
         if count != len(data):
             if data == b'$SMSG=Status\r\n': self._pending_status.clear()
             raise IOError(f'Escritura serial incompleta: {count}/{len(data)} bytes')
-        label = data.decode('utf-8', 'replace').replace('\r', '[CR]').replace('\n', '[LF]')
-        self.on_info('TX SERIAL: ' + label)
+        if log:
+            label = data.decode('utf-8', 'replace').replace('\r', '[CR]').replace('\n', '[LF]')
+            self.on_info('TX SERIAL: ' + label)
 
     def _read(self):
         buf = bytearray()
@@ -144,8 +145,28 @@ class SerialLink:
                             reported_fragment = False
                             if line:
                                 self._frames += 1
-                                self.on_info('RX SERIAL: ' + line)
                                 has_header = line.startswith('AT$POST=1,0,"')
+                                # v1.4.73: el $OK sale ANTES de registrar la línea. Registrar (archivo + cola de eventos
+                                # en SQLite sobre la SD de la Raspberry) podía tardar 1–2 s; la R1 reintentaba, se le
+                                # acumulaba la cola de mensajes y las tramas llegaban decenas de segundos tarde.
+                                ack_ok = None
+                                if has_header:
+                                    self._ack_idle.clear()
+                                    try:
+                                        time.sleep(self.ack_delay_s)
+                                        self._write(b'$OK\r\n', log=False)
+                                        self._last_ack = time.monotonic()
+                                        ack_ok = True
+                                    except Exception as exc:
+                                        self._ack_errors += 1
+                                        ack_ok = exc
+                                    finally:
+                                        self._ack_idle.set()
+                                self.on_info('RX SERIAL: ' + line)
+                                if ack_ok is True:
+                                    self.on_info('TX SERIAL: $OK[CR][LF]')
+                                elif ack_ok is not None:
+                                    self.on_info('ERROR ACK: ' + str(ack_ok))
                                 damaged = ('\ufffd' in line or
                                            ('AT$POST' in line and not has_header))
                                 if damaged:
@@ -160,18 +181,7 @@ class SerialLink:
                                         self._partial_warnings += 1
                                         self.on_info('ERROR RX: S29 incompleto, longitud=' + str(len(line)) +
                                                      '; campos=' + str(line.count('|')) + '/29; no sirve para validación')
-                                    # Confirmación de recepción incluso si la trama está dañada;
-                                    # aceptar ACK no significa aprobar la evidencia.
-                                    self._ack_idle.clear()
-                                    try:
-                                        time.sleep(self.ack_delay_s)
-                                        self._write(b'$OK\r\n')
-                                        self._last_ack = time.monotonic()
-                                    except Exception as exc:
-                                        self._ack_errors += 1
-                                        self.on_info('ERROR ACK: ' + str(exc))
-                                    finally:
-                                        self._ack_idle.set()
+                                    # (el ACK ya se envió arriba, también para tramas dañadas: aceptar ACK no aprueba evidencia)
                                 if has_header and not damaged and not partial and line.endswith('"'):
                                     # S29 completo: liberar la consulta pendiente.
                                     # Puede ser una trama espontánea; el origen exacto no

@@ -53,6 +53,22 @@ class FragmentTests(unittest.TestCase):
         self.assertEqual(parse_status(received[0]).fields['ID'], '0036')
         self.assertEqual(link.health['partial_warnings'], 0)
 
+    def test_ack_sale_antes_de_registrar_la_linea(self):
+        """v1.4.73: el $OK no espera al registro (lento en la SD de la Raspberry): se escribe antes del log RX."""
+        orden = []
+        class Lento(ReplaySerial):
+            def write(self, data):
+                orden.append(('write', data)); return super().write(data)
+        def info(t):
+            orden.append(('log', t[:9]))
+            if t.startswith('RX SERIAL'): time.sleep(.3)   # registro lento
+        link = SerialLink(lambda l: None, info)
+        fake = Lento(link, [STATUS.encode('ascii') + b'\r\n'])
+        link._serial = fake; link._running.set(); link.ack_delay_s = .001
+        link._read()
+        self.assertEqual(orden[0], ('write', b'$OK\r\n'))
+        self.assertEqual([x for x in orden if x[0] == 'log'][:2], [('log', 'RX SERIAL'), ('log', 'TX SERIAL')])
+
     def test_corrupt_header_is_excluded_but_hex_preserved(self):
         received, logs = [], []
         link = SerialLink(received.append, logs.append)

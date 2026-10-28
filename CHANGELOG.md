@@ -1,5 +1,24 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.73 — 2026-10-28
+- **Agente 1.4.73: el `$OK` ya no llega tarde a la R1.** En el ciclo 2 de la prueba del 2026-10-28 a las 15:36, el perno cerró bien pero la etapa 13 falló con «R1 no observó cerrado tras POFF por R2»:
+  - **El retraso:** la Raspberry tardaba 1–2 s en responder `$OK` a cada trama (en el ciclo 1, unos 0.2 s).
+  - **El efecto:** la R1 reintentaba; como envía sus mensajes en cola y espera el ACK de cada uno, se le acumularon. La trama de «cerrado» llegó 33 s después del POFF, cuando la espera era de 32 s.
+  - **La causa:** el hilo serial escribía cada línea en el log y en la cola de eventos (SQLite con fsync en la SD) antes de mandar el `$OK`, y cada línea viajaba al servidor en su propio POST.
+
+  Cambios:
+  - el `$OK` se envía antes de registrar la línea;
+  - la cola de eventos usa WAL y `synchronous=NORMAL`;
+  - los eventos seguidos de una misma prueba viajan juntos, hasta 50 por POST;
+  - la espera de la posición final en las etapas de R2 pasa de 32 s a 60 s.
+
+  Pruebas: `test_ack_sale_antes_de_registrar_la_linea` y `test_cola_de_eventos_viaja_en_lotes`.
+- **Pruebas automáticas: log del agente más legible.** Se ve como una terminal oscura:
+  - las líneas repetidas seguidas se agrupan con «× N»;
+  - los colores separan errores y Traceback (rojo), arranques y autoactualizaciones (verde), puerto y Bluetooth (azul) y reintentos de conexión (gris);
+  - la hora sale atenuada;
+  - la casilla «Ocultar reintentos de conexión» se recuerda en el navegador.
+
 ## v1.4.72 — 2026-10-28
 - **Motor de pruebas (agente 1.4.72): la R2 se busca hasta 3 veces y también por dirección.** En la etapa 12 un solo escaneo de 7 s a veces no veía la R2 y el ciclo quedaba «no verificado: No se identificó R2 automáticamente por MACR». La MACR era correcta: en ciclos anteriores la misma MACR conectó la R2. Ahora:
   - hay hasta 3 escaneos con 2 s entre ellos;

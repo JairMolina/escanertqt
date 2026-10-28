@@ -78,6 +78,25 @@ class Autoactualizacion(unittest.TestCase):
             self.assertFalse((base / ".venv").exists())
             self.assertTrue(agent.instalar_paquete(base, self.paquete("bleak\npyserial\n")))
 
+    def test_cola_de_eventos_viaja_en_lotes(self):
+        """v1.4.73: eventos seguidos de la misma prueba van en un solo POST; otro destino corta el lote y sigue el orden."""
+        import sqlite3
+        from unittest import mock
+        b = object.__new__(agent.Bridge)
+        b.lock = threading.RLock()
+        b.store = sqlite3.connect(":memory:", check_same_thread=False)
+        b.store.execute("CREATE TABLE outbox(id INTEGER PRIMARY KEY,path TEXT NOT NULL,body TEXT NOT NULL)")
+        for i in range(1, 4):
+            b.store.execute("INSERT INTO outbox(path,body) VALUES(?,?)", ("runs/r1/events", json.dumps({"items": [{"seq": i, "data": {}}]})))
+        b.store.execute("INSERT INTO outbox(path,body) VALUES(?,?)", ("runs/r1/finish", json.dumps({"x": 1})))
+        b.store.execute("INSERT INTO outbox(path,body) VALUES(?,?)", ("runs/r1/events", json.dumps({"items": [{"seq": 4, "data": {}}]})))
+        b.api = mock.Mock(return_value={"ok": True})
+        b.flush()
+        envios = [(c.args[0], c.args[1]) for c in b.api.call_args_list]
+        self.assertEqual([p for p, _ in envios], ["runs/r1/events", "runs/r1/finish", "runs/r1/events"])
+        self.assertEqual([x["seq"] for x in envios[0][1]["items"]], [1, 2, 3])
+        self.assertEqual(b.store.execute("SELECT COUNT(*) FROM outbox").fetchone()[0], 0)
+
     def test_linux_decide_actualizar_y_relanza(self):
         """v1.4.64: la Raspberry (Linux) también se autoactualiza; espera a que no haya prueba/comando/BLE."""
         from unittest import mock

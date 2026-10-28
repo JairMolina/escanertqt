@@ -472,3 +472,16 @@ details[open] > summary > .pa-chev { transform: rotate(90deg); }
 .pa-pausa-track:has(i[hidden]) { display: none; }
 .pa-pausa-track i { display: block; height: 100%; background: var(--accent); transition: width 1s linear; }
 @media (prefers-reduced-motion: reduce) { .pa-pausa-track i { transition: none; } }
+
+/* v1.4.73: terminal del log del agente */
+#lTexto { background: #0B0F17; color: #C9D3E3; border-color: #1E2633; font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+:root[data-theme="light"] #lTexto { background: #0F1420; color: #D3DCEA; }
+.pa-tl { display: block; padding-left: 10px; border-left: 2px solid transparent; }
+.pa-tl-ts { color: #6B7A90; }
+.pa-tl[data-k="red"] { color: #8A96A8; }
+.pa-tl[data-k="bad"] { color: #FF8A8A; border-left-color: #FF5C5C; }
+.pa-tl[data-k="ok"] { color: #7EE2A8; border-left-color: #3FD08A; }
+.pa-tl[data-k="info"] { color: #8EC5FF; }
+.pa-tl[data-k="nota"] { color: #6B7A90; font-style: italic; }
+.pa-tl-rep { display: inline-block; padding: 0 6px; border-radius: 999px; background: #1E2633; color: #C9D3E3; font-size: 11px; }
+.pa-log-filtro { font-size: 12px; margin-left: auto; }
