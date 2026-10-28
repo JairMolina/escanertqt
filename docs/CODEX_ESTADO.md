@@ -8,7 +8,11 @@ Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530
 
 Main incluye los avances de otros colaboradores: Pruebas automáticas por cuenta y Raspberry, exclusión de Raspberry de bancos normales, agentes/puentes BLE por cuenta y avisos de actualización, sincronización Skytec y rediseño de Diagrama. No volver a desplegar 1.4.49 ni el checkout documental antiguo. Las notas anteriores de despliegue 1.4.51 pendiente están superadas por esta comprobación de producción; las pruebas físicas y la configuración de Skytec no se revalidaron hoy.
 
-## Claude v1.4.71 (main, sin desplegar; incluye 1.4.68–1.4.70)
+## Claude v1.4.72 (main, sin desplegar)
+
+Etapa 12: hasta 3 escaneos BLE y búsqueda de la R2 por MACR aunque anuncie sin nombre (engine.connect_r2). Causa típica: un celular conectado a la R2 hace que deje de anunciarse.
+
+## Claude v1.4.71 (main 08ca716; incluye 1.4.68–1.4.70)
 
 Cuenta atrás de la pausa entre ciclos en el panel y la barra fija (solo pruebas_auto.js/.html/.css).
 

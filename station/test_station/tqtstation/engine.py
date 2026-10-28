@@ -469,10 +469,21 @@ class TestStation:
             def connect_r2():
                 nonlocal selected_r2
                 self.ble.disconnect()
-                scanned = self.ble.scan()  # Fresh scan after disconnecting R1
                 related = normalize_mac(self.latest.fields.get('MACR', '') if self.latest else '')
-                exact = [d for d in scanned if related and normalize_mac(d.address) == related and
-                         d.address != selected_r1]
+                # v1.4.72: hasta 3 escaneos y buscando también por dirección (la R2 a veces anuncia sin nombre en un
+                # escaneo corto, o no anuncia mientras otro equipo, p. ej. un celular, está conectado a ella).
+                objetivo = ':'.join(related[i:i + 2] for i in range(0, 12, 2)) if len(related) == 12 else None
+                exact, scanned = [], []
+                for intento in range(1, 4):
+                    scanned = self.ble.scan(target=objetivo)  # Fresh scan after disconnecting R1
+                    exact = [d for d in scanned if related and normalize_mac(d.address) == related and
+                             d.address != selected_r1]
+                    if len(exact) == 1 or intento == 3:
+                        break
+                    self.log(f'R2 ({objetivo or related}) no visible en el escaneo {intento}/3; se reintenta. '
+                             'Si un celular u otro equipo está conectado a la R2, desconéctalo: mientras tiene conexión no se anuncia.')
+                    if self.cancel.is_set(): raise Interrupted('Cancelada')
+                    time.sleep(2)
                 if len(exact) == 1:
                     chosen = exact[0]
                     method = 'MACR reportada por R1'
@@ -483,12 +494,16 @@ class TestStation:
                     chosen = selected[0]
                     method = 'selección manual alternativa (MACR no coincidió)'
                 else:
-                    raise NoVerification('No se identificó R2 automáticamente por MACR='+related+
-                        '. Por seguridad, no se enviaron comandos a otro BLE. '+
-                        'Opciones: selección manual de R2 y reintentar. Detectados: '+
-                        ', '.join(f'{d.name}({d.address})' for d in scanned))
-                self._require('R2' in chosen.name.upper(),
-                              'La MACR coincide pero el nombre BLE no identifica a R2: '+chosen.name)
+                    raise NoVerification('No se encontró la R2 (MACR '+(objetivo or related)+') en 3 escaneos BLE. '+
+                        'La MACR es la que reporta la R1; lo más común es que la R2 no esté anunciándose: '+
+                        'otro equipo (p. ej. un celular) conectado a ella, R2 apagada o fuera de alcance. '+
+                        'No se enviaron comandos a otro BLE. Detectados: '+
+                        (', '.join(f'{d.name or "sin nombre"}({d.address})' for d in scanned) or 'ninguno'))
+                if chosen.name:
+                    self._require('R2' in chosen.name.upper(),
+                                  'La MACR coincide pero el nombre BLE no identifica a R2: '+chosen.name)
+                else:   # anunció sin nombre: la dirección exacta (MACR de la R1) es el criterio
+                    self.log(f'R2 encontrada por dirección {chosen.address} sin nombre en el anuncio; se acepta por MACR exacta')
                 selected_r2 = chosen.address
                 self.ble.connect(selected_r2)
                 self.ui('ble_ident','R2',chosen.name,selected_r2,method)

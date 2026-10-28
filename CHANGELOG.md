@@ -1,5 +1,13 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.72 — 2026-10-28
+- **Motor de pruebas (agente 1.4.72): la R2 se busca hasta 3 veces y también por dirección.** En la etapa 12 un solo escaneo de 7 s a veces no veía la R2 y el ciclo quedaba «no verificado: No se identificó R2 automáticamente por MACR». La MACR era correcta: en ciclos anteriores la misma MACR conectó la R2. Ahora:
+  - hay hasta 3 escaneos con 2 s entre ellos;
+  - se busca la R2 también por su dirección (MACR), aunque anuncie sin nombre, y se acepta por la MACR exacta;
+  - el log explica la causa más común: un celular u otro equipo conectado a la R2 hace que deje de anunciarse.
+
+  Prueba `test_r2_invisible_en_el_primer_escaneo_se_reintenta`.
+
 ## v1.4.71 — 2026-10-28
 - **Pruebas automáticas: cuenta atrás entre ciclos.** Al terminar un ciclo, el panel de la campaña en curso muestra:
   - «Pausa entre ciclos · N s» y «El ciclo N empieza en m:ss», que se actualiza cada segundo;

@@ -53,7 +53,7 @@ class BLELink:
         self.devices = {}
         for d, adv in result.values():
             name = (adv.local_name or d.name or '').strip()
-            if 'TQT' in name.upper() or (target and d.address.upper() == target.upper()):
+            if 'TQT' in name.upper() or (target and d.address.upper() == target.upper()):   # target: también sin nombre
                 addr = d.address.upper()
                 self.devices[addr] = d
                 found.append(FoundDevice(name, addr))

@@ -54,7 +54,7 @@ class FakeSerial:
     def send(self,raw):self.fx.send(raw)
 class FakeBLE:
     def __init__(self,fx):self.fx=fx;self.devices={}
-    def scan(self):
+    def scan(self,target=None):
         arr=self.fx.scan();self.devices=self.fx.devices;return arr
     def connect(self,addr):self.fx.connect(addr)
     def disconnect(self):self.fx.disconnect()
@@ -146,5 +146,27 @@ class TestWorkflow(unittest.TestCase):
             self.assertEqual(st.report['result'],'aprobado',st.report.get('issue'))
             texto=''.join(p.read_text(encoding='utf-8') for p in Path(tmp).glob('*.log'))
             self.assertIn('se espera a que lo limpie',texto)
+
+    def test_r2_invisible_en_el_primer_escaneo_se_reintenta(self):
+        """v1.4.72: si la R2 no aparece en el primer escaneo (p. ej. un celular conectado a ella), se reintenta."""
+        class Tardia(Fixture):
+            n=0
+            def scan(self):
+                arr=super().scan()
+                if any(d.address=='11:22:33:44:55:66' for d in arr) and self.active_ble=='' and Tardia.n<1 and getattr(self,'r1_usada',False):
+                    Tardia.n+=1
+                    arr=[d for d in arr if d.address!='11:22:33:44:55:66']; self.devices={d.address:d for d in arr}
+                return arr
+            def connect(self,addr):
+                if addr=='AA:BB:CC:DD:EE:FF': self.r1_usada=True
+                super().connect(addr)
+        fx=Tardia();st=TestStation(FakeSerial(fx),FakeBLE(fx),lambda *a:None)
+        fx.station=st;st.repeat_verify_s=.08
+        with tempfile.TemporaryDirectory() as tmp:
+            st.output_dir=Path(tmp);st.start('COM_FAKE')
+            st._run_thread.join(60)
+            self.assertEqual(st.report['result'],'aprobado',st.report.get('issue'))
+            texto=''.join(p.read_text(encoding='utf-8') for p in Path(tmp).glob('*.log'))
+            self.assertIn('no visible en el escaneo 1/3',texto)
 
 if __name__=='__main__':unittest.main()
