@@ -27,7 +27,7 @@ class TestPortalModulos(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(settings.APP_VERSION, r.text)
         self.assertNotIn("__VERSION__", r.text)
-        for url in ("/static/js/inicio.js", "/static/css/inicio.css", "/api/health"):
+        for url in ("/static/js/inicio.js", "/static/js/planetas.js", "/static/css/inicio.css", "/api/health"):
             self.assertEqual(self.c.get(url).status_code, 200, url)
 
     def test_raiz_sin_sesion_va_al_portal_y_lo_demas_al_login(self):

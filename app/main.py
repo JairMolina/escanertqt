@@ -126,7 +126,7 @@ CABECERAS_SEGURIDAD = {
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
 RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/antijammer/acceso", "/speedlocker/acceso", "/sigfox/acceso", "/caiquen/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico",
                   "/documentacion", "/documentacion/manual"}   # v1.4.39: Documentación TEAM HW es pública (sin datos ni API)
-PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js", "/static/documentacion/")
+PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js", "/static/js/planetas.js", "/static/documentacion/")
 
 
 PAGINAS_CONSULTOR = {"/consultar", "/escaner", "/favicon.ico", "/api/health", "/impresora", "/tpms", "/antijammer", "/speedlocker", "/sigfox", "/caiquen", "/documentacion", "/documentacion/manual"}   # v1.4.14: Impresora en solo lectura; v1.4.27: TPMS (solo escaneo); v1.4.31: AntiJammer; v1.4.32: SpeedLocker; v1.4.33: Skudo Sigfox

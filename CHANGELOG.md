@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.75 — 2026-10-29
+- **Portada `/inicio`: planetas 3D.** Cada módulo es una esfera con shader WebGL (`app/static/js/planetas.js`): relieve procedural, luz desde arriba a la izquierda, terminador suave, atmósfera y rotación lenta. Tres tipos como antes: gigante con bandas y anillo, rocoso con cráteres y tormenta en bandas. Sin WebGL queda el planeta CSS de siempre.
+- **Rendimiento de la portada:** un solo contexto WebGL compartido; mapas horneados una vez por planeta; compilación sin bloquear (`KHR_parallel_shader_compile`); la tubería empieza al cargar la página; 15 cuadros/s; con `prefers-reduced-motion` o en móvil se dibuja una vez. `?planetas=css` desactiva el 3D para comparar.
+- **Póster de carga:** mientras llega la lista de módulos se ve la constelación estática (SVG inline en `#escena`); se desvanece cuando `inicio.js` pone `html.listo`. Si el script falla, se oculta a los 15 s.
+- `/static/js/planetas.js` es público (igual que `inicio.js`). AGENT_VERSION sube con APP_VERSION (convención del proyecto; el agente no cambió).
+
 ## v1.4.74 — 2026-10-29
 - **Agente 1.4.74: la conexión BLE se reintenta.** La campaña `78d9f0cf` (Prueba5, tarjeta 0057) aprobó 5 ciclos y el 6.º (23:00) falló en la etapa 6 con `BleakError: failed to discover services, device disconnected`: la R1 soltó el enlace al descubrir servicios y no había reintento. Ahora R1 y R2 se reintentan 2 veces con escaneo nuevo (`TestStation._conectar_ble`). Pruebas: `ConexionBleReintenta`.
 - **Puente BLE de Windows: suelta la tarjeta si queda inactiva.** Si la web se cerraba o cambiaba de página (p. ej. de Pruebas TQT a Programación) sin desconectar, el puente seguía conectado a la tarjeta indefinidamente; mientras la ESP32 tiene una conexión no se anuncia, así que la OTA por Bluetooth de Programación (de esa u otra laptop) fallaba. Ahora el agente desconecta tras 180 s sin comandos BLE (igual que la reserva del servidor).

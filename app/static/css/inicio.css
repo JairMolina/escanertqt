@@ -100,6 +100,14 @@ body::before {
 .lin .luz { stroke: var(--a, var(--accent)); stroke-width: 1.25; stroke-linecap: round; pointer-events: none; stroke-dasharray: 1 2; stroke-dashoffset: 1; transition: stroke-dashoffset 420ms var(--ease); }
 .lin.on .luz { stroke-dashoffset: 0; }
 .escena[data-act] .lin:not(.on) { opacity: .45; }
+
+/* v1.4.75: póster de carga estático (sin animación). Se desvanece cuando inicio.js pone html.listo; si el script falla,
+   se oculta solo a los 15 s para no tapar la página. */
+.carga { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; color: var(--muted); pointer-events: none;
+         transition: opacity .45s var(--ease), visibility 0s linear .45s; animation: carga-fuera .4s linear 15s forwards; }
+.carga svg { width: 100%; height: 100%; }
+html.listo .carga { opacity: 0; visibility: hidden; }
+@keyframes carga-fuera { to { opacity: 0; visibility: hidden; } }
 .escena[data-act] #orbitas .glow { opacity: 0; transition: opacity var(--t-media) var(--ease); }
 
 /* ---------- núcleo: la plataforma ---------- */
@@ -230,6 +238,10 @@ body::before {
   filter: saturate(.45) brightness(.72); box-shadow: inset calc(var(--d) * -.2) calc(var(--d) * -.1) calc(var(--d) * .28) rgba(0,0,0,.6); }
 .mod:nth-child(3n+1):not([data-estado="disponible"]) .astro::before, .mod:nth-child(3n+1):not([data-estado="disponible"]) .astro::after { opacity: .45; }
 .mod[data-estado="mantenimiento"] .astro { outline: 1.5px dashed color-mix(in srgb, var(--a) 45%, var(--line-2)); outline-offset: 3px; }
+/* v1.4.75: planeta 3D (planetas.js, WebGL). El canvas es 1,2 veces el disco para dejar ver la atmósfera; el halo queda debajo.
+   El anillo de los gigantes: la mitad trasera va bajo el canvas (::before) y la delantera (::after) encima. */
+.pl-cv { position: absolute; left: 50%; top: 50%; width: calc(var(--d) * 1.2); height: calc(var(--d) * 1.2); transform: translate(-50%, -50%); pointer-events: none; }
+.mod:nth-child(3n+1) .astro::after { z-index: 2; }
 
 /* ---------- ficha de detalle ---------- */
 .ficha { position: absolute; left: 0; top: 0; z-index: 5; width: min(304px, calc(100% - 16px)); visibility: hidden; pointer-events: none; transition: visibility 0s linear var(--t-rapida); }
@@ -702,3 +714,11 @@ a.luna:focus-visible .luna-nom { box-shadow: 0 0 0 2px color-mix(in srgb, var(--
          color: var(--text); font: inherit; cursor: pointer; }
 .egg-x:focus-visible, .egg-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @keyframes egg-in { from { opacity: 0; } }
+
+/* v1.4.75: planeta 3D listo (planetas.js le pone .gl): sin el fondo, borde ni sombra del planeta CSS, también en los
+   apagados y en el modo lista (va al final para ganarles). En el modo lista el planeta reemplaza al icono. */
+.mod .astro.gl { background: none; border: 0; box-shadow: none; }
+@media (max-width: 640px), (max-height: 540px) {
+  .mod .astro.gl .ico { display: none; }
+  .pl-cv { width: calc(var(--d) * 1.1); height: calc(var(--d) * 1.1); }
+}

@@ -17,7 +17,7 @@
         })();
     </script>
     <link rel="stylesheet" href="/static/css/app.css?v=1411">
-    <link rel="stylesheet" href="/static/css/inicio.css?v=1418">
+    <link rel="stylesheet" href="/static/css/inicio.css?v=1419">
 </head>
 <body>
 <a class="salto" href="#modulos">Saltar a los módulos</a>
@@ -67,6 +67,19 @@
         </div>
 
         <div class="escena" id="escena" aria-busy="true">
+            <!-- v1.4.75: póster estático de la constelación mientras llega la lista de módulos; se desvanece al pintarla (html.listo) -->
+            <div class="carga" id="carga" role="img" aria-label="Cargando la plataforma">
+                <svg viewBox="0 0 1000 580" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
+                    <g fill="none" stroke="currentColor" stroke-opacity=".2" stroke-width="1.2" transform="rotate(-14 500 280)">
+                        <ellipse cx="500" cy="280" rx="440" ry="186"/>
+                        <ellipse cx="500" cy="280" rx="360" ry="152"/>
+                        <ellipse cx="500" cy="280" rx="280" ry="118"/>
+                        <ellipse cx="500" cy="280" rx="200" ry="84"/>
+                        <ellipse cx="500" cy="280" rx="120" ry="50"/>
+                    </g>
+                    <g fill-opacity=".9"><circle cx="520" cy="46" r="13" fill="#B8B8C8" fill-opacity=".18"/><circle cx="520" cy="46" r="6" fill="#B8B8C8"/><circle cx="677" cy="136" r="13" fill="#39FF14" fill-opacity=".18"/><circle cx="677" cy="136" r="6" fill="#39FF14"/><circle cx="913" cy="207" r="13" fill="#EF4444" fill-opacity=".18"/><circle cx="913" cy="207" r="6" fill="#EF4444"/><circle cx="672" cy="302" r="13" fill="#D9A441" fill-opacity=".18"/><circle cx="672" cy="302" r="6" fill="#D9A441"/><circle cx="538" cy="433" r="13" fill="#FF6A00" fill-opacity=".18"/><circle cx="538" cy="433" r="6" fill="#FF6A00"/><circle cx="180" cy="480" r="13" fill="#FF2E88" fill-opacity=".18"/><circle cx="180" cy="480" r="6" fill="#FF2E88"/><circle cx="248" cy="343" r="13" fill="#38BDF8" fill-opacity=".18"/><circle cx="248" cy="343" r="6" fill="#38BDF8"/><circle cx="212" cy="209" r="13" fill="#A855F7" fill-opacity=".18"/><circle cx="212" cy="209" r="6" fill="#A855F7"/></g>
+                </svg>
+            </div>
             <svg class="trazas" id="trazas" aria-hidden="true" focusable="false" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <g id="orbitas"></g>
                 <g id="lineas"></g>
@@ -195,6 +208,7 @@
         </div>
     </section>
 </div>
-<script src="/static/js/inicio.js?v=1417"></script>
+<script src="/static/js/planetas.js?v=2"></script>
+<script src="/static/js/inicio.js?v=1418"></script>
 </body>
 </html>

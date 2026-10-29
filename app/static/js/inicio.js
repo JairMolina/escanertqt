@@ -191,6 +191,7 @@
         // disponibles primero (estable): la estrella principal es la primera y el recorrido con flechas empieza ahí
         var base = mods.map(function (m, i) { return { m: m, i: i }; });
         base.sort(function (a, b) { return (a.m.estado === 'disponible' ? 0 : 1) - (b.m.estado === 'disponible' ? 0 : 1) || a.i - b.i; });
+        if (window.Planetas) window.Planetas.limpiar();   // v1.4.75: libera los contextos WebGL de la lista anterior
         listaEl.textContent = ''; $('orbitas').textContent = ''; $('lineas').textContent = '';
         items = []; orbs = []; act = null; fichaItem = null;
         st.hov = st.foc = st.tap = null; st.esc = false; ocultarFicha();
@@ -208,6 +209,10 @@
             listaEl.appendChild(li);
             items.push({ m: m, li: li, btn: li.firstChild, orb: null, off: 0, x: 0, y: 0, acento: acentoOk(m.acento), sin: sin });
         });
+        // v1.4.75: mismo tipo que el CSS de respaldo (n%3: 0 gigante, 1 rocoso, 2 tormenta); los apagados se ven igual, con su filtro
+        if (window.Planetas) window.Planetas.montar(items.map(function (it, n) {
+            return { astro: it.btn.querySelector('.astro'), color: it.acento, tipo: n % 3 === 0 ? 1 : n % 3 === 1 ? 2 : 0, seed: n + 1 };
+        }));
 
         // una órbita por módulo, de adentro hacia afuera en el orden de la lista (disponibles primero). La elipse base, el tramo
         // iluminado (lz) y el cometa (gl) son la MISMA elipse; lz y gl solo recortan con dasharray.
@@ -478,7 +483,7 @@
         }).catch(function () {
             sesionInfo = null; pintarSesion();
             construir([]); estadoMsg('error', 'No se pudo cargar la lista de módulos. Revisa la conexión e inténtalo de nuevo.', 'Reintentar');
-        }).then(function () { escena.setAttribute('aria-busy', 'false'); if (!cc.abierto) arrancar(); });
+        }).then(function () { escena.setAttribute('aria-busy', 'false'); document.documentElement.classList.add('listo'); if (!cc.abierto) arrancar(); });
     }
 
     /* ================= bucle de animación (solo escritorio con movimiento permitido) ================= */
