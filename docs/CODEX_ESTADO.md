@@ -8,6 +8,16 @@ Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530
 
 Main incluye los avances de otros colaboradores: Pruebas automáticas por cuenta y Raspberry, exclusión de Raspberry de bancos normales, agentes/puentes BLE por cuenta y avisos de actualización, sincronización Skytec y rediseño de Diagrama. No volver a desplegar 1.4.49 ni el checkout documental antiguo. Las notas anteriores de despliegue 1.4.51 pendiente están superadas por esta comprobación de producción; las pruebas físicas y la configuración de Skytec no se revalidaron hoy.
 
+## Claude v1.4.75 (main; incluye 1.4.74)
+
+Portada `/inicio` con planetas 3D (WebGL, `app/static/js/planetas.js`), rendimiento (contexto compartido, compilación sin bloqueo, arranque en tiempo inactivo, 15 cuadros/s) y póster de carga estático mientras llega la lista de módulos. `?planetas=css` desactiva el 3D.
+
+Evidencia: `node --check` de planetas.js e inicio.js; `tests/test_portal_modulos` 11 OK; `test_qa_version_hoy`; comprobación visual en Chrome headless con servidor aislado (puerto 18099, datos temporales). Limitación: el rendimiento real en el equipo del usuario no se midió; headless usa software para la GPU.
+
+Commit de referencia: `91913d6` (main = origin/main). Despliegue: pendiente de prompt para el servidor.
+
+Pendiente: confirmar en el equipo del usuario que la entrada ya no se traba (probar con y sin `?planetas=css`).
+
 ## Claude v1.4.74 (main, sin desplegar; incluye 1.4.73)
 
 Campaña 78d9f0cf: ciclos 1–5 aprobados; el 6 falló al conectar R1 BLE («failed to discover services, device disconnected»). Agente: `_conectar_ble` reintenta R1/R2 2 veces con escaneo nuevo; el puente Windows desconecta la tarjeta tras 180 s sin comandos BLE (antes quedaba conectado si la página se cerraba y bloqueaba la OTA de Programación). Auditoría: separación por cuenta correcta en servidor; Programación usa Web Bluetooth local. Pruebas: agente 58 (solo falla `test_reporting`, previo), servidor 75 OK. Pendiente: desplegar y que cada laptop actualice su puente (autoactualización).
