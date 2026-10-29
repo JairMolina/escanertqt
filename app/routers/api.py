@@ -125,9 +125,14 @@ def list_tarjetas(
     estado_general: Optional[str] = Query(None, max_length=20, description="PENDIENTE | EN PROCESO | RETRABAJO | DETENIDO | LIBERADO"),
 ):
     """Retorna las tarjetas con ranuras R1/R2/R3, sus 5 etapas de prueba y estado_general (paginado)."""
-    items, total = db.list_tarjetas(
-        lote_id=lote_id, limit=limit, offset=offset, search=search, estado=estado, estado_general=estado_general,
-    )
+    try:
+        items, total = db.list_tarjetas(
+            lote_id=lote_id, limit=limit, offset=offset, search=search, estado=estado, estado_general=estado_general,
+        )
+    except db.NoEncontradoError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"total": total, "limit": limit, "offset": offset, "items": items}
 
 
@@ -155,7 +160,12 @@ def get_tarjeta(tarjeta_id: int):
 @router.get("/stats", response_model=StatsResponse, summary="Obtener estadísticas para pantalla de monitoreo")
 def get_statistics(lote_id: Optional[int] = Query(None, description="ID del lote. Por defecto el activo.")):
     """Totales por estado general (LIBERADO/DETENIDO/RETRABAJO/EN PROCESO/PENDIENTE), tarjetas incompletas e inventario."""
-    return db.get_stats(lote_id)
+    try:
+        return db.get_stats(lote_id)
+    except db.NoEncontradoError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ============================================================================
@@ -181,7 +191,12 @@ async def sync_excel(lote_id: Optional[int] = Query(None, description="ID del lo
 @router.get("/export/excel", summary="Descargar el Excel mensual del lote")
 def export_excel(lote_id: Optional[int] = Query(None, description="ID del lote a descargar")):
     """Descarga el archivo Excel mensual del lote especificado o activo. v1.3.44: solo pide sesión de usuario (sin clave de admin)."""
-    lote = db.get_active_lote() if lote_id is None else db.get_lote_by_id(lote_id)
+    try:
+        lote = db.get_lote_operativo(lote_id)
+    except db.NoEncontradoError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not lote:
         raise HTTPException(status_code=404, detail="Lote no encontrado.")
 

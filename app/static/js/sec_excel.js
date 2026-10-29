@@ -29,7 +29,9 @@
                 histUl.replaceChildren(...historial.map((x) => h('li', null, h('time', null, x.t), h('span', null, x.texto))));
                 histCard.hidden = !historial.length;
             }
-            function pintarLote() { const l = lote(); titulo.textContent = l ? `Lote ${T.loteNombre(l)}` : 'Sin lote'; tarj.textContent = l ? `${l.tarjetas || 0} tarjetas${l.activo ? ' · lote activo' : ''}` : ''; bSync.disabled = !l; bDown.disabled = !l; bMail.disabled = !l; }
+            function pintarLote() { const l = lote(); titulo.textContent = l ? T.loteNombre(l) : 'Sin lote';
+                tarj.textContent = l?.todos ? 'Elige un lote concreto para su archivo mensual. El reporte por fechas puede incluir todos los lotes.' : l ? `${l.tarjetas || 0} tarjetas${l.activo ? ' · lote activo' : ''}` : '';
+                bSync.disabled = bDown.disabled = bMail.disabled = !l || !!l.todos; }
 
             async function sincronizar() {
                 const l = lote(); if (!l) return;

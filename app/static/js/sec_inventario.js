@@ -57,7 +57,7 @@
                 { id: 'mac', titulo: 'MAC', cel: (p) => (p.tipo === 'R3' ? h('span', { class: 'muted' }, 'no aplica') : p.mac ? h('span', { class: 'mono' }, String(p.mac).toLowerCase()) : h('span', { class: 'muted' }, 'sin MAC')), valor: (p) => (p.tipo === 'R3' ? '' : p.mac) },
                 { id: 'estado_ciclo', titulo: 'Estado', cel: (p) => T.cicloBadge(p.estado_ciclo, p) },
                 { id: 'tarjeta', titulo: 'Tarjeta', cls: 'c-3', cel: (p) => (p.id_tarjeta_num ? h('a', { class: 'mono', href: `#/tarjetas?id=${p.tarjeta_id}` }, p.id_tarjeta_num) : h('span', { class: 'muted' }, '—')), valor: (p) => p.id_tarjeta_num },
-                { id: 'lote', titulo: 'Lote', cls: 'c-2', cel: (p) => (p.recibida_lote_id ? h('span', null, loteNom(p.recibida_lote_id)) : h('span', { class: 'muted' }, '—')), valor: (p) => loteNom(p.recibida_lote_id) },
+                { id: 'lote', titulo: 'Lote', cls: 'c-2', cel: (p) => (p.lote_id ? h('span', null, loteNom(p.lote_id)) : h('span', { class: 'muted' }, 'Sin lote')), valor: (p) => loteNom(p.lote_id) },
                 { id: 'recibida_en', titulo: 'Recibida', cls: 'c-2', cel: (p) => h('span', { class: 'mono' }, util.fecha(p.recibida_en)), valor: (p) => p.recibida_en },
                 { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (p) => h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'data-escribe': true, 'aria-label': `Editar ${p.nombre}`, onclick: () => editar(p) }, icon('edit'), 'Editar') },
             ];

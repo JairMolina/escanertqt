@@ -250,6 +250,18 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(self.client.get("/static/js/no-existe.js").status_code, 404)
 
     def test_17_certificado_publico_para_instalar_en_el_celular(self):
+        # A standalone isolated test must not depend on this laptop's real CA.
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from app.config import settings
+        from app.ssl_cert import ensure_ca
+        tmp = tempfile.TemporaryDirectory(prefix='tqt_test_ca_')
+        self.addCleanup(tmp.cleanup)
+        local_ca = patch.object(settings, 'CERTS_DIR', Path(tmp.name))
+        local_ca.start()
+        self.addCleanup(local_ca.stop)
+        ensure_ca()
         res = self.client.get("/cert")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.headers["content-type"], "application/x-x509-ca-cert")

@@ -84,13 +84,13 @@ def ruta_permitida(ruta: str, solo_lectura: bool = False) -> Path:
 async def ejecutar_sync_excel(lote_id: Optional[int], excel_path: Optional[str]) -> Dict[str, Any]:
     """Sincroniza el lote hacia su Excel mensual (lo crea desde la plantilla si aún no existe),
     verifica la integridad y notifica por WebSocket. Compartido por /api/excel/sync y /api/sync/excel."""
-    if not lote_id:
-        active = await run_in_threadpool(db.get_active_lote)
-        if not active:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No hay ningún lote activo configurado.")
-        lote_id = active["id"]
-
-    lote = await run_in_threadpool(db.get_lote_by_id, lote_id)
+    try:
+        lote = await run_in_threadpool(db.get_lote_operativo, lote_id)
+        lote_id = lote["id"]
+    except db.NoEncontradoError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not lote:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Lote con ID {lote_id} no encontrado.")
 

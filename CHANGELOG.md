@@ -1,5 +1,12 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.76 — 2026-10-29 · revisión local, sin desplegar
+- El lote seleccionado se transmite a las consultas y operaciones de tarjetas, PCB y programación mediante un contexto por petición. Se elimina el salto a una tarjeta de otro lote cuando un número, QR o MAC no existe en el elegido.
+- «Todos los lotes» en el selector permite consultar el conjunto completo. Las listas de programación y tarjetas identifican el lote; si un número es ambiguo, Consultar pide elegir su lote.
+- Cambiar de lote limpia selecciones y datos anteriores, conserva la elección al recargar y descarta respuestas antiguas. No permite cambiar durante programación o prueba activa. Inventario, contadores, reportes, historiales y descargas conservan el mismo alcance.
+- Las PCB asignadas siguen el lote de su tarjeta; las sueltas, el de recepción. Recepción y Excel mensual requieren un destino concreto; no usan silenciosamente el activo estando en Todos. Se conserva el traslado explícito de inventario entre lotes.
+- Se integra sobre main 1.4.75 conservando portada y rendimiento. Solo se alinea AGENT_VERSION con la web; no cambia su lógica. Pruebas con datos sintéticos y hardware bloqueado. Ver evidencia y límites en docs/LOTES_ALCANCE_LOCAL.md.
+
 ## v1.4.75 — 2026-10-29
 - **Portada `/inicio`: planetas 3D.** Cada módulo es una esfera con shader WebGL (`app/static/js/planetas.js`): relieve procedural, luz desde arriba a la izquierda, terminador suave, atmósfera y rotación lenta. Tres tipos como antes: gigante con bandas y anillo, rocoso con cráteres y tormenta en bandas. Sin WebGL queda el planeta CSS de siempre.
 - **Rendimiento de la portada:** un solo contexto WebGL compartido; mapas horneados una vez por planeta; compilación sin bloquear (`KHR_parallel_shader_compile`); la tubería empieza al cargar la página; 15 cuadros/s; con `prefers-reduced-motion` o en móvil se dibuja una vez. `?planetas=css` desactiva el 3D para comparar.

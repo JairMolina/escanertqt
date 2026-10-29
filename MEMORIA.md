@@ -1,6 +1,12 @@
 # Memoria de TQT-Web
 
-## Estado vigente — 2026-10-27
+## Estado vigente — 2026-10-29, solo local
+
+Web candidata 1.4.76 en `codex/lotes-aislamiento-20261029`, checkout `work/tqt-lotes-20261029`, parte de origin/main 9d7e93a / 1.4.75; conserva los cambios nuevos de portada. Selección de lote común a vistas/consultas/operaciones TQT; Todos explícito, origen visible, números duplicados sin elegir otro lote por inferencia. Contexto por petición en backend y limpieza de selección/respuestas atrasadas. Controles de ocupación y protocolos físicos conservados.
+
+402 Python y 13+3 Playwright PASS, 14 grupos motor Node y UI PASS. QA http://127.0.0.1:18091/monitor#/programacion healthy; datos ficticios de septiembre/octubre, ninguna copia de producción, cero acciones de hardware. Guía verificable: docs/LOTES_ALCANCE_LOCAL.md. No desplegado ni subido a GitHub por esta tarea. Próximo paso: revisión del usuario, comparar main nuevamente y luego subir/desplegar cuando se solicite. El rediseño antiguo de Pruebas TQT ya quedó superado por main 1.4.64; conservar el borrador sin reintroducirlo.
+
+## Estado histórico — 2026-10-27
 
 Web1.4.49 publicada enmain ydesplegada conautorización,códigoa1ea3d5,
 sobre1.4.48/2fa6fd2. Diagrama debajo deComandos:secciónnativa con

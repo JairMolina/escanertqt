@@ -40,7 +40,8 @@
                     && (!txt || String(t.id_tarjeta_num).includes(txt) || [t.nombre_r1, t.nombre_r2, t.nombre_r3].some((n) => norm(n).includes(txt)) || (hex.length >= 2 && [t.mac_r1, t.mac_r2].some((m) => norm(m).replace(/:/g, '').includes(hex)))));
             }
             const COLS = [
-                { id: 'num', titulo: 'Tarjeta', cel: (t) => h('span', { class: 'mono', style: 'font-size:15px;font-weight:600' }, t.id_tarjeta_num), sort: (a, b) => util.cmp(a.id_tarjeta_num, b.id_tarjeta_num) },
+                { id: 'num', titulo: 'Tarjeta', cel: (t) => h('span', { class: 'mono', style: 'font-size:15px;font-weight:600' }, t.id_tarjeta_num,
+                    ctx.lote()?.todos ? h('small', { class: 'dim', style: 'display:block' }, T.loteEtiqueta(t)) : null), sort: (a, b) => util.cmp(a.id_tarjeta_num, b.id_tarjeta_num) },
                 { id: 'r1', titulo: 'R1', cel: (t) => util.placaCelda(conFw(t, 'r1'), 'R1'), valor: (t) => t.nombre_r1 },
                 { id: 'r2', titulo: 'R2', cel: (t) => util.placaCelda(conFw(t, 'r2'), 'R2'), valor: (t) => t.nombre_r2 },
                 { id: 'r3', titulo: 'R3', cls: 'c-2', cel: (t) => util.placaCelda(conFw(t, 'r3'), 'R3'), valor: (t) => t.nombre_r3 },
@@ -345,7 +346,7 @@
                 const d = res.data; st.dia = new Set(d.items.map((t) => t.id));
                 const enLote = st.tars ? st.tars.filter((t) => st.dia.has(t.id)).length : 0;
                 const q = r.uno ? `fecha=${r.a}` : `desde=${r.a}&hasta=${r.b}`;
-                btnXls.href = `/api/reporte-dia/excel?${q}`; btnXls.setAttribute('download', r.uno ? `Tarjetas_${r.a}.xlsx` : `Tarjetas_${r.a}_a_${r.b}.xlsx`);
+                btnXls.href = T.loteUrl(`/api/reporte-dia/excel?${q}`); btnXls.setAttribute('download', r.uno ? `Tarjetas_${r.a}.xlsx` : `Tarjetas_${r.a}_a_${r.b}.xlsx`);
                 diaRes.replaceChildren(kpiDia(d.programadas || 0, 'con programación', 'ok'), kpiDia(d.completadas, 'completadas', 'ok'), kpiDia(d.entregadas, 'entregadas', 'info'),
                     h('span', { class: 'muted' }, (r.uno ? '' : `${d.dias} días · `) + (d.items.length ? `${enLote} de ${d.items.length} en este lote · la tabla muestra solo esas` : `Sin movimientos ${r.uno ? 'ese día' : 'en ese rango'}`)));
                 lista();

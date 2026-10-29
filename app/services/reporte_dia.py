@@ -85,11 +85,12 @@ def tarjetas_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optiona
              LEFT JOIN pcb_inventario p1 ON p1.id = t.pcb_r1_id
              LEFT JOIN pcb_inventario p2 ON p2.id = t.pcb_r2_id
              LEFT JOIN pcb_inventario p3 ON p3.id = t.pcb_r3_id
-             WHERE t.fecha_finalizado BETWEEN ? AND ? OR t.fecha_real BETWEEN ? AND ? OR t.id IN (_PROG_)
+             WHERE (t.fecha_finalizado BETWEEN ? AND ? OR t.fecha_real BETWEEN ? AND ? OR t.id IN (_PROG_)) _LOTE_
              ORDER BY l.anio, l.mes, l.fecha_inicio, t.id_tarjeta_num"""
     with db.get_db(db_path) as c:
-        sql = sql.replace("_PROG_", _PROGRAMADAS)
-        filas = [dict(r) for r in c.execute(sql, (a, b, a, b, a, b))]
+        w, args = db.clausula_lote(c, "t.lote_id")
+        sql = sql.replace("_PROG_", _PROGRAMADAS).replace("_LOTE_", w)
+        filas = [dict(r) for r in c.execute(sql, [a, b, a, b, a, b, *args])]
         prog = {r[0] for r in c.execute(_PROGRAMADAS, (a, b))}
     for f in filas:
         f["lote"] = db.nombre_lote_de({k: f.pop(k) for k in ("mes", "anio", "tipo_lote", "fecha_inicio", "codigo_lote")})

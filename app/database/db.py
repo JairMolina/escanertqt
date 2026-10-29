@@ -487,6 +487,29 @@ def _con_conn(conn: Optional[sqlite3.Connection], db_path: Optional[Path], fn, e
 # elegido se guarda en `ajustes` ('lote_usuario:<correo>'). Sin usuario (tareas internas, pruebas) o sin elección propia
 # se usa el lote global (lotes_mensuales.activo), que ya no cambia cuando un usuario elige otro lote.
 USUARIO_LOTE: ContextVar[Optional[str]] = ContextVar("usuario_lote", default=None)
+# Request-local view, independent of the user's receiving/creation default.
+# None: legacy/internal caller; 0: explicitly all lots; positive: selected lot.
+LOTE_VISTA: ContextVar[Optional[int]] = ContextVar("lote_vista", default=None)
+
+
+def filtro_lote(c: sqlite3.Connection, explicito: Optional[int] = None, activo: bool = False) -> Optional[int]:
+    vista = LOTE_VISTA.get()
+    if explicito:
+        if vista and vista != explicito:
+            raise ValueError("El lote solicitado no coincide con el seleccionado. Cambia de lote primero.")
+        if vista is not None and not c.execute("SELECT 1 FROM lotes_mensuales WHERE id=?", (explicito,)).fetchone():
+            raise NoEncontradoError(f"Lote con ID {explicito} no encontrado.")
+        return explicito
+    if vista is not None:
+        return vista or None
+    lote = get_active_lote(c) if activo else None
+    return (lote["id"] if lote else -1) if activo else None
+
+
+def clausula_lote(c: sqlite3.Connection, columna: str, explicito: Optional[int] = None,
+                  activo: bool = False) -> Tuple[str, list]:
+    lid = filtro_lote(c, explicito, activo)
+    return (f" AND {columna} = ?", [lid]) if lid is not None else ("", [])
 
 
 def _lote_de_usuario(c: sqlite3.Connection) -> Optional[Dict[str, Any]]:
@@ -632,6 +655,11 @@ def log_evento(
 
 def resolver_lote_id(c: sqlite3.Connection, lote_id: Optional[int]) -> int:
     """`lote_id` explícito (validado) o el lote activo."""
+    if not lote_id and LOTE_VISTA.get() == 0:
+        raise ValueError("Selecciona un lote concreto antes de crear o recibir tarjetas.")
+    lote_id = lote_id or LOTE_VISTA.get()
+    if LOTE_VISTA.get() and lote_id != LOTE_VISTA.get():
+        raise ValueError("El lote destino no coincide con el seleccionado. Cambia de lote primero.")
     if lote_id:
         if not c.execute("SELECT 1 FROM lotes_mensuales WHERE id = ?", (lote_id,)).fetchone():
             raise NoEncontradoError(f"Lote con ID {lote_id} no encontrado.")
@@ -640,6 +668,12 @@ def resolver_lote_id(c: sqlite3.Connection, lote_id: Optional[int]) -> int:
     if not active:
         raise ValueError("No hay un lote mensual activo configurado en el sistema.")
     return active["id"]
+
+
+def get_lote_operativo(lote_id: Optional[int] = None) -> Dict[str, Any]:
+    """A single concrete lot for receiving, pairing and monthly Excel operations."""
+    with get_db() as c:
+        return get_lote_by_id(resolver_lote_id(c, lote_id), c)
 
 
 _resolver_lote_id = resolver_lote_id  # nombre histórico
@@ -677,6 +711,7 @@ _CORTE_VALIDA = "2026-10-12"
 _SELECT_TARJETA = f"""
     SELECT
         t.id, t.lote_id, t.id_tarjeta_num,
+        (SELECT codigo_lote FROM lotes_mensuales WHERE id=t.lote_id) AS lote_codigo,
         t.pcb_r1_id, t.pcb_r2_id, t.pcb_r3_id,
         COALESCE(p1.firmware, t.firmware_r1) AS firmware_r1, COALESCE(p2.firmware, t.firmware_r2) AS firmware_r2,
         p3.firmware AS firmware_r3,
@@ -715,6 +750,8 @@ def _fila_a_tarjeta(row: sqlite3.Row) -> Dict[str, Any]:
             "id": pid, "tipo": r.upper(), "version": version, "serie": serie, "nombre": d.get(f"nombre_{r}"),
             "mac": d.get(f"mac_{r}"), "estado_ciclo": ciclo, "estado_pcb": d.get(f"estado_pcb_{r}"),
             "firmware": d.get(f"firmware_{r}"),
+            "tarjeta_id": d["id"], "id_tarjeta_num": d["id_tarjeta_num"],
+            "lote_id": d["lote_id"], "lote_codigo": d.get("lote_codigo"),
         }
     d["completa"] = bool(d["r1"] and d["r2"])
     ok = {x for x in (d.pop("_validacion", None) or "").split(",") if x}
@@ -743,15 +780,9 @@ def list_tarjetas(
     """Lista tarjetas con sus 5 etapas + estado_general, ranuras R1/R2/R3, búsqueda, filtro y paginación.
     `estado` es el parámetro heredado; `estado_general` el canónico (ambos aceptan alias antiguos)."""
     def _query(c):
-        effective_lote_id = lote_id
-        if effective_lote_id is None:
-            active = get_active_lote(c)
-            effective_lote_id = active["id"] if active else None
-        if effective_lote_id is None:
-            return [], 0
-
-        params: List[Any] = [effective_lote_id]
-        where = ["t.lote_id = ?"]
+        effective_lote_id = filtro_lote(c, lote_id, activo=True)
+        params: List[Any] = [] if effective_lote_id is None else [effective_lote_id]
+        where = ["1=1"] if effective_lote_id is None else ["t.lote_id = ?"]
         if search:
             # % y _ del usuario son literales (ESCAPE), no comodines
             lit = search.strip().replace("!", "!!").replace("%", "!%").replace("_", "!_")
@@ -781,7 +812,8 @@ def list_tarjetas(
 def get_tarjeta_by_id(tarjeta_id: int, conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
     """Obtiene una tarjeta con su historial de pruebas por su ID primario."""
     def _q(c):
-        row = c.execute(f"{_SELECT_TARJETA} WHERE t.id = ?", (tarjeta_id,)).fetchone()
+        w, a = clausula_lote(c, "t.lote_id")
+        row = c.execute(f"{_SELECT_TARJETA} WHERE t.id = ?{w}", [tarjeta_id, *a]).fetchone()
         return _fila_a_tarjeta(row) if row else None
     return _con_conn(conn, db_path, _q)
 
@@ -800,9 +832,10 @@ def find_tarjeta_by_mac(mac: str, conn: Optional[sqlite3.Connection] = None, db_
     limpia = extract_mac(mac) or normalize_mac(mac)
 
     def _q(c):
+        w, a = clausula_lote(c, "t.lote_id")
         row = c.execute(
-            f"{_SELECT_TARJETA} WHERE t.pcb_r1_id = (SELECT id FROM pcb_inventario WHERE mac = ?) "
-            f"OR t.pcb_r2_id = (SELECT id FROM pcb_inventario WHERE mac = ?) LIMIT 1", (limpia, limpia)).fetchone()
+            f"{_SELECT_TARJETA} WHERE (t.pcb_r1_id = (SELECT id FROM pcb_inventario WHERE mac = ?) "
+            f"OR t.pcb_r2_id = (SELECT id FROM pcb_inventario WHERE mac = ?)){w} LIMIT 1", [limpia, limpia, *a]).fetchone()
         if not row:
             return None
         d = _fila_a_tarjeta(row)
@@ -871,7 +904,8 @@ def set_prueba(
     estado_n = normalizar_estado_prueba(estado)
 
     def _exec(c):
-        t = c.execute("SELECT id, lote_id, id_tarjeta_num FROM tarjetas_produccion WHERE id = ?", (tarjeta_id,)).fetchone()
+        w, a = clausula_lote(c, "lote_id")
+        t = c.execute("SELECT id, lote_id, id_tarjeta_num FROM tarjetas_produccion WHERE id = ?" + w, [tarjeta_id, *a]).fetchone()
         if not t:
             return None
         _aplicar_prueba(c, t, etapa_k, estado_n, operador)
@@ -886,10 +920,13 @@ def get_stats(lote_id: Optional[int] = None, conn: Optional[sqlite3.Connection] 
     """Estadísticas del lote (activo por defecto). funcionales=LIBERADO, defectuosas=DETENIDO,
     en_revision=RETRABAJO, pendientes=PENDIENTE, en_proceso=EN PROCESO. `inventario` = PCB DISPONIBLES por tipo."""
     def _query(c):
+        lid = filtro_lote(c, lote_id, activo=True)
+        w, a = (" AND COALESCE(t.lote_id,p.lote_id)=?", [lid]) if lid is not None else ("", [])
         disponibles = {"R1": 0, "R2": 0, "R3": 0}
-        for r in c.execute("SELECT tipo, COUNT(*) n FROM pcb_inventario WHERE estado_ciclo = 'DISPONIBLE' GROUP BY tipo"):
+        for r in c.execute("SELECT p.tipo, COUNT(*) n FROM pcb_inventario p LEFT JOIN tarjetas_produccion t "
+                           "ON p.id IN (t.pcb_r1_id,t.pcb_r2_id,t.pcb_r3_id) WHERE p.estado_ciclo = 'DISPONIBLE'" + w + " GROUP BY p.tipo", a):
             disponibles[r["tipo"]] = r["n"]
-        target = get_lote_by_id(lote_id, c) if lote_id else get_active_lote(c)
+        target = {"id": None, "codigo_lote": "Todos los lotes"} if lid is None else get_lote_by_id(lid, c)
         if not target:
             return {"lote_id": None, "codigo_lote": "Sin Lote", "total_tarjetas": 0, "funcionales": 0, "defectuosas": 0,
                     "en_revision": 0, "pendientes": 0, "en_proceso": 0, "porcentaje_aprobacion": 0.0,
@@ -909,9 +946,9 @@ def get_stats(lote_id: Optional[int] = None, conn: Optional[sqlite3.Connection] 
                 SUM(CASE WHEN t.pcb_r3_id IS NOT NULL THEN 1 ELSE 0 END) AS r3,
                 SUM(CASE WHEN t.pcb_r1_id IS NULL OR t.pcb_r2_id IS NULL THEN 1 ELSE 0 END) AS incompletas
             FROM tarjetas_produccion t LEFT JOIN pruebas_historial p ON t.id = p.tarjeta_id
-            WHERE t.lote_id = ?
+            WHERE (? IS NULL OR t.lote_id = ?)
             """,
-            (target["id"],),
+            (lid, lid),
         ).fetchone()
         total = row["total"] or 0
         liberadas = row["liberadas"] or 0

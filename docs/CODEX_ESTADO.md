@@ -1,8 +1,20 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530cb689b`, web 1.4.63.
+Actualizado: 2026-10-29. Candidata local **1.4.76**, rama `codex/lotes-aislamiento-20261029`, base main `9d7e93a` / 1.4.75, checkout `work/tqt-lotes-20261029`.
 
 ## Estado vigente
+
+El lote elegido filtra tarjetas/PCB, Programación R1/R2/R3, Dashboard, Consultar, MAC, Pruebas TQT y automáticas, inventario, movimientos, reportes/descargas y etiquetas. «Todos los lotes» es explícito, muestra origen y desambigua números repetidos. Cambiar limpia selección/resultados, descarta respuestas antiguas y se bloquea durante operaciones físicas. Backend por petición `X-TQT-Lote`/`vista_lote`; agentes y tareas internas conservan su contrato. Recepción/creación y Excel mensual requieren un lote concreto. No cambia firmware, motor ni esquema.
+
+QA: http://127.0.0.1:18091/monitor#/programacion, Docker aislado `cm-local-tqt-lotes-web-1`, healthy, solo datos sintéticos (1 tarjeta septiembre / 2 octubre / 3 Todos). 402 Python, 13+3 escenarios Playwright, 14 grupos motor Node y prueba UI PASS; cero acciones físicas. Evidencia, contratos y límites: docs/LOTES_ALCANCE_LOCAL.md. Código y documentación en la rama local. No push ni despliegue en esta tarea; pendiente revisión local del usuario y comparación de main antes de subir/desplegar.
+
+Conservar el espejo CM `work/escanertqt_publish` con sus notas; no es el código vigente. El borrador de rediseño `codex/validacion-paneles-20261027` se conserva, pero está superado por main 1.4.64. No retomarlo sobre este ajuste.
+
+## Registros anteriores (no describen el despliegue actual)
+
+Registro del 2026-10-28: código desplegado `985d0d367de308dc1d20badd761793e530cb689b`, web 1.4.63. Producción no se volvió a inspeccionar durante la tarea de lotes.
+
+### Despliegue comprobado el 2026-10-28
 
 Último main comparado con Orange Pi; se aplicó el único commit pendiente d63546b → 985d0d3, ajuste móvil de estrellas del portal. Servicio tqt saludable, salud pública/interna correcta y archivos públicos iguales al código probado. Inventario e historiales conservados. No se cambió APP_VERSION ni firmware. Evidencia y respaldo: docs/DESPLIEGUE_1.4.63_20261028.md.
 
@@ -87,7 +99,9 @@ Pendiente:
 - reinstalar una vez los puentes 1.4.56 y la Raspberry con el comando nuevo;
 - probar «Elegir dispositivo» y una campaña con hardware real.
 
-## Pendiente de Pruebas TQT
+## Pendiente histórico de Pruebas TQT — superado por 1.4.64
+
+No es un pendiente actual: main 1.4.64 ya integró el rediseño. El borrador anterior se conserva como trabajo histórico y no se mezcla en la tarea de lotes.
 
 El usuario autorizó adaptar únicamente cinco bloques de /monitor#/validacion: conexiones compactas Serial/Bluetooth, controles manuales plegables ON/OFF, las 14 etapas originales agrupadas 1–2 / 3–6 / 7–11 / 12–14, barra de tarjeta con datos/historial y selector modal real por número/nombre/QR. Conservar motor, temporización, comandos, Bluetooth Windows por MAC, resultado/S29/impresión y confirmación de identidad real.
 

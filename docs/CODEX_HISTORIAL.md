@@ -225,3 +225,9 @@ Evidencia: 115Python+9Node+16Playwright PASS en QA aislada; Compose/buildOK. Bac
 ## 2026-10-28 — Último Git desplegado (1.4.63)
 
 Se comprobó main 985d0d3 y servidor d63546b, ambos 1.4.63; se desplegó el ajuste móvil pendiente del portal. 13 Python, Node syntax, Compose y Playwright escritorio/móvil PASS; producción healthy, hashes públicos y locales LF idénticos, inventario/historiales preservados. Ver docs/DESPLIEGUE_1.4.63_20261028.md. El borrador de Pruebas TQT en codex/validacion-paneles-20261027 sigue incompleto/no desplegado; retomarlo sobre main actual sin perder agentes por cuenta y avances de colaboradores.
+
+## 2026-10-29 — Lotes aislados en revisión local 1.4.75
+
+Base origin/main f0fac7d / 1.4.74, rama codex/lotes-aislamiento-20261029, checkout work/tqt-lotes-20261029. Alcance común por lote en consultas, operaciones, contadores, programación, pruebas y descargas TQT; Todos explícito con origen y desambiguación. La UI limpia selecciones y descarta respuestas anteriores; backend verifica pertenencia por ID/QR/MAC. Preserva permisos, agentes, banco físico y traslado explícito de inventario.
+
+402 Python PASS en Docker sin red, 13+3 Playwright PASS, 14 grupos motor Node y UI PASS. QA sintética 18091 healthy, cero operaciones físicas. Evidencia docs/LOTES_ALCANCE_LOCAL.md; CM continuar/local/checkpoint/memoria y ECC backend/verificación/E2E aplicados. No push ni despliegue en esta tarea. Pendiente revisión local y comparación de main antes de subir. El borrador de rediseño de Pruebas TQT de octubre 27 ya fue superado por main 1.4.64 y se conserva intacto.

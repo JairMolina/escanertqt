@@ -197,6 +197,7 @@ def _sin_modulo(ruta: str, metodo: str, mod: Optional[str] = None):
 async def _exigir_sesion(request: Request):
     """None si puede pasar; si no, la respuesta de rechazo (401 JSON para la API, redirección a /login para las páginas)."""
     ruta = request.url.path
+    db.LOTE_VISTA.set(None)
     # v1.4.39: '..' o '\' permitían salir de un prefijo público (/static/css/../js/x.js) y leer /static sin sesión
     if ".." in ruta or "\\" in ruta:
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
@@ -207,10 +208,30 @@ async def _exigir_sesion(request: Request):
     try:
         u = await run_in_threadpool(usuarios.validar_sesion, request.cookies.get(usuarios.COOKIE))
         db.USUARIO_LOTE.set(u["email"])   # v1.4.24: el lote activo es por usuario (lo leen get_active_lote/resolver_lote_id)
-        mod = modulos_cat.modulo_de_ruta(ruta)   # v1.4.14: cada módulo con su permiso (antes todo era Escáner TQT)
+        mod = modulos_cat.modulo_de_ruta(ruta)
         if not (modulos_cat.puede(u, mod) if mod else modulos_cat.alguno(u)) and not ruta.startswith("/api/auth/"):
             return _sin_modulo(ruta, request.method, mod)
-        return _permiso_rol(u.get("rol"), ruta, request.method)
+        permiso = _permiso_rol(u.get("rol"), ruta, request.method)
+        if permiso is not None:
+            return permiso
+        vista = request.headers.get("X-TQT-Lote", request.query_params.get("vista_lote"))
+        if vista is not None:
+            if vista == "active":
+                activo = await run_in_threadpool(db.get_active_lote)
+                db.LOTE_VISTA.set(activo["id"] if activo else -1)
+            elif vista == "all":
+                db.LOTE_VISTA.set(0)
+            elif re.fullmatch(r"[1-9][0-9]{0,9}", vista):
+                lote = await run_in_threadpool(db.get_lote_by_id, int(vista))
+                if not lote:
+                    return JSONResponse(status_code=404, content={"detail": "El lote seleccionado ya no existe. Elige otro lote."})
+                db.LOTE_VISTA.set(int(vista))
+            else:
+                return JSONResponse(status_code=400, content={"detail": "Selección de lote inválida."})
+            seleccionado = db.LOTE_VISTA.get()
+            if seleccionado and request.method in ("GET", "HEAD") and request.query_params.get("lote_id") not in (None, str(seleccionado)):
+                return JSONResponse(status_code=400, content={"detail": "El lote solicitado no coincide con el seleccionado. Cambia de lote primero."})
+        return None
     except usuarios.SesionInvalidaError as e:
         if ruta.startswith(("/api/", "/static/", "/ws")) or request.method not in ("GET", "HEAD"):
             return JSONResponse(status_code=401, content={"detail": str(e) or "Inicia sesión."}, headers={"X-Auth": "login"})

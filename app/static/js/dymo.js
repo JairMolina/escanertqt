@@ -391,7 +391,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         const p = new URLSearchParams(location.search);
         const [st, rl] = await Promise.all([api('/api/status'), api('/api/lotes')]);
         const vista = rl.ok ? T.loteVista(rl.data) : null;   // v1.4.42: el lote elegido en la consola, no siempre el activo
-        const lote = p.get('lote_id') || (vista ? vista.id : '') || (st.ok && st.data && st.data.active_lote ? st.data.active_lote.id : '');
+        const lote = vista?.todos ? '' : p.get('lote_id') || (vista ? vista.id : '') || (st.ok && st.data && st.data.active_lote ? st.data.active_lote.id : '');
         const r = await api(`/api/tarjetas?limit=500${lote ? `&lote_id=${encodeURIComponent(lote)}` : ''}`);
         if (!r.ok) { $('aviso').append(T.banner('bad', 'alert', 'No se pudieron cargar las tarjetas: ', r.error)); return; }
         state.tarjetas = (r.data && r.data.items) || [];
@@ -406,7 +406,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         const sel = $('selTarjeta'); const f = ($('inFiltro').value || '').replace(/\D/g, '');
         const lista = state.tarjetas.filter((t) => !f || String(t.id_tarjeta_num).replace(/^0+/, '').includes(f.replace(/^0+/, '') || '0'));
         sel.replaceChildren();
-        lista.forEach((t) => { const k = modo(t).k; sel.append(h('option', { value: String(t.id) }, `#${t.id_tarjeta_num} · ${k === 'FINAL' ? 'final' : k === 'NO' ? 'incompleta' : 'identificación'}${yaImpresa(t) ? ' · impresa' : ''}`)); });
+        lista.forEach((t) => { const k = modo(t).k; sel.append(h('option', { value: String(t.id) }, `#${t.id_tarjeta_num} · ${T.loteEtiqueta(t)} · ${k === 'FINAL' ? 'final' : k === 'NO' ? 'incompleta' : 'identificación'}${yaImpresa(t) ? ' · impresa' : ''}`)); });
         $('filtroInfo').textContent = f ? `${lista.length} de ${state.tarjetas.length}` : '';
         if (!lista.length) { sel.append(h('option', { value: '' }, 'Sin coincidencias')); return; }
         const actual = lista.find((t) => state.cur && t.id === state.cur.id) || lista[0];
@@ -469,8 +469,10 @@ html, body { margin: 0; padding: 0; background: #fff; }
         const lotes = T.ordenarLotes ? T.ordenarLotes(rl.data || []) : (rl.data || []);
         const vista = T.loteVista(lotes);
         const activo = vista ? vista.id : (st.ok && st.data && st.data.active_lote ? st.data.active_lote.id : null);
-        sel.replaceChildren(...lotes.map((l) => h('option', { value: String(l.id), selected: l.id === activo ? '' : null }, T.loteNombre(l) + (l.activo ? ' (activo)' : ''))));
+        sel.replaceChildren(h('option', {value:'0', selected: vista?.todos ? '' : null}, 'Todos los lotes'),
+            ...lotes.map((l) => h('option', { value: String(l.id), selected: l.id === activo ? '' : null }, T.loteNombre(l) + (l.activo ? ' (activo)' : ''))));
         if (!lotes.length) sel.replaceChildren(h('option', { value: '' }, 'Todavía no hay lotes'));
+        r3st.loteId = sel.value;
         await cargarR3Lote();
     }
     async function cargarR3Lote() {
@@ -479,6 +481,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         r3st.cargando = true; r3Vista();
         // v1.3.44: las R3 de las tarjetas del lote y TODAS las R3 sueltas (registradas pero sin emparejar)
         const [r, rp] = await Promise.all([api(`/api/tarjetas?lote_id=${encodeURIComponent(id)}&limit=500`), api('/api/pcb?tipo=R3&limit=5000', { timeout: 20000 })]);
+        if (id !== $('r3Lote').value) return;
         r3st.cargando = false;
         if (!r.ok) r3st.error = r.error || 'No se pudieron cargar las tarjetas del lote.';
         else {
@@ -495,7 +498,12 @@ html, body { margin: 0; padding: 0; background: #fff; }
         r3Vista();
     }
     $('r3Origen').addEventListener('change', r3Vista);
-    $('r3Lote').addEventListener('change', () => { T.guardarLoteVista($('r3Lote').value); cargarR3Lote(); });
+    $('r3Lote').addEventListener('change', () => {
+        if (state.busy) { $('r3Lote').value=r3st.loteId; toast('Termina la impresión antes de cambiar de lote.',{kind:'warn'}); return; }
+        T.guardarLoteVista($('r3Lote').value);
+        const url=new URL(location.href); url.searchParams.delete('lote_id'); url.searchParams.delete('tarjeta_id');
+        location.href=url.href; // clears card, cable and scanned-label selections together
+    });
     ['r3Ver', 'r3Desde', 'r3Hasta', 'r3Copias'].forEach((id) => $(id).addEventListener('input', (e) => { soloDig(e); r3Vista(); }));
     $('selZoom').addEventListener('change', r3Vista);
     const qsR3 = (par) => par.map((n) => `nombre=${encodeURIComponent(n)}`).join('&');

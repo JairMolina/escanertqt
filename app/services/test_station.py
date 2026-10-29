@@ -99,12 +99,13 @@ def init():
 
 
 def snapshot(tid, c):
+    w, a = db.clausula_lote(c, "t.lote_id")
     r = c.execute(
         """SELECT t.id,t.id_tarjeta_num,p.id r1_id,p.nombre nombre,p.serie r1_serie,p.mac mac_r1,
       p.firmware firmware,q.nombre r2_nombre,q.serie r2_serie,q.mac mac_r2
       FROM tarjetas_produccion t JOIN pcb_inventario p ON p.id=t.pcb_r1_id
-      LEFT JOIN pcb_inventario q ON q.id=t.pcb_r2_id WHERE t.id=?""",
-        (tid,),
+      LEFT JOIN pcb_inventario q ON q.id=t.pcb_r2_id WHERE t.id=?""" + w,
+        [tid, *a],
     ).fetchone()
     if not r:
         raise ValueError(
@@ -163,6 +164,10 @@ def compare(d, r):
 def read(jid):
     init()
     with db.get_db() as c:
+        if db.LOTE_VISTA.get():
+            own = c.execute("SELECT COALESCE(tarjeta_id,requested_card) FROM tqt_test_runs WHERE id=?", (jid,)).fetchone()
+            if not own or not db.get_tarjeta_by_id(own[0], c):
+                raise ValueError("La prueba no pertenece al lote seleccionado.")
         # A disconnected run is retained, never automatically retried.
         now = time.time()
         c.execute(

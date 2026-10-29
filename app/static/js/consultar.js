@@ -97,7 +97,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const leidos = new Set((d.leidas || []).map((x) => x.nombre).filter(Boolean));
         const cuerpo = h('div', { class: 'ficha-in stack' });
         (d.avisos || []).forEach((a) => cuerpo.append(T.banner('warn', 'alert', a)));
-        if (t) {
+        if (d.coincidencias?.length) {
+            cuerpo.append(h('h2', null, 'Elige el lote de la tarjeta'),
+                h('div', { class: 'stack' }, d.coincidencias.map(tar => h('button', { class: 'btn', type: 'button', onclick: () => {
+                    T.guardarLoteVista(tar.lote_id); buscar(tar.id_tarjeta_num);
+                } }, '#' + tar.id_tarjeta_num + ' · ' + T.loteEtiqueta(tar)))));
+        } else if (t) {
             cuerpo.append(h('div', { class: 'fichahead' },
                 h('div', { class: 'fh-num' }, h('div', { class: 'silk' }, 'Tarjeta'), h('div', { class: 'num', 'aria-label': 'Tarjeta ' + t.id_tarjeta_num }, t.id_tarjeta_num)),
                 h('div', { class: 'fh-meta' }, T.tarjetaBadge(t), h('div', { class: 'hint' }, ORIGEN[d.origen] || ''),

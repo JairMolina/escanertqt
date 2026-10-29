@@ -47,7 +47,7 @@ Kpis = List[Tuple[str, object, str]]
 
 def _excel_lote(lote_id: Optional[int]) -> Tuple[str, bytes, str, Kpis]:
     from app.routers.admin import _exportar   # import diferido (admin importa routers que importan éste)
-    lote = db.get_lote_by_id(lote_id) if lote_id else db.get_active_lote()
+    lote = db.get_lote_operativo(lote_id)
     if not lote:
         raise LookupError("Lote no encontrado o sin lote activo.")
     nombre = db.archivo_excel_lote(lote)

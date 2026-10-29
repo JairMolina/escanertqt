@@ -39,6 +39,8 @@ _SELECT_PCB = """
                     WHEN t.pcb_r2_id = p.id THEN t.firmware_r2 END) AS firmware, p.estado_ciclo, p.estado_pcb, p.origen, p.operador,
            p.nota, p.recibida_en, p.confirmada_en, p.updated_at, p.lote_id AS recibida_lote_id,
            t.id AS tarjeta_id, t.id_tarjeta_num, t.lote_id AS tarjeta_lote_id,
+           COALESCE(t.lote_id,p.lote_id) AS lote_id,
+           (SELECT codigo_lote FROM lotes_mensuales WHERE id=COALESCE(t.lote_id,p.lote_id)) AS lote_codigo,
            CASE WHEN t.pcb_r1_id = p.id THEN 'R1' WHEN t.pcb_r2_id = p.id THEN 'R2'
                 WHEN t.pcb_r3_id = p.id THEN 'R3' END AS ranura
     FROM pcb_inventario p
@@ -133,7 +135,8 @@ def pcb_a_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, Any]]:
 
 
 def _pcb_por_id(c: sqlite3.Connection, pcb_id: int) -> Optional[Dict[str, Any]]:
-    return pcb_a_dict(c.execute(f"{_SELECT_PCB} WHERE p.id = ?", (pcb_id,)).fetchone())
+    w, a = db.clausula_lote(c, "COALESCE(t.lote_id,p.lote_id)")
+    return pcb_a_dict(c.execute(f"{_SELECT_PCB} WHERE p.id = ?{w}", [pcb_id, *a]).fetchone())
 
 
 def _pcb_o_error(c: sqlite3.Connection, pcb_id: int) -> Dict[str, Any]:
@@ -150,9 +153,11 @@ def get_pcb(pcb_id: int, conn: Optional[sqlite3.Connection] = None, db_path: Opt
 def _filtro_sesion(sesion: Optional[str], alias: str = "") -> Tuple[str, list]:
     """Cada equipo ve solo su propio borrador de recepción (marca anónima `sesion`). Sin marca (API directa) ve todo;
     las RECIBIDA anteriores a la marca (sesion NULL) las ven todos para que no queden huérfanas."""
-    if not sesion:
-        return "", []
-    return f" AND ({alias}sesion = ? OR {alias}sesion IS NULL)", [sesion]
+    w, a = (f" AND ({alias}sesion = ? OR {alias}sesion IS NULL)", [sesion]) if sesion else ("", [])
+    if db.LOTE_VISTA.get():
+        w += f" AND {alias}lote_id = ?"
+        a.append(db.LOTE_VISTA.get())
+    return w, a
 
 
 def conteos_recepcion(c: sqlite3.Connection, sesion: Optional[str] = None) -> Dict[str, int]:
@@ -167,7 +172,8 @@ def conteos_recepcion(c: sqlite3.Connection, sesion: Optional[str] = None) -> Di
 
 def conteos_disponibles(c: sqlite3.Connection) -> Dict[str, int]:
     r = {"R1": 0, "R2": 0, "R3": 0}
-    for f in c.execute("SELECT tipo, COUNT(*) n FROM pcb_inventario WHERE estado_ciclo = 'DISPONIBLE' GROUP BY tipo"):
+    w, a = db.clausula_lote(c, "lote_id")
+    for f in c.execute("SELECT tipo, COUNT(*) n FROM pcb_inventario WHERE estado_ciclo = 'DISPONIBLE'" + w + " GROUP BY tipo", a):
         r[f["tipo"]] = f["n"]
     r["total"] = r["R1"] + r["R2"] + r["R3"]
     return r
@@ -225,9 +231,11 @@ def listar_pcb(
 ) -> Dict[str, Any]:
     def _q(c):
         where, params = [], []
-        if lote_id:   # v1.4.24: recibidas en ese lote
-            where.append("p.lote_id = ?")
-            params.append(lote_id)
+        lid = db.filtro_lote(c, lote_id)
+        if lid is not None:
+            # Assigned boards belong to the card's lot; loose boards to reception.
+            where.append("COALESCE(t.lote_id,p.lote_id) = ?" if db.LOTE_VISTA.get() is not None else "p.lote_id = ?")
+            params.append(lid)
         if tipo:
             where.append("p.tipo = ?")
             params.append(normalizar_tipo(tipo))
@@ -258,18 +266,19 @@ def listar_pcb(
 def pcb_por_codigo(codigo: str, conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> Dict[str, Any]:
     """Resuelve un QR (nombre de PCB) o una MAC a su PCB + tarjeta. NoEncontradoError si no existe."""
     def _q(c):
+        w, a = db.clausula_lote(c, "COALESCE(t.lote_id,p.lote_id)")
         try:
             p = parsear_qr(codigo)
         except ValueError:  # serie 0000 / versión 0: no puede existir
             p = None
         fila = None
         if p:
-            fila = c.execute(f"{_SELECT_PCB} WHERE p.tipo = ? AND p.version = ? AND p.serie = ?",
-                             (p["tipo"], p["version"], p["serie"])).fetchone()
+            fila = c.execute(f"{_SELECT_PCB} WHERE p.tipo = ? AND p.version = ? AND p.serie = ?{w}",
+                             [p["tipo"], p["version"], p["serie"], *a]).fetchone()
         else:
             mac = extract_mac(codigo)
             if mac:
-                fila = c.execute(f"{_SELECT_PCB} WHERE p.mac = ?", (mac,)).fetchone()
+                fila = c.execute(f"{_SELECT_PCB} WHERE p.mac = ?{w}", [mac, *a]).fetchone()
         if not fila:
             raise NoEncontradoError(f"No hay ninguna PCB registrada con el código '{(codigo or '')[:60]}'.")
         d = pcb_a_dict(fila)
@@ -285,12 +294,26 @@ def _consulta_por_numero(valor: str, conn: Optional[sqlite3.Connection], db_path
 
     def _q(c):
         activo = db.get_active_lote(c)
-        fila = c.execute("SELECT id FROM tarjetas_produccion WHERE id_tarjeta_num = ? ORDER BY (lote_id = ?) DESC, id DESC LIMIT 1",
-                         (num, activo["id"] if activo else 0)).fetchone()
+        w, a = db.clausula_lote(c, "lote_id")
+        filas = c.execute("SELECT id FROM tarjetas_produccion WHERE id_tarjeta_num = ?" + w +
+                          " ORDER BY (lote_id = ?) DESC, id DESC", [num, *a, activo["id"] if activo else 0]).fetchall()
+        if db.LOTE_VISTA.get() == 0 and len(filas) > 1:
+            return {"encontrado": True, "origen": "coincidencias", "tarjeta": None, "pcb": None,
+                    "coincidencias": [db.get_tarjeta_by_id(f["id"], c) for f in filas],
+                    "leidas": [], "avisos": ["Hay varias tarjetas con ese número. Elige su lote para continuar."]}
+        fila = filas[0] if filas else None
         if fila:
             return {"encontrado": True, "origen": "tarjeta", "tarjeta": db.get_tarjeta_by_id(fila["id"], c), "pcb": None, "leidas": [], "avisos": []}
         placas: Dict[str, Optional[Dict[str, Any]]] = {"r1": None, "r2": None, "r3": None}
-        for r in c.execute(f"{_SELECT_PCB} WHERE p.serie = ? AND p.estado_ciclo <> 'BAJA' ORDER BY p.tipo, p.id DESC", (num,)):
+        w, a = db.clausula_lote(c, "COALESCE(t.lote_id,p.lote_id)")
+        disponibles = c.execute(f"{_SELECT_PCB} WHERE p.serie = ? AND p.estado_ciclo <> 'BAJA'{w} ORDER BY p.tipo, p.id DESC", [num, *a]).fetchall()
+        lotes = {r['lote_id']: r['lote_codigo'] for r in disponibles}
+        if db.LOTE_VISTA.get() == 0 and len(lotes) > 1:
+            return {"encontrado": True, "origen": "coincidencias", "tarjeta": None, "pcb": None,
+                    "coincidencias": [{"id": None, "id_tarjeta_num": num, "lote_id": lid, "lote_codigo": code}
+                                      for lid, code in lotes.items() if lid is not None],
+                    "leidas": [], "avisos": ["Hay PCB con ese número en varios lotes. Elige su lote; las PCB sin lote se consultan por su nombre completo."]}
+        for r in disponibles:
             d = pcb_a_dict(r)
             placas.setdefault(d["tipo"].lower(), None)
             if placas[d["tipo"].lower()] is None:
@@ -338,12 +361,13 @@ def consulta(codigo: str, conn: Optional[sqlite3.Connection] = None, db_path: Op
     def _q(c):
         avisos: List[str] = []
         encontradas: List[Dict[str, Any]] = []
+        w, a = db.clausula_lote(c, "COALESCE(t.lote_id,p.lote_id)")
         for x in leidas:
             if x["nombre"]:
-                fila = c.execute(f"{_SELECT_PCB} WHERE p.tipo = ? AND p.version = ? AND p.serie = ?",
-                                 (x["tipo"], x["version"], x["serie"])).fetchone()
+                fila = c.execute(f"{_SELECT_PCB} WHERE p.tipo = ? AND p.version = ? AND p.serie = ?{w}",
+                                 [x["tipo"], x["version"], x["serie"], *a]).fetchone()
             else:
-                fila = c.execute(f"{_SELECT_PCB} WHERE p.mac = ?", (x["mac"],)).fetchone()
+                fila = c.execute(f"{_SELECT_PCB} WHERE p.mac = ?{w}", [x["mac"], *a]).fetchone()
             x["pcb"] = pcb_a_dict(fila) if fila else None
             if not fila:
                 avisos.append(f"{x['nombre'] or 'La MAC ' + x['mac']} no está registrada en el sistema.")
@@ -386,6 +410,8 @@ def _duplicada(c: sqlite3.Connection, fila: sqlite3.Row, sesion: Optional[str] =
 
 def _lote_recepcion(c: sqlite3.Connection) -> Optional[int]:
     """v1.4.24: lote del usuario (o el global) en el que queda la placa recibida; None si no hay lotes."""
+    if db.LOTE_VISTA.get() is not None:
+        return db.resolver_lote_id(c, None)
     lote = db.get_active_lote(c)
     return lote["id"] if lote else None
 
@@ -622,8 +648,13 @@ def mover_a_lote(ids: List[int], lote_id: int, con_tarjetas: bool = False, opera
         c.execute(f"UPDATE pcb_inventario SET lote_id = ?, updated_at = ? WHERE id IN ({ph})", (lote_id, ahora, *mover))
         detalle = f"{len(mover)} PCB" + (f" y tarjetas {', '.join(sorted(tarjetas.values()))}" if tarjetas else "")
         db.log_evento("LOTE_MOVIDO", lote_id, db.nombre_lote_de(destino), detalle, operador, conn=c)
-        return {"lote_id": lote_id, "movidas": len(mover), "tarjetas": sorted(tarjetas.values()),
-                "pcbs": [_pcb_por_id(c, i) for i in sorted(mover)]}
+        # The explicit move has succeeded; serialize its destination without hiding moved rows.
+        token = db.LOTE_VISTA.set(None)
+        try:
+            return {"lote_id": lote_id, "movidas": len(mover), "tarjetas": sorted(tarjetas.values()),
+                    "pcbs": [_pcb_por_id(c, i) for i in sorted(mover)]}
+        finally:
+            db.LOTE_VISTA.reset(token)
     return db._con_conn(conn, db_path, _e, escribe=True)
 
 
@@ -798,8 +829,11 @@ def contar_macs_hoy(conn: Optional[sqlite3.Connection] = None, db_path: Optional
     """MAC guardadas HOY (hora local) por cualquier operador o equipo. Sale de la bitácora: una MAC borrada no cuenta.
     La bitácora guarda la hora en UTC, por eso se convierte a hora local antes de comparar el día."""
     def _q(c):
-        return c.execute("SELECT COUNT(*) FROM escaneos WHERE evento = 'MAC_GUARDADA' AND COALESCE(detalle, '') <> '(borrada)' "
-                         "AND date(creado_en, 'localtime') = date('now', 'localtime')").fetchone()[0]
+        w, a = db.clausula_lote(c, "COALESCE((SELECT COALESCE(t.lote_id,p.lote_id) FROM pcb_inventario p "
+                               "LEFT JOIN tarjetas_produccion t ON p.id IN (t.pcb_r1_id,t.pcb_r2_id,t.pcb_r3_id) "
+                               "WHERE p.nombre=e.valor LIMIT 1),e.lote_id)")
+        return c.execute("SELECT COUNT(*) FROM escaneos e WHERE evento = 'MAC_GUARDADA' AND COALESCE(detalle, '') <> '(borrada)' "
+                         "AND date(creado_en, 'localtime') = date('now', 'localtime')" + w, a).fetchone()[0]
     return db._con_conn(conn, db_path, _q)
 
 
@@ -1089,7 +1123,8 @@ def disolver_masivo(ids: Optional[List[int]] = None, todas: bool = False, lote_i
 # ============================================================================
 def _agrupar_disponibles(c: sqlite3.Connection) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
     por_serie: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
-    for r in c.execute(f"{_SELECT_PCB} WHERE p.estado_ciclo = 'DISPONIBLE' ORDER BY p.serie, p.id"):
+    w, a = db.clausula_lote(c, "COALESCE(t.lote_id,p.lote_id)")
+    for r in c.execute(f"{_SELECT_PCB} WHERE p.estado_ciclo = 'DISPONIBLE'{w} ORDER BY p.serie, p.id", a):
         d = pcb_a_dict(r)
         por_serie.setdefault(d["serie"], {"R1": [], "R2": [], "R3": []})[d["tipo"]].append(d)
     return por_serie

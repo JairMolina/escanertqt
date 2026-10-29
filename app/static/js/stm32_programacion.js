@@ -383,6 +383,10 @@ window.TQTSTM32 = function (host, ctx) {
         if (!String(code || '').trim()) return { ok: false, texto: 'Indica una tarjeta o QR.' };
         const r = await api('/api/consulta?codigo=' + encodeURIComponent(code));
         if (!r.ok) { message(r.error, true); return { ok: false, texto: r.error }; }
+        if (r.data.coincidencias?.length) {
+            const texto = 'El número existe en varios lotes. Elige el lote o una PCB concreta del listado.';
+            message(texto, true); return { ok: false, texto };
+        }
         const k = K.toLowerCase();
         const p = r.data.tarjeta?.[k] || (r.data.pcb?.tipo === K ? r.data.pcb : null) || r.data.serie?.[k];
         if (!p) { message('El código no corresponde a una tarjeta con ' + K + '.', true); return { ok: false, texto: 'No se encontró ' + K + '.' }; }
@@ -400,7 +404,7 @@ window.TQTSTM32 = function (host, ctx) {
         };
         list.replaceChildren(...r.data.items.map(p => h('button', { class: 'prog-item', type: 'button', onclick: () => choose(p), disabled: busy,
             'aria-pressed': String(!!selectedPcb && selectedPcb.id === p.id), dataset: { id: p.id } },
-            T.tipoChip(K), h('span', { class: 'nm' }, p.nombre), badge(p), h('span', { class: 'dim' }, p.id_tarjeta_num ? '#' + String(p.id_tarjeta_num).padStart(4, '0') : 'Suelta'))));
+            T.tipoChip(K), h('span', { class: 'nm' }, p.nombre), badge(p), h('span', { class: 'dim' }, (p.id_tarjeta_num ? '#' + String(p.id_tarjeta_num).padStart(4, '0') : 'Suelta') + ' · ' + T.loteEtiqueta(p)))));
         if (!r.data.items.length) list.append(T.empty('search', 'Sin coincidencias', 'También puedes cargar un QR o número con Buscar.'));
     }
     function markSel() { list.querySelectorAll('.prog-item').forEach(b => b.setAttribute('aria-pressed', String(!!selectedPcb && String(selectedPcb.id) === b.dataset.id))); }

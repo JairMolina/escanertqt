@@ -304,7 +304,7 @@
             var l = r.ok ? r.data : [];
             $('cTarjetas').innerHTML = l.length ? l.map(function (t) {
                 return '<button type="button" role="option" class="pa-op" data-id="' + t.id + '" aria-selected="' + (tarjeta && tarjeta.id === t.id) + '">' +
-                    '<b>Tarjeta ' + esc(t.id_tarjeta_num) + '</b><small>' + esc(t.r1) + ' + ' + esc(t.r2) + (t.firmware ? ' · FW ' + esc(t.firmware) : '') + '</small></button>';
+                    '<b>Tarjeta ' + esc(t.id_tarjeta_num) + '</b><small>' + esc(t.r1) + ' + ' + esc(t.r2) + (t.firmware ? ' · FW ' + esc(t.firmware) : '') + ' · ' + esc(T.loteEtiqueta(t)) + '</small></button>';
             }).join('') : '<p class="hint">' + (r.ok ? 'Sin tarjetas armadas con R1 y R2 y sus MAC.' : esc(r.error)) + '</p>';
             l.forEach(function (t) { var b = $('cTarjetas').querySelector('[data-id="' + t.id + '"]'); if (b) b._t = t; });
             if (repetirNum) {   // «Repetir»: se elige sola la misma tarjeta
@@ -391,7 +391,7 @@
             (c.ultimo_fallo ? '<p class="pa-fallo-corto">' + esc(textoFallo(c.ultimo_fallo, true)) + '</p>' : '') + '</div>' +
             '<span class="pa-i pa-chev" data-i="chev" aria-hidden="true"></span></summary>' +
             '<div class="pa-camp-body">' +
-            '<p class="pa-camp-meta">' + esc(c.firmware) + ' · ' + (c.tarjeta && c.tarjeta.nombre ? esc(c.tarjeta.nombre) + ' · ' : '') + esc(c.operador) + '</p>' +
+            '<p class="pa-camp-meta">' + esc(c.firmware) + ' · ' + (c.tarjeta && c.tarjeta.nombre ? esc(c.tarjeta.nombre) + ' · ' + esc(T.loteEtiqueta(c.tarjeta)) + ' · ' : '') + esc(c.operador) + '</p>' +
             '<div class="pa-barra" role="img" aria-label="' + barraLbl(k, c.ciclos) + '">' + barra(k, c.ciclos) + '</div>' +
             '<div class="pa-res"><span>Pausa ' + esc(c.pausa_s) + ' s · ' + (c.detener_en_falla ? 'se detiene al primer fallo' : 'sigue aunque falle') + '</span></div>' +
             (c.ultimo_fallo ? '<div class="pa-fallo"><b>Por qué falló</b><p>' + esc(textoFallo(c.ultimo_fallo)) + '</p></div>' : '') +

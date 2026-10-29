@@ -165,14 +165,18 @@ def start(body: Start, req: Request):
 def history(tarjeta_id: int | None = None):
     svc.init()
     with db.get_db() as c:
-        where = " WHERE r.requested_card=?" if tarjeta_id else ""
+        w, a = db.clausula_lote(c, "t.lote_id")
+        where = " WHERE 1=1" + w
+        if tarjeta_id:
+            where += " AND r.requested_card=?"
+            a.append(tarjeta_id)
         return [
             dict(r)
             for r in c.execute(
-                "SELECT r.id,r.requested_card,r.tarjeta_id,r.operator,r.state,r.created,r.updated,r.result,r.origin,r.station,s.name station_name,s.owner station_owner FROM tqt_test_runs r JOIN stm32_stations s ON s.id=r.station"
+                "SELECT r.id,r.requested_card,r.tarjeta_id,r.operator,r.state,r.created,r.updated,r.result,r.origin,r.station,s.name station_name,s.owner station_owner FROM tqt_test_runs r JOIN stm32_stations s ON s.id=r.station LEFT JOIN tarjetas_produccion t ON t.id=COALESCE(r.tarjeta_id,r.requested_card)"
                 + where
                 + " ORDER BY r.created DESC LIMIT 500",
-                (tarjeta_id,) if tarjeta_id else (),
+                a,
             )
         ]
 

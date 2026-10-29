@@ -227,24 +227,32 @@
         const activo = S.lotes.find((l) => l.activo) || S.lotes[0] || null;
         S.activoId = activo ? activo.id : null;
         if (!S.lote) {
-            const q = +new URLSearchParams(location.search).get('lote');
-            S.lote = (q && S.lotes.find((l) => l.id === q)) || T.loteVista(S.lotes) || activo;   // v1.4.42: recargar no pierde el lote elegido
-        } else S.lote = S.lotes.find((l) => l.id === S.lote.id) || activo;
+            const raw = new URLSearchParams(location.search).get('lote'), q = Number(raw);
+            S.lote = (raw === 'all' ? T.todosLotes(S.lotes) : q && S.lotes.find((l) => l.id === q)) || T.loteVista(S.lotes) || activo;
+        } else S.lote = S.lote.todos ? T.todosLotes(S.lotes) : S.lotes.find((l) => l.id === S.lote.id) || activo;
+        T.guardarLoteVista(S.lote ? S.lote.id : null);
         pintarLote();
         return true;
     }
     function pintarLote() {
         if (!refs.loteTxt) return;
         refs.loteTxt.textContent = T.loteNombre(S.lote); refs.loteTxt.title = T.loteNombre(S.lote);
-        refs.loteEst.replaceChildren(S.lote && S.lote.activo ? 'activo' : (S.lote ? 'solo vista' : ''));
+        refs.loteEst.replaceChildren(S.lote?.todos ? 'todos' : S.lote && S.lote.activo ? 'activo' : (S.lote ? 'seleccionado' : ''));
         refs.loteEst.dataset.a = S.lote && S.lote.activo ? '1' : '';
         refs.loteBtn.setAttribute('aria-label', `Lote: ${T.loteNombre(S.lote)}${S.lote && S.lote.activo ? ', activo' : ''}. Cambiar de lote`);
     }
     function seleccionarLote(id) {
-        const l = S.lotes.find((x) => x.id === id); if (!l) return;
+        const l = id === 0 ? T.todosLotes(S.lotes) : S.lotes.find((x) => x.id === id); if (!l) return;
+        if (S.cur?.inst?.ocupada?.()) { toast('Termina o detén la operación en curso antes de cambiar de lote.', { kind: 'warn' }); return; }
+        const url = new URL(location.href); url.searchParams.delete('lote'); history.replaceState(null, '', url);
         T.guardarLoteVista(id); if (S.lote && S.lote.id === id) return;
-        S.lote = l; pintarLote(); invalidar();
-        if (S.cur) { S.cur.alLote.forEach((fn) => { try { fn(l); } catch (e) { console.error(e); } }); if (S.cur.inst && S.cur.inst.actualizar) S.cur.inst.actualizar(); }
+        S.lote = l; S.feed = []; pintarLote(); invalidar();
+        if (S.cur) {
+            // Re-mount to clear unit IDs, search selections, reports and open forms.
+            const def = S.cur.def;
+            history.replaceState(null, '', '#/' + def.id);
+            montar(def, new URLSearchParams());
+        }
     }
     const shim = { setSub() {}, refresh() {} };
     function cerrarMenu(foco) {
@@ -259,6 +267,9 @@
         const item = (l) => h('button', { class: 'esc-mi', type: 'button', role: 'menuitemradio', 'aria-checked': S.lote && S.lote.id === l.id ? 'true' : 'false', onclick: () => { cerrarMenu(true); seleccionarLote(l.id); } },
             h('span', { class: 'nm' }, T.loteNombre(l)), l.activo ? T.badge('Activo', 'ok') : null, h('span', { class: 'mono t2' }, `${l.tarjetas || 0} tarj. · ${l.placas || 0} pl.`));
         S.menu = h('div', { class: 'esc-menu', role: 'menu', 'aria-label': 'Lotes' },
+            h('button', { class: 'esc-mi', type: 'button', role: 'menuitemradio', 'aria-checked': String(!!S.lote?.todos), onclick: () => { cerrarMenu(true); seleccionarLote(0); } },
+                h('span', { class: 'nm' }, 'Todos los lotes'), h('span', { class: 't2' }, 'Ver todas las tarjetas')),
+            h('div', { class: 'esc-sep', role: 'separator' }),
             S.lotes.length ? S.lotes.map(item) : h('div', { class: 'esc-mi-vacio muted' }, 'Todavía no hay lotes'),
             h('div', { class: 'esc-sep', role: 'separator' }),
             h('button', { class: 'esc-mi acc', type: 'button', role: 'menuitem', onclick: () => { cerrarMenu(false); T.openLotes(shim); } }, icon('plus'), 'Usar o crear lote…'));
@@ -705,7 +716,12 @@
         const ws = T.ws('monitor'); if (!ws) return;
         const refrescar = T.debounce(() => { if (S.cur && S.cur.inst && S.cur.inst.actualizar) S.cur.inst.actualizar(); }, 350);
         const revisar = T.debounce(() => { pedirEntregas().catch((e) => console.error(e)); }, 1200);
-        Object.keys(EV).forEach((ev) => ws.on(ev, (d) => { const [k, t] = EV[ev](d); pushFeed(k, t); invalidar(); refrescar(); if (ev !== 'ADMIN_CAMBIO') revisar(); }));
+        Object.keys(EV).forEach((ev) => ws.on(ev, (d) => {
+            const lid = d?.tarjeta?.lote_id ?? d?.pcb?.lote_id ?? d?.lote_id;
+            const visible = S.lote?.todos || !S.lote || (lid !== undefined && Number(lid) === S.lote.id) || ev === 'ADMIN_CAMBIO';
+            if (visible) { const [k, t] = EV[ev](d); pushFeed(k, t); }
+            invalidar(); refrescar(); if (visible && ev !== 'ADMIN_CAMBIO') revisar();
+        }));
         setTimeout(revisar, 2500);
         escanerTiempoReal(ws);
         ws.on('CLAVE_SOLICITADA', (d) => { pushFeed('warn', `${(d && d.email) || 'Una cuenta'} pidió restablecer su contraseña`); toast('Solicitud de contraseña pendiente', { kind: 'warn' }); revisarSolicitudes(); });
@@ -737,7 +753,11 @@
         T.ws('monitor');
         document.addEventListener('tqt:lote-cambiado', (e) => {   // la hoja de lotes de common.js avisa; aquí no se recarga la página
             e.preventDefault(); const l = e.detail && e.detail.lote;
-            cargarLotes().then(() => { if (l) { S.lote = S.lotes.find((x) => x.id === l.id) || S.lote; T.guardarLoteVista(S.lote && S.lote.id); pintarLote(); } invalidar(); if (S.cur) { S.cur.alLote.forEach((fn) => fn(S.lote)); if (S.cur.inst && S.cur.inst.actualizar) S.cur.inst.actualizar(); } });
+            if (S.cur?.inst?.ocupada?.()) {
+                T.guardarLoteVista(S.lote ? S.lote.id : null);
+                toast('Termina o detén la operación en curso antes de cambiar de lote.', { kind: 'warn' }); return;
+            }
+            cargarLotes().then(() => { if (l) seleccionarLote(l.todos ? 0 : l.id); else { invalidar(); refrescar(); } });
         });
         pushFeed('info', 'Consola conectada');
         tiempoReal();

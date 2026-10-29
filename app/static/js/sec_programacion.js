@@ -109,7 +109,8 @@
                 const b = h('button', {
                     class: 'prog-item', type: 'button', disabled: S.busy, 'aria-pressed': String(S.tarjeta && S.tarjeta.id === p.id),
                     onclick: () => seleccionar(p),
-                }, T.tipoChip(p.tipo), h('span', { class: 'nm' }, p.nombre), ...(p.tipo==='R2' ? [r2Badge(p)] : []), h('span', { class: 'dim' }, p.id_tarjeta_num ? '#' + String(p.id_tarjeta_num).padStart(4, '0') : 'Suelta'));
+                }, T.tipoChip(p.tipo), h('span', { class: 'nm' }, p.nombre), ...(p.tipo==='R2' ? [r2Badge(p)] : []),
+                    h('span', { class: 'dim' }, (p.id_tarjeta_num ? '#' + String(p.id_tarjeta_num).padStart(4, '0') : 'Suelta') + ' · ' + T.loteEtiqueta(p)));
                 lista.appendChild(b);
             });
         }
@@ -819,6 +820,7 @@
         if (navigator.serial) { const onConn = () => refrescarPuertosAutorizados(); navigator.serial.addEventListener('connect', onConn); navigator.serial.addEventListener('disconnect', onConn); unsubs.push(() => { navigator.serial.removeEventListener('connect', onConn); navigator.serial.removeEventListener('disconnect', onConn); }); }
 
         return {
+            ocupada() { return S.busy || uploadBusy || stm.ocupada() || stm3.ocupada(); },
             actualizar() { stm.actualizar(); stm3.actualizar(); if (!S.busy && !uploadBusy) { cargarPendientes(); loadFirmwares(); } },
             async escaneo(codigo) {
                 if(S.busy || uploadBusy) return {ok:false,texto:'Hay una programación en curso.'};

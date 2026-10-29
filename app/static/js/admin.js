@@ -103,11 +103,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Llamada autenticada: {ok,status,data,error,headers}. 401 -> login. */
     async function adm(path, opts = {}) {
+        const vista = T.cabecerasLote(path)['X-TQT-Lote'];
         const headers = { 'X-Admin-Token': S.token || '' };
         if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
         const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), opts.timeout || 30000);
         try {
             const res = await fetch(path, { method: opts.method || 'GET', headers, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined, signal: ctrl.signal });
+            if (vista && vista !== T.cabecerasLote(path)['X-TQT-Lote']) return {ok:false, stale:true, status:409, error:'El lote cambió; se descartó la respuesta anterior.'};
             if (res.status === 401 && !opts.noAuthRedirect) { verLogin('La sesión ya no es válida. Vuelve a entrar.', { kind: 'warn' }); return { ok: false, status: 401, data: null, error: 'Sesión no válida', res }; }
             if (opts.raw) {
                 let error = ''; if (!res.ok) { error = `Error ${res.status}`; try { const j = await res.clone().json(); if (j && typeof j.detail === 'string') error = j.detail; } catch (e) { /* sin JSON */ } }
@@ -168,11 +170,12 @@ document.addEventListener('DOMContentLoaded', () => {
         S.lotes = Array.isArray(r) ? r : [];
         const fill = (sel, withAll, vista) => {
             const keep = sel.value; sel.replaceChildren();
-            if (withAll) sel.append(h('option', { value: '' }, 'Todos los lotes'));
+            if (withAll) sel.append(h('option', { value: '0' }, 'Todos los lotes'));
             S.lotes.forEach((l) => sel.append(h('option', { value: String(l.id) }, T.loteNombre(l) + (l.activo ? ' · activo' : ''))));
-            if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep; else if (!withAll) { const a = (vista && T.loteVista(S.lotes)) || S.lotes.find((l) => l.activo) || S.lotes[0]; if (a) sel.value = String(a.id); }
+            if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep;
+            else { const a = (vista && T.loteVista(S.lotes)) || S.lotes.find((l) => l.activo) || S.lotes[0]; if (a) sel.value = String(a.id); }
         };
-        fill($('tLote'), false, true); fill($('vLote'), false); fill($('mLote'), true);   // v1.4.42: Tarjetas abre en el lote de la consola; «Vaciar» sigue en el activo
+        fill($('tLote'), true, true); fill($('vLote'), false); fill($('mLote'), true, true);
     }
 
     async function cargarResumen() {
@@ -241,12 +244,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function cargarTarjetas() {
+        const scope = T.cabecerasLote('/api/tarjetas')['X-TQT-Lote'];
         const id = $('tLote').value;
         const r = await fetch(`/api/tarjetas?limit=500${id ? `&lote_id=${encodeURIComponent(id)}` : ''}`).then((x) => x.json()).catch(() => ({}));
+        if (scope !== T.cabecerasLote('/api/tarjetas')['X-TQT-Lote']) return;
         S.totalT = (r && r.total) || 0; S.tarjetas = (r && r.items) || []; S.selT = new Set([...S.selT].filter((i) => S.tarjetas.some((t) => t.id === i))); pintarTarjetas();
     }
     async function cargarPcbs() {
+        const scope = T.cabecerasLote('/api/pcb')['X-TQT-Lote'];
         const r = await fetch('/api/pcb?limit=5000').then((x) => x.json()).catch(() => ({}));
+        if (scope !== T.cabecerasLote('/api/pcb')['X-TQT-Lote']) return;
         S.totalP = (r && r.total) || 0; S.pcbs = (r && r.items) || []; S.selP = new Set([...S.selP].filter((i) => S.pcbs.some((p) => p.id === i))); pintarPcbs();
     }
 
@@ -270,7 +277,11 @@ document.addEventListener('DOMContentLoaded', () => {
         actTSel();
     }
     function actTSel() { const n = S.selT.size; $('tSel').textContent = `${n} seleccionada${n === 1 ? '' : 's'} de ${tVis().length} visibles`; $('tDel').disabled = !n; }
-    ['tLote'].forEach((id) => $(id).addEventListener('change', () => { T.guardarLoteVista($(id).value); S.selT.clear(); cargarTarjetas(); }));
+    function cambiarVistaLote(id) {
+        T.guardarLoteVista(id); $('tLote').value = $('mLote').value = id;
+        S.selT.clear(); S.selP.clear(); cargarResumen(); cargarTarjetas(); cargarPcbs(); cargarMov(true);
+    }
+    $('tLote').addEventListener('change', () => cambiarVistaLote($('tLote').value));
     $('tEstado').addEventListener('change', pintarTarjetas); $('tQ').addEventListener('input', T.debounce(pintarTarjetas, 200));
     $('tAllLote').addEventListener('click', () => { S.tarjetas.forEach((t) => S.selT.add(t.id)); pintarTarjetas(); });
     $('tNone').addEventListener('click', () => { S.selT.clear(); pintarTarjetas(); });
@@ -399,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.entries(extra || {}).forEach(([k, v]) => p.set(k, String(v)));
         return p.toString();
     }
-    const mvFiltrado = () => !!(S.mov.categoria || $('mQ').value.trim() || $('mDesde').value || $('mHasta').value || $('mLote').value);
+    const mvFiltrado = () => !!(S.mov.categoria || $('mQ').value.trim() || $('mDesde').value || $('mHasta').value || ($('mLote').value && $('mLote').value !== '0'));
     /** Carga la primera página (reset) o la siguiente ("Cargar más"). Respuestas viejas se descartan. */
     async function cargarMov(reset) {
         const M = S.mov; const id = ++M.pedido;
@@ -457,10 +468,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const mvRecargar = T.debounce(() => cargarMov(true), 300);
     $('mQ').addEventListener('input', mvRecargar);
-    ['mDesde', 'mHasta', 'mLote'].forEach((id) => $(id).addEventListener('change', () => cargarMov(true)));
+    ['mDesde', 'mHasta'].forEach((id) => $(id).addEventListener('change', () => cargarMov(true)));
+    $('mLote').addEventListener('change', () => cambiarVistaLote($('mLote').value));
     $('mMas').addEventListener('click', () => cargarMov(false));
     $('mAct').addEventListener('click', () => cargarMov(true));
-    $('mLimpiar').addEventListener('click', () => { S.mov.categoria = ''; ['mQ', 'mDesde', 'mHasta', 'mLote'].forEach((id) => { $(id).value = ''; }); cargarMov(true); });
+    $('mLimpiar').addEventListener('click', () => { S.mov.categoria = ''; ['mQ', 'mDesde', 'mHasta'].forEach((id) => { $(id).value = ''; }); $('mLote').value=$('tLote').value; cargarMov(true); });
     /** CSV de lo filtrado: pide todas las páginas (200 por vez, tope 5000). Neutraliza fórmulas (=, +, -, @) para Excel. */
     $('mCsv').addEventListener('click', async () => {
         const b = $('mCsv'); b.disabled = true; const filas = []; let total = 0;

@@ -56,8 +56,9 @@ def statuses():
         result=[]
         vnum=lambda v:[int(x) if x.isdigit() else 0 for x in str(v or '').split('.')]
         # v1.4.20: el firmware capturado a mano (o en la tarjeta) también cuenta como programada, aunque no haya evidencia BLE
+        w, a = db.clausula_lote(c, "COALESCE(t.lote_id,p.lote_id)")
         for p in c.execute("SELECT p.id,p.version,COALESCE(NULLIF(TRIM(p.firmware),''),t.firmware_r2) AS firmware,p.mac "
-                           "FROM pcb_inventario p LEFT JOIN tarjetas_produccion t ON t.pcb_r2_id=p.id WHERE p.tipo='R2'"):
+                           "FROM pcb_inventario p LEFT JOIN tarjetas_produccion t ON t.pcb_r2_id=p.id WHERE p.tipo='R2'" + w, a):
             evidence=states.get(p['id']); job=jobs.get(p['id']) or {}
             current=p['firmware']; newest=latest.get(p['version'])
             verified=bool(evidence and evidence['firmware']==current and p['mac'] and

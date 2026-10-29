@@ -70,6 +70,7 @@ def _fila(r) -> Dict[str, Any]:
 _SEL = """SELECT v.*, p.nombre AS pcb_nombre, p.tipo AS pcb_tipo, t.id_tarjeta_num AS id_tarjeta_num
           FROM validaciones_ble v LEFT JOIN pcb_inventario p ON p.id = v.pcb_id
           LEFT JOIN tarjetas_produccion t ON t.id = v.tarjeta_id"""
+_LOTE_VALIDACION = "COALESCE(t.lote_id,(SELECT x.lote_id FROM tarjetas_produccion x WHERE v.pcb_id IN (x.pcb_r1_id,x.pcb_r2_id,x.pcb_r3_id) LIMIT 1),p.lote_id)"
 
 
 def _crear(datos: Registro, operador: str) -> Dict[str, Any]:
@@ -114,9 +115,11 @@ def _listar(tarjeta_id, pcb_id, q, limit) -> Dict[str, Any]:
     if q and q.strip():
         like = f"%{q.strip()}%"
         cond.append("(v.dispositivo LIKE ? OR p.nombre LIKE ? OR v.comando LIKE ?)"); args += [like, like, like]
-    where = (" WHERE " + " AND ".join(cond)) if cond else ""
     with db.get_db() as c:
-        total = c.execute("SELECT COUNT(*) FROM validaciones_ble v LEFT JOIN pcb_inventario p ON p.id = v.pcb_id" + where, args).fetchone()[0]
+        w, a = db.clausula_lote(c, _LOTE_VALIDACION)
+        where = (" WHERE " + " AND ".join(cond)) if cond else " WHERE 1=1"
+        where += w; args += a
+        total = c.execute("SELECT COUNT(*) FROM (" + _SEL + where + ")", args).fetchone()[0]
         filas = c.execute(_SEL + where + " ORDER BY v.id DESC LIMIT ?", args + [limit]).fetchall()
         return {"items": [_fila(f) for f in filas], "total": total}
 
@@ -130,9 +133,11 @@ async def listar(tarjeta_id: Optional[int] = None, pcb_id: Optional[int] = None,
 def _resumen() -> Dict[str, Any]:
     init()
     with db.get_db() as c:
-        r = c.execute("SELECT COUNT(*) n, COALESCE(SUM(resultado='ok'),0) ok, COALESCE(SUM(resultado='error'),0) er, "
-                      "COUNT(DISTINCT dispositivo) d FROM validaciones_ble WHERE date(creado_en) = date('now','localtime')").fetchone()
-        u = c.execute(_SEL + " ORDER BY v.id DESC LIMIT 1").fetchone()
+        w, a = db.clausula_lote(c, _LOTE_VALIDACION)
+        joins = _SEL[_SEL.index('FROM '):]
+        r = c.execute("SELECT COUNT(*) n, COALESCE(SUM(v.resultado='ok'),0) ok, COALESCE(SUM(v.resultado='error'),0) er, "
+                      "COUNT(DISTINCT v.dispositivo) d " + joins + " WHERE date(v.creado_en) = date('now','localtime')" + w, a).fetchone()
+        u = c.execute(_SEL + " WHERE 1=1" + w + " ORDER BY v.id DESC LIMIT 1", a).fetchone()
         return {"hoy": r["n"], "ok_hoy": r["ok"], "error_hoy": r["er"], "dispositivos_hoy": r["d"], "ultima": _fila(u) if u else None}
 
 
@@ -591,6 +596,7 @@ def _usuario_ids(c) -> Dict[str, int]:
 def _placas_validadas(todas: bool) -> Dict[str, Any]:
     with db.get_db() as c:
         ids = _usuario_ids(c)
+        w, a = db.clausula_lote(c, "COALESCE(t.lote_id,p.lote_id)")
         filas = c.execute(
             "SELECT v.id, v.pcb_id, v.comando, v.creado_en, v.operador, p.nombre AS pcb_nombre, p.tipo AS pcb_tipo, "
             "t.id AS tarjeta_id, t.id_tarjeta_num, "
@@ -600,7 +606,7 @@ def _placas_validadas(todas: bool) -> Dict[str, Any]:
             "LEFT JOIN tarjetas_produccion t ON t.id = COALESCE(v.tarjeta_id, (SELECT x.id FROM tarjetas_produccion x WHERE v.pcb_id IN (x.pcb_r1_id, x.pcb_r2_id) LIMIT 1)) "
             "WHERE v.resultado='ok' AND v.comando IN ('VALIDACION_AUTO','VALIDACION_MANUAL') "
             "AND v.id = (SELECT MAX(z.id) FROM validaciones_ble z WHERE z.pcb_id=v.pcb_id AND z.resultado='ok' AND z.comando IN ('VALIDACION_AUTO','VALIDACION_MANUAL')) "
-            "ORDER BY v.id DESC LIMIT 300").fetchall()
+            + w + " ORDER BY v.id DESC LIMIT 300", a).fetchall()
     items = []
     for r in filas:
         d = dict(r)

@@ -5,6 +5,19 @@
     // Sesión de usuario caducada o cerrada en otro equipo: cualquier respuesta 401 marcada por el servidor lleva al login.
     const _fetch = window.fetch.bind(window);
     window.fetch = async function (...a) {
+        // One view scope for JSON, binary downloads and direct fetch callers.
+        const url = new URL(a[0] instanceof Request ? a[0].url : String(a[0]), location.href);
+        if (url.origin === location.origin && window.TQT?.cabecerasLote) {
+            const scope = window.TQT.cabecerasLote(url.pathname);
+            if (scope['X-TQT-Lote']) {
+                const opts = Object.assign({}, a[1]);
+                const headers = new Headers(opts.headers || (a[0] instanceof Request ? a[0].headers : undefined));
+                if (!headers.has('X-TQT-Lote')) headers.set('X-TQT-Lote', scope['X-TQT-Lote']);
+                opts.headers = headers;
+                if (url.searchParams.get('lote_id') === '0' && headers.get('X-TQT-Lote') === 'all') url.searchParams.delete('lote_id');
+                a = [a[0] instanceof Request ? a[0] : url.href, opts];
+            }
+        }
         const r = await _fetch(...a);
         if (r.status === 401 && r.headers.get('X-Auth') === 'login' && location.pathname !== '/login') {
             location.href = accesoDelModulo() + '?next=' + encodeURIComponent(location.pathname + location.search + location.hash);
@@ -20,6 +33,26 @@
  */
 (function () {
     'use strict';
+    let loteElegido = '';
+    try { loteElegido = localStorage.getItem('tqt.lote.vista') || ''; } catch (_) {}
+    const RUTA_LOTE = /^\/api\/(?:pcb|tarjetas|consulta|stats|status|recepcion|emparejar|programacion|firmware|stm32|esp32|validacion|pruebas-auto|reporte-dia|export|excel|sync\/excel|dymo|correo\/excel|admin\/(?:resumen|tarjetas|pcb|movimientos|export))(?:\/|$)/;
+    function cabecerasLote(path) {
+        return RUTA_LOTE.test(path) ? { 'X-TQT-Lote': /^(?:all|[1-9][0-9]*)$/.test(loteElegido) ? loteElegido : 'active' } : {};
+    }
+    function loteUrl(path) {
+        const url = new URL(String(path), location.href);
+        const scope = cabecerasLote(url.pathname)['X-TQT-Lote'];
+        if (url.origin !== location.origin || !scope) return path;
+        url.searchParams.set('vista_lote', scope);
+        if (scope === 'all' && url.searchParams.get('lote_id') === '0') url.searchParams.delete('lote_id');
+        return url.pathname + url.search + url.hash;
+    }
+    const scopeLink = e => { const a = e.target.closest?.('a[href]'); if (a) a.setAttribute('href', loteUrl(a.getAttribute('href'))); };
+    document.addEventListener('click', scopeLink, true);
+    document.addEventListener('auxclick', scopeLink, true);
+    function todosLotes(lotes = []) { return { id: 0, todos: true, nombre: 'Todos los lotes', activo: 0,
+        tarjetas: lotes.reduce((n, l) => n + (l.tarjetas || 0), 0) }; }
+    function loteEtiqueta(item) { return item?.lote_codigo ? 'Lote ' + item.lote_codigo : 'Sin lote'; }
 
     const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto',
         'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -39,7 +72,7 @@
                 else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
                 else if (k === 'text') el.textContent = v;
                 else if (v === true) el.setAttribute(k, '');
-                else el.setAttribute(k, String(v));
+                else el.setAttribute(k, (k === 'href' || k === 'src') ? loteUrl(String(v)) : String(v));
             }
         }
         const add = (c) => {
@@ -80,6 +113,7 @@
 
     /** api(path,{method,body,timeout}) -> {ok,status,data,network,error}. Nunca lanza. */
     async function api(path, opts = {}) {
+        const vista = loteElegido;
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), opts.timeout || 8000);
         try {
@@ -91,6 +125,8 @@
             });
             let data = null;
             try { data = await res.json(); } catch (e) { data = null; }
+            if (vista !== loteElegido && RUTA_LOTE.test(new URL(path, location.href).pathname))
+                return { ok: false, stale: true, status: 409, error: 'La selección de lote cambió; se descartó la respuesta anterior.' };
             // Sesión de supervisor caducada en el monitor: volver a pedir la contraseña (después regresa aquí)
             if (res.status === 401 && location.pathname === '/monitor') { location.href = '/admin?next=/monitor'; }
             return { ok: res.ok, status: res.status, data, network: false, error: res.ok ? '' : (detailText(data && data.detail) || `Error ${res.status}`) };
@@ -186,6 +222,7 @@
     function loteConteo(l) { const t = l.tarjetas || 0, p = l.placas || 0; return `${t} tarjeta${t === 1 ? '' : 's'} · ${p} placa${p === 1 ? '' : 's'}`; }
     function loteNombre(l) {
         if (!l) return 'Sin lote';
+        if (l.todos) return 'Todos los lotes';
         const f = fechaLote(l.fecha_inicio), tipo = l.tipo_lote || 'mes';
         if (tipo === 'semana' && f) {
             const fin = new Date(f.getTime() + 6 * 864e5);
@@ -201,11 +238,14 @@
     function ordenarLotes(arr) { return (arr || []).slice().sort((a, b) => loteInicio(b).localeCompare(loteInicio(a)) || (b.id - a.id)); }
     // v1.4.42: lote elegido en la consola (por navegador). Sobrevive a recargar y lo usan /dymo y /admin; sin elección, el lote activo.
     const CLAVE_LOTE_VISTA = 'tqt.lote.vista';
-    function guardarLoteVista(id) { try { if (id) localStorage.setItem(CLAVE_LOTE_VISTA, String(id)); else localStorage.removeItem(CLAVE_LOTE_VISTA); } catch (e) { /* nada */ } }
+    function guardarLoteVista(id) {
+        loteElegido = id === 0 || id === '0' || id === 'all' ? 'all' : id ? String(id) : '';
+        try { if (loteElegido) localStorage.setItem(CLAVE_LOTE_VISTA, loteElegido); else localStorage.removeItem(CLAVE_LOTE_VISTA); } catch (e) { /* nada */ }
+    }
     /** El lote guardado si sigue en la lista; si no, null. */
     function loteVista(lotes) {
         let id = ''; try { id = localStorage.getItem(CLAVE_LOTE_VISTA) || ''; } catch (e) { /* nada */ }
-        return (id && (lotes || []).find((l) => String(l.id) === id)) || null;
+        return id === 'all' ? todosLotes(lotes) : (id && (lotes || []).find((l) => String(l.id) === id)) || null;
     }
     function debounce(fn, ms) { let t = null; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
     // Un solo Intl.DateTimeFormat: toLocaleTimeString() crea uno nuevo en cada llamada (con 300 filas son ~100 ms por repintado).
@@ -570,6 +610,8 @@
         function pintar() {
             body.replaceChildren();
             body.append(h('p', { class: 'muted lotes-intro' }, 'Elige en qué lote trabajas. Es solo para tu cuenta: lo que recibas y emparejes queda en ese lote, y los demás siguen en el suyo.'));
+            body.append(h('button', { class: 'btn', type: 'button', onclick: () => { s.close(); loteCambiado(shell, todosLotes(lotes || [])); } },
+                'Todos los lotes · consultar todas las tarjetas'));
             if (pendiente) {
                 body.append(h('form', { class: 'panel pad stack lote-auth', onsubmit: (e) => { e.preventDefault(); entrar(); } },
                     h('b', null, 'Estas acciones las hace el supervisor'),
@@ -875,7 +917,7 @@
         versionP,
         hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, esTpms, esAntijammer, esSpeedlocker, esSigfox, esCaiquen, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
-        loteNombre, loteConteo, ordenarLotes, loteVista, guardarLoteVista, debounce, hora,
+        loteNombre, loteConteo, ordenarLotes, loteVista, guardarLoteVista, todosLotes, cabecerasLote, loteUrl, loteEtiqueta, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,
         toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, irModulos, openLotes,
     };

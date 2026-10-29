@@ -552,7 +552,7 @@
         { class: "tqt-cardbtn", type: "button", "aria-pressed": String(tarjeta?.id === t.id), "data-id": t.id,
           onclick: async () => { if (await selectCard(t) !== false) { setCola([]); picker?.close(); } } },
         h("div", { class: "tqt-cardbtn-head" }, h("span", { class: "badge" }, "R1"), h("b", { class: "mono" }, t.r1?.nombre || "R1 sin registrar")),
-        h("div", { class: "tqt-cardbtn-meta" }, h("span", null, window.TQT?.programada?.(window.TQT.conFw(t, "r1")) ? "Programada · FW " + window.TQT.conFw(t, "r1").firmware : "Sin programar"), h("span", null, "#" + cardNum(t))),
+        h("div", { class: "tqt-cardbtn-meta" }, h("span", null, window.TQT?.programada?.(window.TQT.conFw(t, "r1")) ? "Programada · FW " + window.TQT.conFw(t, "r1").firmware : "Sin programar"), h("span", null, "#" + cardNum(t) + " · " + (T.loteEtiqueta?.(t) || t.lote_codigo || ""))),
       );
       const chk = h("input", { type: "checkbox", class: "tqt-pick-chk", checked: pickSel.has(t.id), "aria-label": "Marcar #" + cardNum(t),
         onchange: () => { chk.checked ? pickSel.set(t.id, t) : pickSel.delete(t.id); pickCount.textContent = String(pickSel.size); } });
@@ -1702,7 +1702,7 @@
     if (tid) selectCard({ id: Number(tid) || tid }).catch(() => {});
     return {
       escaneo: scan,
-      ocupada: () => !!active,
+      ocupada: () => !!active || manualBusy,
       // v1.4.0: salir de la vista con una prueba web en curso la cancela; se pide confirmación antes.
       confirmarSalida: () =>
         !active?.web ||

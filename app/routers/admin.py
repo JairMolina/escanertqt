@@ -438,7 +438,12 @@ async def export_excel(
     carpeta del servidor (`ruta`) escribe en disco: sigue pidiendo la clave de administración."""
     if ruta:
         admin_requerido(x_admin_token, tqt_admin)
-    lote =await run_in_threadpool(db.get_lote_by_id, lote_id) if lote_id else await run_in_threadpool(db.get_active_lote)
+    try:
+        lote = await run_in_threadpool(db.get_lote_operativo, lote_id)
+    except db.NoEncontradoError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not lote:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote no encontrado o sin lote activo.")
     nombre = db.archivo_excel_lote(lote)   # v1.3.44: semana/día llevan su código en el nombre

@@ -306,7 +306,7 @@ def _fila(c, r):
     d = dict(r)
     d["detener_en_falla"] = bool(d["detener_en_falla"])
     d["conteo"] = _conteo(c, d["id"])
-    t = c.execute("SELECT t.id_tarjeta_num,p.nombre FROM tarjetas_produccion t JOIN pcb_inventario p ON p.id=t.pcb_r1_id WHERE t.id=?",
+    t = c.execute("SELECT t.id_tarjeta_num,t.lote_id,l.codigo_lote lote_codigo,p.nombre FROM tarjetas_produccion t JOIN pcb_inventario p ON p.id=t.pcb_r1_id JOIN lotes_mensuales l ON l.id=t.lote_id WHERE t.id=?",
                   (d["tarjeta_id"],)).fetchone()
     d["tarjeta"] = dict(t) if t else None
     s = c.execute("SELECT name FROM stm32_stations WHERE id=?", (d["station"],)).fetchone()
@@ -345,10 +345,11 @@ def lista(email=None):
     """v1.4.52: cada cuenta ve solo sus campañas (sesiones separadas). Sin email (uso interno): todas."""
     init()
     with db.get_db() as c:
+        w, a = db.clausula_lote(c, "t.lote_id")
         if email:
-            filas = c.execute("SELECT * FROM tqt_resistencia WHERE operador=? ORDER BY creado DESC LIMIT 200", (email,))
-        else:
-            filas = c.execute("SELECT * FROM tqt_resistencia ORDER BY creado DESC LIMIT 200")
+            w += " AND r.operador=?"
+            a.append(email)
+        filas = c.execute("SELECT r.* FROM tqt_resistencia r JOIN tarjetas_produccion t ON t.id=r.tarjeta_id WHERE 1=1" + w + " ORDER BY r.creado DESC LIMIT 200", a)
         out = [_fila(c, r) for r in filas]
         for d in out:   # v1.4.68: por qué falló (último ciclo fallido o no verificado)
             d["ultimo_fallo"] = _ultimo_fallo(c, d["id"])
@@ -359,7 +360,7 @@ def leer(cid, email=None, admin=False):
     init()
     with db.get_db() as c:
         r = c.execute("SELECT * FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
-        if not r or (email and r["operador"] != email and not admin):
+        if not r or (email and r["operador"] != email and not admin) or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
             raise ValueError("Campaña no encontrada.")
         d = _fila(c, r)
         d["ciclos_detalle"] = [dict(x) for x in c.execute(
@@ -385,8 +386,8 @@ def cambiar(cid, accion, operador, admin=False):
         raise ValueError("Acción no válida.")
     desde, hacia = destino[accion]
     with db.transaction() as c:
-        r = c.execute("SELECT estado,operador FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
-        if not r or (r["operador"] != operador and not admin):
+        r = c.execute("SELECT estado,operador,tarjeta_id FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
+        if not r or (r["operador"] != operador and not admin) or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
             raise ValueError("Campaña no encontrada.")
         if r["estado"] not in ACTIVAS or (desde and r["estado"] != desde):
             raise ValueError("La campaña no está en un estado que permita esa acción.")
@@ -487,21 +488,23 @@ def buscar_tarjetas(q):
     q = (q or "").strip()[:40]
     like = "%" + q.replace("%", "").replace("_", "") + "%"
     with db.get_db() as c:
+        w, a = db.clausula_lote(c, "t.lote_id")
         return [dict(r) for r in c.execute(
-            "SELECT t.id,t.id_tarjeta_num,p.nombre r1,q.nombre r2,p.firmware FROM tarjetas_produccion t "
+            "SELECT t.id,t.id_tarjeta_num,t.lote_id,l.codigo_lote lote_codigo,p.nombre r1,q.nombre r2,p.firmware FROM tarjetas_produccion t "
+            "JOIN lotes_mensuales l ON l.id=t.lote_id "
             "JOIN pcb_inventario p ON p.id=t.pcb_r1_id JOIN pcb_inventario q ON q.id=t.pcb_r2_id "
             "WHERE p.mac IS NOT NULL AND p.mac<>'' AND q.mac IS NOT NULL AND q.mac<>'' "
             "AND (CAST(t.id_tarjeta_num AS TEXT) LIKE ? OR p.nombre LIKE ? OR q.nombre LIKE ?) "
-            "ORDER BY t.id DESC LIMIT 20", (like, like, like))]
+            + w + " ORDER BY t.id DESC LIMIT 20", [like, like, like, *a])]
 
 
 def ciclo_permitido(jid, email, admin=False):
     """El LOG de un ciclo solo lo baja quien lanzó su campaña (o un administrador)."""
     with db.get_db() as c:
-        r = c.execute("SELECT r.operador FROM tqt_resistencia_ciclos x JOIN tqt_resistencia r ON r.id=x.campana WHERE x.run=?",
+        r = c.execute("SELECT r.operador,r.tarjeta_id FROM tqt_resistencia_ciclos x JOIN tqt_resistencia r ON r.id=x.campana WHERE x.run=?",
                       (jid,)).fetchone()
-    if not r or (r["operador"] != email and not admin):
-        raise ValueError("Ciclo no encontrado.")
+        if not r or (r["operador"] != email and not admin) or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
+            raise ValueError("Ciclo no encontrado.")
 
 
 def vivo(cid, email=None, admin=False):
@@ -540,8 +543,8 @@ def eliminar(cid, email, admin=False):
     siguen como pruebas normales en el historial de Pruebas TQT de la tarjeta; solo se quita la campaña y su relación."""
     init()
     with db.transaction() as c:
-        r = c.execute("SELECT estado,operador FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
-        if not r or (r["operador"] != email and not admin):
+        r = c.execute("SELECT estado,operador,tarjeta_id FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
+        if not r or (r["operador"] != email and not admin) or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
             raise ValueError("Campaña no encontrada.")
         if r["estado"] in ACTIVAS:
             raise ValueError("Detén la campaña antes de eliminarla.")

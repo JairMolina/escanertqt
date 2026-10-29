@@ -11,9 +11,10 @@
         id: 'consultar', titulo: 'Consultar', icono: 'consultar', grupo: 'operacion', orden: 50,
         montar(host, ctx) {
             const { T, api, h, icon, util } = ctx;
+            const historialKey = CLAVE + ':' + (ctx.lote()?.todos ? 'all' : ctx.lote()?.id || 'sin-lote');
             const st = { ultimo: '', busy: false, hist: [] };
-            try { const j = JSON.parse(localStorage.getItem(CLAVE) || '[]'); if (Array.isArray(j)) st.hist = j.filter((x) => typeof x === 'string').slice(0, 12); } catch (e) { st.hist = []; }
-            const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(st.hist)); } catch (e) { /* modo privado */ } };
+            try { const j = JSON.parse(localStorage.getItem(historialKey) || '[]'); if (Array.isArray(j)) st.hist = j.filter((x) => typeof x === 'string').slice(0, 12); } catch (e) { st.hist = []; }
+            const guardar = () => { try { localStorage.setItem(historialKey, JSON.stringify(st.hist)); } catch (e) { /* modo privado */ } };
 
             const q = h('textarea', { class: 'input', id: 'consQ', rows: '5', 'data-buscar': '1', spellcheck: 'false', autocomplete: 'off', 'aria-describedby': 'consAyuda',
                 placeholder: 'TQT-R1-V30-0021\n70:4b:ca:5b:9f:6e\nTQT-R2-V30-0010\n70:4b:ca:5b:9c:a2' });
@@ -38,7 +39,12 @@
                 (d.avisos || []).forEach((a) => cuerpo.append(T.banner('warn', 'alert', a)));
                 const nueva = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { st.ultimo = ''; q.value = ''; vacio(); history.replaceState(null, '', '#/consultar'); q.focus(); } }, icon('refresh'), 'Nueva consulta');
                 const ORIGEN = { etiqueta: 'Leída de la etiqueta', pcb: 'Encontrada por el nombre de una PCB', mac: 'Encontrada por MAC', tarjeta: 'Encontrada por número', serie: 'Placas con ese número' };
-                if (t) {
+                if (d.coincidencias?.length) {
+                    cuerpo.append(h('h2', null, 'Elige el lote de la tarjeta'),
+                        h('div', { class: 'stack' }, d.coincidencias.map(tar => h('button', { class: 'btn', type: 'button', onclick: () => {
+                            ctx.seleccionarLote(tar.lote_id); ctx.ir('consultar', { codigo: tar.id_tarjeta_num });
+                        } }, '#' + tar.id_tarjeta_num + ' · ' + T.loteEtiqueta(tar)))));
+                } else if (t) {
                     const conFw = (s) => { const p = t[s]; return p ? Object.assign({}, p, { firmware: p.firmware || t['firmware_' + s] || null }) : null; };
                     cuerpo.append(h('div', { class: 'esc-ficha-cab' },
                         h('div', null, h('div', { class: 'silk', style: 'margin-bottom:4px' }, 'Tarjeta'), h('div', { class: 'num', 'aria-label': 'Tarjeta ' + t.id_tarjeta_num }, t.id_tarjeta_num)),

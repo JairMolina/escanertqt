@@ -40,7 +40,8 @@ def listar_respaldos(limite: int = 10) -> List[Dict[str, Any]]:
 def resumen(db_path: Optional[Path] = None) -> Dict[str, Any]:
     with db.get_db(db_path) as c:
         lotes = []
-        for lote in c.execute("SELECT * FROM lotes_mensuales ORDER BY COALESCE(fecha_inicio, printf('%04d-%02d-01', anio, mes)) DESC, id DESC"):
+        lw, la = db.clausula_lote(c, "id")
+        for lote in c.execute("SELECT * FROM lotes_mensuales WHERE 1=1" + lw + " ORDER BY COALESCE(fecha_inicio, printf('%04d-%02d-01', anio, mes)) DESC, id DESC", la):
             estados = {r["estado_general"]: r["n"] for r in c.execute(
                 "SELECT COALESCE(p.estado_general,'PENDIENTE') AS estado_general, COUNT(*) n FROM tarjetas_produccion t "
                 "LEFT JOIN pruebas_historial p ON p.tarjeta_id = t.id WHERE t.lote_id = ? GROUP BY 1", (lote["id"],))}
@@ -49,12 +50,15 @@ def resumen(db_path: Optional[Path] = None) -> Dict[str, Any]:
                           "mes": lote["mes"], "anio": lote["anio"],
                           "tarjetas": sum(estados.values()), "por_estado": estados})
         inventario: Dict[str, Dict[str, int]] = {}
-        for r in c.execute("SELECT tipo, estado_ciclo, COUNT(*) n FROM pcb_inventario GROUP BY tipo, estado_ciclo"):
+        pw, pa = db.clausula_lote(c, "COALESCE(t.lote_id,p.lote_id)")
+        pcb_from = " FROM pcb_inventario p LEFT JOIN tarjetas_produccion t ON p.id IN (t.pcb_r1_id,t.pcb_r2_id,t.pcb_r3_id) WHERE 1=1" + pw
+        for r in c.execute("SELECT p.tipo, p.estado_ciclo, COUNT(*) n" + pcb_from + " GROUP BY p.tipo, p.estado_ciclo", pa):
             inventario.setdefault(r["tipo"], {})[r["estado_ciclo"]] = r["n"]
+        tw, ta = db.clausula_lote(c, "lote_id")
         totales = {
-            "tarjetas": c.execute("SELECT COUNT(*) FROM tarjetas_produccion").fetchone()[0],
-            "pcb": c.execute("SELECT COUNT(*) FROM pcb_inventario").fetchone()[0],
-            "bitacora": c.execute("SELECT COUNT(*) FROM escaneos").fetchone()[0],
+            "tarjetas": c.execute("SELECT COUNT(*) FROM tarjetas_produccion WHERE 1=1" + tw, ta).fetchone()[0],
+            "pcb": c.execute("SELECT COUNT(*)" + pcb_from, pa).fetchone()[0],
+            "bitacora": c.execute("SELECT COUNT(*) FROM escaneos WHERE 1=1" + tw, ta).fetchone()[0],
         }
     path = Path(db_path or settings.DB_PATH)
     return {"lotes": lotes, "inventario": inventario, "totales": totales,
@@ -65,7 +69,13 @@ def _existentes(c: sqlite3.Connection, tabla: str, ids: List[int]) -> List[int]:
     if not ids:
         return []
     ph = ",".join("?" * len(ids))
-    return [r[0] for r in c.execute(f"SELECT id FROM {tabla} WHERE id IN ({ph})", ids)]
+    if tabla == "pcb_inventario":
+        w, a = db.clausula_lote(c, "COALESCE(t.lote_id,p.lote_id)")
+        sql = f"SELECT p.id FROM pcb_inventario p LEFT JOIN tarjetas_produccion t ON p.id IN (t.pcb_r1_id,t.pcb_r2_id,t.pcb_r3_id) WHERE p.id IN ({ph})"
+    else:
+        w, a = db.clausula_lote(c, "lote_id")
+        sql = f"SELECT id FROM {tabla} WHERE id IN ({ph})"
+    return [r[0] for r in c.execute(sql + w, [*ids, *a])]
 
 
 def verificar_tarjetas(ids: List[int], db_path: Optional[Path] = None) -> List[int]:
@@ -227,6 +237,9 @@ def movimientos(limite: int = 50, desplazamiento: int = 0, categoria: Optional[s
     if hasta:
         base.append("date(e.creado_en, 'localtime') <= ?")
         params.append(hasta)
+    if db.LOTE_VISTA.get() is not None:
+        with db.get_db(db_path) as scope_c:
+            lote_id = db.filtro_lote(scope_c, lote_id)
     if lote_id:
         base.append("e.lote_id = ?")
         params.append(lote_id)
