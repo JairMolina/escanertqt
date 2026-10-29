@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.74 — 2026-10-29
+- **Agente 1.4.74: la conexión BLE se reintenta.** La campaña `78d9f0cf` (Prueba5, tarjeta 0057) aprobó 5 ciclos y el 6.º (23:00) falló en la etapa 6 con `BleakError: failed to discover services, device disconnected`: la R1 soltó el enlace al descubrir servicios y no había reintento. Ahora R1 y R2 se reintentan 2 veces con escaneo nuevo (`TestStation._conectar_ble`). Pruebas: `ConexionBleReintenta`.
+- **Puente BLE de Windows: suelta la tarjeta si queda inactiva.** Si la web se cerraba o cambiaba de página (p. ej. de Pruebas TQT a Programación) sin desconectar, el puente seguía conectado a la tarjeta indefinidamente; mientras la ESP32 tiene una conexión no se anuncia, así que la OTA por Bluetooth de Programación (de esa u otra laptop) fallaba. Ahora el agente desconecta tras 180 s sin comandos BLE (igual que la reserva del servidor).
+- Auditoría: el servidor ya separa los Bluetooth por cuenta (`native_ble.stations/prepare`, `test_station.propia`, la Raspberry excluida) y Programación usa Web Bluetooth del propio navegador (adaptador local). No hay uso cruzado del Bluetooth de otro equipo.
+
 ## v1.4.73 — 2026-10-28
 - **Agente 1.4.73: el `$OK` ya no llega tarde a la R1.** En el ciclo 2 de la prueba del 2026-10-28 a las 15:36, el perno cerró bien pero la etapa 13 falló con «R1 no observó cerrado tras POFF por R2»:
   - **El retraso:** la Raspberry tardaba 1–2 s en responder `$OK` a cada trama (en el ciclo 1, unos 0.2 s).

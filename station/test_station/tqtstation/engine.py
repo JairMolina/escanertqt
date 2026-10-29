@@ -324,6 +324,21 @@ class TestStation:
         self._require(after.number('MOV') == before.number('MOV'), 'MOV de R1 cambió durante R2')
         return f'{cmd} → {expected}, err={code} nuevo en R1; MOV de R1 sin incremento'
 
+    def _conectar_ble(self, address, quien):
+        # v1.4.74: un enlace que se cae al descubrir servicios («failed to discover services, device disconnected»)
+        # cortaba la campaña; ahora se reintenta 2 veces con escaneo nuevo antes de fallar.
+        for intento in range(1, 4):
+            try:
+                return self.ble.connect(address)
+            except Exception as exc:
+                if intento == 3:
+                    raise
+                self.log(f'AVISO BLE: {quien} {address} no conectó ({exc}); reintento {intento}/2 con escaneo nuevo. '
+                         'Si otra laptop o un celular está conectado a esta tarjeta, desconéctalo.')
+                if self.cancel.is_set(): raise Interrupted('Cancelada')
+                time.sleep(3)
+                self.ble.scan(target=address)
+
     def _posicion_estable(self, cursor, expected, ventana=1.5, timeout=10.0):
         """v1.4.65: con R2 el motor lo mueve R2 (R1 queda en TQT=0) y el sensor de fin de carrera puede rebotar
         (ON/OFF 1→0→1) al llegar. Antes se tomaba la última trama en caché, que podía ser justo el rebote.
@@ -458,7 +473,7 @@ class TestStation:
                     raise NoVerification(f'R1 BLE ambigua/no localizada. MAC reportada {reported}; encontrados: '+
                                          ', '.join(f'{d.name} {d.address}' for d in found))
                 selected_r1 = options[0].address
-                self.ble.connect(selected_r1)
+                self._conectar_ble(selected_r1, 'R1')
                 self.mac_comparison = 'coincide' if normalize_mac(selected_r1) == reported else 'no_coincide'
                 self.ui('ble_ident','R1',options[0].name,selected_r1,self.mac_comparison)
                 if self.mac_comparison == 'no_coincide':
@@ -505,7 +520,7 @@ class TestStation:
                 else:   # anunció sin nombre: la dirección exacta (MACR de la R1) es el criterio
                     self.log(f'R2 encontrada por dirección {chosen.address} sin nombre en el anuncio; se acepta por MACR exacta')
                 selected_r2 = chosen.address
-                self.ble.connect(selected_r2)
+                self._conectar_ble(selected_r2, 'R2')
                 self.ui('ble_ident','R2',chosen.name,selected_r2,method)
                 self.log(f'R2 conectada automáticamente por {method}: {chosen.name} / {selected_r2}')
                 return f'R2 {chosen.name} ({selected_r2}), criterio: {method}'

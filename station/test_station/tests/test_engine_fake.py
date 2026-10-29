@@ -2,6 +2,7 @@
 import tempfile
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 from tqtstation.engine import TestStation
 from tqtstation.protocol import FIELDS
@@ -168,5 +169,34 @@ class TestWorkflow(unittest.TestCase):
             self.assertEqual(st.report['result'],'aprobado',st.report.get('issue'))
             texto=''.join(p.read_text(encoding='utf-8') for p in Path(tmp).glob('*.log'))
             self.assertIn('no visible en el escaneo 1/3',texto)
+
+class ConexionBleReintenta(unittest.TestCase):
+    """v1.4.74: ciclo 6 de la campaña 78d9f0cf: «failed to discover services» ya no corta a la primera."""
+    def _station(self, fallos):
+        import threading
+        class Ble:
+            def __init__(s): s.intentos, s.escaneos = 0, 0
+            def connect(s, address):
+                s.intentos += 1
+                if s.intentos <= fallos: raise RuntimeError('failed to discover services, device disconnected')
+            def scan(s, target=None): s.escaneos += 1
+        st = TestStation.__new__(TestStation)
+        st.ble, st.cancel, st.logs = Ble(), threading.Event(), []
+        st.log = st.logs.append
+        return st
+
+    def test_reintenta_con_escaneo_nuevo(self):
+        st = self._station(2)
+        with unittest.mock.patch('tqtstation.engine.time.sleep'):
+            st._conectar_ble('AA:BB:CC:DD:EE:FF', 'R1')
+        self.assertEqual((st.ble.intentos, st.ble.escaneos), (3, 2))
+        self.assertIn('reintento 1/2', st.logs[0])
+
+    def test_falla_tras_tres_intentos(self):
+        st = self._station(5)
+        with unittest.mock.patch('tqtstation.engine.time.sleep'), self.assertRaises(RuntimeError):
+            st._conectar_ble('AA:BB:CC:DD:EE:FF', 'R1')
+        self.assertEqual(st.ble.intentos, 3)
+
 
 if __name__=='__main__':unittest.main()

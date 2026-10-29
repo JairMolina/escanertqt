@@ -8,7 +8,11 @@ Actualizado: 2026-10-28. Código desplegado: `985d0d367de308dc1d20badd761793e530
 
 Main incluye los avances de otros colaboradores: Pruebas automáticas por cuenta y Raspberry, exclusión de Raspberry de bancos normales, agentes/puentes BLE por cuenta y avisos de actualización, sincronización Skytec y rediseño de Diagrama. No volver a desplegar 1.4.49 ni el checkout documental antiguo. Las notas anteriores de despliegue 1.4.51 pendiente están superadas por esta comprobación de producción; las pruebas físicas y la configuración de Skytec no se revalidaron hoy.
 
-## Claude v1.4.73 (main, sin desplegar)
+## Claude v1.4.74 (main, sin desplegar; incluye 1.4.73)
+
+Campaña 78d9f0cf: ciclos 1–5 aprobados; el 6 falló al conectar R1 BLE («failed to discover services, device disconnected»). Agente: `_conectar_ble` reintenta R1/R2 2 veces con escaneo nuevo; el puente Windows desconecta la tarjeta tras 180 s sin comandos BLE (antes quedaba conectado si la página se cerraba y bloqueaba la OTA de Programación). Auditoría: separación por cuenta correcta en servidor; Programación usa Web Bluetooth local. Pruebas: agente 58 (solo falla `test_reporting`, previo), servidor 75 OK. Pendiente: desplegar y que cada laptop actualice su puente (autoactualización).
+
+## Claude v1.4.73 (main 0e4f076)
 
 Agente: `$OK` antes de registrar la línea, outbox en WAL/synchronous=NORMAL y eventos en lotes (hasta 50 por POST); espera de R2 de 32 a 60 s. Causa: en el ciclo 2 la Raspberry tardaba 1–2 s por ACK → reintentos de la R1 y cola de mensajes → «cerrado» llegó 33 s tarde. Log del agente con estilo de terminal.
 

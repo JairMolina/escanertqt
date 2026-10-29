@@ -11,7 +11,7 @@ from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
 
 
-AGENT_VERSION = "1.4.73"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
+AGENT_VERSION = "1.4.74"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
 LOG_MAX = 256 * 1024                      # cola de agent.log que se sube cuando la web la pide
 # v1.4.64: la autoactualización nunca sobrescribe lo propio de esta instalación.
 PROTEGIDOS = {"config.json", "puerto_serie.txt", "agent.log", "outbox.db", ".agent.lock"}
@@ -70,6 +70,9 @@ def norm(x):
     return "".join(c for c in str(x or "").upper() if c.isalnum())
 
 
+BLE_INACTIVO_S = 180   # = vida de la reserva BLE en el servidor (tqt_ble_leases)
+
+
 class StationRevokedError(RuntimeError):
     pass
 
@@ -81,6 +84,7 @@ class Bridge:
         self.lock = threading.RLock()
         self._http = threading.local()   # v1.4.56: una conexión HTTPS keep-alive por hilo
         self.active = None
+        self.ble_uso = 0.0   # v1.4.74: último comando BLE recibido (para soltar la tarjeta si queda inactiva)
         self.sequence = 0
         self.expected = None
         self.latest = {}
@@ -323,6 +327,8 @@ class Bridge:
                 raise RuntimeError("Prueba automática activa; comando bloqueado.")
             if self.cfg.get('ble_only') and action != 'ble_bridge':
                 raise ValueError('Este puente solo permite Bluetooth; no abre serial.')
+            if action in ("ble_bridge", "scan_ble", "connect_ble", "ble"):
+                self.ble_uso = time.time()
             if action in ("serial", "ble") and data.get("command") in ("PPON", "POFF"):
                 d = data.get("inventory") or {}
                 if (
@@ -346,6 +352,7 @@ class Bridge:
                 if self.serial.connected:
                     raise ValueError('El puente BLE no puede poseer el puerto serial.')
                 result = execute_native_ble(self.ble, lambda: self.api('ble/' + cmd['id'] + '/authorize', {}))
+                self.ble_uso = time.time()
             elif action == "ports":
                 result = self.serial.ports()
             elif action == "connect_serial":
@@ -477,6 +484,11 @@ class Bridge:
             try:
                 self.flush()
                 self.auto_serial()
+                # v1.4.74: si la web se cerró o cambió de página sin desconectar, el puente seguía conectado a la
+                # tarjeta para siempre y nadie (ni la OTA de Programación de otra laptop) podía conectarse a ella.
+                if self.ble.address and not self.engine.running and time.time() - self.ble_uso > BLE_INACTIVO_S:
+                    self.log(f"BLE: {self.ble.address} sin comandos {BLE_INACTIVO_S} s; se desconecta para liberar la tarjeta")
+                    self.ble.disconnect()
                 state = {
                     "ble_bridge": 1,
                     "ble_only": bool(self.cfg.get('ble_only')),
