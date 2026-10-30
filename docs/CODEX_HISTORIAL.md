@@ -231,3 +231,9 @@ Se comprobó main 985d0d3 y servidor d63546b, ambos 1.4.63; se desplegó el ajus
 Base origin/main f0fac7d / 1.4.74, rama codex/lotes-aislamiento-20261029, checkout work/tqt-lotes-20261029. Alcance común por lote en consultas, operaciones, contadores, programación, pruebas y descargas TQT; Todos explícito con origen y desambiguación. La UI limpia selecciones y descarta respuestas anteriores; backend verifica pertenencia por ID/QR/MAC. Preserva permisos, agentes, banco físico y traslado explícito de inventario.
 
 402 Python PASS en Docker sin red, 13+3 Playwright PASS, 14 grupos motor Node y UI PASS. QA sintética 18091 healthy, cero operaciones físicas. Evidencia docs/LOTES_ALCANCE_LOCAL.md; CM continuar/local/checkpoint/memoria y ECC backend/verificación/E2E aplicados. No push ni despliegue en esta tarea. Pendiente revisión local y comparación de main antes de subir. El borrador de rediseño de Pruebas TQT de octubre 27 ya fue superado por main 1.4.64 y se conserva intacto.
+
+## 2026-10-29 — Integración final sobre main 1.4.75; candidata local 1.4.76
+
+GitHub avanzó a 91913d6 y 9d7e93a durante el primer QA. El commit local no publicado se integró sobre 9d7e93a conservando los archivos y pruebas de portada íntegros; código de lotes en deac73e. APP_VERSION y la constante AGENT_VERSION quedan alineadas en 1.4.76, sin cambio de lógica del agente. Se repitieron 402 Python PASS (114.386 s) y 13+3 Playwright PASS en esa combinación. Se corrigió la sincronización del test de navegador para esperar la verificación automática existente de R2 antes de cambiar de lote; no cambió esa función.
+
+QA 127.0.0.1:18091 healthy, datos sintéticos y cero acciones físicas. La candidata 1.4.75 y el hash local anterior a6e74c2 de esta tarea quedan superados por la integración 1.4.76; no confundirlos con la portada 1.4.75 del compañero. Pendiente revisión del usuario, subir a GitHub y desplegar cuando se solicite. No hubo push ni despliegue en esta tarea.

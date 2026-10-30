@@ -57,13 +57,15 @@ Se reutilizó la imagen local `tqt-r2-v4-tests` y se montó el código actual; n
 
 Verificaciones completadas:
 
-1. **402 pruebas Python PASS**, 126.613 s, en contenedor sin red y con bases temporales de `_aislamiento`. Incluye 25 pruebas de alcance nuevas: contextos concurrentes, cuenta/activo/vista, ID/QR/MAC, tarjetas y PCB sueltas, reportes/Excel, campañas y operaciones, permisos, movimientos explícitos y recepción. Regresión de programación ESP32/STM32, OTA, firmware, DYMO, Pruebas TQT y automáticas, API y portal. Log local: `outputs/lotes_20261029/regresion_final_402.log`.
+1. **402 pruebas Python PASS**, 114.386 s después de integrar main 1.4.75, en contenedor sin red y con bases temporales de `_aislamiento`. Incluye 25 pruebas de alcance nuevas: contextos concurrentes, cuenta/activo/vista, ID/QR/MAC, tarjetas y PCB sueltas, reportes/Excel, campañas y operaciones, permisos, movimientos explícitos y recepción. Regresión de programación ESP32/STM32, OTA, firmware, DYMO, Pruebas TQT y automáticas, API y portal. Log final local: `outputs/lotes_20261029/regresion_1_4_76.log`.
 2. **13 escenarios Playwright PASS** en `tests/lotes_scope.playwright.js`: Programación por tipo, Dashboard, inventario, tarjetas, consulta ambigua, selector de Pruebas, Excel, bloqueo de cambio durante operación, respuesta atrasada, persistencia y móvil. Cero errores JS, escrituras API y accesos físicos.
 3. **3 escenarios adicionales PASS** en `tests/lotes_auxiliares.playwright.js`: resumen/listas de Administración, búsqueda de Pruebas automáticas por la cabecera real del navegador y DYMO. SDK e impresión remota simulados; cero impresión física y escrituras de inventario.
 4. Node: sintaxis de JS modificado y pruebas Playwright, `validacion_web_engine.cjs` (14 grupos) y `sec_validacion_ui.cjs`, PASS. El motor verifica las 14 etapas con transportes simulados.
 5. Compose validado, arranque y salud local comprobados. Playwright 1440 y 390 px sin desborde; capturas revisadas en `outputs/lotes_20261029/programacion_1440.png` y `programacion_390.png`. `git diff --check` correcto.
 
-Las pruebas Playwright son funciones ejecutables mediante `browser_run_code_unsafe`; crean un contexto propio, únicamente contra el QA en 18091. No reutilizan pestañas personales. Las claves ficticias que aparecen en esas pruebas no sirven en producción.
+Las pruebas Playwright son funciones ejecutables mediante `browser_run_code_unsafe`; crean un contexto propio, únicamente contra el QA en 18091. No reutilizan pestañas personales. Las claves ficticias que aparecen en esas pruebas no sirven en producción. Al seleccionar la R2 elegible, la web conserva su verificación automática existente: el escenario espera que termine (sin estación en QA) antes de cambiar de lote, para no confundirse con la guardia de operación en curso.
+
+La comparación final encontró main 1.4.75 (`91913d6`, cierre documental `9d7e93a`). Se integró manteniendo intactos inicio.html, inicio.js, inicio.css, planetas.js y las pruebas de portada; la candidata pasó a 1.4.76. Se alinea únicamente la constante AGENT_VERSION, según la convención vigente, sin cambios de transporte/lógica del agente. Se repitieron las 402 pruebas y los 13+3 escenarios de navegador sobre esta combinación.
 
 `test_api.py` genera su CA pública en una carpeta temporal para comprobar la descarga sin depender de certificados de la laptop. No se copiaron certificados ni credenciales reales.
 

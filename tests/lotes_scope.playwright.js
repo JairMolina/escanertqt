@@ -35,6 +35,9 @@ async (page) => {
     assert((await items().innerText()).includes('TQT-R2-V30-0065'), 'Septiembre solo R2 propia');
     await items().click();
     await p.locator('#sec-programacion').getByText('TQT-R2-V30-0065', {exact:true}).last().waitFor();
+    // Selecting an eligible R2 starts its existing automatic verification. This QA
+    // has no station: wait for that read-only check to finish before switching lots.
+    await p.locator('#sec-programacion').getByText(/No hay una estación J-Link conectada en esta laptop/).waitFor();
     checks.push('Programación: 0065 de septiembre sin mezclar octubre');
 
     await lot('Octubre 2026'); await listCount(3);
