@@ -341,28 +341,29 @@ def _ultimo_fallo(c, cid):
     return dict(m, n=r["n"], resultado=r["result"] or r["state"])
 
 
-def lista(email=None):
-    """v1.4.52: cada cuenta ve solo sus campañas (sesiones separadas). Sin email (uso interno): todas."""
+def lista(email=None, admin=False):
+    """v1.4.77: el historial de campañas es compartido por todas las cuentas (solo lectura para quien no es dueño).
+    `mia` indica si la campaña es de esta cuenta o si es administrador (solo ellos pausan, detienen o eliminan)."""
     init()
     with db.get_db() as c:
         w, a = db.clausula_lote(c, "t.lote_id")
-        if email:
-            w += " AND r.operador=?"
-            a.append(email)
         filas = c.execute("SELECT r.* FROM tqt_resistencia r JOIN tarjetas_produccion t ON t.id=r.tarjeta_id WHERE 1=1" + w + " ORDER BY r.creado DESC LIMIT 200", a)
         out = [_fila(c, r) for r in filas]
         for d in out:   # v1.4.68: por qué falló (último ciclo fallido o no verificado)
             d["ultimo_fallo"] = _ultimo_fallo(c, d["id"])
+            d["mia"] = bool(admin or (email and d["operador"] == email))
         return out
 
 
 def leer(cid, email=None, admin=False):
+    """v1.4.77: cualquier cuenta puede leer la campaña (historial compartido); `mia` marca si puede actuar sobre ella."""
     init()
     with db.get_db() as c:
         r = c.execute("SELECT * FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
-        if not r or (email and r["operador"] != email and not admin) or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
+        if not r or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
             raise ValueError("Campaña no encontrada.")
         d = _fila(c, r)
+        d["mia"] = bool(admin or (email and r["operador"] == email))
         d["ciclos_detalle"] = [dict(x) for x in c.execute(
             "SELECT x.n,r.id run,r.state,r.result,r.created,r.updated,r.report FROM tqt_resistencia_ciclos x "
             "JOIN tqt_test_runs r ON r.id=x.run WHERE x.campana=? ORDER BY x.n DESC", (cid,))]
@@ -499,11 +500,11 @@ def buscar_tarjetas(q):
 
 
 def ciclo_permitido(jid, email, admin=False):
-    """El LOG de un ciclo solo lo baja quien lanzó su campaña (o un administrador)."""
+    """v1.4.77: el LOG de un ciclo lo puede bajar cualquier cuenta (historial compartido de campañas)."""
     with db.get_db() as c:
         r = c.execute("SELECT r.operador,r.tarjeta_id FROM tqt_resistencia_ciclos x JOIN tqt_resistencia r ON r.id=x.campana WHERE x.run=?",
                       (jid,)).fetchone()
-        if not r or (r["operador"] != email and not admin) or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
+        if not r or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
             raise ValueError("Ciclo no encontrado.")
 
 

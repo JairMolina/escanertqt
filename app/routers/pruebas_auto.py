@@ -147,7 +147,8 @@ def bajar_log(req: Request):
 
 @router.get("/campanas")
 def campanas(req: Request):
-    return svc.lista(quien(req)[0])
+    """v1.4.77: historial compartido por todas las cuentas."""
+    return svc.lista(*quien(req))
 
 
 @router.post("/campanas")

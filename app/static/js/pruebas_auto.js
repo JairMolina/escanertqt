@@ -401,7 +401,7 @@
             '<button class="btn" type="button" data-ver="' + id + '" aria-expanded="' + (abierta === String(c.id)) + '" aria-controls="d' + id + '"><span class="pa-i" data-i="list" aria-hidden="true"></span>Ciclos</button>' +
             (vivo ? '' : '<button class="btn" type="button" data-rep="' + id + '"' + (act ? ' disabled title="Termina o detén la campaña en curso para repetir otra"' : ' title="Carga estos mismos datos en «Nueva campaña»"') +
                 '><span class="pa-i" data-i="repeat" aria-hidden="true"></span>Repetir</button>') +
-            (vivo ? '' : '<button class="btn pa-link pa-del" type="button" data-del="' + id + '" title="Quita esta campaña del historial (sus pruebas siguen en el historial de la tarjeta en Pruebas TQT)"><span class="pa-i" data-i="x" aria-hidden="true"></span><span>Eliminar</span></button>') +
+            (vivo || !c.mia ? '' : '<button class="btn pa-link pa-del" type="button" data-del="' + id + '" title="Quita esta campaña del historial (sus pruebas siguen en el historial de la tarjeta en Pruebas TQT)"><span class="pa-i" data-i="x" aria-hidden="true"></span><span>Eliminar</span></button>') +
             '</div>' +
             '<div class="pa-ciclos" id="d' + id + '">' + (abierta === String(c.id) && detCache[c.id] ? detCache[c.id] : '') + '</div></div></details>';
     }
@@ -543,6 +543,8 @@
         var est = $('vEstado'); est.dataset.k = pausada ? 'warn' : 'run'; setTxt(est, pausada ? 'Pausada' : 'Activa');
         setTxt($('vMeta'), 'Tarjeta ' + (c.tarjeta ? c.tarjeta.id_tarjeta_num : '?') + (c.tarjeta && c.tarjeta.nombre ? ' (' + c.tarjeta.nombre + ')' : '') +
             ' · ' + c.firmware + ' · ' + c.operador + ' · iniciada ' + fecha(c.creado) + ' · pausa ' + c.pausa_s + ' s' + (c.detener_en_falla ? ' · se detiene al primer fallo' : ''));
+        var puedo = c.mia !== false;   // v1.4.77: historial compartido; solo el dueño o un administrador actúa
+        Array.prototype.forEach.call($('vivo').querySelectorAll('[data-a]'), function (x) { x.hidden = !puedo; });
         var bp = $('vPausa');
         if (!bp.disabled) {
             bp.dataset.a = pausada ? 'reanudar' : 'pausar';

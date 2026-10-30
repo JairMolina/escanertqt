@@ -220,15 +220,20 @@ class PruebasAuto(unittest.TestCase):
         with self.assertRaises(pa.Ocupado):
             pa.log_agente("otra@test.mx")
 
-    def test_cada_cuenta_ve_solo_sus_campanas(self):
+    def test_historial_de_campanas_compartido_acciones_solo_dueno(self):
+        """v1.4.77: el historial (lista, detalle, log de ciclo) es de todas las cuentas; actuar sobre una campaña, solo dueño o admin."""
         c = self.campana(ciclos=1)
-        self.assertEqual([x["id"] for x in pa.lista("operador@test.mx")][:1], [c["id"]])
-        self.assertNotIn(c["id"], [x["id"] for x in pa.lista("otra@test.mx")])
-        with self.assertRaises(ValueError):
-            pa.leer(c["id"], "otra@test.mx")
+        suya = next(x for x in pa.lista("operador@test.mx") if x["id"] == c["id"])
+        ajena = next(x for x in pa.lista("otra@test.mx") if x["id"] == c["id"])
+        self.assertTrue(suya["mia"])
+        self.assertFalse(ajena["mia"])
+        self.assertEqual(pa.leer(c["id"], "otra@test.mx")["id"], c["id"])
+        self.assertFalse(pa.leer(c["id"], "otra@test.mx")["mia"])
         with self.assertRaises(ValueError):
             pa.cambiar(c["id"], "detener", "otra@test.mx")
-        self.assertEqual(pa.leer(c["id"], "jefe@test.mx", True)["id"], c["id"])   # el administrador sí
+        with self.assertRaises(ValueError):
+            pa.eliminar(c["id"], "otra@test.mx")
+        self.assertEqual(pa.leer(c["id"], "jefe@test.mx", True)["id"], c["id"])   # el administrador actúa
 
     def test_sesion_sin_campana_se_libera_al_salir(self):
         self.tomar("operador@test.mx")

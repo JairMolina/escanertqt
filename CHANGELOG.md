@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.77 — 2026-10-30
+- **Historial de campañas de Pruebas automáticas compartido.** Lista, detalle, registro en vivo y logs (campaña y ciclo) los ve cualquier cuenta. Pausar, detener y eliminar siguen siendo del dueño o de un administrador; la página oculta esas acciones cuando la campaña es ajena (campo `mia`).
+- Las sesiones de la Raspberry (banco, ocupación, log del agente) no cambian.
+- Prueba local con BD de 1.4.76 en Docker local. Sin commit ni despliegue en producción.
+
 ## v1.4.76 — 2026-10-29
 - El lote seleccionado se transmite a las consultas y operaciones de tarjetas, PCB y programación mediante un contexto por petición. Se elimina el salto a una tarjeta de otro lote cuando un número, QR o MAC no existe en el elegido.
 - «Todos los lotes» en el selector permite consultar el conjunto completo. Las listas de programación y tarjetas identifican el lote; si un número es ambiguo, Consultar pide elegir su lote.

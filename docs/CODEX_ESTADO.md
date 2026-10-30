@@ -1,6 +1,8 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-29. **1.4.76 publicada y desplegada**, código `b0d8c64` (implementación `deac73e`), rama `codex/lotes-aislamiento-20261029`, base main `9d7e93a` / 1.4.75, checkout `work/tqt-lotes-20261029`.
+Actualizado: 2026-10-30. **1.4.77 (historial de campañas compartido) en commit, sin desplegar**. Rama `historial-pruebas-compartido-1.4.77`. Lista, detalle, vivo y logs de Pruebas automáticas son de lectura para todas las cuentas; pausar, detener y eliminar solo dueño o administrador (campo `mia`). Pruebas: `tests/test_pruebas_auto.py` 26/26, `tests/test_qa_version_hoy.py` 5/5. Docker local con BD de prod 1.4.76 (copia en Downloads, no versionada). Pendiente: probar con dos cuentas en navegador. Diagnóstico R3: 29 asignadas de 100 tarjetas; 146 R3 libres; el emparejado automático solo une R1+R2 (decisión pendiente).
+
+Anterior: **1.4.76 publicada y desplegada**, código `b0d8c64` (implementación `deac73e`), rama `codex/lotes-aislamiento-20261029`, base main `9d7e93a` / 1.4.75, checkout `work/tqt-lotes-20261029`.
 
 ## Estado vigente
 
