@@ -1,10 +1,10 @@
 # Memoria de TQT-Web
 
-## Estado vigente — 2026-10-29, solo local
+## Estado vigente — 2026-10-29, 1.4.76 publicada y desplegada
 
-Web candidata 1.4.76 en `codex/lotes-aislamiento-20261029`, checkout `work/tqt-lotes-20261029`, parte de origin/main 9d7e93a / 1.4.75; conserva los cambios nuevos de portada. Selección de lote común a vistas/consultas/operaciones TQT; Todos explícito, origen visible, números duplicados sin elegir otro lote por inferencia. Contexto por petición en backend y limpieza de selección/respuestas atrasadas. Controles de ocupación y protocolos físicos conservados.
+Web 1.4.76, código b0d8c64/deac73e, en main y `codex/lotes-aislamiento-20261029`, checkout `work/tqt-lotes-20261029`, parte de origin/main 9d7e93a / 1.4.75; conserva los cambios nuevos de portada. Selección de lote común a vistas/consultas/operaciones TQT; Todos explícito, origen visible, números duplicados sin elegir otro lote por inferencia. Contexto por petición en backend y limpieza de selección/respuestas atrasadas. Controles de ocupación y protocolos físicos conservados.
 
-402 Python y 13+3 Playwright PASS, 14 grupos motor Node y UI PASS. QA http://127.0.0.1:18091/monitor#/programacion healthy; datos ficticios de septiembre/octubre, ninguna copia de producción, cero acciones de hardware. Guía verificable: docs/LOTES_ALCANCE_LOCAL.md. No desplegado ni subido a GitHub por esta tarea. Próximo paso: revisión del usuario, comparar main nuevamente y luego subir/desplegar cuando se solicite. El rediseño antiguo de Pruebas TQT ya quedó superado por main 1.4.64; conservar el borrador sin reintroducirlo.
+402 Python y 13+3 Playwright PASS, 14 grupos motor Node y UI PASS. QA http://127.0.0.1:18091/monitor#/programacion healthy, datos ficticios y hardware simulado. Usuario revisó y autorizó publicar/desplegar: Orange Pi pasó de f0fac7d/1.4.74 a b0d8c64/1.4.76; tqt healthy, salud pública/interna correcta, backup/quick_check ok, 33 hashes iguales, conteos e IDs preservados, inventario sin cambios. Prueba7 se pausó y reanudó con autorización específica; sigue activa con el ciclo 1 conservado, no se certifica finalización. Evidencia docs/DESPLIEGUE_1.4.76_20261029.md y LOTES_ALCANCE_LOCAL.md. Próximo: operación normal/Ctrl+F5; las PCB sin lote se consultan en Todos. El rediseño antiguo de Pruebas TQT quedó superado por main 1.4.64; conservar el borrador sin reintroducirlo.
 
 ## Estado histórico — 2026-10-27
 

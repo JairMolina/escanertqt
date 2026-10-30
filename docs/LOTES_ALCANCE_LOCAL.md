@@ -1,9 +1,9 @@
-# Alcance por lote — web 1.4.76, revisión local
+# Alcance por lote — web 1.4.76
 
 Fecha: 2026-10-29. Base de esta tarea: `origin/main` `9d7e93a` (1.4.75), integrado tras el primer QA sobre `f0fac7d` / 1.4.74.
 Rama: `codex/lotes-aislamiento-20261029`.
 Checkout: `work/tqt-lotes-20261029` dentro de la carpeta Inventario TQT.
-El usuario pidió probar primero localmente. Esta tarea no subió a GitHub ni desplegó producción.
+El usuario pidió probar primero localmente; después de revisarlo autorizó publicar y desplegar. Código `b0d8c64` publicado y desplegado en Orange Pi, salud y datos verificados. Cierre: docs/DESPLIEGUE_1.4.76_20261029.md.
 
 ## Problema y comportamiento
 
@@ -75,4 +75,4 @@ CM continuar/local, backend ECC (contexto y SQL), verificación ECC y E2E ECC se
 
 El registro CM `TQT-Web` apunta a `work/escanertqt_publish`, espejo documental antiguo con notas propias: conservarlo, copiar únicamente esta guía y añadir el checkpoint; no usarlo como código actual. El borrador viejo `codex/validacion-paneles-20261027` queda preservado y superado por el rediseño de main 1.4.64.
 
-Pendiente: revisión del usuario en local; después comparar de nuevo con GitHub, integrar si avanzó main, subir la rama y desplegar solo cuando se solicite. El último despliegue histórico documentado no prueba la versión que está hoy en producción. Esta tarea no comprobó ni reinició Orange Pi, no grabó tarjetas, no movió pernos y no imprimió etiquetas físicas.
+Revisión local, publicación y despliegue completados con autorización; ver docs/DESPLIEGUE_1.4.76_20261029.md. El QA usó hardware simulado. Para el despliegue se pausó y reanudó expresamente la campaña existente Prueba7, sin crear otra ni modificar su configuración. Se conservó inventario e historial; no se grabaron tarjetas ni se imprimieron etiquetas desde Codex.

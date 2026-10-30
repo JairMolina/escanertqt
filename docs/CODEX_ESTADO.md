@@ -1,12 +1,16 @@
 # Estado de Codex: TQT-Web
 
-Actualizado: 2026-10-29. Candidata local **1.4.76**, rama `codex/lotes-aislamiento-20261029`, base main `9d7e93a` / 1.4.75, checkout `work/tqt-lotes-20261029`.
+Actualizado: 2026-10-29. **1.4.76 publicada y desplegada**, código `b0d8c64` (implementación `deac73e`), rama `codex/lotes-aislamiento-20261029`, base main `9d7e93a` / 1.4.75, checkout `work/tqt-lotes-20261029`.
 
 ## Estado vigente
 
 El lote elegido filtra tarjetas/PCB, Programación R1/R2/R3, Dashboard, Consultar, MAC, Pruebas TQT y automáticas, inventario, movimientos, reportes/descargas y etiquetas. «Todos los lotes» es explícito, muestra origen y desambigua números repetidos. Cambiar limpia selección/resultados, descarta respuestas antiguas y se bloquea durante operaciones físicas. Backend por petición `X-TQT-Lote`/`vista_lote`; agentes y tareas internas conservan su contrato. Recepción/creación y Excel mensual requieren un lote concreto. No cambia firmware, motor ni esquema.
 
-QA: http://127.0.0.1:18091/monitor#/programacion, Docker aislado `cm-local-tqt-lotes-web-1`, healthy, solo datos sintéticos (1 tarjeta septiembre / 2 octubre / 3 Todos). 402 Python, 13+3 escenarios Playwright, 14 grupos motor Node y prueba UI PASS; cero acciones físicas. Evidencia, contratos y límites: docs/LOTES_ALCANCE_LOCAL.md. Código y documentación en la rama local. No push ni despliegue en esta tarea; pendiente revisión local del usuario y comparación de main antes de subir/desplegar.
+QA: http://127.0.0.1:18091/monitor#/programacion, Docker aislado `cm-local-tqt-lotes-web-1`, healthy, solo datos sintéticos (1 tarjeta septiembre / 2 octubre / 3 Todos). 402 Python, 13+3 escenarios Playwright, 14 grupos motor Node y prueba UI PASS; QA sin acciones físicas. Evidencia, contratos y límites: docs/LOTES_ALCANCE_LOCAL.md.
+
+Tras revisión y autorización del usuario, main y rama publicados y Orange Pi actualizada desde 1.4.74 mediante fast-forward. Solo tqt recreado, Cloudflared intacto. Backup predeploy verificado; salud interna/pública 1.4.76, quick_check ok, 33 hashes Git/contenedor iguales, cero IDs perdidos en ocho tablas y cero filas de inventario modificadas. Prueba7 (1 de 16 ciclos aprobado) se pausó y reanudó con autorización específica, quedando activa sin cambiar su configuración. Cierre detallado: docs/DESPLIEGUE_1.4.76_20261029.md. No afirmar que terminó sus 16 ciclos.
+
+Siguiente: revisar operación normal en producción con Ctrl+F5. Las PCB antiguas sin lote aparecen en Todos; no se reasignan automáticamente. Respaldo y datos reales quedan en servidor. Actualizaciones futuras deben partir del main vigente, sin usar el espejo CM antiguo como código.
 
 Conservar el espejo CM `work/escanertqt_publish` con sus notas; no es el código vigente. El borrador de rediseño `codex/validacion-paneles-20261027` se conserva, pero está superado por main 1.4.64. No retomarlo sobre este ajuste.
 
