@@ -54,7 +54,7 @@ class Campana(BaseModel):
 
 
 class Accion(BaseModel):
-    accion: Literal["pausar", "reanudar", "detener", "detener_ahora"]   # v1.4.65: detener_ahora corta el ciclo en curso
+    accion: Literal["pausar", "reanudar", "detener", "detener_ahora", "interrumpir"]   # v1.4.65: detener_ahora corta el ciclo en curso; v1.4.80: interrumpir = pausa + corta el ciclo (destrabar)
 
 
 def quien(req):
@@ -144,12 +144,14 @@ def comando(body: Comando, req: Request):
     b = svc.banco()
     if not b["registrado"]:
         raise HTTPException(400, "Primero instala el agente de la Raspberry.")
-    if body.comando in ("PPON", "POFF") and not body.tarjeta_id:
+    # PPON/POFF verifican la MAC: la tarjeta de la campaña activa/pausada manda; sin campaña, la elegida en la página
+    tarjeta = svc.tarjeta_vigente() or body.tarjeta_id
+    if body.comando in ("PPON", "POFF") and not tarjeta:
         raise HTTPException(400, "Elige la tarjeta en prueba: PPON/POFF verifican su MAC antes de mover.")
     run(_tomar, *quien(req))
     datos = {"command": body.comando}
-    if body.tarjeta_id:
-        datos["tarjeta_id"] = body.tarjeta_id
+    if tarjeta:
+        datos["tarjeta_id"] = tarjeta
     return run(ts.command, b["station"], "serial", datos)
 
 

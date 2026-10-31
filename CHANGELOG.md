@@ -1,7 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.80 — 2026-10-31
+- **Comandos de Pruebas automáticas en cualquier momento.** ON/OFF y el resto ya no se deshabilitan con un ciclo en curso: la web pide confirmación, pausa la campaña, corta el ciclo (acción `interrumpir`, el firmware termina el movimiento que ya empezó), envía el comando y deja la campaña pausada para reanudar. Ese ciclo no cuenta como falla ni cierra la campaña con «detener en falla».
+- **Corregido el parpadeo de la barra de la pausa entre ciclos.** Si el último ciclo había terminado con una etapa fallida, cada sondeo (2 s) borraba la cuenta atrás y el temporizador (1 s) ocultaba la barra; ahora solo un ciclo en marcha la cancela.
+
 ## v1.4.79 — 2026-10-31
-- **Pruebas automáticas: panel «Comandos»** bajo «Log del agente». ON (PPON), OFF (POFF), Reset normal y los comandos serie de Pruebas TQT se envían a la R1 por el puerto de la Raspberry (`POST /api/pruebas-auto/comando`). PPON/POFF usan la tarjeta de «Nueva campaña» y verifican su MAC; se bloquean durante un ciclo y sin puerto conectado. RESET_FACTORY no está disponible.
+- **Pruebas automáticas: panel «Comandos»** bajo «Log del agente». ON (PPON), OFF (POFF), Reset normal y los comandos serie de Pruebas TQT se envían a la R1 por el puerto de la Raspberry (`POST /api/pruebas-auto/comando`). PPON/POFF usan la tarjeta de la campaña activa o pausada (sin campaña, la de «Nueva campaña») y verifican su MAC, así se puede pausar, destrabar el perno y reanudar; se bloquean durante un ciclo y sin puerto conectado. RESET_FACTORY no está disponible.
 
 ## v1.4.77 — 2026-10-30
 - **Historial de campañas de Pruebas automáticas compartido.** Lista, detalle, registro en vivo y logs (campaña y ciclo) los ve cualquier cuenta. Pausar, detener y eliminar siguen siendo del dueño o de un administrador; la página oculta esas acciones cuando la campaña es ajena (campo `mia`).

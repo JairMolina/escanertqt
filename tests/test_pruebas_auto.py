@@ -268,10 +268,32 @@ class PruebasAuto(unittest.TestCase):
         self.assertEqual(__import__("json").loads(fila["body"])["inventory"]["mac_r1"], self.d["mac_r1"])
         with db.get_db() as c:
             c.execute("UPDATE tqt_test_commands SET state='done' WHERE id=?", (j["id"],))
-        self.campana(ciclos=1)
+        self.assertIsNone(pa.tarjeta_vigente())
+        c = self.campana(ciclos=1)
+        self.assertEqual(pa.tarjeta_vigente(), self.t["id"])   # con campaña, PPON/POFF usan su tarjeta sin elegir otra
+        pa.cambiar(c["id"], "pausar", "operador@test.mx")
+        self.assertEqual(pa.tarjeta_vigente(), self.t["id"])   # pausada: sigue valiendo
+        pa.cambiar(c["id"], "reanudar", "operador@test.mx")
         s.claim(self.st["id"], LIBRE)   # el ciclo queda en ejecución
         with self.assertRaisesRegex(ValueError, "bloqueado"):
             s.command(self.st["id"], "serial", {"command": "POFF", "tarjeta_id": self.t["id"]})
+
+    def test_interrumpir_ciclo_para_destrabar_no_detiene_la_campana(self):
+        """v1.4.80: interrumpir = pausa + corta el ciclo en curso; al reanudar ese ciclo no cuenta como falla."""
+        c = self.campana(ciclos=3, detener=True)
+        job = s.claim(self.st["id"], LIBRE)
+        rid = job["run"]["id"]
+        pa.cambiar(c["id"], "interrumpir", "operador@test.mx")
+        with db.get_db() as x:
+            f = x.execute("SELECT cancel,context FROM tqt_test_runs WHERE id=?", (rid,)).fetchone()
+            self.assertEqual(f["cancel"], 1)
+            self.assertTrue(__import__("json").loads(f["context"])["destrabe"])
+            self.assertEqual(x.execute("SELECT estado FROM tqt_resistencia WHERE id=?", (c["id"],)).fetchone()["estado"], "pausada")
+            x.execute("UPDATE tqt_test_runs SET state='interrupted',result='no_verificado',updated=? WHERE id=?", (__import__("time").time() - 99, rid))
+        pa.cambiar(c["id"], "reanudar", "operador@test.mx")
+        job2 = s.claim(self.st["id"], LIBRE)   # sigue con el ciclo 2 en vez de cerrar la campaña por «no verificado»
+        self.assertIn("run", job2)
+        self.assertEqual(pa.leer(c["id"])["estado"], "activa")
 
     def test_pruebas_tqt_no_usa_la_raspberry(self):
         """v1.4.54: la Raspberry se anuncia como puente BLE; Pruebas TQT no la lista ni la usa (ni BLE ni pruebas)."""
