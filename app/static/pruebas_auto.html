@@ -216,6 +216,28 @@
                     </div>
                     <pre id="lTexto" class="pa-term pa-term-alto" tabindex="0" aria-label="Últimas líneas del log del agente"></pre>
                 </section>
+                <section class="pa-panel" aria-labelledby="hCmd">
+                    <div class="pa-panel-head">
+                        <div class="pa-title"><span class="pa-i" data-i="pulse" aria-hidden="true"></span><h2 id="hCmd">Comandos</h2></div>
+                        <span id="kMeta" class="hint"></span>
+                    </div>
+                    <p class="hint pa-panel-note">Los mismos comandos serie de Pruebas TQT, enviados a la R1 por el puerto de la Raspberry. ON = <code>PPON</code>, OFF = <code>POFF</code>. PPON/POFF usan la tarjeta elegida en «Nueva campaña» y verifican su MAC.</p>
+                    <div class="pa-acc">
+                        <button class="btn" id="kOn" type="button" data-cmd="PPON" title="Envía PPON (ON) a la R1"><span class="pa-i" data-i="play" aria-hidden="true"></span>ON (PPON)</button>
+                        <button class="btn" id="kOff" type="button" data-cmd="POFF" title="Envía POFF (OFF) a la R1"><span class="pa-i" data-i="x" aria-hidden="true"></span>OFF (POFF)</button>
+                        <button class="btn pa-link" id="kReset" type="button" data-cmd="RESET" title="Reset normal de la R1 (no restablece de fábrica)"><span class="pa-i" data-i="refresh" aria-hidden="true"></span>Reset normal</button>
+                    </div>
+                    <div class="pa-acc pa-cmd-otro">
+                        <label class="sr-only" for="kSel">Comando serie adicional</label>
+                        <select class="input" id="kSel">
+                            <option value="STATUS">STATUS</option><option value="MOTOR_STATUS">MOTOR_STATUS</option><option value="RESET_BLE">RESET_BLE</option>
+                            <option value="MAP_QUERY">MAP_QUERY</option><option value="MAP_M1_0">MAP_M1_0</option><option value="MAP_M1_1">MAP_M1_1</option>
+                            <option value="MAP_M2_0">MAP_M2_0</option><option value="MAP_M2_1">MAP_M2_1</option>
+                        </select>
+                        <button class="btn" id="kEnviar" type="button"><span class="pa-i" data-i="play" aria-hidden="true"></span>Enviar comando</button>
+                    </div>
+                    <p class="hint" id="kMsg" role="status" aria-live="polite"></p>
+                </section>
             </aside>
         </div>
 

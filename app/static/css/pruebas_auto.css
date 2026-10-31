@@ -485,3 +485,7 @@ details[open] > summary > .pa-chev { transform: rotate(90deg); }
 .pa-tl[data-k="nota"] { color: #6B7A90; font-style: italic; }
 .pa-tl-rep { display: inline-block; padding: 0 6px; border-radius: 999px; background: #1E2633; color: #C9D3E3; font-size: 11px; }
 .pa-log-filtro { font-size: 12px; margin-left: auto; }
+
+/* v1.4.78: panel Comandos */
+.pa-cmd-otro { margin-top: 8px; }
+.pa-cmd-otro .input { min-width: 0; flex: 1 1 150px; }

@@ -156,6 +156,10 @@
         setHTML($('p3Actual'), !en ? 'Disponible cuando la Raspberry esté en línea'
             : conectado ? 'Conectado a <code title="' + esc(e.port) + '">' + esc(pCorto) + '</code>' + (pM && pM.description ? ' · ' + esc(pM.description) : '')
             : e.auto_port ? 'Reintentando <code title="' + esc(e.auto_port) + '">' + esc(pCorto) + '</code>…' : 'Sin puerto conectado: elige uno y pulsa Conectar');
+        // comandos serie: solo con el puerto de la R1 conectado y sin ciclo en curso
+        document.querySelectorAll('#kOn,#kOff,#kReset,#kEnviar').forEach(function (x) { x.disabled = !conectado || run; });
+        $('kSel').disabled = !conectado || run;
+        $('kMeta').textContent = !en ? 'Raspberry sin señal' : !conectado ? 'Conecta el puerto de la R1' : run ? 'Ciclo en curso: bloqueados' : 'Listos';
         var sel = $('pPuerto'), ps = Array.isArray(e.ports) ? e.ports : [];
         if (document.activeElement !== sel) {
             var prev = puertoElegido || e.port || e.auto_port || '';
@@ -225,6 +229,27 @@
             })();
         });
     }
+    /* v1.4.78: comandos serie manuales por la Raspberry (ON/OFF = PPON/POFF); mismo sondeo que el puerto. */
+    function comando(nombre) {
+        var necesita = nombre === 'PPON' || nombre === 'POFF';
+        if (necesita && !tarjeta) { $('kMsg').textContent = 'Elige una tarjeta en «Nueva campaña»: ' + nombre + ' verifica su MAC antes de mover.'; return; }
+        $('kMsg').textContent = 'Enviando ' + nombre + '…';
+        api('/api/pruebas-auto/comando', { method: 'POST', body: { comando: nombre, tarjeta_id: necesita ? tarjeta.id : null } }).then(function (r) {
+            if (!r.ok) { $('kMsg').textContent = r.error; return; }
+            var n = 0, id = r.data.id;
+            (function sondeo() {
+                T.api('/api/validacion/tqt/commands/' + id).then(function (c) {
+                    var st = c.ok && c.data.state;
+                    if (st === 'done' || st === 'error') {
+                        var err = c.data.result && c.data.result.error;
+                        $('kMsg').textContent = err ? nombre + ': ' + err : nombre + ' enviado a la R1 por la Raspberry. La respuesta aparece en el log del agente.';
+                    } else if (++n < 20) setTimeout(sondeo, 700); else $('kMsg').textContent = 'La Raspberry no respondió; revisa el log del agente.';
+                });
+            })();
+        });
+    }
+    ['kOn', 'kOff', 'kReset'].forEach(function (id) { $(id).addEventListener('click', function () { comando(this.dataset.cmd); }); });
+    $('kEnviar').addEventListener('click', function () { comando($('kSel').value); });
     $('pConectar').addEventListener('click', function () { puerto('conectar'); });
     $('pDesconectar').addEventListener('click', function () { puerto('desconectar'); });
 

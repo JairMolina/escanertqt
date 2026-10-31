@@ -33,6 +33,16 @@ class Puerto(BaseModel):
     puerto: str = Field(default="", max_length=100, pattern=r"^$|^/dev/[A-Za-z0-9_./:+-]+$")
 
 
+# v1.4.78: mismos comandos serie de «Controles manuales» de Pruebas TQT (ON/OFF = PPON/POFF); RESET_FACTORY queda fuera.
+COMANDOS_SERIE = ("PPON", "POFF", "RESET", "STATUS", "MOTOR_STATUS", "RESET_BLE", "MAP_QUERY",
+                  "MAP_M1_0", "MAP_M1_1", "MAP_M2_0", "MAP_M2_1")
+
+
+class Comando(BaseModel):
+    comando: Literal[COMANDOS_SERIE]
+    tarjeta_id: int | None = Field(default=None, gt=0)   # PPON/POFF exigen la tarjeta para verificar su MAC
+
+
 class Campana(BaseModel):
     nombre: str = Field(min_length=1, max_length=80)
     firmware: str = Field(min_length=1, max_length=80)
@@ -125,6 +135,22 @@ def puerto(body: Puerto, req: Request):
     run(_tomar, *quien(req))   # el puerto solo lo maneja quien tiene la Raspberry
     accion = "connect_serial" if body.accion == "conectar" else "disconnect_serial"
     return run(ts.command, b["station"], accion, {"port": body.puerto})
+
+
+@router.post("/comando")
+def comando(body: Comando, req: Request):
+    """v1.4.78: envía un comando serie a la R1 por el puerto de la Raspberry (el resultado se sondea en
+    /api/validacion/tqt/commands/{id}, como /puerto). Bloqueado mientras corre un ciclo de campaña."""
+    b = svc.banco()
+    if not b["registrado"]:
+        raise HTTPException(400, "Primero instala el agente de la Raspberry.")
+    if body.comando in ("PPON", "POFF") and not body.tarjeta_id:
+        raise HTTPException(400, "Elige la tarjeta en prueba: PPON/POFF verifican su MAC antes de mover.")
+    run(_tomar, *quien(req))
+    datos = {"command": body.comando}
+    if body.tarjeta_id:
+        datos["tarjeta_id"] = body.tarjeta_id
+    return run(ts.command, b["station"], "serial", datos)
 
 
 @router.post("/agente/log")

@@ -254,6 +254,25 @@ class PruebasAuto(unittest.TestCase):
         self.assertEqual(pa.leer(c["id"])["estado"], "detenida")
         self.assertIsNone(pa.banco("otra@test.mx")["ocupacion"])
 
+    def test_comandos_serie_por_la_raspberry(self):
+        """v1.4.78: PPON/POFF y el resto de comandos serie salen por la Raspberry; se bloquean durante un ciclo."""
+        from app.routers import pruebas_auto as r
+        self.assertEqual(r.COMANDOS_SERIE[:2], ("PPON", "POFF"))
+        self.assertNotIn("RESET_FACTORY", r.COMANDOS_SERIE)
+        s.claim(self.st["id"], LIBRE)   # presencia
+        j = s.command(self.st["id"], "serial", {"command": "PPON", "tarjeta_id": self.t["id"]})
+        self.assertTrue(j["id"])
+        with db.get_db() as c:
+            fila = c.execute("SELECT action,body FROM tqt_test_commands WHERE id=?", (j["id"],)).fetchone()
+        self.assertEqual(fila["action"], "serial")
+        self.assertEqual(__import__("json").loads(fila["body"])["inventory"]["mac_r1"], self.d["mac_r1"])
+        with db.get_db() as c:
+            c.execute("UPDATE tqt_test_commands SET state='done' WHERE id=?", (j["id"],))
+        self.campana(ciclos=1)
+        s.claim(self.st["id"], LIBRE)   # el ciclo queda en ejecución
+        with self.assertRaisesRegex(ValueError, "bloqueado"):
+            s.command(self.st["id"], "serial", {"command": "POFF", "tarjeta_id": self.t["id"]})
+
     def test_pruebas_tqt_no_usa_la_raspberry(self):
         """v1.4.54: la Raspberry se anuncia como puente BLE; Pruebas TQT no la lista ni la usa (ni BLE ni pruebas)."""
         from app.services import native_ble
