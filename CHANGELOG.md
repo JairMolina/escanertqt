@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.81 — 2026-10-31
+- **Pruebas automáticas: confirmación de sensores tras PPON/POFF.** Después de enviar ON/OFF el panel pide Status a la R1 y lee los sensores hasta 30 s: PPON espera apertura (ON 0 · OFF 1), POFF espera cierre (ON 1 · OFF 0). Muestra «✓ el sensor SÍ leyó…, se destrabó» (con el cambio de MOV), «ya estaba» si no hubo cambio, o «✗ el sensor NO leyó… sigue trabado». El banco expone ON/OFF/TQT/MOV/err/PB del último Status.
+
 ## v1.4.80 — 2026-10-31
 - **Comandos de Pruebas automáticas en cualquier momento.** ON/OFF y el resto ya no se deshabilitan con un ciclo en curso: la web pide confirmación, pausa la campaña, corta el ciclo (acción `interrumpir`, el firmware termina el movimiento que ya empezó), envía el comando y deja la campaña pausada para reanudar. Ese ciclo no cuenta como falla ni cierra la campaña con «detener en falla».
 - **Corregido el parpadeo de la barra de la pausa entre ciclos.** Si el último ciclo había terminado con una etapa fallida, cada sondeo (2 s) borraba la cuenta atrás y el temporizador (1 s) ocultaba la barra; ahora solo un ciclo en marcha la cancela.

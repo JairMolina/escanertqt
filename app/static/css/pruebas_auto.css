@@ -488,4 +488,7 @@ details[open] > summary > .pa-chev { transform: rotate(90deg); }
 
 /* v1.4.78: panel Comandos */
 .pa-cmd-otro { margin-top: 8px; }
+#kMsg[data-k="ok"] { color: var(--ok); font-weight: 650; }
+#kMsg[data-k="bad"] { color: var(--bad); font-weight: 650; }
+#kMsg[data-k="warn"] { color: var(--text); font-weight: 650; }
 .pa-cmd-otro .input { min-width: 0; flex: 1 1 150px; }
