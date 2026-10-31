@@ -268,7 +268,12 @@ class PruebasAuto(unittest.TestCase):
         self.assertEqual(__import__("json").loads(fila["body"])["inventory"]["mac_r1"], self.d["mac_r1"])
         with db.get_db() as c:
             c.execute("UPDATE tqt_test_commands SET state='done' WHERE id=?", (j["id"],))
-        self.campana(ciclos=1)
+        self.assertIsNone(pa.tarjeta_vigente())
+        c = self.campana(ciclos=1)
+        self.assertEqual(pa.tarjeta_vigente(), self.t["id"])   # con campaña, PPON/POFF usan su tarjeta sin elegir otra
+        pa.cambiar(c["id"], "pausar", "operador@test.mx")
+        self.assertEqual(pa.tarjeta_vigente(), self.t["id"])   # pausada: sigue valiendo
+        pa.cambiar(c["id"], "reanudar", "operador@test.mx")
         s.claim(self.st["id"], LIBRE)   # el ciclo queda en ejecución
         with self.assertRaisesRegex(ValueError, "bloqueado"):
             s.command(self.st["id"], "serial", {"command": "POFF", "tarjeta_id": self.t["id"]})

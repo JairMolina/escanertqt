@@ -1,7 +1,7 @@
 # Historial de versiones — Escáner TQT
 
 ## v1.4.79 — 2026-10-31
-- **Pruebas automáticas: panel «Comandos»** bajo «Log del agente». ON (PPON), OFF (POFF), Reset normal y los comandos serie de Pruebas TQT se envían a la R1 por el puerto de la Raspberry (`POST /api/pruebas-auto/comando`). PPON/POFF usan la tarjeta de «Nueva campaña» y verifican su MAC; se bloquean durante un ciclo y sin puerto conectado. RESET_FACTORY no está disponible.
+- **Pruebas automáticas: panel «Comandos»** bajo «Log del agente». ON (PPON), OFF (POFF), Reset normal y los comandos serie de Pruebas TQT se envían a la R1 por el puerto de la Raspberry (`POST /api/pruebas-auto/comando`). PPON/POFF usan la tarjeta de la campaña activa o pausada (sin campaña, la de «Nueva campaña») y verifican su MAC, así se puede pausar, destrabar el perno y reanudar; se bloquean durante un ciclo y sin puerto conectado. RESET_FACTORY no está disponible.
 
 ## v1.4.77 — 2026-10-30
 - **Historial de campañas de Pruebas automáticas compartido.** Lista, detalle, registro en vivo y logs (campaña y ciclo) los ve cualquier cuenta. Pausar, detener y eliminar siguen siendo del dueño o de un administrador; la página oculta esas acciones cuando la campaña es ajena (campo `mia`).

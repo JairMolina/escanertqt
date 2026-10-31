@@ -377,6 +377,14 @@ def leer(cid, email=None, admin=False):
     return d
 
 
+def tarjeta_vigente():
+    """v1.4.79: tarjeta de la campaña activa o pausada del banco (la que está físicamente en la Raspberry), o None."""
+    init()
+    with db.get_db() as c:
+        r = c.execute("SELECT tarjeta_id FROM tqt_resistencia WHERE estado IN ('activa','pausada') ORDER BY creado DESC LIMIT 1").fetchone()
+    return r["tarjeta_id"] if r else None
+
+
 def cambiar(cid, accion, operador, admin=False):
     """pausar | reanudar | detener | detener_ahora. Pausar/detener dejan terminar el ciclo en curso y no encolan otro;
     detener_ahora (v1.4.65) además pide cancelar el ciclo en curso (el firmware termina el movimiento actual)."""

@@ -159,7 +159,7 @@
         // comandos serie: solo con el puerto de la R1 conectado y sin ciclo en curso
         document.querySelectorAll('#kOn,#kOff,#kReset,#kEnviar').forEach(function (x) { x.disabled = !conectado || run; });
         $('kSel').disabled = !conectado || run;
-        $('kMeta').textContent = !en ? 'Raspberry sin señal' : !conectado ? 'Conecta el puerto de la R1' : run ? 'Ciclo en curso: bloqueados' : 'Listos';
+        $('kMeta').textContent = !en ? 'Raspberry sin señal' : !conectado ? 'Conecta el puerto de la R1' : run ? 'Ciclo en curso: pausa la campaña y espera a que termine' : 'Listos';
         var sel = $('pPuerto'), ps = Array.isArray(e.ports) ? e.ports : [];
         if (document.activeElement !== sel) {
             var prev = puertoElegido || e.port || e.auto_port || '';
@@ -232,9 +232,9 @@
     /* v1.4.78: comandos serie manuales por la Raspberry (ON/OFF = PPON/POFF); mismo sondeo que el puerto. */
     function comando(nombre) {
         var necesita = nombre === 'PPON' || nombre === 'POFF';
-        if (necesita && !tarjeta) { $('kMsg').textContent = 'Elige una tarjeta en «Nueva campaña»: ' + nombre + ' verifica su MAC antes de mover.'; return; }
+        // con campaña activa o pausada el servidor usa su tarjeta; sin campaña, la elegida en «Nueva campaña»
         $('kMsg').textContent = 'Enviando ' + nombre + '…';
-        api('/api/pruebas-auto/comando', { method: 'POST', body: { comando: nombre, tarjeta_id: necesita ? tarjeta.id : null } }).then(function (r) {
+        api('/api/pruebas-auto/comando', { method: 'POST', body: { comando: nombre, tarjeta_id: necesita && tarjeta ? tarjeta.id : null } }).then(function (r) {
             if (!r.ok) { $('kMsg').textContent = r.error; return; }
             var n = 0, id = r.data.id;
             (function sondeo() {
