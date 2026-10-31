@@ -24,7 +24,7 @@ class TestVersion(unittest.TestCase):
         cls.c = TestClient(app, base_url="https://testserver")
 
     def test_la_version_actual_sale_del_servidor(self):
-        self.assertEqual(settings.APP_VERSION, "1.4.80")
+        self.assertEqual(settings.APP_VERSION, "1.4.81")
         self.assertEqual(self.c.get("/api/config").json()["version"], settings.APP_VERSION)
         self.assertEqual(self.c.get("/api/status").json()["version"], settings.APP_VERSION)
 

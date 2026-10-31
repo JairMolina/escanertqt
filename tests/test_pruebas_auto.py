@@ -278,6 +278,16 @@ class PruebasAuto(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "bloqueado"):
             s.command(self.st["id"], "serial", {"command": "POFF", "tarjeta_id": self.t["id"]})
 
+    def test_banco_expone_sensores_del_ultimo_status(self):
+        """v1.4.81: el banco devuelve ON/OFF/MOV del último Status de la R1 (sin el resto de campos)."""
+        s.claim(self.st["id"], {"serial_connected": True, "fields": {"ON": "0", "OFF": "1", "MOV": "42", "X": "no"}})
+        e = pa.banco()["estado"]
+        self.assertEqual((e["sensores"]["ON"], e["sensores"]["OFF"], e["sensores"]["MOV"]), ("0", "1", "42"))
+        self.assertNotIn("X", e["sensores"])
+        self.assertNotIn("fields", e)
+        s.claim(self.st["id"], {"serial_connected": True})
+        self.assertIsNone(pa.banco()["estado"]["sensores"])
+
     def test_interrumpir_ciclo_para_destrabar_no_detiene_la_campana(self):
         """v1.4.80: interrumpir = pausa + corta el ciclo en curso; al reanudar ese ciclo no cuenta como falla."""
         c = self.campana(ciclos=3, detener=True)

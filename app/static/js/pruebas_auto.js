@@ -234,38 +234,72 @@
         var e = banco && banco.estado || {};
         if (!e.running) { enviarComando(nombre); return; }
         // ciclo en curso: el motor rechaza comandos, así que se pausa la campaña, se corta el ciclo y luego se envía
-        if (!vivoId) { $('kMsg').textContent = 'Hay un ciclo en curso que no es de una campaña: espera a que termine.'; return; }
+        if (!vivoId) { msgCmd('Hay un ciclo en curso que no es de una campaña: espera a que termine.'); return; }
         if (!window.confirm('Hay un ciclo en curso. Se pausará la campaña y se cancelará el ciclo actual (el firmware termina el movimiento que ya empezó); ' +
             'ese ciclo no cuenta como falla. Después se enviará ' + nombre + ' y tú reanudas la campaña. ¿Continuar?')) return;
-        $('kMsg').textContent = 'Pausando la campaña y cortando el ciclo…';
+        msgCmd('Pausando la campaña y cortando el ciclo…');
         api('/api/pruebas-auto/campanas/' + encodeURIComponent(vivoId) + '/accion', { method: 'POST', body: { accion: 'interrumpir' } }).then(function (r) {
-            if (!r.ok) { $('kMsg').textContent = r.error; return; }
+            if (!r.ok) { msgCmd(r.error); return; }
             var n = 0;
             (function espera() {
                 cargarBanco().then(function () {
                     var st = banco && banco.estado || {};
                     if (!st.running) { enviarComando(nombre); refrescar(); }
-                    else if (++n < 60) setTimeout(espera, 1500); else $('kMsg').textContent = 'El ciclo no terminó a tiempo; la campaña quedó pausada. Reintenta en un momento.';
+                    else if (++n < 60) setTimeout(espera, 1500); else msgCmd('El ciclo no terminó a tiempo; la campaña quedó pausada. Reintenta en un momento.', 'bad');
                 });
             })();
         });
     }
+    function msgCmd(t, k) { $('kMsg').textContent = t; if (k) $('kMsg').dataset.k = k; else delete $('kMsg').dataset.k; }
+    function sensoresR1() { var e = banco && banco.estado || {}; return e.sensores || null; }
+    /* Envía un comando y espera su resultado (mismo sondeo que el puerto). Resuelve {ok, error}. */
+    function ejecutar(nombre, tarjetaId) {
+        return api('/api/pruebas-auto/comando', { method: 'POST', body: { comando: nombre, tarjeta_id: tarjetaId || null } }).then(function (r) {
+            if (!r.ok) return { ok: false, error: r.error };
+            return new Promise(function (res) {
+                var n = 0, id = r.data.id;
+                (function sondeo() {
+                    T.api('/api/validacion/tqt/commands/' + id).then(function (c) {
+                        var st = c.ok && c.data.state;
+                        if (st === 'done' || st === 'error') { var err = c.data.result && c.data.result.error; res({ ok: !err, error: err }); }
+                        else if (++n < 20) setTimeout(sondeo, 700); else res({ ok: false, error: 'La Raspberry no respondió; revisa el log del agente.' });
+                    });
+                })();
+            });
+        });
+    }
+    /* v1.4.81: tras PPON/POFF pide Status a la R1 y mira los sensores hasta ver la llegada del perno.
+       PPON → abierto (ON 0 · OFF 1: sensor de apertura); POFF → cerrado (ON 1 · OFF 0: sensor de cierre). */
+    var verifPerno = 0;
+    function verificarPerno(nombre, antes) {
+        var esp = nombre === 'PPON' ? { ON: '0', OFF: '1', que: 'la apertura (perno adentro)', pos: 'abierto' } : { ON: '1', OFF: '0', que: 'el cierre (perno afuera)', pos: 'cerrado' };
+        var mi = ++verifPerno, i = 0, MAX = 12;
+        function lectura(s) { return 'ON ' + s.ON + ' · OFF ' + s.OFF + (s.MOV != null && s.MOV !== '' ? ' · MOV ' + (antes && antes.MOV != null ? antes.MOV + ' → ' : '') + s.MOV : ''); }
+        (function vuelta() {
+            if (mi !== verifPerno) return;   // otro comando tomó el panel
+            msgCmd(nombre + ' enviado. Verificando los sensores de la R1 (' + (i + 1) + '/' + MAX + ')…');
+            ejecutar('STATUS').then(cargarBanco).then(function () {
+                if (mi !== verifPerno) return;
+                var s = sensoresR1();
+                if (s && s.ON === esp.ON && s.OFF === esp.OFF) {
+                    var movio = antes && (antes.ON !== s.ON || antes.OFF !== s.OFF || antes.MOV !== s.MOV);
+                    msgCmd(movio ? '✓ ' + nombre + ': el sensor SÍ leyó ' + esp.que + ' — perno ' + esp.pos + ' (' + lectura(s) + '). Se destrabó; ya puedes reanudar la campaña.'
+                        : nombre + ': el sensor confirma ' + esp.que + ' (' + lectura(s) + '), pero no cambió respecto a antes del comando: el perno ya estaba ' + esp.pos + ' o no se movió.', movio ? 'ok' : 'warn');
+                } else if (++i < MAX) setTimeout(vuelta, 2500);
+                else msgCmd(!s ? '✗ ' + nombre + ': la R1 no devolvió lectura de sensores; revisa el puerto y el log del agente.'
+                    : '✗ ' + nombre + ': el sensor NO leyó ' + esp.que + ' (' + lectura(s) + ' → ' + (s.ON === '1' && s.OFF === '1' ? 'conflicto, ambos activos' : 'perno en medio o sin confirmar') + '). Sigue trabado: prueba de nuevo o revisa el mecanismo.', 'bad');
+            });
+        })();
+    }
     function enviarComando(nombre) {
-        var necesita = nombre === 'PPON' || nombre === 'POFF';
+        var necesita = nombre === 'PPON' || nombre === 'POFF', antes = sensoresR1();
+        verifPerno++;   // cancela una verificación anterior
         // con campaña activa o pausada el servidor usa su tarjeta; sin campaña, la elegida en «Nueva campaña»
-        $('kMsg').textContent = 'Enviando ' + nombre + '…';
-        api('/api/pruebas-auto/comando', { method: 'POST', body: { comando: nombre, tarjeta_id: necesita && tarjeta ? tarjeta.id : null } }).then(function (r) {
-            if (!r.ok) { $('kMsg').textContent = r.error; return; }
-            var n = 0, id = r.data.id;
-            (function sondeo() {
-                T.api('/api/validacion/tqt/commands/' + id).then(function (c) {
-                    var st = c.ok && c.data.state;
-                    if (st === 'done' || st === 'error') {
-                        var err = c.data.result && c.data.result.error;
-                        $('kMsg').textContent = err ? nombre + ': ' + err : nombre + ' enviado a la R1 por la Raspberry. La respuesta aparece en el log del agente.';
-                    } else if (++n < 20) setTimeout(sondeo, 700); else $('kMsg').textContent = 'La Raspberry no respondió; revisa el log del agente.';
-                });
-            })();
+        msgCmd('Enviando ' + nombre + '…');
+        ejecutar(nombre, necesita && tarjeta ? tarjeta.id : null).then(function (r) {
+            if (!r.ok) { msgCmd(/^(PPON|POFF|RESET|STATUS)/.test(r.error || '') ? r.error : nombre + ': ' + r.error, 'bad'); return; }
+            if (necesita) verificarPerno(nombre, antes);
+            else msgCmd(nombre + ' enviado a la R1 por la Raspberry. La respuesta aparece en el log del agente.');
         });
     }
     ['kOn', 'kOff', 'kReset'].forEach(function (id) { $(id).addEventListener('click', function () { comando(this.dataset.cmd); }); });

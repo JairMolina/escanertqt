@@ -160,7 +160,9 @@ def banco(email=None):
             return {"registrado": False, "ocupacion": occ}
         p = c.execute("SELECT seen,state FROM tqt_test_presence WHERE station=?", (b["station"],)).fetchone()
     estado = json.loads(p["state"]) if p else {}
-    estado.pop("fields", None)
+    campos = estado.pop("fields", None) or {}
+    # v1.4.81: último Status de la R1 (sensores del perno) para confirmar que PPON/POFF lo movieron
+    estado["sensores"] = {k: campos.get(k) for k in ("ON", "OFF", "TQT", "MOV", "err", "PB")} if campos else None
     return {"registrado": True, "station": b["station"], "nombre": b["name"], "creado": b["creado"],
             "visto": p["seen"] if p else None, "en_linea": bool(p and time.time() - p["seen"] < 15), "estado": estado,
             "log_pedido": b["log_pedido"], "log_ts": b["log_ts"], "log_bytes": len(b["log_texto"] or ""),
