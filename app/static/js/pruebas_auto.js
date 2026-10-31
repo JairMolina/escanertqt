@@ -729,7 +729,9 @@
                     setTxt($('vEtapaD'), v.motivo || '');
                 }
             }
-            if (idx >= 0 || fallo >= 0) pausa = null;
+            // v1.4.80: solo un ciclo en marcha cancela la cuenta atrás; un ciclo ya terminado con etapa fallida seguía
+            // borrándola y el temporizador de 1 s ocultaba la barra hasta el siguiente sondeo (parpadeo)
+            if (idx >= 0 || (fallo >= 0 && ci && ci.state === 'running')) pausa = null;
             pintarSensores(v.sensores);
             pintarBarra(v, ci, idx);
             pintarLog(v, ci);
