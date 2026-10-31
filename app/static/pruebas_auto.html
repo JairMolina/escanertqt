@@ -221,7 +221,7 @@
                         <div class="pa-title"><span class="pa-i" data-i="pulse" aria-hidden="true"></span><h2 id="hCmd">Comandos</h2></div>
                         <span id="kMeta" class="hint"></span>
                     </div>
-                    <p class="hint pa-panel-note">Los mismos comandos serie de Pruebas TQT, enviados a la R1 por el puerto de la Raspberry. ON = <code>PPON</code>, OFF = <code>POFF</code>. Para destrabar el perno: pausa la campaña (el ciclo en curso termina), envía ON/OFF y reanuda. PPON/POFF usan la tarjeta de la campaña activa o pausada (sin campaña, la de «Nueva campaña») y verifican su MAC.</p>
+                    <p class="hint pa-panel-note">Los mismos comandos serie de Pruebas TQT, enviados a la R1 por el puerto de la Raspberry. ON = <code>PPON</code>, OFF = <code>POFF</code>. Para destrabar el perno puedes enviar ON/OFF en cualquier momento: si hay un ciclo en curso se pausa la campaña y se corta ese ciclo (no cuenta como falla); después reanudas tú. PPON/POFF usan la tarjeta de la campaña activa o pausada (sin campaña, la de «Nueva campaña») y verifican su MAC.</p>
                     <div class="pa-acc">
                         <button class="btn" id="kOn" type="button" data-cmd="PPON" title="Envía PPON (ON) a la R1"><span class="pa-i" data-i="play" aria-hidden="true"></span>ON (PPON)</button>
                         <button class="btn" id="kOff" type="button" data-cmd="POFF" title="Envía POFF (OFF) a la R1"><span class="pa-i" data-i="x" aria-hidden="true"></span>OFF (POFF)</button>

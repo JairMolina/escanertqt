@@ -390,7 +390,7 @@ def cambiar(cid, accion, operador, admin=False):
     detener_ahora (v1.4.65) además pide cancelar el ciclo en curso (el firmware termina el movimiento actual)."""
     init()
     destino = {"pausar": ("activa", "pausada"), "reanudar": ("pausada", "activa"), "detener": (None, "detenida"),
-               "detener_ahora": (None, "detenida")}
+               "detener_ahora": (None, "detenida"), "interrumpir": (None, "pausada")}
     if accion not in destino:
         raise ValueError("Acción no válida.")
     desde, hacia = destino[accion]
@@ -403,7 +403,13 @@ def cambiar(cid, accion, operador, admin=False):
         motivo = f"Detenida por {operador}." if accion == "detener" else f"Detenida al instante por {operador}." if accion == "detener_ahora" else None
         c.execute("UPDATE tqt_resistencia SET estado=?,motivo=COALESCE(?,motivo),actualizado=? WHERE id=?",
                   (hacia, motivo, time.time(), cid))
-        if accion == "detener_ahora":
+        if accion in ("detener_ahora", "interrumpir"):
+            if accion == "interrumpir":   # v1.4.80: ciclo cancelado para destrabar el perno; al reanudar no cuenta como falla
+                for x in c.execute("SELECT id,context FROM tqt_test_runs WHERE state IN ('queued','running') AND id IN "
+                                   "(SELECT run FROM tqt_resistencia_ciclos WHERE campana=?)", (cid,)).fetchall():
+                    ctx = json.loads(x["context"] or "{}")
+                    ctx["destrabe"] = True
+                    c.execute("UPDATE tqt_test_runs SET context=? WHERE id=?", (json.dumps(ctx, ensure_ascii=False), x["id"]))
             c.execute("UPDATE tqt_test_runs SET cancel=1 WHERE state IN ('queued','running') AND id IN "
                       "(SELECT run FROM tqt_resistencia_ciclos WHERE campana=?)", (cid,))
     return leer(cid, operador, admin)
@@ -435,15 +441,17 @@ def programar(c, sid, state, now):
     if not camp:
         return None
     cid = camp["id"]
-    ult = c.execute("SELECT x.n,r.state,r.result,r.updated,r.report FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run "
+    ult = c.execute("SELECT x.n,r.state,r.result,r.updated,r.report,r.context FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run "
                     "WHERE x.campana=? ORDER BY x.n DESC LIMIT 1", (cid,)).fetchone()
+    destrabe = False
     if ult:
+        destrabe = bool(json.loads(ult["context"] or "{}").get("destrabe"))   # interrumpido a propósito: no detiene la campaña
         ult = dict(ult, result=resultado_ciclo(ult["result"], ult["report"]))
     n = ult["n"] if ult else 0
     if ult and ult["state"] in ("queued", "running"):
         return None
     if ult:
-        if ult["result"] not in APROBADOS and ult["result"] != "fallido":
+        if ult["result"] not in APROBADOS and ult["result"] != "fallido" and not destrabe:
             # v1.4.67: un ciclo no verificado/interrumpido ya no corta siempre la campaña: solo si se pidió detener en falla
             # o si se repite 3 veces seguidas (banco o tarjeta con un problema que no se corrige solo).
             seguidos = 0
@@ -463,7 +471,7 @@ def programar(c, sid, state, now):
                 return None
             if now - ult["updated"] < camp["pausa_s"]:
                 return None
-        if ult["result"] == "fallido" and camp["detener_en_falla"]:
+        if ult["result"] == "fallido" and camp["detener_en_falla"] and not destrabe:
             m = motivo_ciclo(c.execute("SELECT report FROM tqt_test_runs WHERE id=(SELECT run FROM tqt_resistencia_ciclos "
                                        "WHERE campana=? AND n=?)", (cid, n)).fetchone()["report"])
             _cerrar(c, cid, "fallida", f"Ciclo {n} fallido" + (f" en la etapa {m['etapa']} «{m['nombre']}»: {m['detalle']}" if m and m.get("etapa")

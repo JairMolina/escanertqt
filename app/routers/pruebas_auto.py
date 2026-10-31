@@ -54,7 +54,7 @@ class Campana(BaseModel):
 
 
 class Accion(BaseModel):
-    accion: Literal["pausar", "reanudar", "detener", "detener_ahora"]   # v1.4.65: detener_ahora corta el ciclo en curso
+    accion: Literal["pausar", "reanudar", "detener", "detener_ahora", "interrumpir"]   # v1.4.65: detener_ahora corta el ciclo en curso; v1.4.80: interrumpir = pausa + corta el ciclo (destrabar)
 
 
 def quien(req):

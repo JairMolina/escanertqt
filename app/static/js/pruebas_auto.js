@@ -157,9 +157,9 @@
             : conectado ? 'Conectado a <code title="' + esc(e.port) + '">' + esc(pCorto) + '</code>' + (pM && pM.description ? ' · ' + esc(pM.description) : '')
             : e.auto_port ? 'Reintentando <code title="' + esc(e.auto_port) + '">' + esc(pCorto) + '</code>…' : 'Sin puerto conectado: elige uno y pulsa Conectar');
         // comandos serie: solo con el puerto de la R1 conectado y sin ciclo en curso
-        document.querySelectorAll('#kOn,#kOff,#kReset,#kEnviar').forEach(function (x) { x.disabled = !conectado || run; });
-        $('kSel').disabled = !conectado || run;
-        $('kMeta').textContent = !en ? 'Raspberry sin señal' : !conectado ? 'Conecta el puerto de la R1' : run ? 'Ciclo en curso: pausa la campaña y espera a que termine' : 'Listos';
+        document.querySelectorAll('#kOn,#kOff,#kReset,#kEnviar').forEach(function (x) { x.disabled = !conectado; });
+        $('kSel').disabled = !conectado;
+        $('kMeta').textContent = !en ? 'Raspberry sin señal' : !conectado ? 'Conecta el puerto de la R1' : run ? 'Ciclo en curso: al enviar se pausa la campaña y se corta el ciclo' : 'Listos';
         var sel = $('pPuerto'), ps = Array.isArray(e.ports) ? e.ports : [];
         if (document.activeElement !== sel) {
             var prev = puertoElegido || e.port || e.auto_port || '';
@@ -231,6 +231,26 @@
     }
     /* v1.4.78: comandos serie manuales por la Raspberry (ON/OFF = PPON/POFF); mismo sondeo que el puerto. */
     function comando(nombre) {
+        var e = banco && banco.estado || {};
+        if (!e.running) { enviarComando(nombre); return; }
+        // ciclo en curso: el motor rechaza comandos, así que se pausa la campaña, se corta el ciclo y luego se envía
+        if (!vivoId) { $('kMsg').textContent = 'Hay un ciclo en curso que no es de una campaña: espera a que termine.'; return; }
+        if (!window.confirm('Hay un ciclo en curso. Se pausará la campaña y se cancelará el ciclo actual (el firmware termina el movimiento que ya empezó); ' +
+            'ese ciclo no cuenta como falla. Después se enviará ' + nombre + ' y tú reanudas la campaña. ¿Continuar?')) return;
+        $('kMsg').textContent = 'Pausando la campaña y cortando el ciclo…';
+        api('/api/pruebas-auto/campanas/' + encodeURIComponent(vivoId) + '/accion', { method: 'POST', body: { accion: 'interrumpir' } }).then(function (r) {
+            if (!r.ok) { $('kMsg').textContent = r.error; return; }
+            var n = 0;
+            (function espera() {
+                cargarBanco().then(function () {
+                    var st = banco && banco.estado || {};
+                    if (!st.running) { enviarComando(nombre); refrescar(); }
+                    else if (++n < 60) setTimeout(espera, 1500); else $('kMsg').textContent = 'El ciclo no terminó a tiempo; la campaña quedó pausada. Reintenta en un momento.';
+                });
+            })();
+        });
+    }
+    function enviarComando(nombre) {
         var necesita = nombre === 'PPON' || nombre === 'POFF';
         // con campaña activa o pausada el servidor usa su tarjeta; sin campaña, la elegida en «Nueva campaña»
         $('kMsg').textContent = 'Enviando ' + nombre + '…';
