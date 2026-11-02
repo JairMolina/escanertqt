@@ -145,6 +145,29 @@ class TestStation:
         self.serial.send(serial_action('STATUS'))
         return self._wait(start, lambda tag, val: tag == 'status' and val.number('TQT') == 0, timeout)
 
+    def _recuperar_perno(self, v: Status):
+        """v1.4.84: si al iniciar el ciclo ambos sensores leen 0 (ON=0 OFF=0), el perno quedó a medio camino de un ciclo
+        anterior. Envía PPON y, si sigue sin asentar, POFF (lo mismo que se haría a mano) y vuelve a leer. Todo queda
+        en el log. Devuelve (status, texto para el detalle de la etapa); si no logra asentarlo devuelve el status original."""
+        if v.number('TQT') not in (0, None) or v.number('err') in (3, 4):
+            return v, ''
+        self.log(f'RECUPERACIÓN AUTOMÁTICA: sensores ON={v.fields.get("ON")} OFF={v.fields.get("OFF")} (perno a medio camino); '
+                 'se intentará destrabar con PPON y, si no basta, POFF.')
+        for cmd in ('PPON', 'POFF'):
+            self.log(f'RECUPERACIÓN AUTOMÁTICA: enviando {cmd}')
+            start = self._checkpoint()
+            self.serial.send(serial_action(cmd))
+            try:
+                st = self._wait(start, lambda tag, val: tag == 'status' and val.position in ('cerrado', 'abierto')
+                                and val.number('TQT') == 0, getattr(self, 'recuperacion_s', 35), f'sensores asentados tras {cmd}')
+            except (TestFailure, NoVerification) as exc:
+                self.log(f'RECUPERACIÓN AUTOMÁTICA: {cmd} no asentó el perno ({exc})')
+                continue
+            self.log(f'RECUPERACIÓN AUTOMÁTICA: el perno quedó {st.position} (ON={st.fields.get("ON")} OFF={st.fields.get("OFF")}) tras {cmd}')
+            return st, f' · recuperado automáticamente con {cmd} (estaba a medio camino)'
+        self.log('RECUPERACIÓN AUTOMÁTICA: no se logró asentar el perno; el ciclo fallará.')
+        return v, ''
+
     def _step(self, idx: int, fn, title: str | None = None):
         if self.cancel.is_set(): raise Interrupted('Cancelada')
         step = self.steps[idx]
@@ -444,12 +467,15 @@ class TestStation:
             self._step(0, identify)
             def check():
                 v = self._fresh_status(timeout=22)
+                recuperado = ''
+                if v.number('ON') == 0 and v.number('OFF') == 0:   # v1.4.84: perno a medio camino (ON=0 OFF=0): intenta destrabarlo
+                    v, recuperado = self._recuperar_perno(v)
                 self._position(v)
                 self._require(v.number('SEN_MOT') == 0, 'SEN_MOT debe ser 0 para verificar sensores físicos')
                 self._require(v.number('TQT') == 0, 'Motor sigue ejecutando una acción')
                 self._require(v.number('err') not in (3, 4), f'Error motor activo err={v.number("err")}')
                 self.log('Banco de pruebas: MOTOR='+str(v.number('MOTOR'))+'; no se exige autorización adicional')
-                return f'Inicio: {v.position} (ON={v.fields["ON"]} OFF={v.fields["OFF"]}); MOTOR={v.number("MOTOR")}'
+                return f'Inicio: {v.position} (ON={v.fields["ON"]} OFF={v.fields["OFF"]}); MOTOR={v.number("MOTOR")}{recuperado}'
             self._step(1, check)
             def motor_series(first_index, interface, origin):
                 before = self._fresh_status(timeout=20)

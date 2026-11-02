@@ -201,23 +201,6 @@
                     </div>
                     <pre id="vLogPre" class="pa-term" tabindex="0" aria-label="Últimas líneas del ciclo en curso">Sin campaña en curso. Aquí aparecen las líneas del ciclo mientras corre.</pre>
                 </section>
-                <details class="pa-panel pa-plegable" aria-labelledby="hAg">
-<summary class="pa-panel-head">
-                        <div class="pa-title"><span class="pa-i" data-i="list" aria-hidden="true"></span><h2 id="hAg">Log del agente</h2></div>
-                        <span id="lMeta" class="hint"></span>
-                    <span class="pa-i pa-chev" data-i="chev" aria-hidden="true"></span></summary>
-<div class="pa-plegable-body">
-<p class="hint pa-panel-note">Terminal de la Raspberry: comandos enviados (TX) y respuestas (RX) del ciclo y de «Comandos».</p>
-                    <div class="pa-acc">
-                        <button class="btn" id="lPedir" type="button"><span class="pa-i" data-i="refresh" aria-hidden="true"></span>Traer log</button>
-                        <a class="btn pa-link" id="lBajar" href="/api/pruebas-auto/agente/log.txt" download><span class="pa-i" data-i="download" aria-hidden="true"></span>Descargar .txt</a>
-                        <button class="btn pa-link" id="lLimpiar" type="button" title="Vacía la vista; solo se mostrarán las líneas nuevas (no borra el log de la Raspberry)"><span class="pa-i" data-i="x" aria-hidden="true"></span>Limpiar</button>
-                        <button class="btn pa-link" id="lTodo" type="button" hidden>Mostrar todo</button>
-                        <label class="pa-check pa-log-filtro"><input type="checkbox" id="lRed"> Ocultar conexión y arranque</label>
-                    </div>
-                    <pre id="lTexto" class="pa-term pa-term-alto" tabindex="0" aria-label="Últimas líneas del log del agente"></pre>
-</div>
-</details>
                 <details class="pa-panel pa-plegable" aria-labelledby="hCmd">
 <summary class="pa-panel-head">
                         <div class="pa-title"><span class="pa-i" data-i="pulse" aria-hidden="true"></span><h2 id="hCmd">Comandos</h2></div>
@@ -240,6 +223,23 @@
                         <button class="btn" id="kEnviar" type="button"><span class="pa-i" data-i="play" aria-hidden="true"></span>Enviar comando</button>
                     </div>
                     <p class="hint" id="kMsg" role="status" aria-live="polite"></p>
+</div>
+</details>
+                <details class="pa-panel pa-plegable" aria-labelledby="hAg">
+<summary class="pa-panel-head">
+                        <div class="pa-title"><span class="pa-i" data-i="list" aria-hidden="true"></span><h2 id="hAg">Log del agente</h2></div>
+                        <span id="lMeta" class="hint"></span>
+                    <span class="pa-i pa-chev" data-i="chev" aria-hidden="true"></span></summary>
+<div class="pa-plegable-body">
+<p class="hint pa-panel-note">Terminal de la Raspberry: comandos enviados (TX) y respuestas (RX) del ciclo y de «Comandos».</p>
+                    <div class="pa-acc">
+                        <button class="btn" id="lPedir" type="button"><span class="pa-i" data-i="refresh" aria-hidden="true"></span>Traer log</button>
+                        <a class="btn pa-link" id="lBajar" href="/api/pruebas-auto/agente/log.txt" download><span class="pa-i" data-i="download" aria-hidden="true"></span>Descargar .txt</a>
+                        <button class="btn pa-link" id="lLimpiar" type="button" title="Vacía la vista; solo se mostrarán las líneas nuevas (no borra el log de la Raspberry)"><span class="pa-i" data-i="x" aria-hidden="true"></span>Limpiar</button>
+                        <button class="btn pa-link" id="lTodo" type="button" hidden>Mostrar todo</button>
+                        <label class="pa-check pa-log-filtro"><input type="checkbox" id="lRed"> Ocultar conexión y arranque</label>
+                    </div>
+                    <pre id="lTexto" class="pa-term pa-term-alto" tabindex="0" aria-label="Últimas líneas del log del agente"></pre>
 </div>
 </details>
             </aside>

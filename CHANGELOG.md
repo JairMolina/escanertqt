@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.84 — 2026-11-02
+- **Recuperación automática del perno (etapa 2).** Si al empezar un ciclo los sensores leen ON=0 OFF=0 (perno a medio camino), el motor envía PPON y, si no asienta, POFF, y vuelve a leer antes de fallar. Todo queda en la terminal («RECUPERACIÓN AUTOMÁTICA: …») y en el detalle de la etapa 2. Antes una racha de ese estado fallaba un ciclo por hora hasta intervenir a mano (Prueba8, ciclos 44–54).
+- **Log del agente = terminal.** El agente ya no repite cada segundo el error de conexión (llenaba el log y tapaba los comandos) y al subir el log descarta esas líneas. El panel «Comandos» ahora va arriba del «Log del agente».
+- Agente 1.4.84 (la Raspberry se autoactualiza).
+
 ## v1.4.83 — 2026-11-02
 - **Pruebas automáticas: «Comandos» y «Log del agente» plegables** (cerrados por defecto) para ocupar menos espacio, también en móvil. Revisión de la vista móvil (375–768 px) del submódulo.
 - Diagnóstico de la Prueba8 (64 ciclos): 16 fallos en dos rachas (ciclos 16–19 y 43–54). Cada racha empezó con un movimiento del perno que no dejó los sensores asentados y siguió con ON=0 OFF=0 hasta intervenir a mano.

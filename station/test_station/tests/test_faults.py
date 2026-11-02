@@ -26,10 +26,11 @@ class WarningCurrent(Fixture):
         super().move(cmd,origin)
 
 class FaultTests(unittest.TestCase):
-    def start_once(self, fx):
+    def start_once(self, fx, recuperacion_s=None):
         ui=[]
         station=TestStation(FakeSerial(fx), FakeBLE(fx),lambda *a:ui.append(a))
         station.repeat_verify_s=.08
+        if recuperacion_s: station.recuperacion_s=recuperacion_s
         fx.station=station
         with tempfile.TemporaryDirectory() as path:
             station.output_dir=Path(path)
@@ -48,13 +49,25 @@ class FaultTests(unittest.TestCase):
         self.assertEqual(station.steps[6].state,'pendiente')
 
     def test_sensor_off_missing_at_initial_check(self):
-        fx=Fixture()
+        """v1.4.84: ON=0 OFF=0 (perno a medio camino) que NO se destraba con PPON/POFF sigue fallando en la etapa 2."""
+        class Atorado(Fixture):
+            def move(self,cmd,origin): self.emit()   # ignora PPON/POFF: el perno no se mueve
+        fx=Atorado()
         fx.values.update({'ON':'0','OFF':'0'})
-        station,_=self.start_once(fx)
+        station,_=self.start_once(fx,recuperacion_s=.3)
         self.assertEqual(station.report['result'],'fallido')
         self.assertIn('Sensores de motor inconsistentes',station.report['issue'])
         self.assertEqual(station.steps[1].state,'fallido')
         self.assertEqual(station.steps[2].state,'pendiente')
+
+    def test_perno_a_medio_camino_se_recupera_solo_y_queda_en_el_log(self):
+        """v1.4.84: ON=0 OFF=0 al iniciar: PPON lo asienta y el ciclo sigue; el log y la etapa 2 lo dicen."""
+        fx=Fixture()
+        fx.values.update({'ON':'0','OFF':'0'})
+        station,ui=self.start_once(fx)
+        self.assertEqual(station.steps[1].state,'aprobado',station.report)
+        self.assertIn('recuperado automáticamente con PPON',station.steps[1].detail)
+        self.assertTrue(any(a[0]=='log' and 'RECUPERACIÓN AUTOMÁTICA: enviando PPON' in a[1] for a in ui))
 
     def test_motor_power_removed_reports_motor_fault_not_power_cause(self):
         station,_=self.start_once(NoClose())

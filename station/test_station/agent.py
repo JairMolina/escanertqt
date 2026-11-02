@@ -11,7 +11,7 @@ from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
 
 
-AGENT_VERSION = "1.4.82"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
+AGENT_VERSION = "1.4.84"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
 LOG_MAX = 256 * 1024                      # cola de agent.log que se sube cuando la web la pide
 # v1.4.64: la autoactualización nunca sobrescribe lo propio de esta instalación.
 PROTEGIDOS = {"config.json", "puerto_serie.txt", "agent.log", "outbox.db", ".agent.lock"}
@@ -482,8 +482,10 @@ class Bridge:
         text = ""
         if path.exists():
             with path.open("rb") as f:
-                f.seek(max(0, path.stat().st_size - LOG_MAX))
+                f.seek(max(0, path.stat().st_size - LOG_MAX * 8))
                 text = f.read().decode("utf-8", "replace")
+            # v1.4.84: la terminal (TX/RX, etapas) no debe quedar sepultada por el ruido de conexión de versiones anteriores
+            text = "\n".join(l for l in text.split("\n") if not l.startswith("Reporte/conexión pendiente"))[-LOG_MAX:]
         self.api("agent-log", {"texto": text or "(agent.log vacío)"})
 
     def loop(self):
@@ -542,7 +544,10 @@ class Bridge:
                     pass
                 return
             except Exception as e:
-                print("Reporte/conexión pendiente:", str(e), flush=True)
+                msg = str(e)   # v1.4.84: sin repetir el mismo error de conexión cada segundo (llenaba agent.log)
+                if msg != getattr(self, "_rep_err", "") or time.time() - getattr(self, "_rep_ts", 0) > 120:
+                    print("Reporte/conexión pendiente:", msg, flush=True)
+                    self._rep_err, self._rep_ts = msg, time.time()
             time.sleep(0.25 if self.cfg.get('ble_only') else 1)
 
 
