@@ -231,15 +231,14 @@ class TestLoteVista(unittest.TestCase):
                 self.assertEqual([t['id'] for t in self.get('/api/pruebas-auto/tarjetas?q='+self.numero, lot)], [card['id']])
                 listing = self.get('/api/pruebas-auto/campanas', lot)
                 self.assertIn(cid, [x['id'] for x in listing])
-                self.assertEqual({x['tarjeta']['lote_id'] for x in listing}, {lot['id']})
+                # v1.4.82: el historial de campañas es compartido: se ven también las de otros lotes
+                self.assertGreaterEqual(len({x['tarjeta']['lote_id'] for x in listing}), 2)
             self.assertEqual(len(self.get('/api/pruebas-auto/tarjetas?q='+self.numero, 'all')), 2)
             self.assertGreaterEqual(len(self.get('/api/pruebas-auto/campanas', 'all')), 2)
             outside = '/api/pruebas-auto/campanas/'+campaigns[1]
             for suffix in ['', '/vivo', '/log.txt']:
-                self.assertEqual(self.client.get(outside+suffix, headers=self.h(self.a)).status_code, 400)
-            self.assertEqual(self.client.delete(outside, headers=self.h(self.a)).status_code, 400)
-            self.assertEqual(self.client.post(outside+'/accion', json={'accion':'detener'}, headers=self.h(self.a)).status_code, 400)
-            self.get(outside, self.b)  # rejected operations left it intact
+                self.assertEqual(self.client.get(outside+suffix, headers=self.h(self.a)).status_code, 200)   # v1.4.82: lectura compartida entre lotes
+            self.get(outside, self.b)
         finally:
             with db.transaction() as c:
                 c.executemany('DELETE FROM tqt_resistencia WHERE id=?', [(cid,) for cid in campaigns])

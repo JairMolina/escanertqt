@@ -84,7 +84,7 @@
             refrescar();
         });
     });
-    // confirmación en dos pasos dentro de la pantalla (sin confirm() nativo)
+    // confirmación en dos pasos dentro de la pantalla (sin diálogo nativo)
     $('ocForzar').addEventListener('click', function () {
         var bt = $('ocForzar');
         if (!bt.dataset.seguro) {
@@ -230,13 +230,20 @@
         });
     }
     /* v1.4.78: comandos serie manuales por la Raspberry (ON/OFF = PPON/POFF); mismo sondeo que el puerto. */
+    var confirmaCmd = '', confirmaT = 0;
     function comando(nombre) {
         var e = banco && banco.estado || {};
         if (!e.running) { enviarComando(nombre); return; }
         // ciclo en curso: el motor rechaza comandos, así que se pausa la campaña, se corta el ciclo y luego se envía
         if (!vivoId) { msgCmd('Hay un ciclo en curso que no es de una campaña: espera a que termine.'); return; }
-        if (!window.confirm('Hay un ciclo en curso. Se pausará la campaña y se cancelará el ciclo actual (el firmware termina el movimiento que ya empezó); ' +
-            'ese ciclo no cuenta como falla. Después se enviará ' + nombre + ' y tú reanudas la campaña. ¿Continuar?')) return;
+        // v1.4.85: sin diálogos nativos: se pide pulsar el mismo botón otra vez (8 s) para confirmar
+        if (confirmaCmd !== nombre) {
+            confirmaCmd = nombre; clearTimeout(confirmaT); confirmaT = setTimeout(function () { confirmaCmd = ''; }, 8000);
+            msgCmd('Hay un ciclo en curso. Se pausará la campaña y se cancelará el ciclo actual (el firmware termina el movimiento que ya empezó); ' +
+                'ese ciclo no cuenta como falla. Pulsa ' + nombre + ' otra vez para continuar.');
+            return;
+        }
+        confirmaCmd = '';
         msgCmd('Pausando la campaña y cortando el ciclo…');
         api('/api/pruebas-auto/campanas/' + encodeURIComponent(vivoId) + '/accion', { method: 'POST', body: { accion: 'interrumpir' } }).then(function (r) {
             if (!r.ok) { msgCmd(r.error); return; }
@@ -826,7 +833,7 @@
     $('vivo').addEventListener('click', function (e) {
         var b = e.target.closest('button[data-a]'); if (!b || !vivoId) return;
         var a = b.dataset.a, lbl = b.querySelector('span:last-child');
-        if (a === 'detener_ahora' && !b.dataset.seguro) {   // confirmación en dos pasos, sin confirm()
+        if (a === 'detener_ahora' && !b.dataset.seguro) {   // confirmación en dos pasos, sin diálogo nativo
             b.dataset.seguro = '1'; lbl.textContent = 'Confirmar: cancelar el ciclo en curso';
             setTimeout(function () { delete b.dataset.seguro; lbl.textContent = 'Detener ahora'; }, 6000);
             return;

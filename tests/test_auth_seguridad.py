@@ -121,7 +121,7 @@ class TestSinSesionNadaAbre(Base):
         probadas = 0
         for path, metodos in rutas:
             url = re.sub(r"\{[^}]+\}", "1", path)
-            if url in RUTAS_PUBLICAS or url.startswith(PREFIJOS_PUBLICOS):
+            if url in RUTAS_PUBLICAS or url.startswith(PREFIJOS_PUBLICOS) or "/agent/tests/instalar/" in url:   # el instalador va por código de un solo uso
                 continue
             for m in metodos:
                 r = self.c.request(m, url, json={} if m not in ("GET", "DELETE") else None, follow_redirects=False)

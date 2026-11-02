@@ -35,6 +35,7 @@ STEP_NAMES = [
 
 class TestFailure(Exception): pass
 class NoVerification(Exception): pass
+class MotorTimeout(TestFailure): pass   # v1.4.85: solo este fallo (no llegó el S29 final) permite repetir el comando
 class Interrupted(Exception): pass
 
 
@@ -155,6 +156,15 @@ class TestStation:
         self.log(f'RECUPERACIÓN AUTOMÁTICA: sensores ON={v.fields.get("ON")} OFF={v.fields.get("OFF")} (perno a medio camino); '
                  'se intentará destrabar con PPON y, si no basta, POFF.')
         for cmd in ('PPON', 'POFF'):
+            if self.cancel.is_set(): raise Interrupted('Prueba detenida')
+            if cmd == 'POFF':   # antes de invertir el sentido, comprobar con un Status nuevo que el motor ya no está en marcha
+                try: chk = self._fresh_status(timeout=6, max_age=0)
+                except (TestFailure, NoVerification): break
+                if chk.position in ('cerrado', 'abierto'):
+                    self.motor_reintentos += 1
+                    self.warnings.append('Motor: al iniciar el perno estaba a medio camino (ON=0 OFF=0); terminó de asentar por sí solo.')
+                    return chk, ' · el perno terminó de asentar solo (estaba a medio camino)'
+                if chk.number('err') in (3, 4): break
             self.log(f'RECUPERACIÓN AUTOMÁTICA: enviando {cmd}')
             start = self._checkpoint()
             self.serial.send(serial_action(cmd))
@@ -241,7 +251,7 @@ class TestStation:
                 last_poll = time.monotonic()
                 try: self.serial.send(serial_action('STATUS'))
                 except Exception as exc: self.log('No se pudo consultar Status: '+str(exc))
-        raise TestFailure(f'No llegó S29 final: {expected}, MOV={needed}, PB={origin}, TQT=0')
+        raise MotorTimeout(f'No llegó S29 final: {expected}, MOV={needed}, PB={origin}, TQT=0')
 
     def _await_repetition(self, cursor: int, expected: str, prev: int, origin: int,
                           command_time: float, timeout: float = 18) -> Status:
@@ -306,14 +316,15 @@ class TestStation:
         if movement:
             try:
                 after = self._await_motor(cursor, expected, prev, True, origin, timeout=getattr(self, 'motor_reintento_s', 10))
-            except TestFailure:
+            except MotorTimeout:
                 # v1.4.85: a los 10 s (el recorrido normal es de 3–4 s) los sensores siguen en ON=0 OFF=0: el perno quedó a medio
                 # camino. Se repite el MISMO comando una vez; si asienta, el ciclo cuenta como correcto con advertencia.
-                with self.cond:
-                    sts = [v for k, v in self.observations[cursor:] if k == 'status']
-                last = sts[-1] if sts else None
-                if last is None or last.number('ON') != 0 or last.number('OFF') != 0:
-                    raise   # sin tramas (comunicación) o sensores en otro estado: no se repite, falla como siempre
+                # Se pide un Status NUEVO (no se confía en uno viejo): si no llega, es comunicación y falla como siempre.
+                try: last = self._fresh_status(timeout=6, max_age=0)
+                except (TestFailure, NoVerification): raise
+                if (last.number('ON') != 0 or last.number('OFF') != 0 or last.number('err') in (3, 4)):
+                    raise   # sensores en otro estado o error de motor: no se repite, falla como siempre
+                if self.cancel.is_set(): raise Interrupted('Prueba detenida')
                 m0 = last.number('MOV')
                 self.log(f'REINTENTO AUTOMÁTICO: {command} sin asentar tras {getattr(self, "motor_reintento_s", 10):g} s '
                          f'(ON={last.fields.get("ON")} OFF={last.fields.get("OFF")}, MOV={m0}); se repite {command} una vez.')

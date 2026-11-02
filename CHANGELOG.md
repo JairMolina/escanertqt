@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.86 — 2026-11-02
+- **Auditoría (4 agentes) y correcciones.** El reintento del perno (1.4.85) ahora solo ocurre ante el timeout «No llegó S29 final» (no tapa error de motor 3/4 ni MOV de más), pide un Status NUEVO antes de repetir, respeta la cancelación y, en la recuperación de la etapa 2, comprueba con un Status nuevo que el motor ya no está en marcha antes de invertir el sentido (POFF).
+- agent.log conserva los errores «No llegó S29…»; solo se omiten las tramas RX S29 y las consultas Status periódicas.
+- Pruebas Automáticas: el comando con ciclo en curso se confirma pulsando el botón otra vez (sin diálogo nativo, que la suite prohíbe). Pruebas actualizadas al diseño vigente (historial de campañas compartido entre lotes, R3 automática por defecto, instalador por código).
+- Agente 1.4.86.
+
 ## v1.4.85 — 2026-11-02
 - **Reintento automático del movimiento del perno.** Si tras enviar PPON/POFF (serie o BLE) pasan 10 s (el recorrido normal es de 3–4 s) y los sensores leen ON=0 OFF=0, se repite el MISMO comando una vez. Si asienta, la etapa queda aprobada con la nota «reintento automático», el log dice «REINTENTO AUTOMÁTICO …» y el reporte lleva el aviso y `motor_reintentos`. Si aun así no asienta, falla como antes. Si no llegó ninguna trama (comunicación) o los sensores están en otro estado, no se repite y falla como siempre.
 - **Cómo cuenta:** en las campañas el ciclo es «aprobado con advertencias»; en Pruebas TQT el resultado guardado queda «no verificado» (estricto, no certifica). La recuperación de la etapa 2 (1.4.84) cuenta igual.

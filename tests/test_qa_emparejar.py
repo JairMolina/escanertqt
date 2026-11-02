@@ -69,8 +69,10 @@ class TestEmparejarAuto(Base):
         self.pcb("R1", s2), self.pcb("R2", s2)          # solo R1+R2
         self.pcb("R1", s3)                               # incompleta
         self.pcb("R2", s4, confirmar=True)               # sin R1
+        sug = self.client.get(f"/api/emparejar/sugerencias?lote_id={self.lote}&r3=manual").json()
+        self.assertIsNone({x["serie"]: x for x in sug["completas"]}[s1]["r3"])   # manual: la R3 no se une sola
         sug = self.client.get(f"/api/emparejar/sugerencias?lote_id={self.lote}").json()
-        self.assertIsNone({x["serie"]: x for x in sug["completas"]}[s1]["r3"])   # R3 manual por defecto
+        self.assertIsNotNone({x["serie"]: x for x in sug["completas"]}[s1]["r3"])   # v1.4.78: automática por defecto
         sug = self.client.get(f"/api/emparejar/sugerencias?lote_id={self.lote}&r3=auto").json()
         comp = {x["serie"]: x for x in sug["completas"]}
         inc = {x["serie"]: x for x in sug["incompletas"]}
