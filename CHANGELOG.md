@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.83 — 2026-11-02
+- **Pruebas automáticas: «Comandos» y «Log del agente» plegables** (cerrados por defecto) para ocupar menos espacio, también en móvil. Revisión de la vista móvil (375–768 px) del submódulo.
+- Diagnóstico de la Prueba8 (64 ciclos): 16 fallos en dos rachas (ciclos 16–19 y 43–54). Cada racha empezó con un movimiento del perno que no dejó los sensores asentados y siguió con ON=0 OFF=0 hasta intervenir a mano.
+
 ## v1.4.82 — 2026-11-02
 - **Placas sin lote ya salen en su lote.** Las 100 R3 recibidas en septiembre tenían `lote_id` vacío (se recibieron antes de que existieran los lotes) y al elegir «2026-09» no aparecían en Dashboard ni Tarjetas (solo las 29 montadas, que toman el lote de su tarjeta). Al iniciar, las placas sin lote pasan al lote de su mes de recepción.
 - **Pruebas automáticas: historial compartido de verdad.** La lista, el detalle, el vivo y los logs de campañas ya no se filtran por el lote elegido en cada dispositivo (otro dispositivo con otro lote no veía las campañas).

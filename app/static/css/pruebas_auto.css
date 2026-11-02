@@ -497,3 +497,37 @@ details[open] > summary > .pa-chev { transform: rotate(90deg); }
 #kMsg[data-k="bad"] { color: var(--bad); font-weight: 650; }
 #kMsg[data-k="warn"] { color: var(--text); font-weight: 650; }
 .pa-cmd-otro .input { min-width: 0; flex: 1 1 150px; }
+
+/* v1.4.83: paneles Log del agente y Comandos plegables (cerrados por defecto) */
+.pa-plegable > summary { cursor: pointer; list-style: none; min-height: 44px; }
+.pa-plegable > summary::-webkit-details-marker { display: none; }
+.pa-plegable > summary .pa-title { flex: 1 1 auto; min-width: 0; }
+.pa-plegable[open] > summary { margin-bottom: 12px; }
+.pa-plegable-body { display: flex; flex-direction: column; gap: 12px; }
+.pa-plegable > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+
+/* v1.4.83: móvil (375-768 px): objetivos táctiles >= 44 px, sin desbordes, scroll propio en tablas/log, barra de detener sin tapar */
+@media (max-width: 768px) {
+  .pa .btn, .pa .input, .pa select.input, .pa .pa-tema { min-height: 44px; }
+  .pa .pa-tema { min-width: 44px; }
+  .pa .pa-link, .pa .pa-del { min-height: 44px; display: inline-flex; align-items: center; }
+  .pa summary, .pa .pa-tgrupo > summary, .pa .pa-camp > summary { min-height: 44px; }
+  .pa label:has(> input[type="checkbox"]) { min-height: 44px; display: flex; align-items: center; gap: 10px; }
+  .pa input[type="checkbox"] { width: 22px; height: 22px; flex: none; }
+  .pa .pa-term, .pa .pa-ciclos { max-width: 100%; overflow: auto; -webkit-overflow-scrolling: touch; }
+  .pa .pa-term { max-height: 260px; }
+  .pa .pa-ciclos table { display: block; overflow-x: auto; max-width: 100%; }
+  .pa-camp-body .pa-acc .btn, .pa-camp-body .pa-acc .pa-link { flex: 1 1 auto; justify-content: center; }
+  .pa-plegable[open] > summary { margin-bottom: 8px; }
+  .pa-plegable-body { gap: 8px; }
+  .pa-main-pad { padding-bottom: 150px; }
+  .pa-stopbar { width: calc(100vw - 16px); bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .pa-stopbar .pa-btn-danger { min-height: 44px; }
+  .pa-fallo-corto { white-space: normal; max-width: none; }
+  .pa-barra i.pa-seg { min-width: 1px; }
+}
+@media (max-width: 768px) {
+  .pa .pa-conn-main .btn, .pa .pa-conn-sec .btn, .pa .pa-uso .btn, .pa .pa-pfila .btn, .pa .pa-camp .pa-acc .btn, .pa .pa-camp .pa-acc .pa-link { min-height: 44px; }
+  .pa .pa-check { min-height: 44px; display: flex; align-items: center; gap: 10px; }
+  .pa input#lRed { width: 22px; height: 22px; }
+}
