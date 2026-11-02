@@ -421,7 +421,7 @@ class PruebasAuto(unittest.TestCase):
         d = r.json()
         self.assertEqual(set(d), {"comando", "expira", "station"})
         self.assertEqual(d["station"], mio["id"])
-        self.assertAlmostEqual(d["expira"], time.time() + 900, delta=30)
+        self.assertAlmostEqual(d["expira"], time.time() + 300, delta=30)
         self.assertRegex(d["comando"], r"^curl -fsSL 'http://testserver/api/stm32/agent/tests/instalar/[A-Za-z0-9_-]{32}\.sh' \| sh$")
         ruta = d["comando"].split("'")[1].replace("http://testserver", "")
         self.assertEqual(cli.get("/api/pruebas-auto/agente/instalacion").json()["etapa"], "")

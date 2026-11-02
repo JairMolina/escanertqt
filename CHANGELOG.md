@@ -1,5 +1,12 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.87 — 2026-11-02
+- **Placas sueltas sin lote visibles.** Las placas recibidas antes de existir los lotes (lote vacío) ya salen en cualquier lote elegido (inventario, conteos, consulta por código/número, escaneo y resumen). Al asignarse a una tarjeta toman el lote de la tarjeta. El inventario ahora filtra siempre con el lote de la tarjeta o el de recepción, igual que los conteos.
+- **Caché de placas del Dashboard con clave de lote** (como el de tarjetas): cambiar de lote no muestra placas del anterior.
+- **Seguridad:** el WebSocket de la planta exige al menos un módulo asignado; los tokens de instaladores anteriores caducan a los 7 días (los antiguos sin fecha siguen valiendo); el código del instalador `.sh` caduca a los 5 min (antes 15); prueba que exige token propio en toda ruta pública de agente (`/api/stm32/agent/`, `/api/dymo/remoto/agente/`).
+- Campañas: una advertencia de protección de motor (err=15) ya no se perdona como «aprobado con advertencias».
+- Agente 1.4.87.
+
 ## v1.4.86 — 2026-11-02
 - **Auditoría (4 agentes) y correcciones.** El reintento del perno (1.4.85) ahora solo ocurre ante el timeout «No llegó S29 final» (no tapa error de motor 3/4 ni MOV de más), pide un Status NUEVO antes de repetir, respeta la cancelación y, en la recuperación de la etapa 2, comprueba con un Status nuevo que el motor ya no está en marcha antes de invertir el sentido (POFF).
 - agent.log conserva los errores «No llegó S29…»; solo se omiten las tramas RX S29 y las consultas Status periódicas.

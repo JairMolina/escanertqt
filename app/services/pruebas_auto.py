@@ -283,6 +283,7 @@ def resultado_ciclo(result, report):
     if (len(steps) == 14 and all(isinstance(x, dict) and x.get("state") == "aprobado" for x in steps)
             and (d.get("inventory_check") or {}).get("state") == "coincide" and src.get("mac_comparison") != "no_coincide"
             and (int(h.get("retries", 0) or 0) > 0 or int(src.get("motor_reintentos", 0) or 0) > 0)   # v1.4.85: o el perno se destrabó repitiendo el comando
+            and not any("err=15" in str(w) or "rotección" in str(w) for w in (src.get("warnings") or []))   # v1.4.87: una protección de motor no se perdona
             and not int(h.get("partial_warnings", 0) or 0)
             and not int(h.get("ack_errors", 0) or 0) and not int(h.get("corrupt_frames", 0) or 0)):
         return "aprobado_con_advertencias"

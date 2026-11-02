@@ -218,10 +218,13 @@ def station_rotate(sid, owner):
         if not row:
             return None
         # el token anterior sigue valiendo (hasta 4): un instalador descargado antes que se abra después no queda en 401
-        previos = ([row['token_hash']] + json.loads(row['tokens_previos'] or '[]'))[:4]
+        previos = ([f"{row['token_hash']}:{int(time.time())}"] + json.loads(row['tokens_previos'] or '[]'))[:4]   # v1.4.87: con fecha (caducan a los 7 días)
         c.execute('UPDATE stm32_stations SET token_hash=?, tokens_previos=? WHERE id=?',
                   (hashlib.sha256(token.encode()).hexdigest(), json.dumps(previos), row['id']))
     return dict(id=row['id'], token=token, name=row['name'], owner=row['owner'])
+
+
+TOKEN_PREVIO_S = 7 * 24 * 3600
 
 
 def station_auth(token):
@@ -230,7 +233,10 @@ def station_auth(token):
         th = hashlib.sha256(token.encode()).hexdigest()
         row = c.execute('SELECT * FROM stm32_stations WHERE token_hash=?', (th,)).fetchone()
         if not row:   # v1.4.64: token de un instalador anterior de la misma estación (ver station_rotate)
-            row = c.execute("SELECT s.* FROM stm32_stations s, json_each(COALESCE(s.tokens_previos,'[]')) j WHERE j.value=?", (th,)).fetchone()
+            row = c.execute("SELECT s.*, j.value AS pv FROM stm32_stations s, json_each(COALESCE(s.tokens_previos,'[]')) j "
+                            "WHERE j.value=? OR j.value LIKE ?", (th, th + ':%')).fetchone()
+            if row and ':' in str(row['pv']) and time.time() - int(str(row['pv']).rsplit(':', 1)[1] or 0) > TOKEN_PREVIO_S:
+                row = None   # v1.4.87: un token de un instalador anterior ya no vale pasados 7 días
     if not row:
         raise ValueError('Credencial de estación inválida.')
     if row['revoked_at'] is not None:

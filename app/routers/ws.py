@@ -10,6 +10,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
 from app.database.db import get_active_lote, get_stats
+from app import modulos as modulos_cat
 from app.services import usuarios
 
 logger = logging.getLogger(__name__)
@@ -117,9 +118,12 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "operador"
         await websocket.close(code=1008)  # otra web intentando escuchar/emitir eventos de la planta (WebSocket entre sitios)
         return
     try:   # sin sesión válida no se acepta ni el apretón de manos: nadie escucha eventos de la planta sin iniciar sesión
-        await run_in_threadpool(usuarios.validar_sesion, websocket.cookies.get(usuarios.COOKIE))
+        u = await run_in_threadpool(usuarios.validar_sesion, websocket.cookies.get(usuarios.COOKIE))
     except usuarios.SesionInvalidaError:
         await websocket.close(code=4401)
+        return
+    if not modulos_cat.alguno(u):   # v1.4.87: una cuenta sin ningún módulo asignado no escucha los eventos de la planta
+        await websocket.close(code=4403)
         return
     await manager.connect(websocket, client_type=client_type)
     try:

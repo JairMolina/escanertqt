@@ -155,7 +155,7 @@ def _filtro_sesion(sesion: Optional[str], alias: str = "") -> Tuple[str, list]:
     las RECIBIDA anteriores a la marca (sesion NULL) las ven todos para que no queden huérfanas."""
     w, a = (f" AND ({alias}sesion = ? OR {alias}sesion IS NULL)", [sesion]) if sesion else ("", [])
     if db.LOTE_VISTA.get():
-        w += f" AND {alias}lote_id = ?"
+        w += f" AND ({alias}lote_id = ? OR {alias}lote_id IS NULL)"
         a.append(db.LOTE_VISTA.get())
     return w, a
 
@@ -173,6 +173,7 @@ def conteos_recepcion(c: sqlite3.Connection, sesion: Optional[str] = None) -> Di
 def conteos_disponibles(c: sqlite3.Connection) -> Dict[str, int]:
     r = {"R1": 0, "R2": 0, "R3": 0}
     w, a = db.clausula_lote(c, "lote_id")
+    if a: w = " AND (lote_id = ? OR lote_id IS NULL)"
     for f in c.execute("SELECT tipo, COUNT(*) n FROM pcb_inventario WHERE estado_ciclo = 'DISPONIBLE'" + w + " GROUP BY tipo", a):
         r[f["tipo"]] = f["n"]
     r["total"] = r["R1"] + r["R2"] + r["R3"]
@@ -234,7 +235,7 @@ def listar_pcb(
         lid = db.filtro_lote(c, lote_id)
         if lid is not None:
             # Assigned boards belong to the card's lot; loose boards to reception.
-            where.append("COALESCE(t.lote_id,p.lote_id) = ?" if db.LOTE_VISTA.get() is not None else "p.lote_id = ?")
+            where.append("(COALESCE(t.lote_id,p.lote_id) = ? OR COALESCE(t.lote_id,p.lote_id) IS NULL)")   # v1.4.87: siempre COALESCE y placas sin lote visibles
             params.append(lid)
         if tipo:
             where.append("p.tipo = ?")

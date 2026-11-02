@@ -400,7 +400,7 @@ def install_progress(body: InstallProgress, st=Depends(station_token)):
 # v1.4.64: instalador .sh de la Raspberry por «curl … | sh»: código de UN solo uso que caduca a los 15 min (en memoria).
 # Sin sesión ni Bearer: el middleware ya deja pasar /api/stm32/agent/ y aquí el código aleatorio es la credencial.
 INSTALADORES_SH = {}
-INSTALADOR_SH_S = 15 * 60
+INSTALADOR_SH_S = 5 * 60   # v1.4.87: 5 min (iba en la URL del curl)
 _instaladores_lock = threading.Lock()
 
 

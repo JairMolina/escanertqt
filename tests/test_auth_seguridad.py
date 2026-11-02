@@ -131,6 +131,25 @@ class TestSinSesionNadaAbre(Base):
                 probadas += 1
         self.assertGreater(probadas, 60)
 
+    def test_10b_rutas_de_agente_publicas_exigen_credencial_propia(self):
+        """v1.4.87: /api/stm32/agent/ y /api/dymo/remoto/agente/ saltan la sesión; cada ruta nueva debe llevar Depends(token)."""
+        def deps(d):
+            for x in d.dependencies:
+                yield x
+                yield from deps(x)
+        prefijos = ("/api/stm32/agent/", "/api/dymo/remoto/agente/")
+        vistas = 0
+        from app.routers import test_station as r_ts, dymo_remoto as r_dr
+        from fastapi import APIRouter
+        routers = [x for m in (r_ts, r_dr) for x in vars(m).values() if isinstance(x, APIRouter)]
+        for r in [r for rt in routers for r in rt.routes]:
+            if not isinstance(r, APIRoute) or not r.path.startswith(prefijos) or "/instalar/" in r.path:
+                continue
+            nombres = {getattr(x.call, "__name__", "") for x in deps(r.dependant)}
+            self.assertTrue(any(n in ("station_token", "agente") for n in nombres), f"{r.path} es pública y no exige token de agente")
+            vistas += 1
+        self.assertGreater(vistas, 8)
+
     def test_11_paginas_redirigen_al_login_con_next(self):
         for ruta in ("/monitor", "/emparejar", "/programar", "/consultar", "/dymo", "/admin"):
             r = self.c.get(ruta, follow_redirects=False)

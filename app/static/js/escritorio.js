@@ -42,10 +42,10 @@
         return items;
     }
     function cargarPcb() {
-        const c = S.cache;
-        if (c.pcb) return Promise.resolve(c.pcb);
-        if (c.pP) return c.pP;
-        const gen = c.gen;
+        const c = S.cache; const lid = S.lote ? S.lote.id : null;   // v1.4.87: el caché lleva su lote, como el de tarjetas
+        if (c.pcb && c.pcbLote === lid) return Promise.resolve(c.pcb);
+        if (c.pP && c.pcbLote === lid) return c.pP;
+        const gen = c.gen; c.pcbLote = lid;
         c.pP = fetchAll('/api/pcb', 1000).then((items) => { if (gen === c.gen) c.pcb = items; return items; }).finally(() => { if (gen === c.gen) c.pP = null; });
         return c.pP;
     }

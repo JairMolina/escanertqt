@@ -512,6 +512,10 @@ def filtro_lote(c: sqlite3.Connection, explicito: Optional[int] = None, activo: 
 def clausula_lote(c: sqlite3.Connection, columna: str, explicito: Optional[int] = None,
                   activo: bool = False) -> Tuple[str, list]:
     lid = filtro_lote(c, explicito, activo)
+    if lid is not None and columna.startswith("COALESCE(t.lote_id,p.lote_id)"):
+        # v1.4.87: una placa suelta recibida antes de existir los lotes (lote NULL) se ve en cualquier lote; al asignarse
+        # a una tarjeta toma el lote de la tarjeta
+        return (f" AND ({columna} = ? OR {columna} IS NULL)", [lid])
     return (f" AND {columna} = ?", [lid]) if lid is not None else ("", [])
 
 
