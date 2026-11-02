@@ -26,11 +26,12 @@ class WarningCurrent(Fixture):
         super().move(cmd,origin)
 
 class FaultTests(unittest.TestCase):
-    def start_once(self, fx, recuperacion_s=None):
+    def start_once(self, fx, recuperacion_s=None, motor_reintento_s=None):
         ui=[]
         station=TestStation(FakeSerial(fx), FakeBLE(fx),lambda *a:ui.append(a))
         station.repeat_verify_s=.08
         if recuperacion_s: station.recuperacion_s=recuperacion_s
+        if motor_reintento_s: station.motor_reintento_s=motor_reintento_s
         fx.station=station
         with tempfile.TemporaryDirectory() as path:
             station.output_dir=Path(path)
@@ -68,6 +69,25 @@ class FaultTests(unittest.TestCase):
         self.assertEqual(station.steps[1].state,'aprobado',station.report)
         self.assertIn('recuperado automáticamente con PPON',station.steps[1].detail)
         self.assertTrue(any(a[0]=='log' and 'RECUPERACIÓN AUTOMÁTICA: enviando PPON' in a[1] for a in ui))
+
+    def test_perno_no_asienta_se_repite_el_comando_y_cuenta_con_advertencia(self):
+        """v1.4.85: PPON deja ON=0 OFF=0; a los N s se repite el MISMO comando una vez y, si asienta, el ciclo sigue con aviso."""
+        class Perezoso(Fixture):
+            primera=True
+            def move(self,cmd,origin):
+                if Perezoso.primera and origin==1:
+                    Perezoso.primera=False
+                    self.values['PB']=str(origin); self.values['ON']='0'; self.values['OFF']='0'
+                    self.values['MOV']=str(int(self.values['MOV'])+1); self.emit(); return
+                super().move(cmd,origin)
+        fx=Perezoso(); fx.values.update({'ON':'1','OFF':'0'})
+        station,ui=self.start_once(fx,motor_reintento_s=.6)
+        self.assertEqual(station.steps[2].state,'aprobado',station.report)
+        self.assertIn('reintento automático',station.steps[2].detail)
+        self.assertEqual(station.report['motor_reintentos'],1)
+        self.assertEqual(station.report['result'],'no_verificado')   # estricto en Pruebas TQT; la campaña lo cuenta como advertencia
+        self.assertTrue(any('no asentó el perno' in w for w in station.report['warnings']))
+        self.assertTrue(any(a[0]=='log' and 'REINTENTO AUTOMÁTICO' in a[1] for a in ui))
 
     def test_motor_power_removed_reports_motor_fault_not_power_cause(self):
         station,_=self.start_once(NoClose())

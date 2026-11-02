@@ -59,6 +59,7 @@ class TestStation:
         self.mac_comparison = 'pendiente'
         self.output_dir = Path('logs')
         self.warnings: list[str] = []
+        self.motor_reintentos = 0
         self._overcurrent_seen = False
         self.inventory_records: dict | None = None
         self.inventory_source = ''
@@ -164,6 +165,8 @@ class TestStation:
                 self.log(f'RECUPERACIÓN AUTOMÁTICA: {cmd} no asentó el perno ({exc})')
                 continue
             self.log(f'RECUPERACIÓN AUTOMÁTICA: el perno quedó {st.position} (ON={st.fields.get("ON")} OFF={st.fields.get("OFF")}) tras {cmd}')
+            self.motor_reintentos += 1
+            self.warnings.append(f'Motor: al iniciar el perno estaba a medio camino (ON=0 OFF=0); se destrabó automáticamente con {cmd}.')
             return st, f' · recuperado automáticamente con {cmd} (estaba a medio camino)'
         self.log('RECUPERACIÓN AUTOMÁTICA: no se logró asentar el perno; el ciclo fallará.')
         return v, ''
@@ -214,8 +217,8 @@ class TestStation:
         raise TestFailure('No se puede mover motor con sensores inconsistentes')
 
     def _await_motor(self, cursor: int, expected: str, prev: int, movement: bool,
-                     origin: int, timeout: float = 31) -> Status:
-        needed = prev + int(movement)
+                     origin: int, timeout: float = 31, floor: int = 0, extra: int = 0) -> Status:
+        needed = max(prev + int(movement), floor)   # v1.4.85: floor/extra permiten que el MOV cuente un movimiento más tras repetir el comando
         until = time.monotonic() + timeout
         last_poll = time.monotonic()
         while time.monotonic() < until:
@@ -227,11 +230,11 @@ class TestStation:
                         raise TestFailure(f'R1 informó error motor {v.fields["err"]}')
                     # err=15 informa una protección; solo emite aviso. El motor
                     # aun debe cumplir sensores/MOV o fallará por timeout.
-                    if (v.position == expected and v.number('MOV') == needed and
+                    if (v.position == expected and needed <= (v.number('MOV') if v.number('MOV') is not None else -1) <= needed + extra and
                             v.number('PB') == origin and v.number('TQT') == 0):
                         return v
-                    if v.number('MOV') is not None and v.number('MOV') > needed:
-                        raise TestFailure(f'MOV subió más de lo esperado: {v.number("MOV")} > {needed}')
+                    if v.number('MOV') is not None and v.number('MOV') > needed + extra:
+                        raise TestFailure(f'MOV subió más de lo esperado: {v.number("MOV")} > {needed + extra}')
                 self.cond.wait(.2)
             # Consultar solo cuando haya tiempo para procesar un movimiento.
             if time.monotonic() - last_poll >= 5 and time.monotonic() + 2 < until:
@@ -299,11 +302,34 @@ class TestStation:
         if interface == 'serial': self.serial.send(serial_action(command))
         else: self.ble.send(command)
         sent_at = time.monotonic()
+        extra_txt = ''
         if movement:
-            after = self._await_motor(cursor, expected, prev, True, origin)
+            try:
+                after = self._await_motor(cursor, expected, prev, True, origin, timeout=getattr(self, 'motor_reintento_s', 10))
+            except TestFailure:
+                # v1.4.85: a los 10 s (el recorrido normal es de 3–4 s) los sensores siguen en ON=0 OFF=0: el perno quedó a medio
+                # camino. Se repite el MISMO comando una vez; si asienta, el ciclo cuenta como correcto con advertencia.
+                with self.cond:
+                    sts = [v for k, v in self.observations[cursor:] if k == 'status']
+                last = sts[-1] if sts else None
+                if last is None or last.number('ON') != 0 or last.number('OFF') != 0:
+                    raise   # sin tramas (comunicación) o sensores en otro estado: no se repite, falla como siempre
+                m0 = last.number('MOV')
+                self.log(f'REINTENTO AUTOMÁTICO: {command} sin asentar tras {getattr(self, "motor_reintento_s", 10):g} s '
+                         f'(ON={last.fields.get("ON")} OFF={last.fields.get("OFF")}, MOV={m0}); se repite {command} una vez.')
+                cursor = self._checkpoint()
+                if interface == 'serial': self.serial.send(serial_action(command))
+                else: self.ble.send(command)
+                after = self._await_motor(cursor, expected, prev, True, origin, timeout=25, floor=m0 if m0 is not None else 0, extra=1)
+                self.motor_reintentos += 1
+                aviso = (f'Motor: {command} ({interface}) no asentó el perno en {getattr(self, "motor_reintento_s", 10):g} s '
+                         f'(sensores ON=0 OFF=0); se repitió el comando y asentó {expected}.')
+                self.warnings.append(aviso)
+                self.log('REINTENTO AUTOMÁTICO: el perno quedó ' + expected + ' tras repetir ' + command + '.')
+                extra_txt = ' · reintento automático (no asentó al primer comando)'
         else:
             after = self._await_repetition(cursor, expected, prev, origin, sent_at)
-        return f'{command} → {expected}; MOV {prev}→{after.number("MOV")}; PB={origin}'
+        return f'{command} → {expected}; MOV {prev}→{after.number("MOV")}; PB={origin}{extra_txt}'
 
     def _r2(self, cmd: str, expected: str, code: int):
         before = self._fresh_status(timeout=18)
@@ -423,6 +449,7 @@ class TestStation:
         self._latest_at = 0.0
         self.mac_comparison = 'pendiente'
         self.warnings.clear()
+        self.motor_reintentos = 0   # v1.4.85: veces que hubo que repetir un comando de motor para que el perno asentara
         self._overcurrent_seen = False
         self.identity_status = None
         self.report_files = {}
@@ -604,13 +631,16 @@ class TestStation:
             if label == 'aprobado' and check['state'] in ('no_coincide','ambiguo'):
                 label = 'no_verificado'
                 issue = 'La MAC no coincide con inventario. '+check['detail']
+            if label == 'aprobado' and self.motor_reintentos:
+                label = 'no_verificado'   # v1.4.85: estricto para Pruebas TQT; las campañas lo cuentan como aprobado con advertencia
+                issue = 'El perno no asentó al primer comando; se repitió automáticamente y asentó (ver avisos).'
             if label == 'aprobado' and quality['state'] == 'no_verificable':
                 label = 'no_verificado'
                 issue = 'Tramas parciales/reintentos/errores ACK impiden certificación serial'
             self.report = {
                 'report_schema':'tqt-station/0.6.3',
                 'date':datetime.now().astimezone().isoformat(timespec='milliseconds'),
-                'card':self.ready_name, 'serial_port':port,
+                'card':self.ready_name, 'serial_port':port, 'motor_reintentos':self.motor_reintentos,
                 'firmware':initial.fields.get('VER') if initial else None,
                 'hardware':initial.fields.get('HW') if initial else None,
                 'card_id':initial.fields.get('ID') if initial else None,

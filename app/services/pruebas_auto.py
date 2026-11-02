@@ -282,7 +282,8 @@ def resultado_ciclo(result, report):
     h = src.get("serial_health") or {}
     if (len(steps) == 14 and all(isinstance(x, dict) and x.get("state") == "aprobado" for x in steps)
             and (d.get("inventory_check") or {}).get("state") == "coincide" and src.get("mac_comparison") != "no_coincide"
-            and int(h.get("retries", 0) or 0) > 0 and not int(h.get("partial_warnings", 0) or 0)
+            and (int(h.get("retries", 0) or 0) > 0 or int(src.get("motor_reintentos", 0) or 0) > 0)   # v1.4.85: o el perno se destrabó repitiendo el comando
+            and not int(h.get("partial_warnings", 0) or 0)
             and not int(h.get("ack_errors", 0) or 0) and not int(h.get("corrupt_frames", 0) or 0)):
         return "aprobado_con_advertencias"
     return result
@@ -382,7 +383,7 @@ def leer(cid, email=None, admin=False):
             x["result_prueba"] = x["result"]
             x["result"] = resultado_ciclo(x["result"], rep)   # v1.4.70: reintentos de ACK solos = con advertencias
             x["motivo"] = (motivo_ciclo(rep) if x["result"] not in APROBADOS else
-                           {"etapa": None, "nombre": "", "detalle": "14 etapas aprobadas; reintentos de ACK en el serial (advertencia)."}
+                           {"etapa": None, "nombre": "", "detalle": "14 etapas aprobadas con advertencia: reintentos de ACK o el perno no asentó al primer comando y se repitió (ver el log)."}
                            if x["result_prueba"] == "no_verificado" else None)
     return d
 

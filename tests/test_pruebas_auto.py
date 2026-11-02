@@ -164,6 +164,16 @@ class PruebasAuto(unittest.TestCase):
         self.assertEqual((d["estado"], d["conteo"]["aprobados"], d["ciclos_detalle"][0]["result"]), ("activa", 1, "aprobado_con_advertencias"))
         self.assertIn("run", s.claim(self.st["id"], LIBRE))   # se encola el ciclo 2
 
+    def test_perno_repetido_solo_cuenta_como_aprobado_en_campana(self):
+        """v1.4.85: el perno no asentó al primer comando y se repitió (motor_reintentos) → aprobado con advertencias en la campaña."""
+        c = self.campana(ciclos=2, detener=True)
+        job = s.claim(self.st["id"], LIBRE)
+        r = self.report(True); r["motor_reintentos"] = 1; r["result"] = "no_verificado"
+        s.finish(self.st["id"], job["run"]["id"], r)
+        self.assertEqual(s.read(job["run"]["id"])["result"], "no_verificado")
+        d = pa.leer(c["id"], "operador@test.mx")
+        self.assertEqual((d["estado"], d["conteo"]["aprobados"], d["ciclos_detalle"][0]["result"]), ("activa", 1, "aprobado_con_advertencias"))
+
     def test_reintentos_con_trama_danada_no_se_perdonan(self):
         c = self.campana(ciclos=2, detener=True)
         job = s.claim(self.st["id"], LIBRE)

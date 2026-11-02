@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.85 — 2026-11-02
+- **Reintento automático del movimiento del perno.** Si tras enviar PPON/POFF (serie o BLE) pasan 10 s (el recorrido normal es de 3–4 s) y los sensores leen ON=0 OFF=0, se repite el MISMO comando una vez. Si asienta, la etapa queda aprobada con la nota «reintento automático», el log dice «REINTENTO AUTOMÁTICO …» y el reporte lleva el aviso y `motor_reintentos`. Si aun así no asienta, falla como antes. Si no llegó ninguna trama (comunicación) o los sensores están en otro estado, no se repite y falla como siempre.
+- **Cómo cuenta:** en las campañas el ciclo es «aprobado con advertencias»; en Pruebas TQT el resultado guardado queda «no verificado» (estricto, no certifica). La recuperación de la etapa 2 (1.4.84) cuenta igual.
+- Agente 1.4.85.
+
 ## v1.4.84 — 2026-11-02
 - **Recuperación automática del perno (etapa 2).** Si al empezar un ciclo los sensores leen ON=0 OFF=0 (perno a medio camino), el motor envía PPON y, si no asienta, POFF, y vuelve a leer antes de fallar. Todo queda en la terminal («RECUPERACIÓN AUTOMÁTICA: …») y en el detalle de la etapa 2. Antes una racha de ese estado fallaba un ciclo por hora hasta intervenir a mano (Prueba8, ciclos 44–54).
 - **Log del agente = terminal.** El agente ya no repite cada segundo el error de conexión (llenaba el log y tapaba los comandos) y al subir el log descarta esas líneas. El panel «Comandos» ahora va arriba del «Log del agente».
