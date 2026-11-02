@@ -666,7 +666,7 @@ class FallaPCB(BaseModel):
 class EmparejarAuto(BaseModel):
     lote_id: Optional[int] = None
     series: Optional[List[str]] = Field(None, max_length=500)
-    r3: str = Field("manual", pattern="^(manual|auto)$")  # manual (por defecto): la R3 se asigna a mano; auto: par e impar por número
+    r3: str = Field("auto", pattern="^(manual|auto)$")  # v1.4.78: auto por defecto, como R1/R2 (la R3 se monta por su número); manual: a mano
     operador: Optional[str] = Field(None, max_length=60)
 
 

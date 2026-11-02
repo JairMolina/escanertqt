@@ -214,6 +214,9 @@
 .pa-metrics .pa-barra, .pa-metrics > .hint { grid-column: 1 / -1; }
 .pa-barra { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--line) 80%, var(--surface)); }
 .pa-barra i { display: block; height: 100%; transition: width .3s ease; }
+.pa-barra i.pa-seg { flex: 1 1 0; min-width: 1px; height: 100%; transition: none; }
+.pa-barra { gap: 1px; }
+.pa-barra i[data-k="pend"] { background: transparent; }
 .pa-barra i[data-k="ok"] { background: var(--ok); }
 .pa-barra i[data-k="bad"] { background: var(--bad); }
 .pa-barra i[data-k="warn"] { background: var(--warn); }
@@ -482,6 +485,8 @@ details[open] > summary > .pa-chev { transform: rotate(90deg); }
 .pa-tl[data-k="bad"] { color: #FF8A8A; border-left-color: #FF5C5C; }
 .pa-tl[data-k="ok"] { color: #7EE2A8; border-left-color: #3FD08A; }
 .pa-tl[data-k="info"] { color: #8EC5FF; }
+.pa-tl[data-k="tx"] { color: #FFD479; }
+.pa-tl[data-k="rx"] { color: #7EE0A5; }
 .pa-tl[data-k="nota"] { color: #6B7A90; font-style: italic; }
 .pa-tl-rep { display: inline-block; padding: 0 6px; border-radius: 999px; background: #1E2633; color: #C9D3E3; font-size: 11px; }
 .pa-log-filtro { font-size: 12px; margin-left: auto; }

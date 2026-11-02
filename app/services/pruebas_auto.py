@@ -290,8 +290,10 @@ def resultado_ciclo(result, report):
 
 def _conteo(c, cid):
     k = {"aprobados": 0, "fallidos": 0, "no_verificados": 0, "en_curso": 0}
-    for r in c.execute("SELECT r.state,r.result,r.report FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run WHERE x.campana=?", (cid,)):
+    sec = {}   # v1.4.82: resultado de cada ciclo por su número, para pintar la barra en orden
+    for r in c.execute("SELECT x.n,r.state,r.result,r.report FROM tqt_resistencia_ciclos x JOIN tqt_test_runs r ON r.id=x.run WHERE x.campana=? ORDER BY x.n", (cid,)):
         res = resultado_ciclo(r["result"], r["report"])
+        sec[r["n"]] = "r" if r["state"] in ("queued", "running") else "o" if res in APROBADOS else "x" if res == "fallido" else "w"
         if r["state"] in ("queued", "running"):
             k["en_curso"] += 1
         elif res in APROBADOS:
@@ -300,6 +302,7 @@ def _conteo(c, cid):
             k["fallidos"] += 1
         else:
             k["no_verificados"] += 1
+    k["secuencia"] = "".join(sec[n] for n in sorted(sec))
     k["hechos"] = k["aprobados"] + k["fallidos"] + k["no_verificados"]
     return k
 
@@ -343,13 +346,18 @@ def _ultimo_fallo(c, cid):
     return dict(m, n=r["n"], resultado=r["result"] or r["state"])
 
 
+def _tarjeta_existe(c, tid):
+    """v1.4.82: la tarjeta de una campaña existe (sin filtrar por el lote elegido en este dispositivo)."""
+    return c.execute("SELECT 1 FROM tarjetas_produccion WHERE id=?", (tid,)).fetchone() is not None
+
+
 def lista(email=None, admin=False):
     """v1.4.77: el historial de campañas es compartido por todas las cuentas (solo lectura para quien no es dueño).
     `mia` indica si la campaña es de esta cuenta o si es administrador (solo ellos pausan, detienen o eliminan)."""
     init()
     with db.get_db() as c:
-        w, a = db.clausula_lote(c, "t.lote_id")
-        filas = c.execute("SELECT r.* FROM tqt_resistencia r JOIN tarjetas_produccion t ON t.id=r.tarjeta_id WHERE 1=1" + w + " ORDER BY r.creado DESC LIMIT 200", a)
+        # v1.4.82: sin filtro de lote; el historial es de todas las cuentas y dispositivos aunque cada uno tenga otro lote elegido
+        filas = c.execute("SELECT r.* FROM tqt_resistencia r JOIN tarjetas_produccion t ON t.id=r.tarjeta_id ORDER BY r.creado DESC LIMIT 200")
         out = [_fila(c, r) for r in filas]
         for d in out:   # v1.4.68: por qué falló (último ciclo fallido o no verificado)
             d["ultimo_fallo"] = _ultimo_fallo(c, d["id"])
@@ -362,7 +370,7 @@ def leer(cid, email=None, admin=False):
     init()
     with db.get_db() as c:
         r = c.execute("SELECT * FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
-        if not r or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
+        if not r or not _tarjeta_existe(c, r["tarjeta_id"]):
             raise ValueError("Campaña no encontrada.")
         d = _fila(c, r)
         d["mia"] = bool(admin or (email and r["operador"] == email))
@@ -398,7 +406,7 @@ def cambiar(cid, accion, operador, admin=False):
     desde, hacia = destino[accion]
     with db.transaction() as c:
         r = c.execute("SELECT estado,operador,tarjeta_id FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
-        if not r or (r["operador"] != operador and not admin) or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
+        if not r or (r["operador"] != operador and not admin) or not _tarjeta_existe(c, r["tarjeta_id"]):
             raise ValueError("Campaña no encontrada.")
         if r["estado"] not in ACTIVAS or (desde and r["estado"] != desde):
             raise ValueError("La campaña no está en un estado que permita esa acción.")
@@ -522,7 +530,7 @@ def ciclo_permitido(jid, email, admin=False):
     with db.get_db() as c:
         r = c.execute("SELECT r.operador,r.tarjeta_id FROM tqt_resistencia_ciclos x JOIN tqt_resistencia r ON r.id=x.campana WHERE x.run=?",
                       (jid,)).fetchone()
-        if not r or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
+        if not r or not _tarjeta_existe(c, r["tarjeta_id"]):
             raise ValueError("Ciclo no encontrado.")
 
 
@@ -563,7 +571,7 @@ def eliminar(cid, email, admin=False):
     init()
     with db.transaction() as c:
         r = c.execute("SELECT estado,operador,tarjeta_id FROM tqt_resistencia WHERE id=?", (cid,)).fetchone()
-        if not r or (r["operador"] != email and not admin) or not db.get_tarjeta_by_id(r["tarjeta_id"], c):
+        if not r or (r["operador"] != email and not admin) or not _tarjeta_existe(c, r["tarjeta_id"]):
             raise ValueError("Campaña no encontrada.")
         if r["estado"] in ACTIVAS:
             raise ValueError("Detén la campaña antes de eliminarla.")

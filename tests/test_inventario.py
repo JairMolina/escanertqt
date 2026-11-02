@@ -252,6 +252,27 @@ class TestInventario(unittest.TestCase):
         self.assertEqual(res["r3_asignadas"], [{"id_tarjeta_num": "0007", "r3": "TQT-R3-V30-0007"}])
         self.assertEqual(inv.listar_pcb(estado_ciclo="DISPONIBLE", db_path=self.path)["items"][0]["nombre"], "TQT-R3-V30-0099")
 
+    def test_16e_v1478_r3_automatica_por_defecto_en_la_api(self):
+        """v1.4.78: el valor por defecto de la API es auto (como R1/R2): una R3 con el número de su tarjeta se monta sola."""
+        from app.database.models import EmparejarAuto
+        self.assertEqual(EmparejarAuto().r3, "auto")
+        self.disponibles("TQT-R1-V30-0007", "TQT-R2-V30-0007")
+        inv.emparejar_auto(self.lote, db_path=self.path)
+        self.disponibles("TQT-R3-V30-0007")
+        res = inv.emparejar_auto(self.lote, r3_auto=EmparejarAuto().r3 == "auto", db_path=self.path)
+        self.assertEqual(res["r3_asignadas"], [{"id_tarjeta_num": "0007", "r3": "TQT-R3-V30-0007"}])
+
+    def test_16f_v1482_placa_sin_lote_pasa_al_lote_de_su_mes(self):
+        """v1.4.82: una placa suelta con lote vacio se asigna al lote cuyo codigo es el mes de su recepcion."""
+        ids = self.disponibles("TQT-R3-V30-0050")
+        with db.get_db(self.path) as c:
+            cod = c.execute("SELECT codigo_lote FROM lotes_mensuales WHERE id=?", (self.lote,)).fetchone()[0]
+            c.execute("UPDATE pcb_inventario SET lote_id=NULL, recibida_en=? WHERE id=?", (cod + "-15 10:00:00", ids["TQT-R3-V30-0050"]))
+            c.commit()
+            db._asegurar_columnas(c)
+            c.commit()
+            self.assertEqual(c.execute("SELECT lote_id FROM pcb_inventario WHERE id=?", (ids["TQT-R3-V30-0050"],)).fetchone()[0], self.lote)
+
     def test_17_auto_con_series_reporta_omitidas(self):
         self.disponibles("TQT-R1-V30-0001", "TQT-R2-V30-0001", "TQT-R1-V30-0003")
         res = inv.emparejar_auto(self.lote, ["1", "0003", "0077"], db_path=self.path)

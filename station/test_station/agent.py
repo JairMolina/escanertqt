@@ -11,7 +11,7 @@ from tqtstation.native_ble import execute as execute_native_ble
 from tqtstation.protocol import serial_action, normalize_mac
 
 
-AGENT_VERSION = "1.4.76"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
+AGENT_VERSION = "1.4.82"   # se muestra en /pruebas-automaticas; si el servidor anuncia otra, Windows se autoactualiza
 LOG_MAX = 256 * 1024                      # cola de agent.log que se sube cuando la web la pide
 # v1.4.64: la autoactualización nunca sobrescribe lo propio de esta instalación.
 PROTEGIDOS = {"config.json", "puerto_serie.txt", "agent.log", "outbox.db", ".agent.lock"}
@@ -217,6 +217,13 @@ class Bridge:
             self.store.commit()
 
     def event(self, kind, *args):
+        if kind == "log" and args:   # v1.4.82: lo que pasa en la terminal (comandos TX, respuestas RX, etapas) también queda en agent.log
+            try:
+                txt = str(args[0]).split(" | ", 1)[-1][:240]
+                if "S29" not in txt and "SMSG=Status" not in txt:   # sin las consultas de estado periódicas
+                    print(time.strftime("%Y-%m-%d %H:%M:%S"), txt, flush=True)
+            except Exception:
+                pass
         with self.lock:
             if kind == "status":
                 self.latest = dict(args[0].fields)

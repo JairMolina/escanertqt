@@ -416,6 +416,9 @@ def _asegurar_columnas(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE pcb_inventario ADD COLUMN sesion TEXT")
     if cols and "lote_id" not in cols:   # v1.4.24: lote en el que se recibió la placa (NULL = recibida antes de v1.4.24)
         conn.execute("ALTER TABLE pcb_inventario ADD COLUMN lote_id INTEGER REFERENCES lotes_mensuales(id) ON DELETE SET NULL")
+    if cols:   # v1.4.82: placas sueltas recibidas sin lote (antes de v1.4.24) pasan al lote de su mes; sin esto no salian al elegir ese lote
+        conn.execute("UPDATE pcb_inventario SET lote_id = (SELECT l.id FROM lotes_mensuales l WHERE l.codigo_lote = strftime('%Y-%m', pcb_inventario.recibida_en)) "
+                     "WHERE lote_id IS NULL AND recibida_en IS NOT NULL AND EXISTS (SELECT 1 FROM lotes_mensuales l WHERE l.codigo_lote = strftime('%Y-%m', pcb_inventario.recibida_en))")
     _asegurar_fechas_entrega(conn)
     lcols = {r[1] for r in conn.execute("PRAGMA table_info(lotes_mensuales)")}
     if lcols and "tipo_lote" not in lcols:   # v1.3.44: lotes de mes, semana o día; los existentes quedan como 'mes'

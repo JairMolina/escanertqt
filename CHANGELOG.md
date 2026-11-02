@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.82 — 2026-11-02
+- **Placas sin lote ya salen en su lote.** Las 100 R3 recibidas en septiembre tenían `lote_id` vacío (se recibieron antes de que existieran los lotes) y al elegir «2026-09» no aparecían en Dashboard ni Tarjetas (solo las 29 montadas, que toman el lote de su tarjeta). Al iniciar, las placas sin lote pasan al lote de su mes de recepción.
+- **Pruebas automáticas: historial compartido de verdad.** La lista, el detalle, el vivo y los logs de campañas ya no se filtran por el lote elegido en cada dispositivo (otro dispositivo con otro lote no veía las campañas).
+- **Barra de ciclos en orden.** Un segmento por ciclo (verde, rojo, ámbar, en curso, pendiente) para ver en qué parte fallaron.
+- **Log del agente = terminal.** El agente (1.4.82) escribe en agent.log los comandos TX/RX y las etapas; la web oculta por defecto errores de conexión, arranque y trazas.
+
 ## v1.4.81 — 2026-10-31
 - **Pruebas automáticas: confirmación de sensores tras PPON/POFF.** Después de enviar ON/OFF el panel pide Status a la R1 y lee los sensores hasta 30 s: PPON espera apertura (ON 0 · OFF 1), POFF espera cierre (ON 1 · OFF 0). Muestra «✓ el sensor SÍ leyó…, se destrabó» (con el cambio de MOV), «ya estaba» si no hubo cambio, o «✗ el sensor NO leyó… sigue trabado». El banco expone ON/OFF/TQT/MOV/err/PB del último Status.
 
@@ -9,6 +15,10 @@
 
 ## v1.4.79 — 2026-10-31
 - **Pruebas automáticas: panel «Comandos»** bajo «Log del agente». ON (PPON), OFF (POFF), Reset normal y los comandos serie de Pruebas TQT se envían a la R1 por el puerto de la Raspberry (`POST /api/pruebas-auto/comando`). PPON/POFF usan la tarjeta de la campaña activa o pausada (sin campaña, la de «Nueva campaña») y verifican su MAC, así se puede pausar, destrabar el perno y reanudar; se bloquean durante un ciclo y sin puerto conectado. RESET_FACTORY no está disponible.
+
+## v1.4.78 — 2026-10-30
+- **R3 se empareja como R1 y R2.** Por defecto «R3 automática»: la R3 se monta en la tarjeta de su mismo número al crear o completar tarjetas (API `r3=auto` por defecto; interfaz sin preferencia guardada antigua). «R3 manual» sigue disponible en Tarjetas.
+- Diagnóstico con BD de 1.4.76: 100 tarjetas (0011–0130), 29 R3 asignadas; con el modo automático se montan 54 R3 libres del mismo número. 17 tarjetas quedan sin R3 porque no hay R3 libre con su número.
 
 ## v1.4.77 — 2026-10-30
 - **Historial de campañas de Pruebas automáticas compartido.** Lista, detalle, registro en vivo y logs (campaña y ciclo) los ve cualquier cuenta. Pausar, detener y eliminar siguen siendo del dueño o de un administrador; la página oculta esas acciones cuando la campaña es ajena (campo `mia`).

@@ -296,7 +296,7 @@ async def pcb_falla(pcb_id: int, payload: FallaPCB = FallaPCB()):
 # Emparejar
 # ============================================================================
 @router.get("/emparejar/sugerencias", summary="Series que se pueden emparejar hoy")
-async def emparejar_sugerencias(lote_id: Optional[int] = Query(None), r3: str = Query("manual", pattern="^(manual|auto)$")):
+async def emparejar_sugerencias(lote_id: Optional[int] = Query(None), r3: str = Query("auto", pattern="^(manual|auto)$")):
     return await _run(inv.sugerencias, lote_id, r3 == "auto")
 
 

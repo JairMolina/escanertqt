@@ -21,9 +21,10 @@
             const info = h('span', { class: 'info', role: 'status', 'aria-live': 'polite' });
             const sugBox = h('section', { class: 'esc-blk', 'aria-labelledby': 'sugT' }); const tw = h('div'); const split = h('div', { class: 'esc-split' }, tw);
             let panel = null;
-            const r3Guardado = () => { try { return localStorage.getItem('tqt.r3modo') === 'auto' ? 'auto' : 'manual'; } catch (e) { return 'manual'; } };
+            // v1.4.78: automático por defecto (como R1/R2). Clave nueva: el «manual» guardado antes ya no aplica.
+            const r3Guardado = () => { try { return localStorage.getItem('tqt.r3modo.v2') === 'manual' ? 'manual' : 'auto'; } catch (e) { return 'auto'; } };
             const selR3 = h('select', { class: 'input', id: 'tarR3', 'aria-label': 'Cómo emparejar las R3', title: 'Manual: la R3 se asigna a mano en cada tarjeta. Automática: par e impar por número.',
-                onchange: (e) => { try { localStorage.setItem('tqt.r3modo', e.target.value); } catch (er) { /* sin almacenamiento */ } cargarSug(); } },
+                onchange: (e) => { try { localStorage.setItem('tqt.r3modo.v2', e.target.value); } catch (er) { /* sin almacenamiento */ } cargarSug(); } },
                 h('option', { value: 'manual' }, 'R3 manual'), h('option', { value: 'auto' }, 'R3 automática (par e impar)'));
             selR3.value = r3Guardado();
             const btnEmp = h('button', { class: 'btn btn-primary', type: 'button', 'data-escribe': true, onclick: emparejarTodas }, icon('link'), 'Emparejar completas');

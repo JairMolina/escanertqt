@@ -435,6 +435,13 @@
 
     /* ---- historial de campañas ---- */
     function barra(k, ciclos) {
+        var q = k.secuencia;
+        if (q) {   // v1.4.82: un segmento por ciclo, en orden: se ve en qué parte fallaron y en cuál no
+            var kk = { o: 'ok', x: 'bad', w: 'warn', r: 'run' }, h = '';
+            for (var i = 0; i < q.length; i++) h += '<i class="pa-seg" data-k="' + kk[q.charAt(i)] + '" title="Ciclo ' + (i + 1) + '"></i>';
+            for (var j = q.length; j < ciclos; j++) h += '<i class="pa-seg" data-k="pend"></i>';
+            return h;
+        }
         var tot = Math.max(ciclos, 1);
         return '<i data-k="ok" style="width:' + (100 * k.aprobados / tot) + '%"></i><i data-k="bad" style="width:' + (100 * k.fallidos / tot) + '%"></i>' +
             '<i data-k="warn" style="width:' + (100 * k.no_verificados / tot) + '%"></i><i data-k="run" style="width:' + (100 * k.en_curso / tot) + '%"></i>';
@@ -861,11 +868,13 @@
     /* v1.4.73: terminal legible: líneas repetidas seguidas se agrupan («× 23»), color por tipo (error, conexión,
        arranque/actualización, puerto) y opción de ocultar los reintentos de conexión con el servidor. */
     var CLAVE_RED = 'pa.log.sinred';
-    function sinRed() { try { return localStorage.getItem(CLAVE_RED) === '1'; } catch (e) { return false; } }
+    function sinRed() { try { return localStorage.getItem(CLAVE_RED) !== '0'; } catch (e) { return true; } }   // v1.4.82: oculto por defecto
     function tipoLinea(l) {
         if (/^Reporte\/conexión pendiente|urlopen error|timed out|Bad Gateway|name resolution/i.test(l)) return 'red';
         if (/Traceback|Error|ERROR|RuntimeError|eliminado desde la web/.test(l)) return 'bad';
         if (/Autoactualización|iniciado en/.test(l)) return 'ok';
+        if (/^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\s+)?TX SERIAL/.test(l)) return 'tx';   // v1.4.82: comandos enviados
+        if (/^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\s+)?RX SERIAL/.test(l)) return 'rx';
         if (/Puerto serie|puerto|BLE|Bluetooth/i.test(l)) return 'info';
         if (/^\s+(File |\^|~)/.test(l)) return 'bad';
         return '';
@@ -876,13 +885,13 @@
         for (var i = 0; i < lineas.length; i++) {
             var l = lineas[i]; if (!l.trim()) continue;
             var k = tipoLinea(l);
-            if (filtrar && k === 'red') { ocultas++; continue; }
+            if (filtrar && (k === 'red' || (!/SERIAL|BLE|Etapa|etapa|Ciclo/.test(l) && (k === 'bad' || /^\s|During handling|^Traceback/.test(l)) && !/ERROR (RX|ACK|SERIAL)/.test(l)))) { ocultas++; continue; }
             var n = 1; while (i + 1 < lineas.length && lineas[i + 1] === l) { n++; i++; }
             var m = /^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+(.*)$/.exec(l);
             out.push('<span class="pa-tl" data-k="' + k + '">' + (m ? '<span class="pa-tl-ts">' + esc(m[1]) + '</span> ' + esc(m[2]) : esc(l)) +
                 (n > 1 ? ' <span class="pa-tl-rep">× ' + n + '</span>' : '') + '</span>');
         }
-        if (ocultas) out.unshift('<span class="pa-tl" data-k="nota">' + ocultas + ' líneas de reintento de conexión ocultas</span>');
+        if (ocultas) out.unshift('<span class="pa-tl" data-k="nota">' + ocultas + ' líneas de conexión/arranque ocultas (casilla de abajo)</span>');
         return out.slice(-400).join('');   // cada línea es un bloque: sin saltos extra
     }
     $('lRed').checked = sinRed();
