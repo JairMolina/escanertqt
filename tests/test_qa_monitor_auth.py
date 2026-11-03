@@ -49,7 +49,8 @@ class TestSoloAdminPideClave(unittest.TestCase):
 
     def test_la_zona_de_administracion_si_pide_contrasena(self):
         c = self.cliente()
-        self.assertEqual(c.get("/admin").status_code, 200)                         # la página abre y muestra el login
+        r0 = c.get("/admin")   # v1.4.88: /admin redirige al Centro de administración (el portal pide la clave de /admin)
+        self.assertEqual((r0.status_code, r0.headers["location"]), (302, "/inicio?centro=1"))
         for metodo, ruta, cuerpo in (("get", "/api/admin/resumen", None), ("get", "/api/admin/movimientos", None),
                                      ("delete", "/api/admin/tarjetas", {"ids": [1]}), ("delete", "/api/admin/pcb", {"ids": [1]}),
                                      ("post", "/api/admin/lote/1/vaciar", {"confirmar": "VACIAR"}),

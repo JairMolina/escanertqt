@@ -673,7 +673,7 @@
         // ------------------------------------------------------------ pestaña Pegar varias
         const P = { fase: 'editando', lineas: [], resultados: null, confirmando: false };
         const ta = h('textarea', { id: 'macs-ta', spellcheck: 'false', autocomplete: 'off', wrap: 'off',
-            placeholder: 'TQT-R1-V30-0021  70:4b:ca:5b:9f:6e  4.1\nTQT-R2-V30-0010;704bca5b9ca2\n0021 R1 704bca5b9f6e' });
+            placeholder: 'TQT-R1-V30-0021  70:4B:CA:5B:9F:6E  4.1\nTQT-R2-V30-0010;704bca5b9ca2\n0021 R1 704bca5b9f6e' });
         const modoAuto = h('input', { type: 'radio', name: 'macs-modo', value: 'auto', checked: true });
         const modoOrden = h('input', { type: 'radio', name: 'macs-modo', value: 'orden' });
         const fwPeg = {};
@@ -1017,7 +1017,7 @@
                 if (!r || r.saved || !r.tr.isConnected) return { ok: false, texto: 'Escanea primero el QR de la placa y después su MAC.' };
                 if (r.esR3) return { ok: false, texto: `${r.pcb.nombre} es R3: no lleva MAC, solo firmware.` };
                 r.inp.value = mac.mac; r.inp.dispatchEvent(new Event('input', { bubbles: true })); r.inp.focus();
-                return { ok: true, texto: `MAC ${mac.mac.toLowerCase()} puesta en ${r.pcb.nombre}: revisa y pulsa Enter para guardar.` };
+                return { ok: true, texto: `MAC ${mac.mac.toUpperCase()} puesta en ${r.pcb.nombre}: revisa y pulsa Enter para guardar.` };
             }
             if (!nm) return null;   // no es una placa: lo resuelve la consola (ficha)
             const tipo = 'R' + nm[1], ver = Number(nm[2]), serie = Number(nm[3]);
@@ -1027,7 +1027,7 @@
             if (r && !r.saved) { ubicar(vPend, 'pend', r); return { ok: true, texto: r.esR3 ? `${r.pcb.nombre} ubicada: elige su firmware en la consola (la R3 no lleva MAC).` : `${r.pcb.nombre} ubicada: captura su MAC en la consola.` }; }
             if (!vMac.cargado) await vMac.cargar();
             r = buscar(vMac);
-            if (r) { ubicar(vMac, 'mac', r); return { ok: true, texto: r.esR3 ? `${r.pcb.nombre} ya está programada (firmware ${r.pcb.firmware}): puedes cambiarlo.` : `${r.pcb.nombre} ya tiene MAC ${String(r.orig || '').toLowerCase()}: puedes corregirla.` }; }
+            if (r) { ubicar(vMac, 'mac', r); return { ok: true, texto: r.esR3 ? `${r.pcb.nombre} ya está programada (firmware ${r.pcb.firmware}): puedes cambiarlo.` : `${r.pcb.nombre} ya tiene MAC ${String(r.orig || '').toUpperCase()}: puedes corregirla.` }; }
             return { ok: false, texto: `TQT-${tipo}-V${nm[2]}-${String(serie).padStart(4, '0')} no aparece en MAC y firmware (¿está registrada?).` };
         }
 

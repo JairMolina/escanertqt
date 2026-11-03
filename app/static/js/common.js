@@ -187,6 +187,9 @@
         return hex.match(/.{2}/g).join(':');
     }
 
+    /** MAC para mostrar: siempre en MAYÚSCULAS (AA:BB:CC:DD:EE:FF); vacío si no hay. */
+    const verMac = (m) => (m ? String(m).toUpperCase() : '');
+
     // ---------------------------------------------------------------- estado de las placas y de la tarjeta
     const CICLO_LABEL = { RECIBIDA: 'Sin confirmar', DISPONIBLE: 'Suelta', ASIGNADA: 'Asignada', FALLA: 'Falla', BAJA: 'Baja' };
     const CICLO_KIND = { RECIBIDA: 'warn', DISPONIBLE: 'info', ASIGNADA: 'ok', FALLA: 'bad', BAJA: '' };
@@ -915,7 +918,7 @@
 
     window.TQT = {
         versionP,
-        hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, esTpms, esAntijammer, esSpeedlocker, esSigfox, esCaiquen, nombreDe, parseMac, formatMacProgress, VERSION_DEFAULT,
+        hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, esTpms, esAntijammer, esSpeedlocker, esSigfox, esCaiquen, nombreDe, parseMac, verMac, formatMacProgress, VERSION_DEFAULT,
         CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
         loteNombre, loteConteo, ordenarLotes, loteVista, guardarLoteVista, todosLotes, cabecerasLote, loteUrl, loteEtiqueta, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,

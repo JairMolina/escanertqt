@@ -89,7 +89,7 @@
         if (!p) return h('span', { class: 'muted' }, '—');
         const r3 = slot === 'R3' || p.tipo === 'R3';
         return h('div', { class: 'esc-placa' }, h('span', { class: 'mono nm' }, p.nombre),
-            r3 ? (p.firmware ? h('span', { class: 'mono sub' }, h('span', { class: 'fw' }, `fw ${p.firmware}`)) : null) : h('span', { class: 'mono sub' }, p.mac ? String(p.mac).toLowerCase() : 'sin MAC', p.firmware ? h('span', { class: 'fw' }, ` · fw ${p.firmware}`) : null));
+            r3 ? (p.firmware ? h('span', { class: 'mono sub' }, h('span', { class: 'fw' }, `fw ${p.firmware}`)) : null) : h('span', { class: 'mono sub' }, p.mac ? String(p.mac).toUpperCase() : 'sin MAC', p.firmware ? h('span', { class: 'fw' }, ` · fw ${p.firmware}`) : null));
     }
 
     /**
@@ -191,7 +191,7 @@
         if (slot === 'R3') {   // la R3 no lleva MAC, pero sí firmware (programada = con firmware)
             return art([h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fw), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC.')]);
         }
-        const mac = p.mac ? String(p.mac).toLowerCase() : '';
+        const mac = p.mac ? String(p.mac).toUpperCase() : '';
         const macBox = mac
             ? h('div', { class: 'mac' }, h('span', { class: 'val', 'aria-label': 'MAC ' + mac.split(':').join(' ') }, mac),
                 h('button', { class: 'btn btn-sm', type: 'button', 'aria-label': `Copiar la MAC de ${p.nombre}`, title: 'Copiar MAC', onclick: () => copiar(mac, 'MAC copiada') }, icon('paste')))
@@ -204,7 +204,7 @@
         ['r1', 'r2', 'r3'].forEach((s) => {
             const p = t[s]; if (!p) return;
             if (s === 'r3') { l.push(`R3 ${p.nombre} · Hardware V${p.version} (sin MAC)${p.firmware ? ' · Firmware ' + p.firmware : ''}`); return; }
-            l.push(`${s.toUpperCase()} ${p.nombre} · Hardware V${p.version}${p.mac ? ' · MAC ' + String(p.mac).toLowerCase() : ''}${p.firmware ? ' · Firmware ' + p.firmware : ''}`);
+            l.push(`${s.toUpperCase()} ${p.nombre} · Hardware V${p.version}${p.mac ? ' · MAC ' + String(p.mac).toUpperCase() : ''}${p.firmware ? ' · Firmware ' + p.firmware : ''}`);
         });
         if (t.fecha_llegada || t.fecha_finalizado || t.fecha_real || t.gabinete) l.push(`Llegada ${t.fecha_llegada || '—'} · Finalizado ${t.fecha_finalizado || '—'} · Entrega ${t.fecha_real || '—'} · Gabinete ${t.gabinete || '—'}`);
         return l.join('\n');
@@ -609,7 +609,7 @@
     // ------------------------------------------------------------------ tiempo real
     const EV = {
         PCB_RECIBIDA: (d) => ['ok', d && d.pcb ? `Recibida ${d.pcb.nombre}` : 'Placa recibida'],
-        PCB_ACTUALIZADA: (d) => ['info', d && d.pcb ? `Actualizada ${d.pcb.nombre}${d.pcb.mac ? ' · ' + String(d.pcb.mac).toLowerCase() : ''}${d.pcb.firmware ? ' · fw ' + d.pcb.firmware : ''}` : 'Placa actualizada'],
+        PCB_ACTUALIZADA: (d) => ['info', d && d.pcb ? `Actualizada ${d.pcb.nombre}${d.pcb.mac ? ' · ' + String(d.pcb.mac).toUpperCase() : ''}${d.pcb.firmware ? ' · fw ' + d.pcb.firmware : ''}` : 'Placa actualizada'],
         PCB_ELIMINADA: (d) => ['warn', d && d.nombre ? `Eliminada ${d.nombre}` : 'Placa eliminada'],
         RECEPCION_CONFIRMADA: (d) => ['ok', `Recepción confirmada${d && d.confirmadas ? ` (${d.confirmadas} placas)` : ''}`],
         TARJETA_EMPAREJADA: (d) => ['ok', d && d.tarjeta ? `Tarjeta ${d.tarjeta.id_tarjeta_num} emparejada` : 'Tarjeta emparejada'],

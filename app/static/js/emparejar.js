@@ -246,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return h('div', { class: 'slot', dataset: { empty: p ? '' : '1' }, style: 'grid-template-columns:auto 1fr;row-gap:8px' },
                 T.tipoChip(s, { lg: true, empty: !p }),
-                h('div', null, h('div', { class: 'nm' }, p ? p.nombre : 'Sin placa asignada'), p ? h('div', { class: 'mc' }, ['Hardware V' + p.version, s !== 'R3' ? (p.mac || 'sin MAC todavía') : null, s !== 'R3' && (p.firmware || t['firmware_' + s.toLowerCase()]) ? 'Firmware ' + (p.firmware || t['firmware_' + s.toLowerCase()]) : null].filter(Boolean).join(' · ')) : null),
+                h('div', null, h('div', { class: 'nm' }, p ? p.nombre : 'Sin placa asignada'), p ? h('div', { class: 'mc' }, ['Hardware V' + p.version, s !== 'R3' ? (p.mac ? String(p.mac).toUpperCase() : 'sin MAC todavía') : null, s !== 'R3' && (p.firmware || t['firmware_' + s.toLowerCase()]) ? 'Firmware ' + (p.firmware || t['firmware_' + s.toLowerCase()]) : null].filter(Boolean).join(' · ')) : null),
                 h('span'), acts);
         };
 

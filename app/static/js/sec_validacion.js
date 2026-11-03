@@ -629,7 +629,7 @@
             h("dt", null, "FW registrado"), h("dd", null, p.firmware || "sin registro"),
             h("dt", null, "FW leído"), h("dd", null, rol === "R1" ? leido || "sin lectura en esta ejecución" : "no disponible"),
             h("dt", null, "Última compatible"), h("dd", null, sem.ultima || "—"),
-            rol !== "R3" ? [h("dt", null, "MAC " + rol + " (registrada)"), h("dd", { class: "mono" }, p.mac || "sin registro")] : null,
+            rol !== "R3" ? [h("dt", null, "MAC " + rol + " (registrada)"), h("dd", { class: "mono" }, p.mac ? String(p.mac).toUpperCase() : "sin registro")] : null,
           ),
           h("p", { class: "tqt-sem", "data-k": semK.k }, h("span", { class: "tqt-dot", "aria-hidden": "true" }), "FW: " + semK.txt),
         );
@@ -1055,7 +1055,7 @@
           logLine("ADVERTENCIA: " + (a[0] ?? ""));
           break;
         case "ble_ident":
-          if (a[0] === "R1" || a[0] === "R2") run.observed[a[0]] = { name: a[1], address: a[2], check: a[3] };
+          if (a[0] === "R1" || a[0] === "R2") run.observed[a[0]] = { name: a[1], address: String(a[2] || "").toUpperCase(), check: a[3] };
           break;
         case "card":
           run.observed.card = a[0];
@@ -1103,7 +1103,7 @@
       const na = "pendiente / no disponible";
       const started = r?.created || run.started;
       const ended = r && !["queued", "running"].includes(r.state) ? r.updated : run.ended;
-      const fact = (k, val, mono) => [h("dt", null, k), h("dd", mono ? { class: "mono" } : null, val || na)];
+      const fact = (k, val, mono) => [h("dt", null, k), h("dd", mono ? { class: "mono" } : null, (mono && val ? String(val).toUpperCase() : val) || na)];
       sumFacts.replaceChildren(
         ...fact("Tarjeta", inv.id_tarjeta_num ? inv.id_tarjeta_num + " · " + (inv.nombre || "") : tarjeta ? cardNum(tarjeta) : ""),
         ...fact("R1 MAC registrada", inv.mac_r1, true),
@@ -1201,7 +1201,7 @@
       }
       const txt = { creado: "Candado creado en Skytec correctamente", ya_existia: "ya estaba registrado en Skytec", error: "ERROR" };
       skyOut.className = r.data.ok ? "hint ok" : "hint bad";
-      skyOut.textContent = r.data.items.map((i) => i.slot + " " + i.nombre + " (" + i.mac + "): " + txt[i.estado] + (i.estado === "error" ? " — " + i.detalle : "")).join(" · ")
+      skyOut.textContent = r.data.items.map((i) => i.slot + " " + i.nombre + " (" + String(i.mac || "").toUpperCase() + "): " + txt[i.estado] + (i.estado === "error" ? " — " + i.detalle : "")).join(" · ")
         + (r.data.ok ? "." : ". Puedes reintentar con «Reimprimir etiquetas».");
     }
     // ---------------------------------------------------------------- sensores

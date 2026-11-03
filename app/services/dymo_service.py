@@ -3,7 +3,7 @@
 Formato principal: **30334 Multi-Purpose** (2-1/4" x 1-1/4" = 57 x 32 mm, apaisada). El 30252 (89 x 28 mm) queda
 como formato secundario. Todo es blanco y negro puro: sin grises, sin degradados, sin texto menor a 7 pt.
 
-Trama (texto impreso Y contenido del QR), 4 líneas exactas, MAC en minúsculas y R3 fuera:
+Trama (texto impreso Y contenido del QR), 4 líneas exactas, MAC en MAYÚSCULAS y R3 fuera:
     TQT-R1-V30-0021
     70:4b:ca:5b:9f:6e
     TQT-R2-V30-0010
@@ -363,12 +363,12 @@ class DymoService:
     # ------------------------------------------------------------------ trama
     @staticmethod
     def trama_lineas(tarjeta: Dict[str, Any]) -> List[str]:
-        """Las 4 líneas de la trama: nombre R1, MAC R1 (minúsculas), nombre R2, MAC R2 (minúsculas)."""
+        """Las 4 líneas de la trama: nombre R1, MAC R1 (MAYÚSCULAS), nombre R2, MAC R2 (MAYÚSCULAS)."""
         if tarjeta.get("_lineas"):   # etiqueta suelta (p. ej. R3: solo su nombre)
             return [str(x) for x in tarjeta["_lineas"]]
         def mac(clave: str) -> str:
             m = extract_mac(str(tarjeta.get(clave) or ""))
-            return m.lower() if m else ""
+            return m.upper() if m else ""
         return [str(tarjeta.get("nombre_r1") or ""), mac("mac_r1"), str(tarjeta.get("nombre_r2") or ""), mac("mac_r2")]
 
     @classmethod

@@ -3,8 +3,8 @@
  * La vista previa es a escala real; la impresión NO usa el navegador: se envía el XML a DYMO Connect
  * (TQTDymo, js/dymo_connect.js) o se descarga el archivo .dymo para abrirlo con la app.
  *
- * Trama (texto exacto, 4 líneas, sin línea final; MAC en minúsculas):
- *     TQT-R1-V30-0021 / 70:4b:ca:5b:9f:6e / TQT-R2-V30-0010 / 70:4b:ca:5b:9c:a2
+ * Trama (texto exacto, 4 líneas, sin línea final; MAC en MAYÚSCULAS):
+ *     TQT-R1-V30-0021 / 70:4B:CA:5B:9F:6E / TQT-R2-V30-0010 / 70:4B:CA:5B:9C:A2
  * Es el texto impreso y el contenido del QR. Si falta una MAC, su línea queda vacía (nunca se inventa).
  * API: GET /api/tarjetas · GET /api/dymo/label/{id}/xml · GET /api/dymo/label/{id}/archivo
  */
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pcbDe = (t, s) => t[s] || (t[`nombre_${s}`] ? { nombre: t[`nombre_${s}`], mac: t[`mac_${s}`], estado_pcb: t[`estado_pcb_${s}`] } : null);
     function lineas(t) {
         const r1 = pcbDe(t, 'r1'), r2 = pcbDe(t, 'r2');
-        const mac = (p) => (p && p.mac ? String(p.mac).toLowerCase() : '');
+        const mac = (p) => (p && p.mac ? String(p.mac).toUpperCase() : '');
         return [r1 ? r1.nombre : '', mac(r1), r2 ? r2.nombre : '', mac(r2)];
     }
     const trama = (t) => lineas(t).join('\n');

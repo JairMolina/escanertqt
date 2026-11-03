@@ -375,7 +375,7 @@ def consulta(codigo: str, conn: Optional[sqlite3.Connection] = None, db_path: Op
             else:
                 encontradas.append(x)
                 if x["mac"] and x["pcb"]["mac"] and x["mac"] != x["pcb"]["mac"]:
-                    avisos.append(f"{x['nombre']}: la MAC de la etiqueta ({x['mac'].lower()}) no coincide con la registrada ({x['pcb']['mac'].lower()}).")
+                    avisos.append(f"{x['nombre']}: la MAC de la etiqueta ({x['mac'].upper()}) no coincide con la registrada ({x['pcb']['mac'].upper()}).")
         if not encontradas:
             raise NoEncontradoError("Ninguna de las PCB leídas está registrada: " + ", ".join(x["nombre"] or x["mac"] for x in leidas) + ".")
         principal = next((x["pcb"] for x in encontradas if x["pcb"]["tarjeta_id"]), encontradas[0]["pcb"])

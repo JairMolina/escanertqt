@@ -619,7 +619,7 @@
             if (await this._coincide(fields, name)) return;
             const detectada = { nombre: name || '', id: fields.ID || '', mac: fields.MAC || '', macr: fields.MACR || '', idr: fields.IDR || '' };
             if (this.identity_change) throw new TestFailure('La identidad física no coincide con la tarjeta confirmada; no se moverá el motor.');
-            this.log('IDENTIDAD: la tarjeta conectada no es la seleccionada (' + momento + '). Detectada ID ' + detectada.id + ' MAC ' + detectada.mac + ' MACR ' + detectada.macr);
+            this.log('IDENTIDAD: la tarjeta conectada no es la seleccionada (' + momento + '). Detectada ID ' + detectada.id + ' MAC ' + String(detectada.mac).toUpperCase() + ' MACR ' + String(detectada.macr).toUpperCase());
             let propuesta;
             try { propuesta = await this.hooks.identidad(detectada, false); }
             catch (e) { throw new NoVerification('Tarjeta detectada no resoluble en inventario: ' + e.message); }
@@ -674,7 +674,7 @@
                     // Identidad tras reinicio y antes de cualquier movimiento.
                     await this._resolverIdentidad(status.fields, name, 'tras Reset_44, antes de mover');
                     this.identity_status = status;
-                    return name + ' | ID ' + status.fields.ID + ' | FW ' + status.fields.VER + ' | MAC ' + status.fields.MAC;
+                    return name + ' | ID ' + status.fields.ID + ' | FW ' + status.fields.VER + ' | MAC ' + String(status.fields.MAC).toUpperCase();
                 });
                 await this._step(1, async () => {
                     const v = await this._fresh_status(22);
@@ -705,7 +705,7 @@
                     this.ble_identity.r1 = { nombre: r1Name, metodo: this.ble instanceof WindowsBleLink ? 'MAC Windows + vínculo funcional PB=2' : 'identidad equivalente autorizada + vínculo funcional PB=2', mac_reportada_r1: reported, id_opaco_navegador: device.id || null,
                         observed_address: this.ble instanceof WindowsBleLink ? this.ble.address : null };
                     this.ui('ble_ident', 'R1', r1Name, this.ble_identity.r1.observed_address || '', this.mac_comparison);
-                    return r1Name + (this.ble instanceof WindowsBleLink ? ' | MAC Windows ' + this.ble.address + '; vínculo por movimiento PB=2' : ' | identidad equivalente; MAC BLE no expuesta por el navegador (se verifica por movimiento PB=2)');
+                    return r1Name + (this.ble instanceof WindowsBleLink ? ' | MAC Windows ' + String(this.ble.address).toUpperCase() + '; vínculo por movimiento PB=2' : ' | identidad equivalente; MAC BLE no expuesta por el navegador (se verifica por movimiento PB=2)');
                 });
                 await series(7, 'ble', 2);
                 if ([7, 8, 9, 10].every(i => this.steps[i].state === 'aprobado')) this.mac_comparison = 'vinculo_funcional';

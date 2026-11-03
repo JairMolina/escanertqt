@@ -616,3 +616,6 @@ a.acceso-bloq::after { content: ""; position: absolute; top: 6px; right: 6px; wi
 .rem-lista li[data-e="bad"] { box-shadow: inset 4px 0 0 var(--bad); }
 .rem-cod { font-size: 14px; overflow-wrap: anywhere; }
 .rem-lista:empty::after { content: "Todavía no has enviado nada."; color: var(--muted); font-size: 14px; }
+
+/* MAC siempre en MAYUSCULAS (AA:BB:CC:DD:EE:FF), aunque se teclee o llegue en minusculas */
+.macval, .c-mac, .macfield, .macs-in input, #eMac, .mac .val, input[data-mac], input[id*="mac" i] { text-transform: uppercase; }

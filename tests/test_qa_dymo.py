@@ -94,7 +94,7 @@ class TestContenido(unittest.TestCase):
         t = db.get_tarjeta_by_id(t["id"])
         l = d["qr_payload"].split("\n")
         self.assertEqual((l[0], l[2]), ("TQT-R1-V30-0021", "TQT-R2-V30-0010"))
-        self.assertEqual((l[1], l[3]), (t["mac_r1"].lower(), t["mac_r2"].lower()))
+        self.assertEqual((l[1], l[3]), (t["mac_r1"].upper(), t["mac_r2"].upper()))
         self.assertNotIn("R3", d["qr_payload"])
         self.assertNotIn("\r", d["qr_payload"])
 
@@ -105,7 +105,7 @@ class TestContenido(unittest.TestCase):
             self.assertIn(f"-{esp1}-", l[0])
             self.assertIn(f"-{esp2}-", l[2])
             self.assertRegex(l[0], r"^TQT-R1-V\d{1,3}-\d{4}$")
-            self.assertRegex(l[1], r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
+            self.assertRegex(l[1], r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
     def test_03_mac_faltante_linea_vacia_e_identificacion_vs_final(self):
         t, i1, i2 = self._impar(None, None, None, macs=(False, True))
@@ -131,11 +131,11 @@ class TestContenido(unittest.TestCase):
         # aun así el XML se genera sin romperse
         self.assertEqual(ET.fromstring(self.client.get(f"/api/dymo/label/{t['id']}/xml").text).tag, "DesktopLabel")
 
-    def test_05_mac_mayuscula_en_bd_sale_en_minuscula_y_ceros_se_conservan(self):
+    def test_05_mac_mayuscula_en_bd_sale_en_mayuscula_y_ceros_se_conservan(self):
         t = crear_par(self.lote)
         d = self._lineas(t["id"])
         self.assertTrue(t["mac_r1"] == t["mac_r1"].upper())
-        self.assertEqual(d["trama_lineas"][1], t["mac_r1"].lower())
+        self.assertEqual(d["trama_lineas"][1], t["mac_r1"].upper())
         self.assertEqual(d["trama_lineas"][0], t["nombre_r1"])
         self.assertRegex(d["id_tarjeta_num"], r"^\d{4}$")
 
@@ -157,7 +157,7 @@ class TestContenido(unittest.TestCase):
         despues = self._lineas(t["id"])
         self.assertEqual(despues["trama_lineas"][0:2], antes[0:2])
         self.assertEqual(despues["trama_lineas"][2], nueva["nombre"])
-        self.assertEqual(despues["trama_lineas"][3], "aa:bb:cc:dd:ee:01")
+        self.assertEqual(despues["trama_lineas"][3], "AA:BB:CC:DD:EE:01")
         self.assertNotIn(antes[2], despues["qr_payload"])
         self.assertNotIn(antes[3], despues["qr_payload"])
         self.assertIn(nueva["nombre"], self.client.get(f"/api/dymo/label/{t['id']}/xml").text)
@@ -222,7 +222,7 @@ class TestGeometriaRaster(unittest.TestCase):
         for t in (BASE, PEOR):
             g = self._img(t)
             self.assertEqual(decodificar(g), DymoService.format_qr_payload(t))
-        self.assertEqual(decodificar(self._img(BASE)), "TQT-R1-V30-0021\n70:4b:ca:5b:9f:6e\nTQT-R2-V30-0010\n70:4b:ca:5b:9c:a2")
+        self.assertEqual(decodificar(self._img(BASE)), "TQT-R1-V30-0021\n70:4B:CA:5B:9F:6E\nTQT-R2-V30-0010\n70:4B:CA:5B:9C:A2")
 
     @unittest.skipUnless(zxingcpp, "sin zxing-cpp")
     def test_14_qr_se_decodifica_en_todas_las_variantes_de_contenido(self):

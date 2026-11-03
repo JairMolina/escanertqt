@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fwBox), campo('Serie', p.serie)),
                 h('p', { class: 'pcbf-nota' }, icon('info'), 'La R3 no lleva MAC'));
         }
-        const mac = p.mac ? String(p.mac).toLowerCase() : '';
+        const mac = p.mac ? String(p.mac).toUpperCase() : '';
         const macBox = mac
             ? h('div', { class: 'macline' }, h('span', { class: 'macval mono', 'aria-label': 'MAC ' + mac.split(':').join(' ') }, mac),
                 h('button', { class: 'btn btn-sm', type: 'button', 'aria-label': `Copiar MAC de ${p.nombre}`, title: 'Copiar MAC', onclick: () => copiar(mac, 'MAC copiada') }, icon('paste')))
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         SLOTS.forEach((s) => {
             const p = t[s]; if (!p) return;
             if (s === 'r3') { l.push(`R3 ${p.nombre} (Hardware V${p.version}; sin MAC${p.firmware ? '; Firmware ' + p.firmware : '; sin firmware'})`); return; }
-            l.push(`${s.toUpperCase()} ${p.nombre} · Hardware V${p.version}${p.mac ? ' · MAC ' + String(p.mac).toLowerCase() : ''}${p.firmware ? ' · Firmware ' + p.firmware : ''}`);
+            l.push(`${s.toUpperCase()} ${p.nombre} · Hardware V${p.version}${p.mac ? ' · MAC ' + String(p.mac).toUpperCase() : ''}${p.firmware ? ' · Firmware ' + p.firmware : ''}`);
         });
         return l.join('\n');
     }
