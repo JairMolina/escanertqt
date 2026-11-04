@@ -194,7 +194,7 @@ def calcular_diseno_r3(formato: FormatoEtiqueta, nombres: List[str]) -> List[Mit
     m = MARGEN_SEGURO_MM
     mitad = formato.alto_mm / 2
     mitades: List[MitadR3] = []
-    for i, nombre in enumerate(nombres[:2]):
+    for i, nombre in enumerate(nombres[:1]):   # v1.4.89: UNA R3 arriba; abajo va «R3 nnnn» dos veces (caja_num_r3 y caja_num_r3_der)
         y0, alto = i * mitad + m, mitad - 2 * m
         modulos = len(matriz_qr(nombre)) + 2 * SILENCIO_MODULOS
         ppm = PUNTOS_POR_MODULO
@@ -206,6 +206,38 @@ def calcular_diseno_r3(formato: FormatoEtiqueta, nombres: List[str]) -> List[Mit
         texto = Caja(x_txt, y0, formato.ancho_mm - m - x_txt, alto)
         mitades.append(MitadR3(nombre, qr, ppm, texto))
     return mitades
+
+
+R3_CABLE_ANCHO_MM = 14.0   # v1.4.90: franja de la mitad inferior (texto girado, como la etiqueta Cable)
+R3_CABLE_PT = 16.0
+
+
+def caja_num_r3_der(formato: FormatoEtiqueta) -> Caja:
+    """v1.4.92: mitad inferior, pegado al borde DERECHO (dentro del margen seguro) = «R3» + número GIRADO 90° (repite el izquierdo)."""
+    m = MARGEN_SEGURO_MM
+    mitad = formato.alto_mm / 2
+    return Caja(formato.ancho_mm - m - R3_CABLE_ANCHO_MM, mitad + m, R3_CABLE_ANCHO_MM, mitad - 2 * m)
+
+
+def caja_num_r3(formato: FormatoEtiqueta) -> Caja:
+    """v1.4.91: mitad inferior, pegado al borde IZQUIERDO (dentro del margen seguro) = «R3» + número GIRADO 90°."""
+    c = caja_num_r3_der(formato)
+    return Caja(MARGEN_SEGURO_MM, c.y, c.w, c.h)
+
+
+def caja_linea_r3(formato: FormatoEtiqueta) -> Caja:
+    """v1.4.91: línea punteada vertical al centro de la mitad inferior (separa los dos «R3 nnnn»)."""
+    m = MARGEN_SEGURO_MM
+    mitad = formato.alto_mm / 2
+    return Caja(formato.ancho_mm / 2 - CABLE_LINEA_ANCHO_MM / 2, mitad + m, CABLE_LINEA_ANCHO_MM, mitad - 2 * m)
+
+
+def lineas_num_r3(nombre: str) -> List[str]:
+    return ["R3", nombre[-4:]]
+
+
+def texto_num_r3(nombre: str) -> str:
+    return chr(10).join(lineas_num_r3(nombre))
 
 
 # --- Etiqueta de cable (v1.3.83) -----------------------------------------------------------------------------------
@@ -612,12 +644,16 @@ class DymoService:
     # ------------------------------------------------------------------ R3 doble (v1.3.44): dos R3 por etiqueta, una por mitad
     @classmethod
     def generate_r3_label_xml(cls, nombres: List[str], label_format: Optional[str] = None) -> str:
-        """`.label` (DYMO Label v8) con 1 o 2 R3: objetos QR1/TEXTO1 (mitad de arriba) y QR2/TEXTO2 (de abajo)."""
+        """`.label` (DYMO Label v8): R3 arriba (QR1/TEXTO1) y «R3 nnnn» girado dos veces abajo (NUMR3, NUMR3D)."""
         f = obtener_formato(label_format)
         objetos = ""
         for i, md in enumerate(calcular_diseno_r3(f, nombres), 1):
             objetos += _v8_imagen(f"QR{i}", cls.generate_qr_base64(md.nombre, box_size=md.puntos_por_modulo), md.qr)
             objetos += _v8_texto(f"TEXTO{i}", md.nombre, R3_FUENTE_PT, md.texto)
+            objetos += _v8_texto("NUMR3D", texto_num_r3(md.nombre), R3_CABLE_PT, caja_num_r3_der(f), "Center", "Rotation90")
+            objetos += _v8_texto("NUMR3", texto_num_r3(md.nombre), R3_CABLE_PT, caja_num_r3(f), "Center", "Rotation90")
+            ln = caja_linea_r3(f)
+            objetos += _v8_imagen("LINEA", png_linea_punteada(ln), ln)   # v1.4.91: línea punteada al centro de la mitad inferior
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
     <PaperOrientation>{f.v8_orientacion}</PaperOrientation>
@@ -630,7 +666,7 @@ class DymoService:
 
     @classmethod
     def generate_r3_dcd_xml(cls, nombres: List[str], label_format: Optional[str] = None) -> str:
-        """`.dymo` (DYMO Connect) con 1 o 2 R3, una por mitad de la etiqueta."""
+        """`.dymo` (DYMO Connect): R3 arriba y «R3 nnnn» dos veces abajo."""
         f = obtener_formato(label_format)
         m = MARGEN_SEGURO_MM
         negro = cls._color(1, 0, 0, 0)
@@ -641,6 +677,32 @@ class DymoService:
                     f"<Size><Width>{_pulg(c.w)}</Width><Height>{_pulg(c.h)}</Height></Size></ObjectLayout>")
         fuente = (f"<FontInfo><FontName>{FUENTE}</FontName><FontSize>{R3_FUENTE_PT:g}</FontSize><IsBold>True</IsBold>"
                   f"<IsItalic>False</IsItalic><IsUnderline>False</IsUnderline><FontBrush>{negro}</FontBrush></FontInfo>")
+        fuente_cable = fuente.replace(f"<FontSize>{R3_FUENTE_PT:g}</FontSize>", f"<FontSize>{R3_CABLE_PT:g}</FontSize>")
+
+        def texto_obj(nombre: str, lineas: List[str], c: Caja, h: str, rot: str, fnt: str) -> str:
+            spans = "".join(f"<LineTextSpan><TextSpan><Text>{xml_escape(t)}</Text>{fnt}</TextSpan></LineTextSpan>" for t in lineas)
+            return f"""
+        <TextObject>
+          <Name>{nombre}</Name>
+          {cls._brushes()}
+          <Rotation>{rot}</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          {margen}
+          <HorizontalAlignment>{h}</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <FitMode>AlwaysFit</FitMode>
+          <IsVertical>False</IsVertical>
+          <FormattedText>
+            <FitMode>AlwaysFit</FitMode>
+            <HorizontalAlignment>{h}</HorizontalAlignment>
+            <VerticalAlignment>Middle</VerticalAlignment>
+            <IsVertical>False</IsVertical>
+            {spans}
+          </FormattedText>
+          {layout(c)}
+        </TextObject>"""
         objetos = ""
         for i, md in enumerate(calcular_diseno_r3(f, nombres), 1):
             objetos += f"""
@@ -681,11 +743,29 @@ class DymoService:
             <LineTextSpan><TextSpan><Text>{xml_escape(md.nombre)}</Text>{fuente}</TextSpan></LineTextSpan>
           </FormattedText>
           {layout(md.texto)}
-        </TextObject>"""
+        </TextObject>
+        """
+            objetos += f"""{texto_obj("NUMR3D", lineas_num_r3(md.nombre), caja_num_r3_der(f), "Center", "Rotation90", fuente_cable)}{texto_obj("NUMR3", lineas_num_r3(md.nombre), caja_num_r3(f), "Center", "Rotation90", fuente_cable)}"""
+            ln = caja_linea_r3(f)
+            objetos += f"""
+        <ImageObject>
+          <Name>LINEA</Name>
+          {cls._brushes()}
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          {margen}
+          <Data>{png_linea_punteada(ln)}</Data>
+          <ScaleMode>Fill</ScaleMode>
+          <HorizontalAlignment>Center</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          {layout(ln)}
+        </ImageObject>"""
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <DesktopLabel Version="1">
   <DYMOLabel Version="3">
-    <Description>TQT R3 doble {f.codigo} {f.ancho_mm:g}x{f.alto_mm:g} mm</Description>
+    <Description>TQT R3 {f.codigo} {f.ancho_mm:g}x{f.alto_mm:g} mm</Description>
     <Orientation>Landscape</Orientation>
     <LabelName>{f.nombre_dcd}</LabelName>
     <InitialLength>0</InitialLength>
@@ -712,7 +792,7 @@ class DymoService:
 
     @classmethod
     def archivo_r3(cls, nombres: List[str], label_format: Optional[str] = None, tipo: str = "dymo") -> Tuple[bytes, str]:
-        base = "_".join(n.rsplit("-", 1)[-1] for n in nombres[:2])
+        base = "_".join(n.rsplit("-", 1)[-1] for n in nombres[:1])
         if tipo == "label":
             return cls.generate_r3_label_xml(nombres, label_format).encode("utf-8"), f"TQT_R3_{base}.label"
         return b"\xef\xbb\xbf" + cls.generate_r3_dcd_xml(nombres, label_format).encode("utf-8"), f"TQT_R3_{base}.dymo"
@@ -737,7 +817,7 @@ class DymoService:
 
     @classmethod
     def generate_r3_svg(cls, nombres: List[str], label_format: Optional[str] = None) -> str:
-        """v1.4.2: SVG a escala real (1 unidad = 1 mm) de la etiqueta R3 doble, mismo diseño que el .label (QR + nombre por mitad)."""
+        """v1.4.2: SVG a escala real (1 unidad = 1 mm); v1.4.89: R3 (QR + nombre) arriba y «R3 nnnn» dos veces abajo."""
         f = obtener_formato(label_format)
         pt = R3_FUENTE_PT * PT_A_MM
         partes = []
@@ -748,8 +828,18 @@ class DymoService:
                                   for r, fila in enumerate(matriz_qr(md.nombre)) for c, v in enumerate(fila) if v))
             partes.append(f'<text x="{md.texto.x:.3f}" y="{md.texto.y + md.texto.h / 2:.3f}" dominant-baseline="central" '
                           f'font-family="{FUENTE_SVG}" font-weight="700" font-size="{pt:.4f}">{xml_escape(md.nombre)}</text>')
+            # «R3 nnnn» girado (izquierda y derecha) como generate_cable_svg: dos columnas, leídas de abajo hacia arriba
+            for caja, lins in ((caja_num_r3(f), lineas_num_r3(md.nombre)), (caja_num_r3_der(f), lineas_num_r3(md.nombre))):
+                ptc = min(R3_CABLE_PT * PT_A_MM, caja.w / 2.1, caja.h / 4 / 0.6)
+                cx, cy = caja.x + caja.w / 2, caja.y + caja.h / 2
+                for dx, t in zip((-ptc * 0.52, ptc * 0.52), lins):
+                    partes.append(f'<text transform="translate({cx + dx:.3f} {cy:.3f}) rotate(-90)" text-anchor="middle" dominant-baseline="central" '
+                                  f'font-family="{FUENTE_SVG}" font-weight="700" font-size="{ptc:.4f}">{xml_escape(t)}</text>')
+        ln = caja_linea_r3(f)
+        linea = (f'<line x1="{ln.x + ln.w / 2:.3f}" y1="{ln.y:.3f}" x2="{ln.x + ln.w / 2:.3f}" y2="{ln.abajo:.3f}" stroke="#000" stroke-width="0.5" '
+                 f'stroke-dasharray="{CABLE_GUION_MM} {CABLE_HUECO_MM}"/>')
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f.ancho_mm:g}mm" height="{f.alto_mm:g}mm" viewBox="0 0 {f.ancho_mm:g} {f.alto_mm:g}">'
-                f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/><g fill="#000" shape-rendering="crispEdges">{"".join(partes)}</g></svg>')
+                f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/><g fill="#000" shape-rendering="crispEdges">{"".join(partes)}</g>{linea}</svg>')
 
     @classmethod
     def generate_cable_svg(cls, numero: str, label_format: Optional[str] = None, r3: str = "") -> str:

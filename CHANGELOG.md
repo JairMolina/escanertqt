@@ -1,5 +1,8 @@
 # Historial de versiones — Escáner TQT
 
+## Sin versionar (rama comandos-pruebas-auto-1.4.78, avance sin commitear)
+- **Etiqueta R3 = una R3 arriba (QR + nombre) y abajo el cable de esa R3** («TQT: 0123 / R3: 0102»; sin cable «TQT: ----»). Parámetro opcional `cable` en `/api/dymo/r3/xml|archivo`, `.label`/`.dymo`/SVG remoto y vista previa; el endpoint pide exactamente 1 `nombre` y el trabajo remoto `r3` acepta 1 nombre + `cable`. Pruebas: tests.test_dymo_r3, test_dymo_remoto, test_qa_dymo, test_cable_r3_auto (48 OK, unittest). No cambia la versión.
+
 ## v1.4.88 — 2026-11-03
 - **Administración migrada al Centro de administración** (núcleo «Administrar» de `/inicio`). El panel ahora tiene pestañas: **Cuentas, Resumen, Tarjetas, PCB, Movimientos, Borrado y Clave** (`app/static/js/centro_admin.js`). Incluye totales, lotes, inventario, copia de la base (.db), interruptor «Cable R3 automático», tablas con selección y eliminación, movimientos con filtros y CSV, vaciar lote / borrar todo (palabra de confirmación), cambio de clave, exportar Excel y enviar por correo.
 - **Doble control:** se entra con la sesión de administrador del portal y las secciones de datos piden además la contraseña de `/admin` (mismo token `X-Admin-Token`, 30 min, botón «Bloquear»). Al cerrar el panel no queda ningún dato en pantalla.
