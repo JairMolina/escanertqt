@@ -2,6 +2,33 @@
    escritorio ≥1024px) y las secciones de consola: Dashboard, Lotes, Movimientos y Excel. Tokens de antijammer.css. */
 
 /* ---------- navegación: celular ---------- */
+.mt-vistas, .mt-cantidades, .mt-plan-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 16px;
+}
+.mt-vistas { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.mt-vistas [aria-pressed="true"] { color: var(--accent-text); border-color: var(--accent); background: var(--surface); }
+.mt-plan .x-caja { padding: 18px; }
+.mt-plan .mt-cantidades .field { width: min(135px, 100%); }
+.mt-modos { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 0; border: 0; min-width: 0; }
+.mt-modos legend { font-weight: 600; margin-bottom: 6px; }
+.mt-modos label { display: flex; align-items: center; gap: 8px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 12px; }
+.mt-modos label:has(:checked) { border-color: var(--accent); }
+.mt-modos input { accent-color: var(--accent); }
+.mt-modos small { display: block; color: var(--muted); }
+.mt-plan-bar { justify-content: space-between; }
+.mt-resultado .btn { margin-top: 12px; }
+.mt-pedir { font-weight: 700; }
+.mt-plan .i-tabla thead th:nth-child(n+3) { text-align: right; }
+.aj-pcb-largo { display: none; }
+@media (max-width: 700px) {
+  #v-materiales .i-tabla tbody td[data-l]::before { content: attr(data-l) ": "; font-family: inherit; font-weight: 600; }
+  #v-materiales .i-tabla tbody th { flex-basis: 100%; }
+}
+@media (min-width: 1024px) {
+  .aj-pcb-largo { display: inline; }
+  .aj-pcb-corto { display: none; }
+  #pestanas a[data-tab="materiales"] span { white-space: normal; }
+}
 .pestanas { position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
             background: var(--bg-2); border-top: 1px solid var(--line); padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .pestanas .grupo { display: contents; }

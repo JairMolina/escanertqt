@@ -135,11 +135,19 @@ def _estado(c, conf: Dict[str, Any]) -> Dict[str, Any]:
     modulo = conf["modulo"]
     bom = _bom(c, modulo)
     mats: Dict[str, Dict[str, Any]] = {}
-    for r in c.execute("SELECT descripcion, MIN(categoria) AS categoria, MIN(unidad) AS unidad, GROUP_CONCAT(DISTINCT tarjeta) AS tarjetas "
+    for r in c.execute("SELECT descripcion, MIN(categoria) AS categoria, MIN(unidad) AS unidad, "
+                       "COUNT(DISTINCT LOWER(TRIM(unidad))) AS unidades, GROUP_CONCAT(DISTINCT tarjeta) AS tarjetas "
                        "FROM costeo_componentes WHERE modulo=? AND tipo='produccion' GROUP BY descripcion ORDER BY MIN(orden)", (modulo,)):
         mats[r["descripcion"]] = {"descripcion": r["descripcion"], "categoria": r["categoria"], "unidad": r["unidad"],
                                   "tarjetas": sorted((r["tarjetas"] or "").split(",")), "entradas": 0.0, "salidas": 0.0,
                                   "consumido": 0.0, "minimo": 0.0, "en_bom": True}
+        if modulo == "skudo-antijammer":
+            # El saldo se registra por descripción, nunca sumar p. ej. metros con piezas.
+            mats[r["descripcion"]].update(por_tarjeta={}, unidad_ambigua=r["unidades"] > 1)
+    if modulo == "skudo-antijammer":
+        for tarjeta, piezas in bom.items():
+            for pieza in piezas:
+                mats[pieza["descripcion"]]["por_tarjeta"][tarjeta] = pieza["cantidad"]
 
     def mat(desc: str) -> Dict[str, Any]:   # material con movimientos que ya no está en la lista de materiales
         return mats.setdefault(desc, {"descripcion": desc, "categoria": "", "unidad": "", "tarjetas": [], "entradas": 0.0,

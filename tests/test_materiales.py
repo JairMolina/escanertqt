@@ -106,6 +106,26 @@ class TestMateriales(unittest.TestCase):
         self.assertEqual((self.disp(d, "PCB RX"), self.disp(d, "Relevador"), self.disp(d, "PCB TX")), (5, 5, 4))
         self.assertEqual(self.c.post(f"{b}/asignar", json={"pcb_ids": [pid], "tarjeta": "Sigfox"}).status_code, 422)
 
+    def test_insumos_solicitud_misma_lectura_que_existencias(self):
+        self.limpiar("antijammer")
+        b = "/api/antijammer"
+        for tarjeta, unidad, cantidad in (("RX", "m", .25), ("TX", "M", .5)):
+            r = self.c.post(b + "/costos", json=dict(tarjeta=tarjeta, unidad=unidad, cantidad=cantidad, descripcion="Cable"))
+            self.assertEqual(r.status_code, 201, r.text)
+            cid = r.json()["id"]
+        self.c.post(b + "/costos", json=dict(tarjeta="TX", tipo="recurrente", cantidad=1, descripcion="Licencia"))
+        self.material("sigfox", "Cable", 99)
+        self.c.post(b + "/materiales/movimientos", json=dict(descripcion="Cable", tipo="entrada", cantidad=3))
+        tomar = lambda: self.c.get(b + "/materiales").json()
+        d = tomar()
+        self.assertFalse(d["activo"])
+        self.assertEqual([m["descripcion"] for m in d["materiales"]], ["Cable"])
+        cable = d["materiales"][0]
+        self.assertEqual((cable["por_tarjeta"], cable["disponible"], cable["unidad_ambigua"]), ({"RX": .25, "TX": .5}, 3, False))
+        self.assertEqual(tomar()["movimientos"], d["movimientos"])
+        self.c.patch(b + f"/costos/{cid}", json={"unidad": "cm"})
+        self.assertTrue(tomar()["materiales"][0]["unidad_ambigua"])
+
 
 if __name__ == "__main__":
     unittest.main()

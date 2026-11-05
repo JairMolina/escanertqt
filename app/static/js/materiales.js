@@ -10,9 +10,14 @@
     const $ = (id) => document.getElementById(id);
     const num = (v) => Number(v || 0).toLocaleString('es-MX', { maximumFractionDigits: 3 });
     let d = null;
+    const conPlan = cfg.plan === '1';
+    let vista = 'Resumen';
+    const plan = { cantidades: {}, conStock: true };
+    let busqueda = '';
 
     async function cargar() {
         const r = await api(B);
+        if (conPlan) await P.yo;
         if (!r.ok) { $('mtCuerpo').replaceChildren(h('p', { class: 'x-intro', role: 'alert' }, 'No se pudo cargar el inventario: ' + r.error, ' ', h('button', { class: 'btn', type: 'button', onclick: cargar }, 'Reintentar'))); return; }
         d = r.data; pintar();
     }
@@ -26,6 +31,41 @@
 
     function pintar() {
         const ro = P.soloLectura();
+        if (!conPlan) {
+            $('mtCuerpo').replaceChildren(...resumen(ro), tabla(ro), historial(ro));
+            return;
+        }
+        const vistas = ['Resumen', 'Componentes', 'Registro', 'Solicitud de material'];
+        const barra = h('div', { class: 'mt-vistas', role: 'group', 'aria-label': 'Vistas de componentes' },
+            vistas.map(v => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(v === vista),
+                onclick: () => { vista = v; pintar(); $('mtCuerpo').querySelector('[aria-pressed="true"]').focus(); } }, v)));
+        let contenido;
+        if (vista === 'Resumen') {
+            const bajos = d.materiales.filter(m => m.bajo_minimo);
+            contenido = [...resumen(ro), h('section', { class: 'x-caja' }, h('h2', { class: 'c-grupo-t' }, 'Componentes bajo mínimo'),
+                bajos.length ? h('ul', { class: 'mt-lista' }, bajos.map(m => h('li', null, m.descripcion, h('b', null, num(m.disponible) + ' / ' + num(m.minimo) + ' ' + m.unidad)))) :
+                h('p', { class: 'x-intro' }, 'Ningún componente con mínimo configurado está en alerta.'))];
+        } else if (vista === 'Componentes') {
+            const zona = h('div', null);
+            const filtrar = () => {
+                const q = busqueda.trim().toLocaleLowerCase('es');
+                const filas = d.materiales.filter(m => [m.descripcion, m.categoria, ...m.tarjetas].join(' ').toLocaleLowerCase('es').includes(q));
+                zona.replaceChildren(q && !filas.length ? h('p', { role: 'status' }, 'Ningún componente coincide con la búsqueda.') : tabla(ro, filas));
+            };
+            const buscar = h('input', { class: 'input', id: 'mtBuscar', type: 'search', placeholder: 'Nombre, categoría, RX o TX',
+                value: busqueda, oninput: e => { busqueda = e.target.value; filtrar(); } });
+            filtrar();
+            contenido = [h('div', { class: 'c-barra' }, h('div', { class: 'field c-q' }, h('label', { for: 'mtBuscar' }, 'Buscar componente'), buscar),
+                h('a', { class: 'btn', href: '#costos' }, ro ? 'Ver lista por tarjeta' : 'Editar lista por tarjeta')), zona];
+        } else if (vista === 'Registro') {
+            contenido = [historial(ro)];
+        } else {
+            contenido = [window.TQT.solicitudMateriales(d, plan, cargar)];
+        }
+        $('mtCuerpo').replaceChildren(barra, ...contenido);
+    }
+
+    function resumen(ro) {
         const partes = [];
         if (!d.activo) {
             const f = h('input', { class: 'input mono', id: 'mtDesde', type: 'date', value: new Date().toISOString().slice(0, 10) });
@@ -40,8 +80,7 @@
         kpis.push(kpi('Bajo mínimo', num(d.bajo_minimo), 'materiales por comprar', d.bajo_minimo ? 'mt-alerta' : ''));
         partes.push(h('div', { class: 'c-kpis' }, ...kpis));
         if (d.pendientes.length) partes.push(pendientes(ro));
-        partes.push(tabla(ro), historial(ro));
-        $('mtCuerpo').replaceChildren(...partes);
+        return partes;
     }
 
     function pendientes(ro) {
@@ -53,18 +92,18 @@
             h('ul', { class: 'mt-lista' }, ...d.pendientes.map((p) => h('li', null, h('span', { class: 'mono' }, p.nombre), botones([p.id], true)))));
     }
 
-    function tabla(ro) {
+    function tabla(ro, materiales = d.materiales) {
         if (!d.materiales.length) return h('div', { class: 'x-caja' }, h('p', { class: 'x-intro' }, 'No hay materiales: primero carga la lista en la pestaña Costos (Importar Excel o Agregar material).'));
         return h('section', { class: 'c-grupo', 'aria-label': 'Existencias' },
             h('h2', { class: 'c-grupo-t' }, 'Existencias'),
             h('div', { class: 'i-tabla' }, h('table', { class: 'grid mt-tabla' },
                 h('thead', null, h('tr', null, ...['Material', 'Tarjetas', 'Entradas', 'Salidas', 'Consumido', 'Disponible', 'Mínimo', ''].map((x) => h('th', { scope: 'col' }, x)))),
-                h('tbody', null, ...d.materiales.map((m) => {
+                h('tbody', null, ...materiales.map((m) => {
                     const min = h('input', { class: 'input mono mt-min', type: 'number', min: '0', step: 'any', value: String(m.minimo || 0), disabled: ro, 'aria-label': `Mínimo de ${m.descripcion}` });
                     min.addEventListener('change', () => enviar('/minimo', 'PATCH', { descripcion: m.descripcion, minimo: Number(min.value || 0) }, 'Mínimo guardado'));
                     return h('tr', { 'data-bajo': m.bajo_minimo ? '1' : null },
                         h('th', { scope: 'row', 'data-l': 'Material' }, m.descripcion, m.en_bom ? null : h('span', { class: 'c-kpi-n' }, ' (ya no está en Costos)')),
-                        h('td', { 'data-l': 'Tarjetas' }, m.tarjetas.join(', ') || '—'),
+                        h('td', { 'data-l': 'Tarjetas' }, (conPlan ? m.tarjetas.map(t => t + ': ' + num(m.por_tarjeta?.[t])) : m.tarjetas).join(', ') || '—'),
                         h('td', { class: 'mono', 'data-l': 'Entradas' }, num(m.entradas)),
                         h('td', { class: 'mono', 'data-l': 'Salidas' }, num(m.salidas)),
                         h('td', { class: 'mono', 'data-l': 'Consumido' }, num(m.consumido)),

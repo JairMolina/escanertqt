@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.88 — 2026-11-05
+
+- AntiJammer: inventario de PCB separado del inventario de componentes. Solicitud RX/TX según el material por tarjeta, con o sin descontar existencias compartidas; descarga CSV sin alterar stock.
+
 ## v1.4.87 — 2026-11-02
 - **Placas sueltas sin lote visibles.** Las placas recibidas antes de existir los lotes (lote vacío) ya salen en cualquier lote elegido (inventario, conteos, consulta por código/número, escaneo y resumen). Al asignarse a una tarjeta toman el lote de la tarjeta. El inventario ahora filtra siempre con el lote de la tarjeta o el de recepción, igual que los conteos.
 - **Caché de placas del Dashboard con clave de lote** (como el de tarjetas): cambiar de lote no muestra placas del anterior.
