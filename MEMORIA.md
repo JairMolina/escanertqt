@@ -1,5 +1,9 @@
 # Memoria de TQT-Web
 
+## Estado vigente — 2026-11-05, AntiJammer 1.4.89 en producción
+
+La rama revisada `9a9a96a` se integró con los dos commits que conservaba la Orange Pi (hasta `5dc5d76`). Código publicado en GitHub main y desplegado: `34f184a`. AntiJammer separa PCB y componentes; la solicitud RX/TX admite descontar o ignorar existencias, sin reservar ni generar movimientos. Ver [verificación del despliegue](docs/ANTIJAMMER_COMPONENTES.md). Los demás módulos no recibieron este planificador.
+
 ## Estado vigente — 2026-10-29, 1.4.76 publicada y desplegada
 
 Web 1.4.76, código b0d8c64/deac73e, en main y `codex/lotes-aislamiento-20261029`, checkout `work/tqt-lotes-20261029`, parte de origin/main 9d7e93a / 1.4.75; conserva los cambios nuevos de portada. Selección de lote común a vistas/consultas/operaciones TQT; Todos explícito, origen visible, números duplicados sin elegir otro lote por inferencia. Contexto por petición en backend y limpieza de selección/respuestas atrasadas. Controles de ocupación y protocolos físicos conservados.
