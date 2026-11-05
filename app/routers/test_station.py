@@ -217,7 +217,7 @@ def get_run(jid: str):
 
 @router.post("/runs/{jid}/cancel")
 def cancel(jid: str, req: Request):
-    svc.read(jid)
+    run(svc.read, jid)   # v1.4.93: 400 con el motivo, no 500
     with db.get_db() as c:
         # v1.4.56: solo quien la inició, el dueño del agente o un administrador
         u = usuarios.validar_sesion(req.cookies.get(usuarios.COOKIE))
@@ -254,7 +254,7 @@ def alta_skytec_tarjeta(tarjeta_id: int, operador: str):
 
 @router.get("/runs/{jid}/events")
 def get_events(jid: str, after: int = Query(0, ge=0)):
-    svc.read(jid)
+    run(svc.read, jid)   # v1.4.93: otro lote seleccionado o prueba inexistente = 400 con el motivo, no 500
     with db.get_db() as c:
         rows = c.execute(
             "SELECT seq,data FROM tqt_test_events WHERE run=? AND seq>? ORDER BY seq LIMIT 500",
@@ -265,7 +265,7 @@ def get_events(jid: str, after: int = Query(0, ge=0)):
 
 def texto_log(jid):
     """LOG original completo de una ejecución (o, si no llegó, las líneas de log de sus eventos)."""
-    svc.read(jid)
+    run(svc.read, jid)
     with db.get_db() as c:
         rows = c.execute(
             "SELECT data FROM tqt_test_events WHERE run=? ORDER BY seq", (jid,)
