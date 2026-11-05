@@ -86,6 +86,16 @@ def login_de(modulo_id: Optional[str]) -> str:
     return next((m.get("login") or "/login" for m in MODULOS if m["id"] == modulo_id), "/login")
 
 
+LUNAS_ACCESO = (("/pruebas-automaticas", "/static/pruebas_auto", "/static/js/pruebas_auto", "/api/pruebas-auto"), "/pruebas-automaticas/acceso")   # v1.4.91
+
+
+def login_de_ruta(ruta: str) -> str:
+    """Pantalla de acceso para una ruta: las lunas tienen la suya (v1.4.91); el resto, la de su módulo."""
+    if ruta.startswith(LUNAS_ACCESO[0]) and ruta != LUNAS_ACCESO[1]:
+        return LUNAS_ACCESO[1]
+    return login_de(modulo_de_ruta(ruta))
+
+
 def alguno(usuario: Optional[Dict[str, Any]]) -> bool:
     return bool(usuario) and (usuario.get("rol") == "administrador" or bool(usuario.get("modulos")))
 

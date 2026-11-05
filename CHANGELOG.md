@@ -1,5 +1,13 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.92 — 2026-11-05
+
+- Pruebas TQT: la tarjeta «Puerto serial» pasa a llamarse «Puerto» y añade el selector «Este equipo / Raspberry del banco». La Raspberry (la de Pruebas automáticas) se elige a propósito, no se recuerda entre visitas, se reserva por cuenta con la misma reserva de Pruebas automáticas (otra cuenta la ve ocupada; no se usa con una campaña activa) y se libera al volver a «Este equipo» o cerrar la pestaña. `GET /stations?raspberry=1` y `POST /raspberry/liberar`. Los agentes y puentes de otras cuentas siguen sin mezclarse.
+
+## v1.4.91 — 2026-11-05
+
+- La luna Pruebas automáticas tiene su propia pantalla de acceso (`/pruebas-automaticas/acceso`, misma cuenta y API que `/login`); sin sesión, la luna, su página, JS y API redirigen/responden con ella y el cierre de sesión vuelve ahí. Escáner TQT conserva `/login`. Sin migración.
+
 ## v1.4.90 — 2026-11-05
 
 - Solicitud de material y pestaña Costos en el Inventario de componentes de Sigfox, TPMS, Caiquen y SpeedLocker (misma calculadora que AntiJammer; `por_tarjeta` ya se expone en todos los módulos). Costos se incrusta como pestaña sin salir de la vista.

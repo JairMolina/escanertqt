@@ -1,6 +1,6 @@
 (function () {
     /** v1.4.17: cada módulo tiene su pantalla de inicio de sesión (Impresora: /impresora/acceso; TPMS: /tpms/acceso; el resto, /login). */
-    function accesoDelModulo() { var p = location.pathname; return p.indexOf('/impresora') === 0 ? '/impresora/acceso' : p.indexOf('/tpms') === 0 ? '/tpms/acceso' : p.indexOf('/antijammer') === 0 ? '/antijammer/acceso' : p.indexOf('/speedlocker') === 0 ? '/speedlocker/acceso' : p.indexOf('/sigfox') === 0 ? '/sigfox/acceso' : p.indexOf('/caiquen') === 0 ? '/caiquen/acceso' : '/login'; }
+    function accesoDelModulo() { var p = location.pathname; return p.indexOf('/impresora') === 0 ? '/impresora/acceso' : p.indexOf('/tpms') === 0 ? '/tpms/acceso' : p.indexOf('/antijammer') === 0 ? '/antijammer/acceso' : p.indexOf('/speedlocker') === 0 ? '/speedlocker/acceso' : p.indexOf('/sigfox') === 0 ? '/sigfox/acceso' : p.indexOf('/caiquen') === 0 ? '/caiquen/acceso' : p.indexOf('/pruebas-automaticas') === 0 ? '/pruebas-automaticas/acceso' : '/login'; }
     window.accesoDelModulo = accesoDelModulo;
     // Sesión de usuario caducada o cerrada en otro equipo: cualquier respuesta 401 marcada por el servidor lleva al login.
     const _fetch = window.fetch.bind(window);
