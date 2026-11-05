@@ -209,8 +209,9 @@ def read(jid):
         # A disconnected run is retained, never automatically retried.
         now = time.time()
         c.execute(
-            "UPDATE tqt_test_runs SET state='interrupted',result='no_verificado',updated=? WHERE id=? AND state IN ('queued','running') AND updated<?",
-            (now, jid, now - 120),
+            "UPDATE tqt_test_runs SET state='interrupted',result='no_verificado',updated=? WHERE id=? AND state IN ('queued','running') "
+            "AND updated<?-CASE WHEN origin='web' THEN ? ELSE 120 END",   # v1.4.93: la web late cada 20 s; sin latido 45 s = pestaña perdida
+            (now, jid, now, WEB_SIN_LATIDO_S),
         )
         r = c.execute("SELECT r.*,s.name station_name,s.owner station_owner FROM tqt_test_runs r JOIN stm32_stations s ON s.id=r.station WHERE r.id=?", (jid,)).fetchone()
     if not r:
@@ -488,6 +489,7 @@ def finish(sid, jid, report):
 # reconstruye la identidad desde las tramas S29 crudas recibidas. Límite de confianza:
 # el servidor no observa el hardware; el informe no es una atestación criptográfica.
 WEB_CONTEXT = "banco de pruebas · modo seguro"
+WEB_SIN_LATIDO_S = 45   # v1.4.93
 S29_FIELDS = (
     "BLK", "OUT1", "OUT2", "OUT3", "INT1", "INT2", "INT3", "EST1", "EST2", "EST3",
     "MOTOR", "SEN_MOT", "TIEMPO", "DBG", "VIVA", "TQT", "ON", "OFF", "PB", "err",
@@ -566,7 +568,7 @@ def web_create(tid, operator):
         # v1.4.1: también la de otro operador sobre esta tarjeta (si no, la bloquea hasta que alguien la abra).
         c.execute(
             "UPDATE tqt_test_runs SET state='interrupted',result='no_verificado',updated=? WHERE (station=? OR (requested_card=? AND origin='web')) AND state IN ('queued','running') AND updated<?",
-            (now, sid, tid, now - 120),
+            (now, sid, tid, now - WEB_SIN_LATIDO_S),   # v1.4.93: antes 120 s
         )
         if c.execute(
             "SELECT 1 FROM tqt_test_runs WHERE (station=? OR requested_card=?) AND state IN ('queued','running')",

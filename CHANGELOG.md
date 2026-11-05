@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.93 — 2026-11-05
+
+- Pruebas TQT al volver de otro módulo: el seguimiento de una prueba (`/runs/{id}/events`, `/cancel`, `/log`) devolvía 500 cuando la prueba era de otro lote seleccionado o no existía y la vista quedaba «en prueba activa» sin avance; ahora responde 400 con el motivo y la vista lo muestra (sigue esperando sin repetir la prueba).
+- La vista recupera sola una prueba de agente/Raspberry en curso al volver (se vuelve a seguir desde su primer evento); una prueba del navegador sin latido se libera a los 45 s (antes 120 s) para poder reintentar. No se suelta la reserva de la Raspberry con una prueba en curso.
+
 ## v1.4.92 — 2026-11-05
 
 - Pruebas TQT: la tarjeta «Puerto serial» pasa a llamarse «Puerto» y añade el selector «Este equipo / Raspberry del banco». La Raspberry (la de Pruebas automáticas) se elige a propósito, no se recuerda entre visitas, se reserva por cuenta con la misma reserva de Pruebas automáticas (otra cuenta la ve ocupada; no se usa con una campaña activa) y se libera al volver a «Este equipo» o cerrar la pestaña. `GET /stations?raspberry=1` y `POST /raspberry/liberar`. Los agentes y puentes de otras cuentas siguen sin mezclarse.

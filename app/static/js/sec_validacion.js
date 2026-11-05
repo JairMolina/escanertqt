@@ -1394,9 +1394,30 @@
           return;
         }
       } catch (e) {
-        message("Conexión pendiente. No repitas la prueba; se conserva la evidencia recibida.", true);
+        const lote = /lote/i.test(e?.message || "");   // v1.4.93: la prueba es de otro lote seleccionado (no es un fallo de conexión)
+        message(lote ? e.message + " Vuelve a ese lote para ver el avance; la prueba sigue en el servidor." : "Conexión pendiente. No repitas la prueba; se conserva la evidencia recibida.", true);
+        pollTimer = setTimeout(poll, lote ? 5000 : 1000);
+        return;
       }
       pollTimer = setTimeout(poll, 1000);
+    }
+    // v1.4.93: al volver a Pruebas TQT (cambio de sección o de módulo) la vista se recupera sola: una prueba de agente/Raspberry
+    // sigue en el servidor y se vuelve a seguir desde su primer evento; una prueba del navegador sin latido se libera sola.
+    function reanudar(rows_) {
+      if (active || !alive || !tarjeta) return;
+      const viva = rows_.find((r) => ["queued", "running"].includes(r.state));
+      if (!viva) return;
+      if (viva.origin !== "web") {
+        prepareRun(false);
+        run.started = viva.created;
+        active.id = viva.id;
+        message("Prueba en curso recuperada: se sigue su avance desde el servidor. No cambies la tarjeta ni envíes comandos desde otro programa.");
+        poll();
+        return;
+      }
+      message("Esta tarjeta tiene una prueba del navegador sin actividad (se cerró la pestaña o se cambió de módulo). Se libera sola en menos de 1 minuto; vuelve a iniciar entonces.", true);
+      const sel = selSeq;
+      setTimeout(() => { if (alive && !active && sel === selSeq) history(sel); }, 15000);
     }
     async function history(my = selSeq) {
       if (!tarjeta) return;
@@ -1409,6 +1430,7 @@
         return;
       }
       if (my !== selSeq || !alive) return; // historial de una selección anterior
+      reanudar(rows_);
       const label = (r) => {
         const map = { aprobado: "Aprobada", aprobado_con_advertencias: "Aprobada con advertencias", fallido: "Fallida", no_verificado: "No verificada" };
         if (["queued", "running"].includes(r.state)) return "En curso";
@@ -1753,7 +1775,7 @@
       desmontar() {
         alive = false;
         clearInterval(refresh);
-        if (raspberry()) { try { api("/api/validacion/tqt/raspberry/liberar", { method: "POST", body: {} }); } catch (e) {} }   // v1.4.92: suelta la reserva de la Raspberry
+        if (raspberry() && !active) { try { api("/api/validacion/tqt/raspberry/liberar", { method: "POST", body: {} }); } catch (e) {} }   // v1.4.92: suelta la reserva de la Raspberry
         clearInterval(tickTimer);
         clearTimeout(pollTimer);
         clearTimeout(searchTimer);
