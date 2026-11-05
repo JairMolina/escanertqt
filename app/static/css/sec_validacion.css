@@ -616,3 +616,6 @@
 #sec-validacion .tqt-inst[data-k="bad"] { border-color: var(--bad); color: var(--bad); }
 @keyframes tqt-gira { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #sec-validacion .tqt-inst[data-k="run"]::before { animation: none; } }
+
+/* v1.4.92: selector de puerto (este equipo / Raspberry del banco) */
+.tqt-origen { min-height: 40px; max-width: 220px; }

@@ -104,9 +104,11 @@ def native_authorize(identifier: str, st=Depends(station_token)):
 
 
 @router.get("/stations")
-def stations(req: Request):
+def stations(req: Request, raspberry: bool = False):
     svc.init()
     yo = operator(req)
+    if raspberry:   # v1.4.92: modo «Raspberry» de Pruebas TQT: solo la Raspberry del banco, con su reserva por cuenta
+        return svc.raspberry_estaciones(yo)
     with db.get_db() as c:
         return [
             dict(
@@ -121,6 +123,13 @@ def stations(req: Request):
             # v1.4.55: un puente «solo BLE» no ejecuta pruebas ni abre el COM; no se ofrece como agente
             if not json.loads(r["state"]).get("ble_only")
         ]
+
+
+@router.post("/raspberry/liberar")
+def raspberry_liberar(req: Request):
+    """v1.4.92: Pruebas TQT deja de usar la Raspberry (solo su reserva; una campaña activa lo impide)."""
+    from app.services import pruebas_auto as pa
+    return run(pa.liberar, operator(req))
 
 
 @router.get("/agentes/desactualizados")

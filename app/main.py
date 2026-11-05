@@ -124,7 +124,7 @@ CABECERAS_SEGURIDAD = {
 
 # Rutas que NO piden sesión: la pantalla de acceso, el propio login, el pulso de salud (Docker) y los certificados
 # (los celulares instalan la autoridad ANTES de poder entrar). Todo lo demás —páginas, API, WebSocket, archivos— exige sesión.
-RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/antijammer/acceso", "/speedlocker/acceso", "/sigfox/acceso", "/caiquen/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico",
+RUTAS_PUBLICAS = {"/inicio", "/impresora/acceso", "/tpms/acceso", "/antijammer/acceso", "/speedlocker/acceso", "/sigfox/acceso", "/caiquen/acceso", "/pruebas-automaticas/acceso", "/api/modulos", "/api/plataforma/entrar", "/login", "/invitacion", "/api/auth/invitacion", "/api/auth/invitacion/aceptar", "/api/auth/login", "/api/auth/olvide", "/api/auth/olvide/estado", "/api/auth/restablecer", "/api/health", "/cert", "/ca", "/favicon.ico",
                   "/documentacion", "/documentacion/manual"}   # v1.4.39: Documentación TEAM HW es pública (sin datos ni API)
 PREFIJOS_PUBLICOS = ("/static/css/", "/static/fonts/", "/static/icons/", "/static/js/login.js", "/static/js/inicio.js", "/static/js/centro_admin.js", "/static/js/planetas.js", "/static/documentacion/")
 
@@ -238,7 +238,7 @@ async def _exigir_sesion(request: Request):
         if ruta == "/":   # v1.4.10: sin sesión, la portada es el portal de módulos (el resto sigue yendo al login)
             return RedirectResponse("/inicio", status_code=302)
         destino = ruta + (("?" + request.url.query) if request.url.query else "")
-        acceso = modulos_cat.login_de(modulos_cat.modulo_de_ruta(ruta))   # v1.4.17: cada módulo con su pantalla de acceso
+        acceso = modulos_cat.login_de_ruta(ruta)   # v1.4.17: cada módulo con su pantalla de acceso
         if acceso != "/login":
             return RedirectResponse(acceso + "?next=" + quote(destino, safe=""), status_code=302)
         return RedirectResponse("/login?next=" + quote(destino, safe=""), status_code=302)
@@ -463,6 +463,12 @@ async def serve_consultar():
 async def serve_escaner():
     """Escáner remoto: el celular se vincula a la consola de escritorio (QR) y le envía lo que escanea (v1.3.43)."""
     return _serve_file(settings.STATIC_DIR / "escaner.html")
+
+
+@app.get("/pruebas-automaticas/acceso", include_in_schema=False)
+async def serve_pruebas_auto_acceso(request: Request):
+    """v1.4.91: inicio de sesión propio de la luna Pruebas automáticas (misma cuenta y API que /login)."""
+    return _pagina_acceso(request, "pruebas_auto_acceso.html")
 
 
 @app.get("/pruebas-automaticas", include_in_schema=False)

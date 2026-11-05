@@ -26,9 +26,47 @@ def no_raspberry(c, sid):
         raise ValueError("Ese agente es la Raspberry de Pruebas automáticas; Pruebas TQT usa el banco o puente de Windows.")
 
 
+def usar_raspberry(c, operator):
+    """v1.4.92: Pruebas TQT puede elegir la Raspberry del banco como puerto, sin mezclarla: la toma con la misma reserva
+    por cuenta que Pruebas automáticas (otra cuenta → Ocupado) y nunca mientras haya una campaña activa o pausada."""
+    from app.services import pruebas_auto as pa
+    occ = pa._ocupacion(c)
+    if occ and occ["motivo"] == "campana":
+        raise ValueError(f"La Raspberry está en una campaña de Pruebas automáticas ({occ['por']}); detenla o espera a que termine.")
+    pa.tomar(c, operator)
+
+
+def raspberry_estaciones(operator):
+    """v1.4.92: lista de UNA sola estación, la Raspberry del banco, para el modo «Raspberry» de Pruebas TQT. Ver la lista
+    la reserva (latido) si está libre; si la usa otra cuenta o una campaña, se devuelve sin conexión y con `ocupada`."""
+    init()
+    from app.services import pruebas_auto as pa
+    pa.init()
+    with db.transaction() as c:
+        sid = pa.banco_station(c)
+        if not sid:
+            return []
+        occ = pa._ocupacion(c)
+        ocupada = None
+        if occ and (occ["por"] != operator or occ["motivo"] == "campana"):
+            ocupada = {"por": occ["por"], "motivo": occ["motivo"], "mia": occ["por"] == operator}
+        else:
+            pa.tomar(c, operator)
+        r = c.execute("SELECT p.seen,p.state,s.name FROM tqt_test_presence p JOIN stm32_stations s ON s.id=p.station "
+                      "WHERE p.station=? AND s.revoked_at IS NULL", (sid,)).fetchone()
+    if not r:
+        return []
+    estado = json.loads(r["state"])
+    en_linea = time.time() - r["seen"] < 15
+    return [dict(id=sid, name=r["name"], raspberry=True, ocupada=ocupada, **dict(estado, online=en_linea and not ocupada))]
+
+
 def propia(c, sid, operator):
-    """v1.4.56: cada cuenta usa solo SUS agentes/puentes (serial y Bluetooth) y nunca la Raspberry."""
-    no_raspberry(c, sid)
+    """v1.4.56: cada cuenta usa solo SUS agentes/puentes (serial y Bluetooth). v1.4.92: la Raspberry solo si se elige
+    explícitamente (su id) y está libre o reservada por la misma cuenta."""
+    if es_raspberry(c, sid):
+        usar_raspberry(c, operator)
+        return
     r = c.execute("SELECT owner FROM stm32_stations WHERE id=?", (sid,)).fetchone()
     if r and str(r["owner"]).lower() != str(operator).lower():
         raise ValueError("Ese agente pertenece a otra cuenta; instala o abre el de tu laptop.")

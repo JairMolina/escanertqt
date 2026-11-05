@@ -322,12 +322,51 @@ class PruebasAuto(unittest.TestCase):
         self.assertNotIn(self.st["id"], [x["id"] for x in native_ble.stations("operador@test.mx")])
         with self.assertRaisesRegex(ValueError, "Raspberry"):
             native_ble.prepare("operador@test.mx", {"station_id": self.st["id"], "operation": "scan", "role": "R1", "request_id": "x"})
-        with self.assertRaisesRegex(ValueError, "Raspberry"):
-            s.create(self.st["id"], self.t["id"], "operador@test.mx", True)
+        self.assertEqual([x["id"] for x in s.raspberry_estaciones("operador@test.mx")], [self.st["id"]])   # v1.4.92: solo si se elige el modo Raspberry
         win = stm.station_create("Banco TQT Windows", "operador@test.mx")
         s.claim(win["id"], {"ble_bridge": 1})
         self.assertIn(win["id"], [x["id"] for x in native_ble.stations("operador@test.mx")])
 
+
+    def test_pruebas_tqt_elige_la_raspberry_con_reserva_por_cuenta(self):
+        """v1.4.92: modo «Raspberry» de Pruebas TQT: la reserva es de la cuenta que la elige, otra cuenta la ve ocupada y
+        con una campaña activa nadie (ni su dueño) puede usarla desde Pruebas TQT."""
+        s.claim(self.st["id"], {"serial_connected": True})
+        r = s.raspberry_estaciones("operador@test.mx")[0]
+        self.assertEqual((r["raspberry"], r["online"], r["ocupada"]), (True, True, None))
+        otra = s.raspberry_estaciones("otra@test.mx")[0]   # ya la reservó operador: otra cuenta la ve sin conexión y ocupada
+        self.assertEqual((otra["online"], otra["ocupada"]["por"], otra["ocupada"]["mia"]), (False, "operador@test.mx", False))
+        with db.get_db() as c:
+            s.propia(c, self.st["id"], "operador@test.mx")   # su reserva: puede usarla
+            with self.assertRaises(pa.Ocupado):
+                s.propia(c, self.st["id"], "otra@test.mx")
+        pa.liberar("operador@test.mx")
+        self.assertTrue(s.raspberry_estaciones("otra@test.mx")[0]["online"])   # liberada: otra cuenta la toma
+        pa.liberar("otra@test.mx")
+        self.campana(ciclos=2)
+        mia = s.raspberry_estaciones("operador@test.mx")[0]
+        self.assertEqual((mia["online"], mia["ocupada"]["motivo"], mia["ocupada"]["mia"]), (False, "campana", True))
+        with db.get_db() as c, self.assertRaisesRegex(ValueError, "campaña"):
+            s.propia(c, self.st["id"], "operador@test.mx")
+
+    def test_pruebas_tqt_en_la_raspberry_aprobada_habilita_las_etiquetas(self):
+        """v1.4.92: una prueba de Pruebas TQT hecha por la Raspberry (modo «Raspberry») que termina aprobada con cotejo
+        «coincide» deja la tarjeta lista para la etiqueta «Aprobada» (la misma regla que con un agente Windows)."""
+        from app.routers import excel_dymo as ed
+        from app.services.dymo_service import DymoService
+        sid, op = self.st["id"], "operador@test.mx"
+        self.assertEqual(s.claim(sid, LIBRE), {})
+        run = s.create(sid, self.t["id"], op, True)
+        job = s.claim(sid, LIBRE)
+        self.assertIn("run", job)
+        with self.assertRaises(ed.HTTPException):
+            ed._exigir_aprobada(self.t["id"])   # aún no hay resultado aprobado: no se imprime «Aprobada»
+        s.finish(sid, job["run"]["id"], self.report(True))
+        fin = s.read(job["run"]["id"])
+        self.assertEqual((fin["result"], fin["report"]["inventory_check"]["state"]), ("aprobado", "coincide"))
+        ed._exigir_aprobada(self.t["id"])   # no lanza: última prueba aprobada
+        xml = DymoService.generate_dcd_xml(ed._tarjeta_o_404(self.t["id"]), ed._formato_o_400("30334"), "text", aprobada=True)
+        self.assertIn("Aprobada", xml if isinstance(xml, str) else xml.decode("utf-8"))
 
     def test_cada_cuenta_ve_y_usa_solo_sus_agentes(self):
         """v1.4.55/56: /stations (modo agente de Pruebas TQT) solo lista agentes de la cuenta, sin la Raspberry ni puentes

@@ -82,6 +82,7 @@
       lastRun = null,
       printTarjeta = null,
       lastRunWeb = false,
+      lastRunRasp = false,
       contract = { fields: [], help: {}, errors: {} };
     // v1.4.0: estado por ejecución (se reinicia al iniciar; nunca arrastra valores de otra ejecución).
     let run = freshRun();
@@ -108,9 +109,13 @@
       reported_id_r2: "Identificador de R2",
       state: "Cotejo completo con inventario",
     };
+    // v1.4.92: puerto de las pruebas: este equipo (serial del navegador o agente Windows) o la Raspberry del banco.
+    // No se recuerda entre visitas: la Raspberry se elige cada vez (reserva por cuenta, ver test_station.usar_raspberry).
+    let origen = "navegador";
+    const raspberry = () => origen === "raspberry";
     const web = () => {
       try {
-        return !!window.TQTValWeb?.soportado?.();
+        return !raspberry() && !!window.TQTValWeb?.soportado?.();
       } catch (e) {
         return false;
       }
@@ -322,10 +327,12 @@
       h("span", { class: "tqt-conn-icon" }, ic(icon)),
       h("div", { class: "tqt-conn-body" }, h("h3", null, title), state, note, extra),
       mainBtn);
-    const serialMain = h("div", { class: "tqt-conn-main" }, choosePort);   // el botón sale de la fila de webBox
+    const origenSel = h("select", { class: "input tqt-origen", "aria-label": "Puerto de las pruebas", onchange: () => cambiarOrigen() },
+      h("option", { value: "navegador" }, "Este equipo"), h("option", { value: "raspberry" }, "Raspberry del banco"));
+    const serialMain = h("div", { class: "tqt-conn-main" }, origenSel, choosePort);   // el botón sale de la fila de webBox
     webBox.firstElementChild.className = "tqt-conn-sec";
     webBox.firstElementChild.append(disconnectSerial);
-    const serialPanel = connCard("tqt-serial-panel", "cable", "Puerto serial", connSerial.el, modeHint, serialMain, [webBox, agentBox]);
+    const serialPanel = connCard("tqt-serial-panel", "cable", "Puerto", connSerial.el, modeHint, serialMain, [webBox, agentBox]);
     const blePanel = connCard("tqt-ble-panel", "bluetooth", "Puente Bluetooth", connBle.el, [nativeInfo, instOut], h("div", { class: "tqt-conn-main" }, chooseBle, nativeInstall),
       h("div", { class: "tqt-conn-sec" }, modeBtn));
     const manualPanel = h("details", { class: "tqt-fold tqt-manual" },
@@ -650,6 +657,19 @@
       catalog = r.ok && r.data ? r.data : null;
       if (alive) paintCard("");
     });
+    // v1.4.92: cambia entre este equipo y la Raspberry del banco; al dejar la Raspberry suelta su reserva.
+    async function cambiarOrigen() {
+      const nuevo = origenSel.value, antes = origen;
+      if (nuevo === antes) return;
+      if (active || manualBusy) { origenSel.value = antes; message("Termina la prueba en curso antes de cambiar de puerto.", true); return; }
+      try { await window.TQTValWeb?.desconectar?.(); await window.TQTValWeb?.desconectarBle?.(); } catch (e) {}
+      origen = nuevo; stationId = ""; stationsCache = [];
+      if (antes === "raspberry") { try { await api("/api/validacion/tqt/raspberry/liberar", { method: "POST", body: {} }); } catch (e) {} }
+      connSerial.set("off", "desconectado"); connBle.set("off", "desconectado");
+      stationInfo.textContent = "";
+      try { if (web()) { await refreshNative(); paintWebEstado(); } else await stations(); } catch (e) {}
+      updateControls();
+    }
     // ---------------------------------------------------------------- estaciones (respaldo agente)
     // v1.4.60: versión del agente/puente en uso; se compara con la que se descarga hoy.
     let agenteActual = "";
@@ -659,11 +679,13 @@
     }
     async function stations() {
       if (web()) return;
-      const list = await call("/stations");
+      const rasp = raspberry();
+      const list = await call(rasp ? "/stations?raspberry=1" : "/stations");
+      if (rasp !== raspberry()) return;   // cambió el puerto mientras respondía el servidor
       stationsCache = list;
       const online = list.filter((s) => s.online);
       // v1.4.0: sin selector; se elige automáticamente la estación en línea (la anterior si sigue conectada).
-      const pick =
+      const pick = rasp ? list[0] || null :
         online.find((s) => s.id === stationId) ||
         online.find((s) => s.id === savedStation()) ||
         (online.length === 1 ? online[0] : null) ||
@@ -671,12 +693,16 @@
         list.find((s) => s.id === savedStation()) ||
         null;
       stationId = pick?.id || "";
-      if (pick?.online) saveStation(stationId);
-      stationInfo.textContent = pick
-        ? "Agente Windows: " + pick.name + (pick.online ? " · en línea" : " · sin conexión") + verAgente(pick) + (online.length > 1 ? " (" + online.length + " en línea; se usa esta)" : "")
+      if (pick?.online && !rasp) saveStation(stationId);
+      const quien = rasp ? "Raspberry" : "Agente Windows";
+      const oc = pick?.ocupada;
+      stationInfo.textContent = rasp && !pick ? "La Raspberry del banco aún no está instalada (se instala en Pruebas automáticas)."
+        : rasp && oc ? "Raspberry ocupada: " + (oc.motivo === "campana" ? (oc.mia ? "tu campaña de Pruebas automáticas la está usando" : oc.por + " tiene una campaña en curso") : oc.por + " la está usando") + ". Espera o pídele que la libere."
+        : pick
+        ? quien + ": " + pick.name + (pick.online ? " · en línea" : " · sin conexión") + verAgente(pick) + (online.length > 1 ? " (" + online.length + " en línea; se usa esta)" : "")
         : online.length > 1 ? "Hay varios bancos Windows; configura en esta laptop su estación para no usar otra computadora." : "No hay agente de pruebas registrado.";
-      if (!pick || !pick.online) connSerial.set("off", pick ? "agente sin conexión" : "sin agente");
-      else if (pick.serial_connected) connSerial.set("ok", "conectado · " + (pick.port || "COM") + " (agente)");
+      if (!pick || !pick.online) connSerial.set("off", oc ? "Raspberry ocupada" : pick ? (rasp ? "Raspberry sin conexión" : "agente sin conexión") : (rasp ? "sin Raspberry" : "sin agente"));
+      else if (pick.serial_connected) connSerial.set("ok", "conectado · " + (pick.port || "COM") + (rasp ? " (Raspberry)" : " (agente)"));
       else connSerial.set("off", "desconectado (agente en línea)");
       if (pick?.online && pick.ble_address) connBle.set("ok", "conectado · " + pick.ble_address);
       else connBle.set("off", "desconectado");
@@ -921,9 +947,14 @@
       const busy = !!active || manualBusy;
       webBox.hidden = !isWeb;
       agentBox.hidden = isWeb;
-      modeHint.textContent = isWeb
+      modeHint.textContent = raspberry()
+        ? "Serial y Bluetooth de la Raspberry del banco (la misma de Pruebas automáticas). Se reserva para tu cuenta mientras esta pestaña esté abierta; no se usa con una campaña en curso."
+        : isWeb
         ? "Serial directo desde este navegador · Bluetooth Windows por MAC. Mantén esta pestaña visible durante la prueba."
         : "Este navegador no admite Web Serial. Se conserva el banco Windows como respaldo.";
+      origenSel.value = origen;
+      origenSel.disabled = busy;
+      agentBox.querySelectorAll(".tqt-install").forEach((d) => (d.hidden = raspberry()));
       modeBtn.disabled = nativeInstall.disabled = busy;
       nativeInstall.hidden = !isWeb;
       // con puente listo el botón principal es «Elegir dispositivo»; «Preparar» pasa a «Actualizar puente» (misma estación)
@@ -970,7 +1001,7 @@
       // v1.4.69: la parte Serial avisa por su cuenta (no se mezcla con los mensajes de Bluetooth)
       const serOk = isWeb ? window.TQTValWeb?.estado?.()?.serial?.estado === "ok" : !!curStation()?.serial_connected;
       if (serOk && serialOut.textContent.startsWith("Serial desconectado")) serialOut.textContent = "";
-      if (!serOk && !busy) serialOut.textContent ||= "Serial desconectado: conecta el puerto en la tarjeta «Puerto serial» para usar ON/OFF serial.";
+      if (!serOk && !busy) serialOut.textContent ||= "Serial desconectado: conecta el puerto en la tarjeta «Puerto» para usar ON/OFF serial.";
       if (!card && !busy && serOk) serialOut.textContent ||= "Elige la tarjeta en prueba para usar ON/OFF serial.";
       if (card && serialOut.textContent.startsWith("Elige la tarjeta")) serialOut.textContent = "";
     }
@@ -1115,7 +1146,7 @@
         ...fact("Inicio", started ? fmtDate(started) : ""),
         ...fact("Duración", started ? fmtDur((ended || Date.now() / 1000) - started) : ""),
         ...fact("HW / FW leídos", rep.hardware || o.hw || rep.firmware || o.ver ? "HW " + (rep.hardware || o.hw || "—") + " · FW " + (rep.firmware || o.ver || "—") : ""),
-        ...fact("Interfaz", (active ? active.web : r?.origin === "web" || lastRunWeb) ? "Navegador · Web Serial 57600 + Web Bluetooth" : started ? "Agente Windows · serial 57600 + BLE" : ""),
+        ...fact("Interfaz", (active ? active.web : r?.origin === "web" || lastRunWeb) ? "Navegador · Web Serial 57600 + Web Bluetooth" : started ? (lastRunRasp || (active && raspberry()) ? "Raspberry del banco · serial 57600 + BLE" : "Agente Windows · serial 57600 + BLE") : ""),
         ...fact("Comandos", started ? run.commands.serial + " serial · " + run.commands.ble + " BLE registrados" + (r ? " · LOG completo en el reporte" : "") : ""),
         ...(run.issue ? fact("Motivo", run.issue) : []),
       );
@@ -1124,11 +1155,12 @@
       reportBtn.hidden = !r;
       metOk.textContent = String(v.n);   // v1.4.63: métricas de la cabecera
       metDur.textContent = started ? fmtDur((ended || Date.now() / 1000) - started) : "—";
-      sumChip.textContent = (active ? active.web : r ? r.origin === "web" || lastRunWeb : web()) ? "Navegador" : "Agente Windows";
+      sumChip.textContent = (active ? active.web : r ? r.origin === "web" || lastRunWeb : web()) ? "Navegador" : (r ? lastRunRasp : raspberry()) ? "Raspberry" : "Agente Windows";
     }
     async function finishRun(r) {
       lastRun = r;
       lastRunWeb = !!active?.web;
+      lastRunRasp = raspberry();   // v1.4.92: el resumen y el reporte dicen en qué puerto corrió
       active = null;
       clearInterval(tickTimer);
       run.ended = Date.now() / 1000;
@@ -1721,6 +1753,7 @@
       desmontar() {
         alive = false;
         clearInterval(refresh);
+        if (raspberry()) { try { api("/api/validacion/tqt/raspberry/liberar", { method: "POST", body: {} }); } catch (e) {} }   // v1.4.92: suelta la reserva de la Raspberry
         clearInterval(tickTimer);
         clearTimeout(pollTimer);
         clearTimeout(searchTimer);
