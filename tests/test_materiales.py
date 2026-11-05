@@ -126,6 +126,14 @@ class TestMateriales(unittest.TestCase):
         self.c.patch(b + f"/costos/{cid}", json={"unidad": "cm"})
         self.assertTrue(tomar()["materiales"][0]["unidad_ambigua"])
 
+    def test_solicitud_disponible_en_modulos_de_una_tarjeta(self):
+        """v1.4.90: la solicitud de material usa por_tarjeta en todos los módulos, no solo en AntiJammer."""
+        self.limpiar("sigfox")
+        self.material("sigfox", "Conector", 2)
+        d = self.c.get("/api/sigfox/materiales").json()
+        m = d["materiales"][0]
+        self.assertEqual((d["tarjetas"], m["por_tarjeta"], m["unidad_ambigua"]), (["Sigfox"], {"Sigfox": 2}, False))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,7 +13,7 @@
     const $ = (id) => document.getElementById(id);
     const ROLES = { administrador: 'Administrador', general: 'General', consultor: 'Consulta' };
     const VISTAS = ['dashboard', 'recibir', 'programar', 'consultar', 'inventario', 'lotes', 'movimientos', 'materiales', 'costos', 'excel'];
-    const MAS = { dashboard: 'Dashboard', materiales: 'Inventario de componentes', lotes: 'Lotes', movimientos: 'Movimientos', costos: 'Costos', excel: 'Excel' };   // en celular, dentro de «Más»
+    const MAS = { dashboard: 'Dashboard', materiales: 'Inventario de componentes', lotes: 'Lotes', movimientos: 'Movimientos', excel: 'Excel' };   // en celular, dentro de «Más»
     const escritorio = () => matchMedia('(min-width: 1024px)').matches;
 
     // El tema lo fija el <head>; common.js lo pisa a "oscuro" si no hay ajuste guardado: se restablece la preferencia del sistema.

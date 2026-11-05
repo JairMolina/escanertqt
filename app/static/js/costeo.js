@@ -10,11 +10,12 @@
     const $ = (id) => document.getElementById(id);
     const mxn = (v) => Number(v || 0).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
     const num = (v, d) => Number(v || 0).toLocaleString('es-MX', { maximumFractionDigits: d == null ? 4 : d });
-    let d = null, ui = {}, filtro = '';
+    let d = null, ui = {}, filtro = '', destino = null;
+    const cuerpo = () => destino || $('cCuerpo');   // pestaña propia o incrustada en Inventario de componentes
 
     async function cargar() {
         const r = await api(B);
-        if (!r.ok) { $('cCuerpo').replaceChildren(h('p', { class: 'x-intro', role: 'alert' }, 'No se pudo cargar el cotizador: ' + r.error, ' ', h('button', { class: 'btn', type: 'button', onclick: cargar }, 'Reintentar'))); return; }
+        if (!r.ok) { cuerpo().replaceChildren(h('p', { class: 'x-intro', role: 'alert' }, 'No se pudo cargar el cotizador: ' + r.error, ' ', h('button', { class: 'btn', type: 'button', onclick: cargar }, 'Reintentar'))); return; }
         d = r.data; pintar();
     }
 
@@ -41,7 +42,7 @@
         ui.q = h('input', { class: 'input', id: 'cQ', type: 'search', placeholder: 'Material, categoría o proveedor', value: filtro, autocomplete: 'off' });
         ui.q.addEventListener('input', T.debounce(() => { filtro = ui.q.value.trim().toLowerCase(); ui.zona.replaceChildren(...tablas()); }, 200));
         ui.zona = h('div', { class: 'c-zona' }, ...tablas());
-        $('cCuerpo').replaceChildren(
+        cuerpo().replaceChildren(
             h('div', { class: 'c-kpis' }, ...kpis),
             h('div', { class: 'c-barra' },
                 h('div', { class: 'field c-tc' }, h('label', { for: 'cTc' }, 'Tipo de cambio (MXN por USD)'), tc, h('span', { class: 'c-kpi-n', id: 'cTcAyuda' }, 'Solo afecta a este módulo')),
@@ -147,6 +148,7 @@
 
     P.registrar('costos', {
         montar() { $('cCuerpo').replaceChildren(h('p', { class: 'x-intro' }, 'Cargando cotizador…')); },
-        entrar() { cargar(); },
+        entrar() { destino = null; cargar(); },
     });
+    T.costeoEn = (el) => { destino = el; if (el) { el.replaceChildren(h('p', { class: 'x-intro' }, 'Cargando cotizador…')); cargar(); } };
 })();

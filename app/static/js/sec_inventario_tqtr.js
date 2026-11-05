@@ -83,7 +83,7 @@
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(revisarBadge, 1500)); else setTimeout(revisarBadge, 1500);
     setInterval(revisarBadge, 10 * 60 * 1000);
-    const PESTANAS = [['dashboard', 'Dashboard'], ['registro', 'Registro'], ['componentes', 'Componentes'], ['costos', 'Costos'], ['consumo', 'Consumo'], ['stock', 'Stock mínimo'], ['configuracion', 'Configuración']];
+    const PESTANAS = [['dashboard', 'Dashboard'], ['registro', 'Registro'], ['componentes', 'Componentes'], ['solicitud', 'Solicitud de material'], ['costos', 'Costos'], ['consumo', 'Consumo'], ['stock', 'Stock mínimo'], ['configuracion', 'Configuración']];
     const TIPOS = [['categoria', 'Categorías'], ['movimiento', 'Tipos de movimiento'], ['condicion', 'Condición'], ['unidad', 'Unidades']];
     const ESTADOS = { ok: ['Con existencia', 'ok', 'check'], bajo: ['Bajo mínimo', 'warn', 'alert'], insuficiente: ['No alcanza para 1', 'warn', 'alert'], agotado: ['Agotado', 'bad', 'x'] };
 
@@ -134,6 +134,7 @@
                     } else if (st.tab === 'stock') { st.stock = await obtener(`${B}/stock-minimo`); contarStock(st.stock.pendientes ?? st.stock.a_comprar.length); }
                     else if (st.tab === 'consumo') { st.cons = await obtener(`${B}/consumos`); }
                     else if (st.tab === 'costos') { st.costos = await obtener(`${B}/costos`); if (!st.comps) st.comps = await obtener(`${B}/componentes`); }
+                    else if (st.tab === 'solicitud') { st.comps = await obtener(`${B}/componentes`); }
                     else if (st.tab === 'componentes') { st.comps = await obtener(`${B}/componentes`); if (!st.dash) st.dash = await obtener(`${B}/dashboard`); }
                     else st.conf = await obtener(`${B}/configuracion`);
                     st.error = '';
@@ -144,9 +145,9 @@
 
             function pintar() {
                 if (st.error) { panel.replaceChildren(util.errorBox(st.error, () => { st.error = ''; cargar(); })); return; }
-                const listo = { dashboard: st.dash, registro: st.regs, componentes: st.comps, costos: st.costos && st.comps, consumo: st.cons, stock: st.stock, configuracion: st.conf }[st.tab];
+                const listo = { dashboard: st.dash, registro: st.regs, componentes: st.comps, solicitud: st.comps, costos: st.costos && st.comps, consumo: st.cons, stock: st.stock, configuracion: st.conf }[st.tab];
                 if (!listo) { panel.replaceChildren(util.cargando('Cargando el inventario TQTR…')); return; }
-                panel.replaceChildren(...[].concat({ dashboard: vistaDashboard, registro: vistaRegistro, componentes: vistaComponentes, costos: vistaCostos, consumo: vistaConsumo, stock: vistaStock, configuracion: vistaConfig }[st.tab]()));
+                panel.replaceChildren(...[].concat({ dashboard: vistaDashboard, registro: vistaRegistro, componentes: vistaComponentes, solicitud: vistaSolicitud, costos: vistaCostos, consumo: vistaConsumo, stock: vistaStock, configuracion: vistaConfig }[st.tab]()));
             }
 
             // ---------------------------------------------------------------- Dashboard
@@ -348,6 +349,20 @@
             }
 
             // ---------------------------------------------------------------- Componentes
+            // ---------------------------------------------------------------- Solicitud de material (misma calculadora que los módulos Plataforma I+D)
+            function vistaSolicitud() {
+                const usados = st.comps.items.filter((c) => Object.values(c.bom || {}).some((q) => q > 0));
+                const datos = {
+                    modulo: 'inventario-tqtr', etiqueta: 'Productos', catalogo: 'Componentes', activo: true, pendientes: [],
+                    tarjetas: st.comps.productos.map((p) => p.nombre).filter((n) => usados.some((c) => c.bom[n] > 0)),
+                    materiales: usados.map((c) => ({ descripcion: c.descripcion, unidad: c.unidad || '', en_bom: true, unidad_ambigua: false,
+                        tarjetas: Object.keys(c.bom).filter((n) => c.bom[n] > 0), por_tarjeta: c.bom, disponible: Number(c.disponible) || 0 })),
+                };
+                if (!datos.tarjetas.length) return [h('p', { class: 'muted' }, 'Aún no hay componentes con cantidad por producto. Cárgalos en la pestaña Componentes.')];
+                st.plan = st.plan || { cantidades: {}, conStock: true };
+                return [h('div', { class: 'itq-sol' }, window.TQT.solicitudMateriales(datos, st.plan, () => { st.comps = null; cargar(); }))];
+            }
+
             function vistaComponentes() {
                 const prods = st.comps.productos.map((p) => p.nombre);
                 const COLS = [

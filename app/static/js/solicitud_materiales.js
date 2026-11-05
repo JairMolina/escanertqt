@@ -6,20 +6,20 @@
     const limpio = n => Number(n.toPrecision(15));
 
     function calcular(datos, cantidades, conStock) {
-        const tipos = datos.tarjetas.filter(t => cantidades[t] > 0);
+        const tipos = datos.tarjetas.filter(t => cantidades[t] > 0), cat = datos.catalogo || 'Costos';
         if (!tipos.length) return { aviso: 'Indica cuántas tarjetas quieres fabricar.' };
         for (const t of tipos) {
             if (!datos.materiales.some(m => m.en_bom && m.tarjetas.includes(t))) {
-                return { aviso: 'Falta la lista de materiales de ' + t + '. Cárgala en Costos para calcular la solicitud.' };
+                return { aviso: 'Falta la lista de materiales de ' + t + '. Cárgala en ' + cat + ' para calcular la solicitud.' };
             }
         }
         const filas = [];
         for (const m of datos.materiales) {
             const usan = tipos.filter(t => m.en_bom && m.tarjetas.includes(t));
             if (!usan.length) continue;
-            if (m.unidad_ambigua) return { aviso: 'Revisa «' + m.descripcion + '» en Costos: está registrada con unidades diferentes.' };
+            if (m.unidad_ambigua) return { aviso: 'Revisa «' + m.descripcion + '» en ' + cat + ': está registrada con unidades diferentes.' };
             const falta = usan.find(t => !(m.por_tarjeta?.[t] > 0));
-            if (falta) return { aviso: 'Falta la cantidad de «' + m.descripcion + '» por tarjeta ' + falta + '. Revisa la lista en Costos.' };
+            if (falta) return { aviso: 'Falta la cantidad de «' + m.descripcion + '» por tarjeta ' + falta + '. Revisa la lista en ' + cat + '.' };
             const necesario = limpio(usan.reduce((n, t) => n + m.por_tarjeta[t] * cantidades[t], 0));
             const disponible = m.disponible;
             const pedir = conStock ? Math.max(0, limpio(necesario - Math.max(0, disponible))) : necesario;
@@ -49,12 +49,12 @@
         const aviso = h('p', { class: 'x-intro', role: 'status' });
         const notaStock = h('p', { class: 'c-kpi-n' }, !datos.activo ?
             'El consumo automático no está activo. El disponible refleja los movimientos registrados.' :
-            'Hay PCB pendientes de asignar a RX o TX; sus consumos aún no se reflejan en el disponible.');
+            'Hay PCB pendientes de asignar a ' + datos.tarjetas.join(' o ') + '; sus consumos aún no se reflejan en el disponible.');
         const inputs = datos.tarjetas.map((t, i) => {
             const id = 'mtTarjeta' + i;
             const input = h('input', { class: 'input mono', id, type: 'number', min: 0, max: 1000000, step: 1,
                 inputmode: 'numeric', placeholder: '0', value: estado.cantidades[t] ?? '', oninput: actualizar });
-            return { t, input, campo: h('div', { class: 'field' }, h('label', { for: id }, 'Tarjetas ' + t), input) };
+            return { t, input, campo: h('div', { class: 'field' }, h('label', { for: id }, (datos.etiqueta || 'Tarjetas') + ' ' + t), input) };
         });
         const opciones = [[true, 'Descontar existencias', 'Pide solo lo que falta.'], [false, 'Ignorar existencias', 'Pide todo lo necesario.']];
         const modos = h('fieldset', { class: 'mt-modos' }, h('legend', null, 'Cómo calcular la solicitud'),
@@ -89,7 +89,7 @@
         actualizar();
         return h('section', { class: 'mt-plan' },
             h('div', { class: 'x-caja' }, h('h2', { class: 'c-grupo-t' }, 'Solicitud de material'),
-                h('p', { class: 'x-intro' }, 'Indica las tarjetas que vas a fabricar. Para equipos completos, pon la misma cantidad en RX y TX.'),
+                h('p', { class: 'x-intro' }, datos.tarjetas.length > 1 ? 'Indica ' + (datos.etiqueta ? 'los productos' : 'las tarjetas') + ' que vas a fabricar. Para equipos completos, pon la misma cantidad en ' + datos.tarjetas.join(' y ') + '.' : 'Indica cuántas ' + (datos.etiqueta ? 'unidades' : 'tarjetas') + ' vas a fabricar.'),
                 h('div', { class: 'mt-cantidades' }, inputs.map(x => x.campo)), modos),
             h('div', { class: 'mt-plan-bar' }, aviso,
                 h('button', { type: 'button', class: 'btn btn-sm', onclick: recargar }, icon('refresh'), 'Actualizar existencias')),

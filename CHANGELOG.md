@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.90 — 2026-11-05
+
+- Solicitud de material y pestaña Costos en el Inventario de componentes de Sigfox, TPMS, Caiquen y SpeedLocker (misma calculadora que AntiJammer; `por_tarjeta` ya se expone en todos los módulos). Costos se incrusta como pestaña sin salir de la vista.
+- Escáner TQT: pestaña «Solicitud de material» en Inventario TQTR (productos y BOM de Componentes, existencias disponibles, con o sin descontar, CSV).
+- Estilos de la solicitud movidos de `antijammer_consola.css` a `costeo.css`. Sin migración. Sin commit ni despliegue en producción.
+
 ## v1.4.89 — 2026-11-05
 
 - AntiJammer: inventarios de PCB y componentes separados, solicitud RX/TX con o sin existencias y descarga CSV sin modificar el stock. Integra el piloto aprobado sobre la versión de producción 1.4.88, con el Centro de Administración y la etiqueta R3 conservados.

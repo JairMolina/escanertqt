@@ -38,3 +38,22 @@
 .mt-hist { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
 .mt-hist summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
 .mt-ancho { grid-column: 1 / -1; }
+
+/* Solicitud de material y pestañas de componentes (todos los módulos con inventario) */
+.mt-vistas, .mt-cantidades, .mt-plan-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 16px;
+}
+.mt-vistas { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.mt-vistas [aria-pressed="true"] { color: var(--accent-text); border-color: var(--accent); background: var(--surface); }
+.mt-plan .x-caja { padding: 18px; }
+.mt-plan .mt-cantidades .field { width: min(135px, 100%); }
+.mt-modos { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 0; border: 0; min-width: 0; }
+.mt-modos legend { font-weight: 600; margin-bottom: 6px; }
+.mt-modos label { display: flex; align-items: center; gap: 8px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 12px; }
+.mt-modos label:has(:checked) { border-color: var(--accent); }
+.mt-modos input { accent-color: var(--accent); }
+.mt-modos small { display: block; color: var(--muted); }
+.mt-plan-bar { justify-content: space-between; }
+.mt-resultado .btn { margin-top: 12px; }
+.mt-pedir { font-weight: 700; }
+.mt-plan .i-tabla thead th:nth-child(n+3) { text-align: right; }

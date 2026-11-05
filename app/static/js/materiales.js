@@ -35,10 +35,10 @@
             $('mtCuerpo').replaceChildren(...resumen(ro), tabla(ro), historial(ro));
             return;
         }
-        const vistas = ['Resumen', 'Componentes', 'Registro', 'Solicitud de material'];
+        const vistas = ['Resumen', 'Componentes', 'Registro', 'Solicitud de material', 'Costos'];
         const barra = h('div', { class: 'mt-vistas', role: 'group', 'aria-label': 'Vistas de componentes' },
             vistas.map(v => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(v === vista),
-                onclick: () => { vista = v; pintar(); $('mtCuerpo').querySelector('[aria-pressed="true"]').focus(); } }, v)));
+                onclick: () => { if (vista === 'Costos' && v !== 'Costos') T.costeoEn(null); vista = v; pintar(); $('mtCuerpo').querySelector('[aria-pressed="true"]').focus(); } }, v)));
         let contenido;
         if (vista === 'Resumen') {
             const bajos = d.materiales.filter(m => m.bajo_minimo);
@@ -56,9 +56,14 @@
                 value: busqueda, oninput: e => { busqueda = e.target.value; filtrar(); } });
             filtrar();
             contenido = [h('div', { class: 'c-barra' }, h('div', { class: 'field c-q' }, h('label', { for: 'mtBuscar' }, 'Buscar componente'), buscar),
-                h('a', { class: 'btn', href: '#costos' }, ro ? 'Ver lista por tarjeta' : 'Editar lista por tarjeta')), zona];
+                h('button', { class: 'btn', type: 'button', onclick: () => { vista = 'Costos'; pintar(); } }, ro ? 'Ver lista por tarjeta' : 'Editar lista por tarjeta')), zona];
         } else if (vista === 'Registro') {
             contenido = [historial(ro)];
+        } else if (vista === 'Costos') {
+            const zona = h('div', { id: 'cCuerpoMt' });
+            $('mtCuerpo').replaceChildren(barra, zona);
+            T.costeoEn(zona);
+            return;
         } else {
             contenido = [window.TQT.solicitudMateriales(d, plan, cargar)];
         }
@@ -155,7 +160,7 @@
 
     P.registrar('materiales', {
         montar() { $('mtCuerpo').replaceChildren(h('p', { class: 'x-intro' }, 'Cargando inventario…')); },
-        entrar() { cargar(); },
+        entrar() { if (vista === 'Costos') { vista = 'Resumen'; T.costeoEn(null); } cargar(); },
     });
     if (cfg.evento) document.addEventListener(cfg.evento, () => { if (d && document.querySelector('[data-vista="materiales"]:not([hidden])')) cargar(); });
 })();

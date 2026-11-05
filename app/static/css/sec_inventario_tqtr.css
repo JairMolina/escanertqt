@@ -85,3 +85,22 @@
 .itq-compra[data-k="warn"] { border-color: var(--warn); color: var(--warn); }
 .itq-compra[data-k="bad"] { border-color: var(--bad); color: var(--bad); }
 .itq-compra[data-k="info"] { border-color: var(--info, var(--line)); color: var(--info, inherit); }
+
+/* Solicitud de material (v1.4.90): la calculadora compartida con los módulos Plataforma I+D, aquí sobre los tokens del escritorio */
+.itq-sol .x-caja { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 18px; }
+.itq-sol .c-grupo-t { margin: 0 0 6px; font-size: 16px; }
+.itq-sol .x-intro, .itq-sol .c-kpi-n { margin: 4px 0; color: var(--muted); font-size: 13.5px; }
+.itq-sol .i-tabla { overflow-x: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.itq-sol .mt-cantidades, .itq-sol .mt-plan-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 16px; }
+.itq-sol .mt-cantidades .field { width: min(150px, 100%); }
+.itq-sol .mt-modos { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 0; border: 0; min-width: 0; }
+.itq-sol .mt-modos legend { font-weight: 600; margin-bottom: 6px; }
+.itq-sol .mt-modos label { display: flex; align-items: center; gap: 8px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 12px; }
+.itq-sol .mt-modos label:has(:checked) { border-color: var(--accent); }
+.itq-sol .mt-modos input { accent-color: var(--accent); }
+.itq-sol .mt-modos small { display: block; color: var(--muted); }
+.itq-sol .mt-plan-bar { justify-content: space-between; }
+.itq-sol .mt-resultado .btn { margin-top: 12px; }
+.itq-sol .mt-pedir { font-weight: 700; }
+.itq-sol table.grid td.mono, .itq-sol .i-tabla thead th:nth-child(n+3) { text-align: right; }
+.itq-sol input[aria-invalid="true"] { border-color: var(--bad); }
