@@ -65,11 +65,12 @@ class TestBloqueoPorEquipo(unittest.TestCase):
 
     def test_la_pagina_de_administracion_entrega_la_marca(self):
         c = TestClient(app, base_url="https://testserver")
-        r = c.get("/admin")
+        r = c.get("/admin", follow_redirects=False)   # v1.4.88: /admin redirige al Centro de administración y conserva la marca
+        self.assertEqual((r.status_code, r.headers["location"]), (302, "/inicio?centro=1"))
         sc = r.headers.get("set-cookie", "").lower()
         for marca in ("tqt_cid=", "httponly", "secure", "samesite=strict"):
             self.assertIn(marca, sc)
-        self.assertNotIn("set-cookie", equipo("dddddddddddddddddddddddd").get("/admin").headers)   # ya la tiene: no se cambia
+        self.assertNotIn("set-cookie", equipo("dddddddddddddddddddddddd").get("/admin", follow_redirects=False).headers)   # ya la tiene: no se cambia
 
     def test_entrar_bien_limpia_solo_los_fallos_de_ese_equipo(self):
         a, b = equipo("eeeeeeeeeeeeeeeeeeeeeeee"), equipo("ffffffffffffffffffffffff")

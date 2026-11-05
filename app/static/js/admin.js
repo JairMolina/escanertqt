@@ -154,10 +154,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ------------------------------------------------------------------ pestañas
     function setVista(v) {
-        ['resumen', 'tarjetas', 'pcb', 'movimientos', 'riesgo', 'usuarios', 'cuenta'].forEach((k) => { $('v-' + k).hidden = k !== v; });
+        ['resumen', 'tarjetas', 'pcb', 'movimientos', 'riesgo', 'cuenta'].forEach((k) => { $('v-' + k).hidden = k !== v; });
         document.querySelectorAll('.desk-nav [role=tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.v === v)));
     }
-    document.querySelector('.desk-nav').addEventListener('click', (e) => { const b = e.target.closest('[role=tab]'); if (b) { setVista(b.dataset.v); if (b.dataset.v === 'movimientos' && S.token) cargarMov(true); if (b.dataset.v === 'usuarios') cargarCuentas(); } });
+    document.querySelector('.desk-nav').addEventListener('click', (e) => { const b = e.target.closest('[role=tab]'); if (b) { setVista(b.dataset.v); if (b.dataset.v === 'movimientos' && S.token) cargarMov(true); } });
 
     // ------------------------------------------------------------------ datos
     const bonito = (k) => { const s = String(k).replace(/_/g, ' ').trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
@@ -546,104 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Atrás/Adelante desde la caché del navegador: nunca enseñar datos de una sesión ya cerrada.
     window.addEventListener('pageshow', (ev) => { if (ev.persisted) location.reload(); });
-    // ------------------------------------------------------------------ cuentas (alta por invitación, roles) v1.3.35
-    const ROL_TXT = { administrador: 'Puede todo, incluida esta zona de administración.', general: 'Opera la app (recibir, emparejar, programar, consola) sin acceso a Administración.',
-        consultor: 'Solo consulta escaneando: no puede crear, editar ni mover nada.' };
-    const rolHint = () => { $('uRolHint').textContent = ROL_TXT[$('uRol').value] || ''; };
-    $('uRol').addEventListener('change', rolHint); rolHint();
-    function avisoEnvio(d, quien) {
-        const m = $('uMsg'); m.replaceChildren(); m.className = 'hint';
-        if (d.enviado) { m.textContent = `Invitación enviada a ${quien}.`; toast('Invitación enviada', { kind: 'ok' }); return; }
-        m.className = 'hint err';
-        m.append(`${d.error || 'No se envió el correo.'} Comparte este enlace con ${quien}: `, h('span', { class: 'mono', style: 'overflow-wrap:anywhere' }, d.enlace || ''), ' ',
-            h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { if (navigator.clipboard) navigator.clipboard.writeText(d.enlace || ''); toast('Enlace copiado', { kind: 'ok' }); } }, 'Copiar'));
-    }
-    const rutaCuenta = (email) => '/api/admin/usuarios/' + encodeURIComponent(email);
-    async function cargarCuentas() {
-        const r = await adm('/api/admin/usuarios');
-        if (!r.ok) { $('uTabla').replaceChildren(h('p', { class: 'hint err' }, r.error)); return; }
-        $('uSmtp').textContent = r.data.smtp ? 'Correo SMTP configurado.' : 'Correo SMTP sin configurar: al invitar se mostrará el enlace para compartirlo a mano.';
-        const catalogo = r.data.modulos || [];
-        const filas = r.data.items.map((u) => {
-            const estado = u.pendiente ? (u.inv_exp * 1000 < Date.now() ? 'Invitación caducada' : 'Invitación pendiente') : u.activo ? 'Activa' : 'Desactivada';
-            const sel = h('select', { class: 'input', 'aria-label': 'Rol de ' + u.email, style: 'min-height:36px' }, ...['administrador', 'general', 'consultor'].map((x) => h('option', { value: x }, bonito(x))));
-            sel.value = u.rol;
-            sel.addEventListener('change', async () => {
-                const x = await adm(rutaCuenta(u.email), { method: 'PATCH', body: { rol: sel.value } });
-                if (x.ok) toast('Rol actualizado', { kind: 'ok' }); else { toast(x.error, { kind: 'bad' }); sel.value = u.rol; }
-            });
-            const acc = [];
-            if (u.pendiente) {
-                acc.push(h('button', { class: 'btn btn-sm', type: 'button', onclick: async (e) => {
-                    e.target.disabled = true;
-                    const x = await adm(rutaCuenta(u.email) + '/reenviar', { method: 'POST', timeout: 45000 });
-                    e.target.disabled = false;
-                    if (x.ok) { avisoEnvio(x.data, u.email); cargarCuentas(); } else toast(x.error, { kind: 'bad' });
-                } }, 'Reenviar'));
-            } else {
-                acc.push(h('button', { class: 'btn btn-sm', type: 'button', onclick: async () => {
-                    const x = await adm(rutaCuenta(u.email), { method: 'PATCH', body: { activo: !u.activo } });
-                    if (x.ok) cargarCuentas(); else toast(x.error, { kind: 'bad' });
-                } }, u.activo ? 'Desactivar' : 'Activar'));
-            }
-            acc.push(h('button', { class: 'btn btn-sm btn-danger', type: 'button', onclick: async (e) => {
-                const b = e.currentTarget;   // dos clics para confirmar (sin diálogos del navegador)
-                if (!b.dataset.seguro) { b.dataset.seguro = '1'; b.textContent = '¿Eliminar?'; setTimeout(() => { delete b.dataset.seguro; b.textContent = 'Eliminar'; }, 4000); return; }
-                const x = await adm(rutaCuenta(u.email), { method: 'DELETE' });
-                if (x.ok) { toast('Cuenta eliminada', { kind: 'ok' }); cargarCuentas(); } else toast(x.error, { kind: 'bad' });
-            } }, 'Eliminar'));
-            const esAdmin = u.rol === 'administrador';
-            const asignados = new Set(u.modulos || []);
-            const chips = esAdmin ? [h('span', { class: 'mchip', 'data-todos': '1' }, 'Todos los módulos')]
-                : catalogo.filter((m) => asignados.has(m.id)).map((m) => h('span', { class: 'mchip' }, m.nombre, m.estado === 'proximamente' ? h('small', {}, ' (próx.)') : null));
-            if (!esAdmin && !chips.length) chips.push(h('span', { class: 'mchip vacio' }, 'Sin módulos'));
-            const celdaMod = h('div', { class: 'mchips', role: 'list', 'aria-label': 'Módulos de ' + u.email }, ...chips.map((c) => { c.setAttribute('role', 'listitem'); return c; }));
-            if (!esAdmin) acc.unshift(h('button', { class: 'btn btn-sm', type: 'button', 'aria-label': 'Módulos de ' + u.email, onclick: () => editarModulos(u, catalogo) }, 'Módulos'));
-            return h('tr', {}, h('td', { class: 'mono' }, u.email), h('td', {}, sel), h('td', {}, celdaMod), h('td', {}, estado), h('td', {}, u.ultimo_acceso || '—'),
-                h('td', {}, h('div', { class: 'row wrap', style: 'gap:6px' }, ...acc)));
-        });
-        $('uTabla').replaceChildren(h('div', { class: 'tablewrap' }, h('table', { class: 'table' }, h('thead', {}, h('tr', {}, ...['Correo', 'Rol', 'Módulos', 'Estado', 'Último acceso', 'Acciones'].map((t) => h('th', {}, t)))), h('tbody', {}, ...filas))));
-    }
-    /** Hoja con una casilla por módulo del catálogo; guarda con PATCH {modulos}. */
-    function editarModulos(u, catalogo) {
-        const sel = new Set(u.modulos || []);
-        const tuvoEscaner = sel.has('escaner-tqt');
-        const aviso = h('p', { class: 'hint warn', role: 'status', 'aria-live': 'polite', hidden: true }, 'Esta cuenta ya no podrá entrar a Escáner TQT');
-        const err = h('p', { class: 'hint err', role: 'alert', hidden: true });
-        const refrescaAviso = () => { aviso.hidden = !(tuvoEscaner && !sel.has('escaner-tqt')); };
-        const lista = catalogo.map((m) => {
-            const cb = h('input', { type: 'checkbox', value: m.id, checked: sel.has(m.id) });
-            cb.addEventListener('change', () => { if (cb.checked) sel.add(m.id); else sel.delete(m.id); refrescaAviso(); });
-            return h('label', { class: 'mod-opt' }, cb, h('span', {}, m.nombre, m.estado === 'proximamente' ? h('small', {}, ' (próx.)') : null));
-        });
-        const body = [h('p', { class: 'hint' }, u.email), h('div', { class: 'mod-lista', role: 'group', 'aria-label': 'Módulos asignados' }, ...lista), aviso, err];
-        sheet({ title: 'Módulos de la cuenta', body, actions: [
-            { label: 'Cancelar', kind: 'ghost', onClick: () => true },
-            { label: 'Guardar', kind: 'primary', onClick: async () => {
-                err.hidden = true;
-                const x = await adm(rutaCuenta(u.email), { method: 'PATCH', body: { modulos: catalogo.map((m) => m.id).filter((id) => sel.has(id)) } });
-                if (!x.ok) { err.textContent = x.error || 'No se pudo guardar.'; err.hidden = false; return false; }
-                toast('Módulos actualizados', { kind: 'ok' }); cargarCuentas(); return true;
-            } },
-        ] });
-    }
-    $('formAlta').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = $('uEmail').value.trim(); if (!email) { $('uEmail').focus(); return; }
-        $('btnAlta').disabled = true; $('uMsg').textContent = 'Enviando…'; $('uMsg').className = 'hint';
-        const r = await adm('/api/admin/usuarios', { method: 'POST', body: { email, rol: $('uRol').value }, timeout: 45000 });
-        $('btnAlta').disabled = false;
-        if (!r.ok) { $('uMsg').textContent = r.error; $('uMsg').className = 'hint err'; return; }
-        avisoEnvio(r.data, email); $('uEmail').value = ''; cargarCuentas();
-    });
-    $('btnSmtp').addEventListener('click', async () => {
-        const para = $('uEmail').value.trim();
-        if (!para) { $('uMsg').textContent = 'Escribe en "Correo" la dirección a la que se envía la prueba.'; $('uMsg').className = 'hint err'; $('uEmail').focus(); return; }
-        $('btnSmtp').disabled = true;
-        const r = await adm('/api/admin/correo/prueba', { method: 'POST', body: { para }, timeout: 45000 });
-        $('btnSmtp').disabled = false;
-        toast(r.ok ? `Correo de prueba enviado a ${para}` : r.error, { kind: r.ok ? 'ok' : 'bad', ms: 5000 });
-    });
+    // v1.4.88: la gestión de cuentas (alta, roles, módulos, activar, eliminar, prueba de correo) vive en el Centro de administración del portal /inicio.
 
     arrancar();
 });

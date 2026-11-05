@@ -617,14 +617,20 @@
         $('ccHead').innerHTML = h + '</tr>'; $('ccMods').innerHTML = t;
     }
     function accionesPend(c, mail) {
-        if (!c.pendiente) return '';
         var oc = !!cc.busy[String(c.email).toLowerCase()], d = oc ? ' disabled' : '';
+        if (!c.pendiente) {      // v1.4.88: activar/desactivar y eliminar (migrado de Administración › Cuentas); nunca sobre la propia sesión
+            if (esYo(c)) return '';
+            return '<span class="cc-pacc"><button type="button" class="cc-lnk" data-f="a|' + mail + '|t" data-cta="' + (c.activo === false ? 'activar' : 'desactivar') + '" data-e="' + mail + '">' + (c.activo === false ? 'Activar' : 'Desactivar') + '</button>' +
+                '<button type="button" class="cc-lnk cc-lnk-bad" data-f="a|' + mail + '|e" data-cta="eliminar" data-e="' + mail + '" aria-label="Eliminar la cuenta ' + mail + '">Eliminar</button></span>';
+        }
         return '<span class="cc-pacc"><button type="button" class="cc-lnk" data-f="i|' + mail + '|r" data-inv="reenviar" data-e="' + mail + '"' + d + '>' + (oc ? 'Reenviando…' : 'Reenviar') + '</button>' +
             '<button type="button" class="cc-lnk cc-lnk-bad" data-f="i|' + mail + '|c" data-inv="cancelar" data-e="' + mail + '"' + d + ' aria-label="Cancelar invitación de ' + mail + '">Cancelar invitación</button></span>';
     }
     function chips(c) {
-        return (c.pendiente ? '<span class="cc-chip" data-k="info">Pendiente</span>' : '') + (c.activo === false ? '<span class="cc-chip" data-k="warn">Inactiva</span>' : '');
+        var cad = c.pendiente && c.inv_exp && c.inv_exp * 1000 < Date.now();
+        return (c.pendiente ? '<span class="cc-chip" data-k="' + (cad ? 'warn' : 'info') + '">' + (cad ? 'Invitación caducada' : 'Pendiente') + '</span>' : '') + (c.activo === false && !c.pendiente ? '<span class="cc-chip" data-k="warn">Desactivada</span>' : '');
     }
+    function acceso(c) { return c.pendiente || !c.ultimo_acceso ? '' : '<span class="cc-nota">Último acceso: ' + esc(c.ultimo_acceso) + '</span>'; }
     function ccRender() {
         var ae = document.activeElement, clave = ae && ae.dataset && ae.dataset.f && ccPanel.contains(ae) ? ae.dataset.f : null;
         var q = cc.q.trim().toLowerCase(), todas = cc.cuentas;
@@ -639,8 +645,8 @@
             var opts = cc.roles.map(function (r) { return '<option value="' + esc(r) + '"' + (r === c.rol ? ' selected' : '') + '>' + esc(ROLES[r] || r) + '</option>'; }).join('');
             var sel = function (v) { return '<select class="input cc-rol" data-e="' + mail + '" data-f="r|' + mail + '|' + v + '" aria-label="Rol de ' + mail + '">' + opts + '</select>'; };
             var tod = function (v) { return '<input type="checkbox" class="cc-todos" data-e="' + mail + '" data-f="t|' + mail + '|' + v + '" aria-label="Todos los módulos para ' + mail + '"' + (todos ? ' checked' : '') + (parcial ? ' data-ind="1"' : '') + (adm ? ' disabled' : '') + '>'; };
-            filas += '<tr><th scope="row" class="cc-cta"><span class="cc-mail" title="' + mail + '">' + mail + '</span>' + chips(c) + accionesPend(c, mail) + nota + '</th><td>' + sel('t') + '</td><td class="cc-c"><label class="cc-cl">' + tod('t') + '</label></td>';
-            tarj += '<li class="cc-card"><div class="cc-chead"><span class="cc-mail">' + mail + '</span>' + chips(c) + '</div>' + accionesPend(c, mail) + nota +
+            filas += '<tr><th scope="row" class="cc-cta"><span class="cc-mail" title="' + mail + '">' + mail + '</span>' + chips(c) + acceso(c) + accionesPend(c, mail) + nota + '</th><td>' + sel('t') + '</td><td class="cc-c"><label class="cc-cl">' + tod('t') + '</label></td>';
+            tarj += '<li class="cc-card"><div class="cc-chead"><span class="cc-mail">' + mail + '</span>' + chips(c) + '</div>' + acceso(c) + accionesPend(c, mail) + nota +
                 '<div class="cc-crow"><label class="cc-rl"><span>Rol</span>' + sel('m') + '</label><label class="cc-pill">' + tod('m') + '<span class="cc-pb"><b>Todos</b></span></label></div><div class="cc-pills">';
             cc.mods.forEach(function (m) {
                 var at = 'class="cc-chk" data-e="' + mail + '" data-m="' + esc(m.id) + '" aria-label="' + esc(m.nombre) + ' para ' + mail + '"' + (tiene(c, m.id) ? ' checked' : '') + (adm ? ' disabled' : '');
@@ -706,7 +712,22 @@
         if (ccConf.hidden) return;
         var k = cc.conf; ccConf.hidden = true; cc.conf = null;
         if (!devolver) return;
-        if (k && k.inv) enfocarF('i|' + k.inv + '|c', 'ccInv'); else if (menuBtn) menuBtn.focus();
+        if (k && k.inv) enfocarF('i|' + k.inv + '|c', 'ccInv'); else if (k && k.cta) enfocarF('a|' + k.cta + '|e', 'ccInv'); else if (menuBtn) menuBtn.focus();
+    }
+    function confCuenta(mail) {
+        cc.conf = { cta: mail };
+        $('ccConfTxt').textContent = '¿Eliminar la cuenta ' + mail + '? Se pierde su acceso y no se puede deshacer.';
+        var ok = $('ccConfOk'); ok.textContent = 'Eliminar cuenta'; ok.className = 'btn btn-sm btn-danger';
+        $('ccConfNo').textContent = 'Conservar';
+        ccConf.hidden = false; $('ccConfNo').focus();
+    }
+    function cuentaEliminar(mail) {
+        ccAvisar('Eliminando…', false);
+        encolar(function () { return api('DELETE', '/api/plataforma/cuentas/' + encodeURIComponent(mail)); }, null, function () { ccAvisar('Cuenta ' + mail + ' eliminada', false); enfocarF('x', 'ccInv'); });
+    }
+    function cuentaActivar(c, activo) {
+        var antes = c.activo; c.activo = activo; ccRender();
+        encolar(function () { return api('PATCH', '/api/plataforma/cuentas/' + encodeURIComponent(c.email), { activo: activo }); }, function () { c.activo = antes; });
     }
     function enfocarF(clave, alt) {
         var c = ccPanel.querySelectorAll('[data-f="' + clave.replace(/["\\]/g, '\\$&') + '"]'), k;
@@ -731,6 +752,7 @@
     $('ccConfOk').addEventListener('click', function () {
         var k = cc.conf; if (!k) return;
         if (k.inv) { confCerrar(false); invCancelar(k.inv); return; }
+        if (k.cta) { confCerrar(false); cuentaEliminar(k.cta); return; }
         confCerrar(true); ccAvisar('Aplicando…', false);
         encolar(function () { return api('POST', '/api/plataforma/modulos/' + encodeURIComponent(k.id) + '/todos', { activo: k.activo }); }, null);
     });
@@ -823,6 +845,13 @@
     }
     $('ccInv').addEventListener('click', function () { if (invForm.hidden) invAbrir(null); else invCerrar(true); });
     $('ccInvNo').addEventListener('click', function () { invCerrar(true); });
+    $('ccInvProbar').addEventListener('click', function () {      // v1.4.88: prueba de SMTP (antes en Administración › Cuentas)
+        var b = this, para = invMail.value.trim();
+        if (!para || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(para)) { invError('Escribe en «Correo» la dirección a la que se envía la prueba.', invMail); invMail.focus(); return; }
+        invError('', null); b.disabled = true; ccAvisar('Enviando correo de prueba…', false);
+        api('POST', '/api/plataforma/correo/prueba', { para: para }).then(function () { b.disabled = false; ccAvisar('Correo de prueba enviado a ' + para, false); },
+            function (e) { b.disabled = false; invError(e.message, null); });
+    });
     invRol.addEventListener('change', invRolCambio);
     $('ccEnlCop').addEventListener('click', invCopiar);
     $('ccEnlX').addEventListener('click', function () { enlCerrar(true); });
@@ -845,6 +874,12 @@
     ccPanel.addEventListener('click', function (e) {
         var bi = e.target.closest && e.target.closest('[data-inv]');
         if (bi && !bi.disabled) { menuCerrar(false); if (bi.dataset.inv === 'reenviar') invReenviar(bi.dataset.e); else confInv(bi.dataset.e); return; }
+        var bc = e.target.closest && e.target.closest('[data-cta]');
+        if (bc) {
+            menuCerrar(false); var cu = cuentaDe(bc.dataset.e); if (!cu) return;
+            if (bc.dataset.cta === 'eliminar') confCuenta(cu.email); else cuentaActivar(cu, bc.dataset.cta === 'activar');
+            return;
+        }
         var b = e.target.closest && e.target.closest('[data-menu]');
         if (b) { confCerrar(false); menuAbrir(b); return; }
         if (!ccMenu.hidden && !ccMenu.contains(e.target)) menuCerrar(false);
@@ -871,8 +906,8 @@
     }
     function ccVista(v) {
         cc.vista = v; ccEl.dataset.vista = v;
-        $('ccTit').textContent = v === 'acceso' ? 'Acceso de administrador' : 'Cuentas y módulos';
-        $('ccSub').textContent = v === 'acceso' ? 'Entra para administrar cuentas y módulos.' : 'Los cambios se guardan al instante.';
+        $('ccTit').textContent = v === 'acceso' ? 'Acceso de administrador' : 'Centro de administración';
+        $('ccSub').textContent = v === 'acceso' ? 'Entra para administrar cuentas y módulos.' : 'Cuentas, módulos y datos de producción.';
     }
 
     /* ---- vista «acceso»: formulario de administrador ---- */

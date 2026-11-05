@@ -741,7 +741,7 @@ class ExcelSyncEngine:
                     filas[nombre] = fila
                 ws.cell(fila, col_n).value = nombre
                 if col_m and t.get(k_mac):
-                    ws.cell(fila, col_m).value = t[k_mac]
+                    ws.cell(fila, col_m).value = str(t[k_mac]).upper()
                 estado = t.get(k_estado) or "PENDIENTE"
                 celda = ws.cell(fila, col_e)
                 # Un estado ya decidido en la BD manda; "PENDIENTE" no pisa lo que el usuario puso a mano.

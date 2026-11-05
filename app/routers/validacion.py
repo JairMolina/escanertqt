@@ -499,9 +499,9 @@ def _comparar(codigo: str, station_id: str) -> Dict[str, Any]:
             chk("nombre", "Nombre BLE", None, ble["nombre"], None, "Sin nombre BLE esperado para esta placa.")
         if probada["mac"]:
             ok = _mac_norm(probada["mac"]) == _mac_norm(ble["address"])
-            chk("mac", "MAC", probada["mac"], ble["address"], ok, "" if ok else "La MAC registrada no coincide con la del dispositivo.")
+            chk("mac", "MAC", str(probada["mac"]).upper(), str(ble["address"] or "").upper(), ok, "" if ok else "La MAC registrada no coincide con la del dispositivo.")
         else:
-            chk("mac", "MAC", None, ble["address"], None, "La placa no tiene MAC registrada.")
+            chk("mac", "MAC", None, str(ble["address"] or "").upper(), None, "La placa no tiene MAC registrada.")
         act_fw = _mayor_menor(ble["firmware"]) or _version_de_nombre(ble["nombre"])
         if not probada["firmware"]:
             chk("firmware", "Firmware", None, act_fw, None, "La placa no tiene firmware registrado.")

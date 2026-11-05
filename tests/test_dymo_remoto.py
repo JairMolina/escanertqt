@@ -106,7 +106,8 @@ class TestDymoRemoto(unittest.TestCase):
         self.assertEqual(p({"tipo": "cable", "numero": "1", "copias": 21}), 422)
         t = iso.crear_par(iso.nuevo_lote()["id"])
         self.assertEqual(p({"tipo": "aprobada", "tarjeta_id": t["id"]}), 403)   # sin prueba TQT aprobada
-        self.assertEqual(p({"tipo": "r3", "nombres": ["TQT-R3-V30-0084", "TQT-R3-V30-0085"]}), 200)
+        self.assertEqual(p({"tipo": "r3", "nombres": ["TQT-R3-V30-0084", "TQT-R3-V30-0085"]}), 422)   # v1.4.89: una R3 por etiqueta
+        self.assertEqual(p({"tipo": "r3", "nombres": ["TQT-R3-V30-0084"]}), 200)
 
     def test_resultado_tolerante_no_atora_al_agente(self):
         """v1.4.9: un resultado con null, texto largo o estado raro ya no da 422 (el agente lo reintentaba para siempre)."""
@@ -152,9 +153,10 @@ class TestDymoRemoto(unittest.TestCase):
             self.assertEqual(c.execute("SELECT estado FROM dymo_trabajos WHERE id=?", (a["id"],)).fetchone()[0], "cancelada")
 
     def test_svg_r3(self):
-        svg = DymoService.generate_r3_svg(["TQT-R3-V30-0084", "TQT-R3-V30-0085"])
+        svg = DymoService.generate_r3_svg(["TQT-R3-V30-0084"])
         ET.fromstring(svg.encode())
-        self.assertIn("TQT-R3-V30-0084", svg); self.assertIn("Inconsolata", svg)
+        self.assertIn("TQT-R3-V30-0084", svg); self.assertIn(">0084<", svg); self.assertIn(">R3<", svg); self.assertIn("rotate(-90)", svg); self.assertNotIn(">TQT<", svg); self.assertEqual(svg.count(">0084<"), 2); self.assertEqual(svg.count(">R3<"), 2); self.assertIn("Inconsolata", svg)
+        self.assertIn("stroke-dasharray", svg)   # v1.4.91: línea punteada central de la mitad inferior
 
 
 if __name__ == "__main__":

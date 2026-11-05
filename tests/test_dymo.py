@@ -48,12 +48,12 @@ def _cajas_v8(xml: str):
 class TestTrama(unittest.TestCase):
     def test_01_trama_exacta_del_usuario(self):
         self.assertEqual(DymoService.format_label_text(EJEMPLO),
-                         "TQT-R1-V30-0021\n70:4b:ca:5b:9f:6e\nTQT-R2-V30-0010\n70:4b:ca:5b:9c:a2")
+                         "TQT-R1-V30-0021\n70:4B:CA:5B:9F:6E\nTQT-R2-V30-0010\n70:4B:CA:5B:9C:A2")
         self.assertEqual(DymoService.format_qr_payload(EJEMPLO), DymoService.format_label_text(EJEMPLO))  # QR = texto impreso
 
     def test_02_versiones_reales_por_pcb_y_r3_fuera(self):
         t = {**EJEMPLO, "nombre_r1": "TQT-R1-V31-0021", "nombre_r3": "TQT-R3-V30-0021", "mac_r3": "AA:AA:AA:AA:AA:AA"}
-        self.assertEqual(DymoService.trama_lineas(t), ["TQT-R1-V31-0021", "70:4b:ca:5b:9f:6e", "TQT-R2-V30-0010", "70:4b:ca:5b:9c:a2"])
+        self.assertEqual(DymoService.trama_lineas(t), ["TQT-R1-V31-0021", "70:4B:CA:5B:9F:6E", "TQT-R2-V30-0010", "70:4B:CA:5B:9C:A2"])
         self.assertNotIn("R3", DymoService.format_label_text(t))
 
     def test_03_mac_ausente_deja_la_linea_vacia(self):
@@ -117,7 +117,7 @@ class TestGeometria30334(unittest.TestCase):
     def test_09_las_4_lineas_no_desbordan_su_caja_en_el_peor_caso(self):
         d = DymoService.diseno(PEOR_CASO)
         lineas = DymoService.trama_lineas(PEOR_CASO)
-        self.assertEqual(lineas, ["TQT-R1-V31-9999", "ff:ff:ff:ff:ff:fe", "TQT-R2-V31-9999", "ff:ff:ff:ff:ff:fe"])
+        self.assertEqual(lineas, ["TQT-R1-V31-9999", "FF:FF:FF:FF:FF:FE", "TQT-R2-V31-9999", "FF:FF:FF:FF:FF:FE"])
         for l in lineas:
             self.assertLessEqual(dy.ancho_texto_mm(l, d.fuente_pt), d.texto.w, l)     # ancho: 17 caracteres = 26.4 mm < 28.2 mm
         self.assertLessEqual(dy.alto_texto_mm(4, d.fuente_pt), d.texto.h)              # alto: 4 líneas = 14 mm < 26 mm

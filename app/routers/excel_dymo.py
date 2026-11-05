@@ -335,15 +335,15 @@ NOMBRE_R3 = r"^TQT-R[123]-V[0-9]{1,3}-[0-9]{4}$"
 
 
 def _nombres_r3(nombre: List[str]) -> List[str]:
-    """1 o 2 nombres TQT-R3-Vxx-0000 (v1.3.44: dos R3 por etiqueta, una por mitad)."""
-    if not 1 <= len(nombre) <= 2:
-        raise HTTPException(400, "Indica una o dos R3 por etiqueta.")
+    """Exactamente 1 nombre TQT-R3-Vxx-0000 (v1.4.89: una R3 arriba y «R3 nnnn» repetido abajo)."""
+    if len(nombre) != 1:
+        raise HTTPException(400, "Indica una R3 por etiqueta.")
     return nombre
 
 
-@router.get("/dymo/r3/xml", summary="XML de la etiqueta R3 doble (1 o 2 R3, una por mitad) para DYMO")
+@router.get("/dymo/r3/xml", summary="XML de la etiqueta R3 (1 R3 arriba, «R3 nnnn» dos veces abajo) para DYMO")
 def get_dymo_r3_xml(
-    nombre: List[str] = Query(..., description="1 o 2 veces, ej. ?nombre=TQT-R3-V30-0084&nombre=TQT-R3-V30-0085"),
+    nombre: List[str] = Query(..., description="1 sola vez, ej. ?nombre=TQT-R3-V30-0084"),
     label_format: str = Query("30334", description=FORMATO_DOC),
     tipo: str = Query("dymo", pattern="^(dymo|label)$"),
 ):
@@ -356,7 +356,7 @@ def get_dymo_r3_xml(
     return Response(content=xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
-@router.get("/dymo/r3/archivo", summary="Descarga la etiqueta R3 doble como archivo .dymo o .label")
+@router.get("/dymo/r3/archivo", summary="Descarga la etiqueta R3 como archivo .dymo o .label")
 def get_dymo_r3_archivo(
     nombre: List[str] = Query(...),
     label_format: str = Query("30334", description=FORMATO_DOC),

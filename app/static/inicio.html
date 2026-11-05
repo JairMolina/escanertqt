@@ -17,7 +17,7 @@
         })();
     </script>
     <link rel="stylesheet" href="/static/css/app.css?v=1411">
-    <link rel="stylesheet" href="/static/css/inicio.css?v=1419">
+    <link rel="stylesheet" href="/static/css/inicio.css?v=1420">
 </head>
 <body>
 <a class="salto" href="#modulos">Saltar a los módulos</a>
@@ -136,6 +136,14 @@
             </div>
             <button class="iconbtn" type="button" id="ccX" aria-label="Cerrar el panel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </header>
+        <nav class="cc-tabs" id="ccTabs" role="tablist" aria-label="Secciones del Centro de administración">
+            <button type="button" role="tab" data-sec="cuentas" aria-selected="true">Cuentas</button>
+            <button type="button" role="tab" data-sec="resumen" aria-selected="false">Resumen</button>
+            <button type="button" role="tab" data-sec="modulos" aria-selected="false">Módulos</button>
+            <button type="button" role="tab" data-sec="movimientos" aria-selected="false">Movimientos</button>
+            <button type="button" role="tab" data-sec="borrado" aria-selected="false">Borrado</button>
+            <button type="button" role="tab" data-sec="clave" aria-selected="false">Clave</button>
+        </nav>
         <form class="cc-acc" id="ccAcc" novalidate>
             <p class="cc-sesnota" id="ccSesNota" hidden></p>
             <div class="field"><label for="ccEmail">Correo</label>
@@ -168,6 +176,7 @@
             <div class="cc-inv-acc">
                 <button class="btn btn-primary" type="submit" id="ccInvEnv">Enviar invitación</button>
                 <button class="btn btn-ghost" type="button" id="ccInvNo">Cancelar</button>
+                <button class="btn btn-sm btn-ghost" type="button" id="ccInvProbar" title="Envía un correo de prueba a la dirección escrita arriba para verificar el SMTP del servidor">Probar envío de correo</button>
             </div>
         </form>
         <div class="cc-enl" id="ccEnl" role="group" aria-labelledby="ccEnlTit" hidden>
@@ -200,6 +209,76 @@
                 <button class="btn" type="button" id="ccEstBtn" hidden>Reintentar</button>
             </div>
         </div>
+        <div class="cc-adm" id="ccAdm" hidden>
+            <form class="cc-gate" id="admGate" autocomplete="off" novalidate>
+                <p>Estas secciones leen, exportan y borran datos de producción. Confirma con la <b>contraseña de administración</b> (la misma de <code>/admin</code>).</p>
+                <div class="field"><label for="admPass">Contraseña de administración</label>
+                    <input class="input" id="admPass" type="password" autocomplete="current-password" required></div>
+                <div class="cc-err" id="admGateErr" role="alert" hidden></div>
+                <button class="btn btn-primary" type="submit" id="admGateBtn">Desbloquear</button>
+            </form>
+            <div class="adm-body" id="admBody" hidden>
+                <div class="adm-bar">
+                    <label class="adm-lote" id="admLoteWrap"><span>Lote</span><select class="input" id="admLote" aria-label="Lote"></select></label>
+                    <span class="adm-ses" id="admSes" role="timer" aria-label="Tiempo de sesión de administración restante"></span>
+                    <button class="btn btn-sm" type="button" id="admExcel">Exportar Excel</button>
+                    <button class="btn btn-sm" type="button" id="admExcelMail">Enviar por correo</button>
+                    <button class="btn btn-sm btn-ghost" type="button" id="admSalir">Bloquear</button>
+                </div>
+                <div class="adm-msg" id="admMsg" role="status" aria-live="polite"></div>
+                <div class="adm-dlg" id="admDlg" role="group" aria-labelledby="admDlgTit" hidden></div>
+                <section id="adm-resumen" class="adm-sec" hidden></section>
+                <section id="adm-modulos" class="adm-sec" hidden>
+                    <div class="adm-filtros">
+                        <label class="adm-f">Módulo <select class="input" id="moMod"></select></label>
+                        <input class="input" id="moQ" type="search" placeholder="Buscar en la colección" aria-label="Buscar en la colección" autocomplete="off">
+                        <button class="btn btn-sm" type="button" id="moAct">Actualizar</button>
+                    </div>
+                    <div class="mv-cats" id="moCols" role="group" aria-label="Colección del módulo"></div>
+                    <div id="moEstado" class="muted" role="status" aria-live="polite"></div>
+                    <div class="adm-sel" id="moSel" hidden>
+                        <span class="grow" id="moSelN" aria-live="polite"></span>
+                        <button class="btn btn-sm btn-ghost" type="button" id="moNinguna">Quitar selección</button>
+                        <button class="btn btn-sm btn-danger" type="button" id="moEliminar">Eliminar seleccionadas…</button>
+                    </div>
+                    <div id="moLista"></div>
+                    <div class="adm-mas"><button class="btn" type="button" id="moMas" hidden>Cargar más</button></div>
+                </section>
+                <section id="adm-movimientos" class="adm-sec" hidden>
+                    <div class="mv-cats" id="mCats" role="group" aria-label="Filtrar por tipo de movimiento"></div>
+                    <div class="adm-filtros">
+                        <input class="input" id="mQ" type="search" placeholder="Buscar placa, MAC, operador o detalle" aria-label="Buscar en los movimientos">
+                        <label class="adm-f">Desde <input class="input" id="mDesde" type="date"></label>
+                        <label class="adm-f">Hasta <input class="input" id="mHasta" type="date"></label>
+                        <button class="btn btn-sm" type="button" id="mLimpiar">Quitar filtros</button>
+                        <button class="btn btn-sm" type="button" id="mAct">Actualizar</button>
+                        <button class="btn btn-sm" type="button" id="mCsv">Exportar CSV</button>
+                    </div>
+                    <div id="mEstado" class="muted" role="status" aria-live="polite"></div>
+                    <div id="mLista"></div>
+                    <div class="adm-mas"><button class="btn" type="button" id="mMas" hidden>Cargar más</button></div>
+                </section>
+                <section id="adm-borrado" class="adm-sec" hidden>
+                    <p class="muted">Estas acciones no se pueden deshacer desde la app. Antes de ejecutarlas el sistema guarda un respaldo automático de la base de datos.</p>
+                    <div class="adm-peligro">
+                        <div class="dz"><div><b>Vaciar un lote</b><span class="muted">Borra las tarjetas del lote elegido. Sus PCB vuelven al inventario como sueltas.</span></div>
+                            <div class="adm-fila"><select class="input" id="vLote" aria-label="Lote a vaciar"></select><button class="btn btn-danger" type="button" id="btnVaciar">Vaciar lote…</button></div></div>
+                        <div class="dz"><div><b>Borrar TODO</b><span class="muted">Borra tarjetas y PCB. Se conservan los lotes, la contraseña y los movimientos.</span></div>
+                            <button class="btn btn-solid-danger" type="button" id="btnReset">Borrar todo…</button></div>
+                    </div>
+                </section>
+                <section id="adm-clave" class="adm-sec" hidden>
+                    <form class="adm-form" id="formClave" autocomplete="off" novalidate>
+                        <h3>Cambiar la contraseña de administración</h3>
+                        <div class="field"><label for="cActual">Contraseña actual</label><input class="input" id="cActual" type="password" autocomplete="current-password"></div>
+                        <div class="field"><label for="cNueva">Contraseña nueva</label><input class="input" id="cNueva" type="password" autocomplete="new-password" minlength="8"><div class="hint">Mínimo 8 caracteres.</div></div>
+                        <div class="field"><label for="cRep">Repite la nueva</label><input class="input" id="cRep" type="password" autocomplete="new-password"></div>
+                        <div id="cErr" class="adm-hint" role="alert"></div>
+                        <button class="btn btn-primary" type="submit" id="btnClave">Guardar contraseña</button>
+                    </form>
+                </section>
+            </div>
+        </div>
         <p class="cc-aviso" id="ccAviso" role="status" aria-live="polite"></p>
         <div class="cc-menu" id="ccMenu" role="menu" hidden>
             <button type="button" role="menuitem" data-ac="dar">Dar a todos</button>
@@ -209,6 +288,7 @@
     </section>
 </div>
 <script src="/static/js/planetas.js?v=2"></script>
-<script src="/static/js/inicio.js?v=1418"></script>
+<script src="/static/js/inicio.js?v=1421"></script>
+<script src="/static/js/centro_admin.js?v=1"></script>
 </body>
 </html>

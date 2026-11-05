@@ -444,6 +444,34 @@ def _asegurar_columnas(conn: sqlite3.Connection) -> None:
                 conn.execute("INSERT OR IGNORE INTO firmware_catalogo (rol, version, orden) VALUES (?,?,?)", (rol, v, i))
 
 
+def asegurar_macs_mayusculas(conn: sqlite3.Connection) -> Dict[str, int]:
+    """MAC siempre en MAYÚSCULAS (AA:BB:CC:DD:EE:FF). Idempotente: solo toca filas con minúsculas.
+    En pcb_inventario (MAC única) no cambia la fila si otra ya tiene esa misma MAC en mayúsculas: la deja como está,
+    avisa en MIGRATION_WARNINGS y sigue. Devuelve cuántas filas cambió por tabla.columna."""
+    cambiadas: Dict[str, int] = {}
+    existentes = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+
+    def _cols(tabla: str) -> set:
+        return {r[1] for r in conn.execute(f"PRAGMA table_info({tabla})")} if tabla in existentes else set()
+
+    if "mac" in _cols("pcb_inventario"):
+        n = 0
+        for f in conn.execute("SELECT id, nombre, mac FROM pcb_inventario WHERE mac IS NOT NULL AND mac <> UPPER(mac)").fetchall():
+            dup = conn.execute("SELECT nombre FROM pcb_inventario WHERE mac = UPPER(?) AND id <> ?", (f["mac"], f["id"])).fetchone()
+            if dup:
+                _aviso_migracion(f"MAC en mayúsculas: {f['nombre']} ({f['mac']}) coincide con {dup['nombre']}; no se cambió.")
+                continue
+            conn.execute("UPDATE pcb_inventario SET mac = UPPER(mac) WHERE id = ?", (f["id"],))
+            n += 1
+        cambiadas["pcb_inventario.mac"] = n
+    for tabla, col in (("skytec_candados", "mac"), ("r2_programming_state", "mac"), ("catalogo_pcb", "mac_address"),
+                       ("tarjetas_produccion", "mac_r1"), ("tarjetas_produccion", "mac_r2")):
+        if col in _cols(tabla):
+            cur = conn.execute(f"UPDATE {tabla} SET {col} = UPPER({col}) WHERE {col} IS NOT NULL AND {col} <> UPPER({col})")
+            cambiadas[f"{tabla}.{col}"] = cur.rowcount
+    return cambiadas
+
+
 def init_db(db_path: Optional[Path] = None) -> None:
     """Inicializa esquema, migra bases existentes (v0/v1 -> v2) y crea el lote del mes actual si no hay ninguno."""
     target_path = Path(db_path or settings.DB_PATH)
@@ -463,6 +491,7 @@ def init_db(db_path: Optional[Path] = None) -> None:
                 _migrar_v2(conn)
             conn.executescript(SCHEMA)
         _asegurar_columnas(conn)
+        asegurar_macs_mayusculas(conn)
     finally:
         conn.close()
 

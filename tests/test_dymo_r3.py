@@ -37,27 +37,33 @@ class TestDymoR3(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn('TQT_R3_0007.label', r.headers["content-disposition"])
 
-    def test_dos_r3_por_etiqueta(self):
-        """v1.3.44: dos R3 por etiqueta, una en cada mitad; con una sola queda en la mitad izquierda."""
-        from app.services.dymo_service import calcular_diseno_r3, obtener_formato
+    def test_r3_arriba_y_r3_repetido_abajo(self):
+        """v1.4.92: una R3 arriba (QR + nombre) y abajo «R3 0001» GIRADO dos veces (izquierda y derecha)."""
+        from app.services.dymo_service import calcular_diseno_r3, caja_num_r3_der, obtener_formato
         f = obtener_formato("30334")
-        a, b = calcular_diseno_r3(f, ["TQT-R3-V30-0001", "TQT-R3-V30-0002"])
-        mitad = f.alto_mm / 2   # mitades horizontales: arriba y abajo (57 x 16 mm)
-        for md, y0 in ((a, 0), (b, mitad)):   # QR a la izquierda y texto a la derecha, dentro de su tira con margen
-            self.assertGreaterEqual(md.qr.y, y0 + 1.5 - 1e-6); self.assertLessEqual(md.qr.abajo, y0 + mitad - 1.5 + 1e-6)
-            self.assertGreater(md.texto.x, md.qr.derecha); self.assertLessEqual(md.texto.derecha, f.ancho_mm - 1.5 + 1e-6)
-            self.assertGreaterEqual(md.puntos_por_modulo, 4)
-        self.assertEqual(len(calcular_diseno_r3(f, ["TQT-R3-V30-0001"])), 1)
+        mitades = calcular_diseno_r3(f, ["TQT-R3-V30-0001", "TQT-R3-V30-0002"])
+        self.assertEqual(len(mitades), 1)   # solo la primera
+        md, mitad = mitades[0], f.alto_mm / 2
+        self.assertGreaterEqual(md.qr.y, 1.5 - 1e-6); self.assertLessEqual(md.qr.abajo, mitad - 1.5 + 1e-6)
+        self.assertGreater(md.texto.x, md.qr.derecha); self.assertGreaterEqual(md.puntos_por_modulo, 4)
+        cc = caja_num_r3_der(f)
+        self.assertGreaterEqual(cc.y, mitad); self.assertLessEqual(cc.abajo, f.alto_mm - 1.5 + 1e-6)
+        from app.services.dymo_service import caja_num_r3, caja_linea_r3, DymoService
+        cn, ln = caja_num_r3(f), caja_linea_r3(f)   # v1.4.91: R3 al borde izquierdo, R3 repetido al derecho, línea al centro
+        self.assertAlmostEqual(cn.x, 1.5); self.assertAlmostEqual(cc.derecha, f.ancho_mm - 1.5)
+        self.assertLess(cn.derecha, ln.x); self.assertLess(ln.derecha, cc.x)
+        self.assertAlmostEqual(ln.x + ln.w / 2, f.ancho_mm / 2); self.assertGreaterEqual(ln.y, mitad)
+        self.assertIn("stroke-dasharray", DymoService.generate_r3_svg(["TQT-R3-V30-0001"], "30334"))
         for tipo in ("label", "dymo"):
-            r = self.c.get(f"/api/dymo/r3/xml?nombre=TQT-R3-V30-0001&nombre=TQT-R3-V30-0002&tipo={tipo}")
+            r = self.c.get(f"/api/dymo/r3/xml?nombre=TQT-R3-V30-0001&tipo={tipo}")
             self.assertEqual(r.status_code, 200)
-            self.assertIn("QR2", r.text); self.assertIn("TQT-R3-V30-0002", r.text)
-            r1 = self.c.get(f"/api/dymo/r3/xml?nombre=TQT-R3-V30-0001&tipo={tipo}")
-            self.assertIn("QR1", r1.text); self.assertNotIn("QR2", r1.text)
-        tres = "&".join(f"nombre=TQT-R3-V30-000{i}" for i in (1, 2, 3))
-        self.assertEqual(self.c.get(f"/api/dymo/r3/xml?{tres}").status_code, 400)
-        r = self.c.get("/api/dymo/r3/archivo?nombre=TQT-R3-V30-0001&nombre=TQT-R3-V30-0002&tipo=dymo")
-        self.assertIn("TQT_R3_0001_0002.dymo", r.headers["content-disposition"])
+            self.assertIn("0001", r.text); self.assertIn("QR1", r.text); self.assertNotIn("QR2", r.text)
+            self.assertIn("Rotation90", r.text); self.assertIn("NUMR3", r.text); self.assertIn("LINEA", r.text)
+            self.assertIn("NUMR3D", r.text); self.assertNotIn("CABLE", r.text); self.assertNotIn("----", r.text)
+        dos = "nombre=TQT-R3-V30-0001&nombre=TQT-R3-V30-0002"
+        self.assertEqual(self.c.get(f"/api/dymo/r3/xml?{dos}").status_code, 400)
+        r = self.c.get("/api/dymo/r3/archivo?nombre=TQT-R3-V30-0001&tipo=dymo")
+        self.assertIn("TQT_R3_0001.dymo", r.headers["content-disposition"])
 
 
 if __name__ == "__main__":

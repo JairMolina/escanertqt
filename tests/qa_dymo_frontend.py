@@ -258,7 +258,7 @@ def escenarios(pw, nav, falso, ids):
     chk("preview con zona segura de 3 mm", abs(caja["pad"] - 3) < 0.1, str(caja))
     chk("preview escalada 3x proporcional", abs(caja["rw"] / caja["rh"] - 57 / 32) < 0.02, str(caja))
     txt = pg.evaluate("() => [...document.querySelectorAll('.dymo-l')].map(e => e.textContent)")
-    chk("preview muestra la trama de 4 lineas", txt[0] == "TQT-R1-V30-0021" and txt[2] == "TQT-R2-V30-0021" and txt[1] == txt[1].lower() and len(txt) == 4, str(txt))
+    chk("preview muestra la trama de 4 lineas", txt[0] == "TQT-R1-V30-0021" and txt[2] == "TQT-R2-V30-0021" and txt[1] == txt[1].upper() and len(txt) == 4, str(txt))
     desb = pg.evaluate("() => [...document.querySelectorAll('.dymo-l')].some(l => l.scrollWidth > l.clientWidth + 1)")
     chk("preview sin desbordar", not desb)
     chk("aviso final", "Etiqueta final" in pg.inner_text("#aviso"))

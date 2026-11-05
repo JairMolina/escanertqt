@@ -23,6 +23,7 @@ def ensure(c):
         app_sha256 TEXT NOT NULL, validation TEXT NOT NULL)''')
     if not any(r[1]=='mac' for r in c.execute('PRAGMA table_info(r2_programming_state)')):
         c.execute('ALTER TABLE r2_programming_state ADD COLUMN mac TEXT')
+    c.execute("UPDATE r2_programming_state SET mac=UPPER(mac) WHERE mac IS NOT NULL AND mac<>UPPER(mac)")
     c.execute('''CREATE TABLE IF NOT EXISTS r2_agent_presence (
         station TEXT PRIMARY KEY, seen REAL NOT NULL, available INTEGER NOT NULL)''')
     c.execute("UPDATE r2_programming_attempts SET state='error',error='Verificación interrumpida o vencida.',updated=? WHERE state IN ('flashing','queued','running') AND created<?",(time.time(),time.time()-TTL))

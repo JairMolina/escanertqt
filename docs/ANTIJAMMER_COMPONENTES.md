@@ -1,6 +1,6 @@
 # AntiJammer · Inventarios y solicitud de material
 
-Base: main `be4e152` (1.4.87). Candidato 1.4.88; solo se habilita en AntiJammer. No necesita migración.
+Base: main `be4e152` (1.4.87). Piloto revisado como 1.4.88 e integrado sobre producción en 1.4.89; solo se habilita en AntiJammer. No necesita migración.
 
 - **Inventario de PCB** (`/antijammer#inventario`): placas físicas, serie, lote, estado y firmware; conserva la recepción, los filtros y las acciones existentes.
 - **Inventario de componentes** (`/antijammer#materiales`): Resumen (ensambles posibles, pendientes RX/TX y mínimos), Componentes (búsqueda, BOM por tarjeta, existencias, mínimos y movimientos), Registro (movimientos y consumo por PCB) y Solicitud de material. El catálogo se edita en Costos, sin duplicarlo. Los permisos de consulta y edición siguen siendo los del módulo.

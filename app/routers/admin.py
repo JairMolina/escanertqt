@@ -190,9 +190,10 @@ async def cambiar_clave(payload: CambiarClaveIn, request: Request, response: Res
 async def movimientos(limite: int = Query(50, ge=1, le=200), desplazamiento: int = Query(0, ge=0, le=1_000_000),
                       categoria: Optional[str] = Query(None, max_length=20), q: Optional[str] = Query(None, max_length=100),
                       desde: Optional[str] = Query(None, max_length=10), hasta: Optional[str] = Query(None, max_length=10),
-                      lote_id: Optional[int] = Query(None, ge=1, le=2**31), _: Dict = Depends(admin_requerido)):
+                      lote_id: Optional[int] = Query(None, ge=0, le=2**31, description="0 = todos los lotes (así lo manda el selector del Centro de administración)"),
+                      _: Dict = Depends(admin_requerido)):
     try:
-        return await run_in_threadpool(admin_ops.movimientos, limite, desplazamiento, categoria, q, desde, hasta, lote_id)
+        return await run_in_threadpool(admin_ops.movimientos, limite, desplazamiento, categoria, q, desde, hasta, lote_id or None)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 

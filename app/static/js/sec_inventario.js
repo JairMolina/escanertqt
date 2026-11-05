@@ -54,7 +54,7 @@
                 { id: 'nombre', titulo: 'Nombre', cel: (p) => h('span', { class: 'mono' }, p.nombre), sort: (a, b) => util.cmp(a.serie, b.serie) || util.cmp(a.tipo, b.tipo) },
                 { id: 'version', titulo: 'Hardware', cel: (p) => h('span', { class: 'mono' }, 'V' + p.version), sort: (a, b) => (+a.version) - (+b.version) },
                 { id: 'firmware', titulo: 'Firmware', cel: (p) => (p.firmware ? h('span', { class: 'mono' }, p.firmware) : h('span', { class: 'muted' }, 'sin firmware')), valor: (p) => p.firmware || '' },
-                { id: 'mac', titulo: 'MAC', cel: (p) => (p.tipo === 'R3' ? h('span', { class: 'muted' }, 'no aplica') : p.mac ? h('span', { class: 'mono' }, String(p.mac).toLowerCase()) : h('span', { class: 'muted' }, 'sin MAC')), valor: (p) => (p.tipo === 'R3' ? '' : p.mac) },
+                { id: 'mac', titulo: 'MAC', cel: (p) => (p.tipo === 'R3' ? h('span', { class: 'muted' }, 'no aplica') : p.mac ? h('span', { class: 'mono' }, String(p.mac).toUpperCase()) : h('span', { class: 'muted' }, 'sin MAC')), valor: (p) => (p.tipo === 'R3' ? '' : p.mac) },
                 { id: 'estado_ciclo', titulo: 'Estado', cel: (p) => T.cicloBadge(p.estado_ciclo, p) },
                 { id: 'tarjeta', titulo: 'Tarjeta', cls: 'c-3', cel: (p) => (p.id_tarjeta_num ? h('a', { class: 'mono', href: `#/tarjetas?id=${p.tarjeta_id}` }, p.id_tarjeta_num) : h('span', { class: 'muted' }, '—')), valor: (p) => p.id_tarjeta_num },
                 { id: 'lote', titulo: 'Lote', cls: 'c-2', cel: (p) => (p.lote_id ? h('span', null, loteNom(p.lote_id)) : h('span', { class: 'muted' }, 'Sin lote')), valor: (p) => loteNom(p.lote_id) },
@@ -98,8 +98,8 @@
                 const segB = ['R1', 'R2', 'R3'].map((t) => h('button', { type: 'button', 'aria-pressed': String(t === tipo), onclick: () => { tipo = t; segB.forEach((b, i) => b.setAttribute('aria-pressed', String(['R1', 'R2', 'R3'][i] === t))); upd(); } }, t));
                 [inVer, inSer].forEach((i) => i.addEventListener('input', () => { i.value = i.value.replace(/\D/g, ''); upd(); }));
                 upd();
-                const macIn = p.tipo === 'R3' ? null : h('input', { class: 'input mono', id: 'eMac', maxlength: 17, placeholder: 'sin MAC', value: p.mac ? String(p.mac).toLowerCase() : '' });
-                if (macIn) macIn.addEventListener('input', () => { macIn.value = T.formatMacProgress(macIn.value).toLowerCase(); });
+                const macIn = p.tipo === 'R3' ? null : h('input', { class: 'input mono', id: 'eMac', maxlength: 17, placeholder: 'sin MAC', value: p.mac ? String(p.mac).toUpperCase() : '' });
+                if (macIn) macIn.addEventListener('input', () => { macIn.value = T.formatMacProgress(macIn.value); });
                 const fwSel = h('select', { class: 'input', id: 'eFw' }, h('option', { value: '' }, 'Sin firmware'),
                     [...new Set([...opciones, ...(p.firmware ? [p.firmware] : [])])].map((v) => h('option', { value: v, selected: v === p.firmware ? '' : null }, v)),
                     h('option', { value: '__otra' }, 'Otra versión…'));

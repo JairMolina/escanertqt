@@ -3,8 +3,8 @@
  * La vista previa es a escala real; la impresión NO usa el navegador: se envía el XML a DYMO Connect
  * (TQTDymo, js/dymo_connect.js) o se descarga el archivo .dymo para abrirlo con la app.
  *
- * Trama (texto exacto, 4 líneas, sin línea final; MAC en minúsculas):
- *     TQT-R1-V30-0021 / 70:4b:ca:5b:9f:6e / TQT-R2-V30-0010 / 70:4b:ca:5b:9c:a2
+ * Trama (texto exacto, 4 líneas, sin línea final; MAC en MAYÚSCULAS):
+ *     TQT-R1-V30-0021 / 70:4B:CA:5B:9F:6E / TQT-R2-V30-0010 / 70:4B:CA:5B:9C:A2
  * Es el texto impreso y el contenido del QR. Si falta una MAC, su línea queda vacía (nunca se inventa).
  * API: GET /api/tarjetas · GET /api/dymo/label/{id}/xml · GET /api/dymo/label/{id}/archivo
  */
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pcbDe = (t, s) => t[s] || (t[`nombre_${s}`] ? { nombre: t[`nombre_${s}`], mac: t[`mac_${s}`], estado_pcb: t[`estado_pcb_${s}`] } : null);
     function lineas(t) {
         const r1 = pcbDe(t, 'r1'), r2 = pcbDe(t, 'r2');
-        const mac = (p) => (p && p.mac ? String(p.mac).toLowerCase() : '');
+        const mac = (p) => (p && p.mac ? String(p.mac).toUpperCase() : '');
         return [r1 ? r1.nombre : '', mac(r1), r2 ? r2.nombre : '', mac(r2)];
     }
     const trama = (t) => lineas(t).join('\n');
@@ -422,8 +422,8 @@ html, body { margin: 0; padding: 0; background: #fff; }
     const ancho = Math.min(window.innerWidth, 1100) - 72;
     const zFit = Math.max(1, Math.min(3, Math.floor(ancho / (57 * 96 / 25.4))));
     state.zoom = zFit; $('selZoom').value = String(zFit);
-    // ------------------------------------------------------------------ etiquetas R3 (v1.3.44): DOS R3 por etiqueta, una por mitad
-    // La R3 es muy pequeña: la etiqueta se corta por la mitad y cada mitad lleva el QR y el nombre de una R3.
+    // ------------------------------------------------------------------ etiquetas R3 (v1.4.89): UNA R3 arriba + «R3 nnnn» dos veces abajo
+    // La R3 es muy pequeña: la mitad de arriba lleva el QR y el nombre de la R3; la de abajo «R3» + número girado, repetido a izquierda y derecha.
     // Origen: las R3 de las tarjetas de un lote (como el lote de R1/R2) o un rango de series.
     const soloDig = (e) => { e.target.value = e.target.value.replace(/\D/g, ''); };
     const r3Serie = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 && n <= 9999 ? n : null; };
@@ -431,34 +431,37 @@ html, body { margin: 0; padding: 0; background: #fff; }
     const esLote = () => $('r3Origen').value === 'lote';
     function r3Nombres() {
         const ver = ($('r3Ver').value || '').replace(/\D/g, '') || '30';
-        if (esLote()) return { ver, lista: r3st.lote.map((x) => x.nombre), error: r3st.error || (r3st.cargando ? 'Cargando las R3 del lote…' : (!r3st.lote.length && $('r3Lote').value ? 'No hay R3 en las tarjetas del lote ni R3 sueltas.' : '')) };
+        if (esLote()) return { ver, lista: r3st.lote.map((x) => ({ nombre: x.nombre })), error: r3st.error || (r3st.cargando ? 'Cargando las R3 del lote…' : (!r3st.lote.length && $('r3Lote').value ? 'No hay R3 en las tarjetas del lote ni R3 sueltas.' : '')) };
         const d = r3Serie($('r3Desde').value); if (d === null) return { ver, lista: [] };
         const hRaw = $('r3Hasta').value.trim(); const hh = hRaw ? r3Serie(hRaw) : d;
         if (hh === null || hh < d) return { ver, lista: [], error: '"Serie hasta" debe ser mayor o igual que "desde".' };
-        if (hh - d >= 1000) return { ver, lista: [], error: 'Máximo 1000 R3 (500 etiquetas) por tanda.' };
-        const lista = []; for (let n = d; n <= hh; n++) lista.push(`TQT-R3-V${ver}-${String(n).padStart(4, '0')}`);
+        if (hh - d >= 1000) return { ver, lista: [], error: 'Máximo 1000 R3 (1000 etiquetas) por tanda.' };
+        const lista = []; for (let n = d; n <= hh; n++) lista.push({ nombre: `TQT-R3-V${ver}-${String(n).padStart(4, '0')}` });
         return { ver, lista };
     }
-    const pares = (lista) => { const out = []; for (let i = 0; i < lista.length; i += 2) out.push(lista.slice(i, i + 2)); return out; };
     function mitad(nombre) {
-        if (!nombre) return h('div', { class: 'r3m' }, h('span', { class: 'r3m-vacia' }, 'Mitad libre'));
         const svg = qrSvg(nombre);
         const total = +svg.getAttribute('viewBox').split(' ')[2];
         let ppm = 6; while (ppm > 3 && total * ppm / 11.811 > 13) ppm--;   // igual que calcular_diseno_r3 del servidor (tira de 16 mm)
         const mm = (total * ppm / 11.811).toFixed(2) + 'mm'; svg.setAttribute('width', mm); svg.setAttribute('height', mm);
         return h('div', { class: 'r3m' }, h('div', { class: 'dymo-qr' }, svg), h('span', { class: 'dymo-l n' }, nombre));
     }
+    // v1.4.92: abajo «R3» + 4 dígitos GIRADO, pegado a la izquierda y repetido pegado a la derecha, con línea punteada al centro
+    const numR3 = (nombre) => h('div', { class: 'cable-num r3-cable-num' }, h('span', { class: 'cable-tqt' }, 'R3'), h('span', null, nombre.slice(-4)));
+    const mitadCable = (nombre) => h('div', { class: 'r3m r3cable' }, numR3(nombre), h('i', { class: 'cable-linea', 'aria-hidden': 'true' }), numR3(nombre));
+    const nodoR3 = (it) => h('div', { class: 'dymo-label r3doble' }, mitad(it.nombre), mitadCable(it.nombre));
     function r3Vista() {
         document.querySelectorAll('.r3-serie').forEach((e) => { e.hidden = esLote(); });
         document.querySelectorAll('.r3-lote').forEach((e) => { e.hidden = !esLote(); });
         const { ver, lista, error } = r3Nombres();
-        const par = lista.length ? lista.slice(0, 2) : [`TQT-R3-V${ver}-0000`];
-        $('r3Ejemplo').textContent = par.join(' + ');
-        $('r3Label').replaceChildren(h('div', { class: 'dymo-label r3doble', role: 'img', 'aria-label': `Etiqueta R3: ${par.join(' y ')}` }, mitad(par[0]), mitad(par[1])));
+        const it = lista.length ? lista[0] : { nombre: `TQT-R3-V${ver}-0000` };
+        $('r3Ejemplo').textContent = it.nombre;
+        const nodo = nodoR3(it); nodo.setAttribute('role', 'img'); nodo.setAttribute('aria-label', `Etiqueta R3: ${it.nombre}`);
+        $('r3Label').replaceChildren(nodo);
         $('r3ZoomHost').style.transform = `scale(${state.zoom})`;
         const lbl = $('r3Label').firstChild; $('r3ZoomHost').style.width = `${lbl.offsetWidth * state.zoom}px`; $('r3ZoomHost').style.height = `${lbl.offsetHeight * state.zoom}px`;
-        const n = pares(lista).length;
-        $('r3Info').textContent = error || (lista.length ? `${lista.length} R3 → ${n} etiqueta${n === 1 ? '' : 's'} (${lista[0]} … ${lista[lista.length - 1]})${lista.length % 2 ? ' · la última lleva una sola R3' : ''}` : 'Vista previa · 57 × 32 mm, dos mitades');
+        const n = lista.length;
+        $('r3Info').textContent = error || (n ? `${n} R3 → ${n} etiqueta${n === 1 ? '' : 's'} (${lista[0].nombre} … ${lista[n - 1].nombre})` : 'Vista previa · 57 × 32 mm: R3 arriba, R3 repetido abajo');
         $('btnR3Print').disabled = $('btnR3Open').disabled = !lista.length || state.busy;
         $('btnR3Print').lastChild.textContent = esLote() ? ' Imprimir lote R3 en DYMO…' : ' Imprimir R3 en DYMO';
     }
@@ -506,37 +509,37 @@ html, body { margin: 0; padding: 0; background: #fff; }
     });
     ['r3Ver', 'r3Desde', 'r3Hasta', 'r3Copias'].forEach((id) => $(id).addEventListener('input', (e) => { soloDig(e); r3Vista(); }));
     $('selZoom').addEventListener('change', r3Vista);
-    const qsR3 = (par) => par.map((n) => `nombre=${encodeURIComponent(n)}`).join('&');
-    async function xmlR3(par, tipo) {
+    const qsR3 = (it) => `nombre=${encodeURIComponent(it.nombre)}`;
+    async function xmlR3(it, tipo) {
         let res;
-        try { res = await fetch(`/api/dymo/r3/xml?${qsR3(par)}&tipo=${tipo}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        try { res = await fetch(`/api/dymo/r3/xml?${qsR3(it)}&tipo=${tipo}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
         if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`);
         const txt = await res.text();
         if (!D.esXmlEtiqueta(txt)) throw new Error('El servidor no devolvió un XML de etiqueta válido.');
         return txt;
     }
-    async function imprimirR3(printer, par, c) {
-        if (printer === REMOTA) { await R.imprimir({ tipo: 'r3', nombres: par.filter(Boolean), copias: c }); return; }
-        if (navegador()) { encolar(h('div', { class: 'dymo-label r3doble' }, mitad(par[0]), mitad(par[1])), c); return; }
+    async function imprimirR3(printer, it, c) {
+        if (printer === REMOTA) { await R.imprimir({ tipo: 'r3', nombres: [it.nombre], copias: c }); return; }
+        if (navegador()) { encolar(nodoR3(it), c); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
-            try { await D.print(printer, await xmlR3(par, tipo), c); return; }
+            try { await D.print(printer, await xmlR3(it, tipo), c); return; }
             catch (e) { if (/no respondi|no encuentra|Elige|cargó|Sin conexión/i.test(e.message)) throw e; if (!primero) primero = e; }
         }
         throw primero;
     }
     async function imprimirParesR3(lista) {
-        const etiquetas = pares(lista); const tq = lista.every((n) => /-R3-/.test(n)) ? 'R3' : 'individual';
+        const etiquetas = lista; const tq = lista.every((x) => /-R3-/.test(x.nombre)) ? 'R3' : 'individual';
         const printer = $('selPrinter').value; const c = Math.max(1, Math.min(99, parseInt($('r3Copias').value || '1', 10) || 1));
         state.busy = true; refrescarBotones(); r3Vista(); let hechas = 0; const fallos = [];
-        for (const par of etiquetas) {
-            progreso(hechas, etiquetas.length, `Imprimiendo ${hechas + 1} de ${etiquetas.length}: ${par.join(' + ')}…`);
-            try { await imprimirR3(printer, par, c); hechas++; }
-            catch (e) { fallos.push(`${par.join(' + ')}: ${e.message}`); if (/no respondió|DYMO Connect|servicio|compartida/i.test(e.message)) break; }
+        for (const it of etiquetas) {
+            progreso(hechas, etiquetas.length, `Imprimiendo ${hechas + 1} de ${etiquetas.length}: ${it.nombre}…`);
+            try { await imprimirR3(printer, it, c); hechas++; }
+            catch (e) { fallos.push(`${it.nombre}: ${e.message}`); if (/no respondió|DYMO Connect|servicio|compartida/i.test(e.message)) break; }
         }
         progreso(hechas, etiquetas.length, `${hechas} de ${etiquetas.length} etiquetas ${tq} enviadas.`);
         if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} etiqueta${fallos.length === 1 ? '' : 's'} ${tq} sin imprimir. `), fallos.slice(0, 4).join(' · ')));
-        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} ${tq} (${lista.length} placas) enviada${hechas === 1 ? '' : 's'} a la DYMO. Las etiquetas de placas sueltas no quedan registradas como impresas.`, { kind: 'ok', ms: 5000 });
+        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} ${tq} enviada${hechas === 1 ? '' : 's'} a la DYMO. Las etiquetas de placas sueltas no quedan registradas como impresas.`, { kind: 'ok', ms: 5000 });
         ocultarProg(4000); state.busy = false; refrescarBotones(); r3Vista();
     }
     // Lote: hoja con TODAS las R3 del lote para marcar cuáles imprimir (igual que "Imprimir lote en DYMO…" de R1/R2)
@@ -552,8 +555,8 @@ html, body { margin: 0; padding: 0; background: #fff; }
         const visibles = () => { const f = sinCeros(filtro.value.replace(/\D/g, '')); return todas.filter((x) => !f || sinCeros(x.nombre.slice(-4)).includes(f) || sinCeros(x.num).includes(f)); };
         let btnImp = null;
         const actualizarCuenta = () => {
-            const n = marcadas.size, et = Math.ceil(n / 2);
-            cuenta.textContent = `${n} de ${todas.length} R3 seleccionada${n === 1 ? '' : 's'} → ${et} etiqueta${et === 1 ? '' : 's'}${n % 2 ? ' (la última con una sola R3)' : ''}`;
+            const n = marcadas.size, et = n;
+            cuenta.textContent = `${n} de ${todas.length} R3 seleccionada${n === 1 ? '' : 's'} → ${et} etiqueta${et === 1 ? '' : 's'}`;
             if (btnImp) btnImp.disabled = !n;
         };
         function pintarLista() {
@@ -575,7 +578,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         const c = Math.max(1, Math.min(99, parseInt($('r3Copias').value || '1', 10) || 1));
         const nomLote = $('r3Lote').selectedOptions[0] ? $('r3Lote').selectedOptions[0].textContent : '';
         const cuerpo = h('div', { class: 'stack', style: 'display:flex;flex-direction:column;gap:12px' },
-            h('p', { class: 'muted' }, `Lote ${nomLote}. Aparecen las R3 de sus tarjetas y las R3 sueltas (sin emparejar). Marca las que quieres imprimir: van dos por etiqueta, en orden (${c} copia${c === 1 ? '' : 's'} de cada etiqueta).`),
+            h('p', { class: 'muted' }, `Lote ${nomLote}. Aparecen las R3 de sus tarjetas y las R3 sueltas (sin emparejar). Marca las que quieres imprimir: cada una lleva su número R3 repetido abajo (${c} copia${c === 1 ? '' : 's'} de cada etiqueta).`),
             h('div', { class: 'row wrap', style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, filtro,
                 h('button', { class: 'btn btn-sm', type: 'button', onclick: () => marcarVisibles(true) }, 'Marcar todas'),
                 h('button', { class: 'btn btn-sm', type: 'button', onclick: () => marcarVisibles(false) }, 'Quitar todas'),
@@ -589,7 +592,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
             actions: [
                 { label: 'Cancelar', onClick: () => true },
                 { label: 'Imprimir seleccionadas', kind: 'primary', icon: 'layers', onClick: () => {
-                    const elegidas = todas.filter((x) => marcadas.has(x.nombre)).map((x) => x.nombre);
+                    const elegidas = todas.filter((x) => marcadas.has(x.nombre)).map((x) => ({ nombre: x.nombre }));
                     if (!elegidas.length) return false;
                     imprimirParesR3(elegidas);
                     return true;
@@ -605,41 +608,16 @@ html, body { margin: 0; padding: 0; background: #fff; }
     });
     $('btnR3Open').addEventListener('click', () => {
         const { lista } = r3Nombres(); if (!lista.length) return;
-        const etiquetas = pares(lista);
-        etiquetas.slice(0, 20).forEach((par, i) => setTimeout(() => bajar(`/api/dymo/r3/archivo?${qsR3(par)}&tipo=label`, `TQT_R3_${par.map((n) => n.slice(-4)).join('_')}.label`), i * 300));
+        const etiquetas = lista;
+        etiquetas.slice(0, 20).forEach((it, i) => setTimeout(() => bajar(`/api/dymo/r3/archivo?${qsR3(it)}&tipo=label`, `TQT_R3_${it.nombre.slice(-4)}.label`), i * 300));
         toast(etiquetas.length > 20 ? 'Se descargaron las primeras 20. Para más, imprime directo en DYMO.' : 'Archivo .label descargado. Ábrelo con DYMO Label (o DYMO Connect).', { ms: 4000 });
     });
     r3Vista();
     cargarLotesR3();
 
     // ------------------------------------------------------------------ etiquetas de cable (v1.3.83): una por número
-    // La etiqueta se divide a la mitad en vertical; solo la izquierda lleva el número porque la derecha se enrolla en el cable.
-    const cableDoble = () => $('cableBarra').getAttribute('aria-pressed') === 'true';   // v1.3.92: «0000/0000» (R1/R2)
-    function cableNumeros() {
-        const d = $('cableDesde').value.trim(), hs = $('cableHasta').value.trim() || d;
-        if (!d) return { lista: [], error: '' };
-        if (cableDoble()) {
-            const r2 = $('cableR2').value.trim();
-            if (!/^\d{1,4}$/.test(d) || !/^\d{1,4}$/.test(r2)) return { lista: [], error: r2 ? 'Escribe números de 1 a 4 dígitos.' : 'Escribe también el número de la R2.' };
-            return { lista: [`${d.padStart(4, '0')}/${r2.padStart(4, '0')}`], error: '' };
-        }
-        if (!/^\d{1,4}$/.test(d) || !/^\d{1,4}$/.test(hs)) return { lista: [], error: 'Escribe números de 1 a 4 dígitos.' };
-        const a = +d, b = +hs;
-        if (b < a) return { lista: [], error: '«Hasta» debe ser mayor o igual que «Desde».' };
-        if (b - a >= 500) return { lista: [], error: 'Máximo 500 etiquetas por tanda.' };
-        const lista = []; for (let n = a; n <= b; n++) lista.push(String(n).padStart(4, '0'));
-        return { lista, error: '' };
-    }
     const nodoCable = (num) => h('div', { class: 'dymo-label cable', role: 'img', 'aria-label': `Etiqueta de cable: ${num}` },
         h('div', { class: num.includes('/') ? 'cable-num doble' : 'cable-num' }, h('span', { class: 'cable-tqt' }, 'TQT'), h('span', null, num)), h('div', { class: 'cable-vacia', 'aria-hidden': 'true' }), h('i', { class: 'cable-linea', 'aria-hidden': 'true' }));
-    function cableVista() {
-        const { lista, error } = cableNumeros(); const num = lista[0] || (cableDoble() ? '0000/0000' : '0000');
-        $('cableLabel').replaceChildren(nodoCable(num));
-        $('cableZoomHost').style.transform = `scale(${state.zoom})`;
-        const lbl = $('cableLabel').firstChild; $('cableZoomHost').style.width = `${lbl.offsetWidth * state.zoom}px`; $('cableZoomHost').style.height = `${lbl.offsetHeight * state.zoom}px`;
-        $('cableInfo').textContent = error || (lista.length ? `${lista.length} etiqueta${lista.length === 1 ? '' : 's'} (${lista[0]}${lista.length > 1 ? ' … ' + lista[lista.length - 1] : ''})` : 'Vista previa · 57 × 32 mm, número en la mitad izquierda');
-        $('btnCablePrint').disabled = $('btnCableOpen').disabled = !lista.length || state.busy;
-    }
     async function xmlCable(num, tipo, r3) {
         let res;
         try { res = await fetch(`/api/dymo/cable/xml?numero=${encodeURIComponent(num)}&tipo=${tipo}${r3 ? `&r3=${encodeURIComponent(r3)}` : ''}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
@@ -658,32 +636,6 @@ html, body { margin: 0; padding: 0; background: #fff; }
         }
         throw primero;
     }
-    $('btnCablePrint').addEventListener('click', async () => {
-        const { lista } = cableNumeros(); if (!lista.length) return;
-        const printer = $('selPrinter').value; const c = Math.max(1, Math.min(99, parseInt($('cableCopias').value || '1', 10) || 1));
-        state.busy = true; refrescarBotones(); cableVista(); let hechas = 0; const fallos = [];
-        for (const num of lista) {
-            progreso(hechas, lista.length, `Imprimiendo ${hechas + 1} de ${lista.length}: cable ${num}…`);
-            try { await imprimirCable(printer, num, c); hechas++; }
-            catch (e) { fallos.push(`${num}: ${e.message}`); if (/no respondió|DYMO Connect|servicio|compartida/i.test(e.message)) break; }
-        }
-        progreso(hechas, lista.length, `${hechas} de ${lista.length} etiquetas de cable enviadas.`);
-        if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} etiqueta${fallos.length === 1 ? '' : 's'} de cable sin imprimir. `), fallos.slice(0, 4).join(' · ')));
-        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} de cable enviada${hechas === 1 ? '' : 's'} a la DYMO.`, { kind: 'ok', ms: 4000 });
-        ocultarProg(4000); state.busy = false; refrescarBotones(); cableVista();
-    });
-    $('btnCableOpen').addEventListener('click', () => {
-        const { lista } = cableNumeros();
-        lista.slice(0, 20).forEach((num, i) => setTimeout(() => bajar(`/api/dymo/cable/archivo?numero=${encodeURIComponent(num)}&tipo=label`, `TQT_cable_${num.replace('/', '-')}.label`), i * 250));
-    });
-    ['cableDesde', 'cableHasta', 'cableR2'].forEach((id) => $(id).addEventListener('input', cableVista));
-    $('cableBarra').addEventListener('click', () => {
-        const on = !cableDoble(); $('cableBarra').setAttribute('aria-pressed', String(on)); $('cableBarra').classList.toggle('btn-primary', on);
-        $('cableR2Box').hidden = !on; $('cableHastaBox').hidden = on; $('cableDesdeLbl').textContent = on ? 'Número R1' : 'Número desde';
-        cableVista(); if (on) $('cableR2').focus();
-    });
-    $('selZoom').addEventListener('change', cableVista);
-    cableVista();
 
     // ------------------------------------------------------------------ v1.4.5: «Cable R3» (TQT: 0000 arriba, R3: 0000 abajo)
     // Al emparejar una R3 con su R1/R2 (evento WS), la tarjeta y su R3 se cargan solas en esta zona.
@@ -830,15 +782,15 @@ html, body { margin: 0; padding: 0; background: #fff; }
             return fila(T.tipoChip('R1'), h('span', { class: 'mono grow', style: 'min-width:0;overflow-wrap:anywhere' }, `Tarjeta ${t.id_tarjeta_num} · ${l[0]} + ${l[2]}`),
                 h('span', { class: 'hint' }, fin ? 'final' : 'identificación'), quitar(() => ESC.tarjetas.delete(t.id), `Quitar tarjeta ${t.id_tarjeta_num}`));
         });
-        pares(ESC.r3).forEach((par, i) => {
-            const tipos = [...new Set(par.map((n) => (/-R([123])-/.exec(n) || [])[1]).filter(Boolean))];
-            filas.push(fila(T.tipoChip(tipos.length === 1 ? 'R' + tipos[0] : 'R3'), h('span', { class: 'mono grow', style: 'min-width:0;overflow-wrap:anywhere' }, `Etiqueta individual ${i + 1} · ${par.join(' + ')}${par.length === 1 ? ' (mitad libre)' : ''}`),
-                ...par.map((n) => quitar(() => { ESC.r3 = ESC.r3.filter((x) => x !== n); }, `Quitar ${n}`))));
+        ESC.r3.forEach((n, i) => {
+            const m = /-R([123])-/.exec(n);
+            filas.push(fila(T.tipoChip(m ? 'R' + m[1] : 'R3'), h('span', { class: 'mono grow', style: 'min-width:0;overflow-wrap:anywhere' }, `Etiqueta individual ${i + 1} · ${n}`),
+                quitar(() => { ESC.r3 = ESC.r3.filter((x) => x !== n); }, `Quitar ${n}`)));
         });
-        const nR3 = pares(ESC.r3).length;
+        const nR3 = ESC.r3.length;
         $('escLista').replaceChildren(...(filas.length ? filas : [h('p', { class: 'muted', style: 'margin:0' }, 'Todavía no has escaneado nada.')]));
         $('escCuenta').hidden = !filas.length; $('escCuenta').textContent = String(tj.length + nR3);
-        $('escResumen').textContent = filas.length ? `${tj.length} tarjeta${tj.length === 1 ? '' : 's'} (R1 + R2) · ${ESC.r3.length} placa${ESC.r3.length === 1 ? '' : 's'} individual${ESC.r3.length === 1 ? '' : 'es'} en ${nR3} etiqueta${nR3 === 1 ? '' : 's'} → ${tj.length + nR3} etiqueta${tj.length + nR3 === 1 ? '' : 's'} en total` : '';
+        $('escResumen').textContent = filas.length ? `${tj.length} tarjeta${tj.length === 1 ? '' : 's'} (R1 + R2) · ${ESC.r3.length} placa${ESC.r3.length === 1 ? '' : 's'} individual${ESC.r3.length === 1 ? '' : 'es'} → ${tj.length + nR3} etiqueta${tj.length + nR3 === 1 ? '' : 's'} en total` : '';
         refrescarBotones();
     }
     $('btnEscVinc').addEventListener('click', escVincular);
@@ -854,7 +806,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
     $('btnEscPrint').addEventListener('click', async () => {
         const tj = [...ESC.tarjetas.values()]; const r3 = ESC.r3.slice();
         if (tj.length) await imprimirSeleccion(tj);
-        if (r3.length) await imprimirParesR3(r3);
+        if (r3.length) await imprimirParesR3(r3.map((nombre) => ({ nombre })));
     });
     const wsc = T.ws && T.ws('monitor');
     if (wsc && wsc.on) {
@@ -882,7 +834,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
     escPintar(); escRestaurar();
 
     // ------------------------------------------------------------------ v1.3.94: zonas con botones (la hoja era muy larga)
-    // Solo se ve la zona elegida: tarjetas, escanear, R3 o cable. Se recuerda la última en este navegador.
+    // Solo se ve la zona elegida: tarjetas, escanear, R3 o cable R3. Se recuerda la última en este navegador.
     const ZONA_KEY = 'tqt.dymo.zona';
     const zonaActual = () => { const b = document.querySelector('#zonas [aria-pressed="true"]'); return b ? b.dataset.zona : 'tarj'; };
     function mostrarZona(z, enfocar) {
@@ -892,7 +844,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         document.querySelectorAll('main [data-zona]:not(button)').forEach((el) => { el.hidden = el.dataset.zona !== z; });
         try { localStorage.setItem(ZONA_KEY, z); } catch (e) { /* nada */ }
         // Las vistas previas miden la etiqueta y oculta mide 0: se recalculan al mostrarse
-        aplicarZoom(); r3Vista(); cableVista(); cr3Vista();
+        aplicarZoom(); r3Vista(); cr3Vista();
         if (enfocar && z === 'esc') $('escIn').focus();   // listo para el lector USB
     }
     document.querySelectorAll('#zonas [data-zona]').forEach((b) => b.addEventListener('click', () => mostrarZona(b.dataset.zona, true)));

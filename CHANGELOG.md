@@ -1,8 +1,20 @@
 # Historial de versiones — Escáner TQT
 
-## v1.4.88 — 2026-11-05
+## v1.4.89 — 2026-11-05
 
-- AntiJammer: inventario de PCB separado del inventario de componentes. Solicitud RX/TX según el material por tarjeta, con o sin descontar existencias compartidas; descarga CSV sin alterar stock.
+- AntiJammer: inventarios de PCB y componentes separados, solicitud RX/TX con o sin existencias y descarga CSV sin modificar el stock. Integra el piloto aprobado sobre la versión de producción 1.4.88, con el Centro de Administración y la etiqueta R3 conservados.
+
+## Sin versionar (rama comandos-pruebas-auto-1.4.78, avance sin commitear)
+- **Etiqueta R3 = una R3 arriba (QR + nombre) y abajo el cable de esa R3** («TQT: 0123 / R3: 0102»; sin cable «TQT: ----»). Parámetro opcional `cable` en `/api/dymo/r3/xml|archivo`, `.label`/`.dymo`/SVG remoto y vista previa; el endpoint pide exactamente 1 `nombre` y el trabajo remoto `r3` acepta 1 nombre + `cable`. Pruebas: tests.test_dymo_r3, test_dymo_remoto, test_qa_dymo, test_cable_r3_auto (48 OK, unittest). No cambia la versión.
+
+## v1.4.88 — 2026-11-03
+- **Administración migrada al Centro de administración** (núcleo «Administrar» de `/inicio`). El panel ahora tiene pestañas: **Cuentas, Resumen, Tarjetas, PCB, Movimientos, Borrado y Clave** (`app/static/js/centro_admin.js`). Incluye totales, lotes, inventario, copia de la base (.db), interruptor «Cable R3 automático», tablas con selección y eliminación, movimientos con filtros y CSV, vaciar lote / borrar todo (palabra de confirmación), cambio de clave, exportar Excel y enviar por correo.
+- **Doble control:** se entra con la sesión de administrador del portal y las secciones de datos piden además la contraseña de `/admin` (mismo token `X-Admin-Token`, 30 min, botón «Bloquear»). Al cerrar el panel no queda ningún dato en pantalla.
+- **Cuentas:** activar/desactivar, eliminar (confirmación en línea; no sobre la propia sesión), estado «Desactivada» / «Invitación caducada», último acceso y «Probar envío de correo». API `/api/plataforma`: `PATCH /cuentas/{email}` acepta `activo`; nuevos `DELETE /cuentas/{email}` y `POST /correo/prueba`; la lista trae `ultimo_acceso` e `inv_exp`. Siempre queda al menos un administrador activo.
+- **`/admin` ahora redirige** a `/inicio?centro=1` (conserva `#seccion`, p. ej. `#movimientos`, y `?next=/monitor`, que vuelve al monitor tras desbloquear). Los endpoints `/api/admin/*` no cambian. `admin.html`/`admin.js` quedan como archivos sin enlace.
+- **Módulos en el Centro (opción B):** nueva pestaña «Módulos» con selector de módulo y colecciones (`app/routers/plataforma_admin.py`: `GET /api/plataforma/admin/modulos`, `GET|DELETE .../{id}/colecciones/{col}`; rol administrador + clave de `/admin`, respaldo antes de borrar). Borrables: Escáner TQT (tarjetas, PCB), Impresora (activos) y placas de Caiquén, Skudo AntiJammer, Skudo Sigfox, TPMS y SpeedLocker. Tarjetas y PCB salieron de las pestañas fijas del Centro.
+- **MAC en mayúsculas en Escáner TQT** (pantallas, API, Excel, etiquetas DYMO —trama y QR ahora en mayúsculas—) con migración idempotente `db.asegurar_macs_mayusculas()` (no toca las que colisionen; avisa en `MIGRATION_WARNINGS`).
+- Agente 1.4.88 (solo sube la versión, igual que la web).
 
 ## v1.4.87 — 2026-11-02
 - **Placas sueltas sin lote visibles.** Las placas recibidas antes de existir los lotes (lote vacío) ya salen en cualquier lote elegido (inventario, conteos, consulta por código/número, escaneo y resumen). Al asignarse a una tarjeta toman el lote de la tarjeta. El inventario ahora filtra siempre con el lote de la tarjeta o el de recepción, igual que los conteos.

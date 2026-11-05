@@ -29,11 +29,13 @@
         .dymo-l.n { font-weight: 700; }
         .dymo-l.m { font-weight: 700; }
         .dymo-l.r3 { font-size: 11pt; }
-        /* R3 doble (v1.3.44): dos tiras horizontales de 57 x 16 mm (QR a la izquierda, nombre a la derecha); la línea punteada azul marca el corte */
+        /* R3 + cable (v1.4.89): tira de arriba = QR + nombre de una R3; tira de abajo = «R3 0102» girado dos veces; la línea punteada azul marca el corte */
         .dymo-label.r3doble { padding: 0; gap: 0; display: grid; grid-template-rows: 1fr 1fr; grid-template-columns: 1fr; }
         .r3m { position: relative; min-height: 0; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 1.5mm; padding: 1.5mm; box-sizing: border-box; }
         .r3m + .r3m::before { content: ""; position: absolute; left: 0; right: 0; top: 0; border-top: 1px dashed #1d63c2; }
         .r3m .dymo-l { font-size: 10pt; }
+        .r3m.r3cable { justify-content: space-between; gap: 0; padding: 1.5mm; }   /* v1.4.89: mitad de abajo = «R3 nnnn» repetido */
+        .r3m.r3cable .r3-cable-num { margin-left: 0; font-size: 15pt; }   /* cable girado como la etiqueta Cable, cabe en la tira de 16 mm */
         /* Cable (v1.3.83): la etiqueta se divide a la mitad en vertical; el número va solo en la mitad izquierda */
         .dymo-label.cable { padding: 0; gap: 0; display: grid; grid-template-columns: 1fr 1fr; }
         .cable-num { justify-self: start; margin-left: 1.5mm; display: flex; flex-direction: column; gap: 0.6mm; align-items: center; justify-content: center; font-size: 16pt; font-weight: 700; line-height: 1; writing-mode: vertical-rl; transform: rotate(180deg); }   /* v1.3.84: vertical, se lee de abajo hacia arriba */
@@ -91,7 +93,6 @@
                 <button type="button" data-zona="tarj" aria-controls="tarjBox" aria-pressed="true">Tarjetas</button>
                 <button type="button" data-zona="esc" aria-controls="escBox" aria-pressed="false">Escanear <span class="cuenta" id="escCuenta" hidden></span></button>
                 <button type="button" data-zona="r3" aria-controls="r3Box" aria-pressed="false">R3</button>
-                <button type="button" data-zona="cable" aria-controls="cableBox" aria-pressed="false">Cable</button>
                 <button type="button" data-zona="cr3" aria-controls="cr3Box" aria-pressed="false">Cable R3</button>
             </div>
             <div class="field"><label for="selZoom">Ampliación de la vista</label>
@@ -143,7 +144,7 @@
         <section class="panel pad stack" aria-labelledby="hR3" id="r3Box" data-zona="r3" hidden>
             <div class="row wrap" style="justify-content:space-between;gap:8px">
                 <h2 class="silk grow" id="hR3" style="min-width:200px">Etiquetas R3</h2>
-                <span class="hint">Dos R3 por etiqueta (se corta a lo largo en dos tiras); cada tira lleva el QR y el nombre: <b class="mono" id="r3Ejemplo">TQT-R3-V30-0000</b></span>
+                <span class="hint">Una R3 por etiqueta: arriba el QR y el nombre de la R3, abajo «R3 nnnn» repetido: <b class="mono" id="r3Ejemplo">TQT-R3-V30-0000</b></span>
             </div>
             <div class="tools-row">
                 <div class="field" style="width:170px"><label for="r3Origen">Imprimir</label>
@@ -161,27 +162,6 @@
             <div class="row wrap" style="gap:10px">
                 <button class="btn btn-primary" type="button" id="btnR3Print"><span class="svg-slot" data-i="printer"></span> Imprimir R3 en DYMO</button>
                 <button class="btn" type="button" id="btnR3Open"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
-            </div>
-        </section>
-        <section class="panel pad stack" aria-labelledby="hCable" id="cableBox" data-zona="cable" hidden>
-            <div class="row wrap" style="justify-content:space-between;gap:8px">
-                <h2 class="silk grow" id="hCable" style="min-width:200px">Etiquetas cable</h2>
-                <span class="hint">La etiqueta se divide a la mitad: el número va solo en la izquierda y la derecha se enrolla en el cable.</span>
-            </div>
-            <div class="row wrap" style="gap:10px;align-items:flex-end">
-                <div class="field" style="width:130px"><label for="cableDesde" id="cableDesdeLbl">Número desde</label><input class="input mono" id="cableDesde" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
-                <button class="btn" type="button" id="cableBarra" aria-pressed="false" title="Dos números: R1 y R2 con número diferente (TQT 0000/0000)" style="min-width:44px;font-weight:700">/</button>
-                <div class="field" style="width:130px" id="cableR2Box" hidden><label for="cableR2">Número R2</label><input class="input mono" id="cableR2" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
-                <div class="field" style="width:130px" id="cableHastaBox"><label for="cableHasta">Número hasta</label><input class="input mono" id="cableHasta" inputmode="numeric" maxlength="4" placeholder="(igual)" autocomplete="off"></div>
-                <div class="field" style="width:110px"><label for="cableCopias">Copias</label><input class="input mono" id="cableCopias" inputmode="numeric" maxlength="2" value="1"></div>
-            </div>
-            <div class="stage-preview" role="region" aria-label="Vista previa de la etiqueta de cable">
-                <div class="silk" style="width:100%" id="cableInfo">Vista previa · 57 × 32 mm</div>
-                <div id="cableZoomHost" class="zoomhost"><div id="cableLabel"></div></div>
-            </div>
-            <div class="row wrap" style="gap:10px">
-                <button class="btn btn-primary" type="button" id="btnCablePrint"><span class="svg-slot" data-i="printer"></span> Imprimir cable en DYMO</button>
-                <button class="btn" type="button" id="btnCableOpen"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
             </div>
         </section>
         <!-- v1.4.5: «Cable R3» = TQT: 0000 arriba y R3: 0000 abajo; se llena solo al emparejar una R3 con su R1/R2 -->

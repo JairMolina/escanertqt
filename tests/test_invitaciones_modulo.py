@@ -107,6 +107,64 @@ class TestInvitacionesModulo(unittest.TestCase):
         self.assertEqual(imp["login"], "/impresora/acceso")
 
 
+    def test_centro_activar_desactivar_eliminar_y_correo_de_prueba(self):
+        """v1.4.88: lo que tenía Administración › Cuentas ahora se hace desde el Centro de administración."""
+        c = self.entrar(ADMIN)
+        mail = "centro.cuenta@tqt.mx"
+        self.addCleanup(self.borrar, mail)
+        with mock.patch.object(correo, "enviar", return_value="<id>"):
+            c.post("/api/plataforma/invitaciones", json={"email": mail, "rol": "general", "modulos": ["impresora"]})
+        with db.transaction() as cn:
+            cn.execute("UPDATE usuarios SET inv_hash = NULL, activo = 1 WHERE email = ?", (mail,))
+        d = c.patch(f"/api/plataforma/cuentas/{mail}", json={"activo": False}).json()
+        cta = next(x for x in d["cuentas"] if x["email"] == mail)
+        self.assertEqual(cta["activo"], 0)
+        self.assertIn("ultimo_acceso", cta)
+        self.assertIn("inv_exp", cta)
+        d = c.patch(f"/api/plataforma/cuentas/{mail}", json={"activo": True}).json()
+        self.assertEqual(next(x for x in d["cuentas"] if x["email"] == mail)["activo"], 1)
+        # correo de prueba: sin SMTP => 503; con SMTP simulado => ok; sin sesión => 401
+        with mock.patch.object(correo, "enviar", side_effect=correo.CorreoNoConfigurado("sin SMTP")):
+            self.assertEqual(c.post("/api/plataforma/correo/prueba", json={"para": mail}).status_code, 503)
+        with mock.patch.object(correo, "enviar", return_value="<id>"):
+            self.assertTrue(c.post("/api/plataforma/correo/prueba", json={"para": mail}).json()["ok"])
+        self.assertEqual(cliente_sin_sesion(app).post("/api/plataforma/correo/prueba", json={"para": mail}).status_code, 401)
+        # eliminar
+        d = c.delete(f"/api/plataforma/cuentas/{mail}").json()
+        self.assertFalse(any(x["email"] == mail for x in d["cuentas"]))
+        self.assertEqual(c.delete(f"/api/plataforma/cuentas/{mail}").status_code, 404)
+
+    def test_centro_no_elimina_ni_desactiva_al_ultimo_administrador(self):
+        c = self.entrar(ADMIN)
+        with db.transaction() as cn:
+            cn.execute("UPDATE usuarios SET activo = 0 WHERE rol = 'administrador' AND email != ?", (ADMIN,))
+        try:
+            self.assertEqual(c.patch(f"/api/plataforma/cuentas/{ADMIN}", json={"activo": False}).status_code, 422)
+            self.assertEqual(c.delete(f"/api/plataforma/cuentas/{ADMIN}").status_code, 422)
+        finally:
+            with db.transaction() as cn:
+                cn.execute("UPDATE usuarios SET activo = 1 WHERE inv_hash IS NULL")
+
+    def test_admin_antiguo_redirige_al_centro_y_el_centro_trae_las_secciones(self):
+        """v1.4.88: /admin redirige al Centro de administración (solo admite como destino el monitor) y el portal trae todas las secciones."""
+        c = self.entrar(ADMIN)
+        r = c.get("/admin", follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (302, "/inicio?centro=1"))
+        r = c.get("/admin?next=/monitor", follow_redirects=False)
+        self.assertEqual(r.headers["location"], "/inicio?centro=1&next=%2Fmonitor")
+        self.assertEqual(c.get("/admin?next=https://evil.example", follow_redirects=False).headers["location"], "/inicio?centro=1")
+        html = c.get("/inicio").text
+        for sec in ("cuentas", "resumen", "modulos", "movimientos", "borrado", "clave"):
+            self.assertIn(f'data-sec="{sec}"', html)
+        self.assertNotIn('data-sec="tarjetas"', html); self.assertNotIn('data-sec="pcb"', html)   # son del módulo Escáner TQT
+        for ident in ("admGate", "btnVaciar", "btnReset", "formClave", "mCsv", "admExcel", "admExcelMail"):
+            self.assertIn(f'id="{ident}"', html)
+        js = c.get("/static/js/centro_admin.js").text
+        for ruta in ("/api/admin/login", "/api/admin/resumen", "/api/admin/movimientos", "/api/admin/reset",
+                     "/api/admin/cambiar-clave", "/api/admin/respaldo/descargar", "/api/admin/export/excel", "/api/admin/dymo/cable-r3-auto", "/vaciar", "/api/plataforma/admin/modulos"):
+            self.assertIn(ruta, js)
+        self.assertNotRegex(js, r".innerHTMLs*[=+]")   # texto del servidor solo por textContent
+
     def test_tpms_tiene_su_propia_pantalla_de_acceso(self):
         """v1.4.27: TPMS ya está disponible, con su login propio y su ventana de escaneo."""
         c = cliente_sin_sesion(app)

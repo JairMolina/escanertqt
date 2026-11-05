@@ -215,7 +215,7 @@
             <div class="tilt" id="tilt">
                 <div class="etiqueta" id="etiqueta">
                     <svg class="qr" id="qr" viewBox="0 0 25 25" shape-rendering="crispEdges" fill="#0D1630"></svg>
-                    <p class="trama"><span class="nom" id="n1">TQT-R1-V30-0021</span><span class="mac" id="m1">70:4b:ca:5b:9f:6e</span><span class="nom" id="n2">TQT-R2-V30-0010</span><span class="mac" id="m2">70:4b:ca:5b:9c:a2</span></p>
+                    <p class="trama"><span class="nom" id="n1">TQT-R1-V30-0021</span><span class="mac" id="m1">70:4B:CA:5B:9F:6E</span><span class="nom" id="n2">TQT-R2-V30-0010</span><span class="mac" id="m2">70:4B:CA:5B:9C:A2</span></p>
                     <i class="brillo"></i>
                     <i class="barrido"></i>
                 </div>
@@ -310,8 +310,8 @@
         qr(7);
 
         /* Cada ciclo (9 s) se lee una tarjeta distinta, igual que en planta: cambia el QR, la trama y la confirmación. */
-        var muestras = [['0021', '0010', '70:4b:ca:5b:9f:6e', '70:4b:ca:5b:9c:a2', 7], ['0022', '0022', '70:4b:ca:5b:a1:3c', '70:4b:ca:5b:a4:71', 31],
-                        ['0023', '0023', '70:4b:ca:5b:b2:08', '70:4b:ca:5b:b5:d9', 53], ['0024', '0024', '70:4b:ca:5b:c7:1e', '70:4b:ca:5b:c3:6a', 89]], k = 0;
+        var muestras = [['0021', '0010', '70:4B:CA:5B:9F:6E', '70:4B:CA:5B:9C:A2', 7], ['0022', '0022', '70:4B:CA:5B:A1:3C', '70:4B:CA:5B:A4:71', 31],
+                        ['0023', '0023', '70:4B:CA:5B:B2:08', '70:4B:CA:5B:B5:D9', 53], ['0024', '0024', '70:4B:CA:5B:C7:1E', '70:4B:CA:5B:C3:6A', 89]], k = 0;
         function pon(m) {
             $('n1').textContent = 'TQT-R1-V30-' + m[0]; $('m1').textContent = m[2]; $('n2').textContent = 'TQT-R2-V30-' + m[1]; $('m2').textContent = m[3]; qr(m[4]);
         }

@@ -13,7 +13,7 @@ from app.database import db
 from app.routers.auth import LoginIn, _cliente, _etq, _ip, fijar_sesion, usuario_actual
 from app.services import admin_auth as aa
 from app.services import correo, usuarios
-from app.routers.admin import _enlace, _enviar_invitacion
+from app.routers.admin import CorreoPruebaIn, _enlace, _enviar_invitacion
 
 router = APIRouter(prefix="/api/plataforma", tags=["Plataforma"])
 
@@ -29,6 +29,7 @@ def _admin(request: Request) -> Dict[str, Any]:
 class CuentaModulosIn(BaseModel):
     rol: Optional[str] = Field(None, max_length=20)
     modulos: Optional[List[str]] = Field(None, max_length=30)
+    activo: Optional[bool] = None   # v1.4.88: activar/desactivar desde el Centro de administración
 
 
 class InvitacionIn(BaseModel):
@@ -44,7 +45,7 @@ class TodosIn(BaseModel):
 def _respuesta() -> Dict[str, Any]:
     catalogo = [{"id": m["id"], "nombre": m["nombre"], "estado": m["estado"], "acento": m["acento"], "icono": m["icono"]}
                 for m in modulos_cat.MODULOS]
-    cuentas = [{k: u[k] for k in ("email", "rol", "modulos", "activo", "pendiente")} for u in usuarios.listar()]
+    cuentas = [{k: u[k] for k in ("email", "rol", "modulos", "activo", "pendiente", "ultimo_acceso", "inv_exp")} for u in usuarios.listar()]
     return {"modulos": catalogo, "roles": list(usuarios.ROLES), "cuentas": cuentas, "smtp": correo.configurado()}
 
 
@@ -119,16 +120,53 @@ async def cuentas(request: Request):
 @router.patch("/cuentas/{email}", summary="Cambiar rol y/o módulos de una cuenta")
 async def cuenta_cambio(email: str, payload: CuentaModulosIn, request: Request):
     yo = _admin(request)
+    if payload.activo is False and usuarios.normalizar(email) == yo["email"]:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No puedes desactivar tu propia cuenta. Pídelo a otro administrador.")
     try:
-        await run_in_threadpool(usuarios.actualizar_cuenta, email, payload.rol, None, None, payload.modulos)
+        await run_in_threadpool(usuarios.actualizar_cuenta, email, payload.rol, payload.activo, None, payload.modulos)
     except LookupError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     detalle = "; ".join(x for x in (f"rol {payload.rol}" if payload.rol else "",
-                                     "módulos " + (",".join(payload.modulos) or "ninguno") if payload.modulos is not None else "") if x)
+                                     "módulos " + (",".join(payload.modulos) or "ninguno") if payload.modulos is not None else "",
+                                     ("activada" if payload.activo else "desactivada") if payload.activo is not None else "") if x)
     await run_in_threadpool(db.log_evento, "USUARIO_MODULOS", None, usuarios.normalizar(email), detalle, yo["email"])
     return await run_in_threadpool(_respuesta)
+
+
+@router.delete("/cuentas/{email}", summary="Eliminar una cuenta (nunca deja la plataforma sin un administrador activo)")
+async def cuenta_baja(email: str, request: Request):
+    yo = _admin(request)
+    if usuarios.normalizar(email) == yo["email"]:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No puedes eliminar tu propia cuenta. Pídelo a otro administrador.")
+    try:
+        await run_in_threadpool(usuarios.eliminar_cuenta, email)
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    await run_in_threadpool(db.log_evento, "USUARIO_BAJA", None, usuarios.normalizar(email), "Cuenta eliminada desde el Centro de administración", yo["email"])
+    return await run_in_threadpool(_respuesta)
+
+
+@router.post("/correo/prueba", summary="Enviar un correo de prueba para verificar el SMTP del servidor")
+async def correo_prueba_plataforma(payload: CorreoPruebaIn, request: Request):
+    _admin(request)
+    para = usuarios.normalizar(payload.para)
+    if not usuarios._EMAIL.match(para):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Escribe un correo válido para la prueba.")
+    try:
+        html = correo.plantilla("Prueba de envío", ["Este es un correo de prueba enviado desde la plataforma I+D.",
+                                                     "Si lo recibiste, el envío de correo del servidor está funcionando."],
+                                aviso=("ok", "Configuración de correo verificada."))
+        mid = await run_in_threadpool(correo.enviar, para, "Prueba de envío · Plataforma I+D",
+                                      "Correo de prueba enviado desde la plataforma I+D.", html, None)
+    except correo.CorreoNoConfigurado as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except Exception as e:  # noqa: BLE001 - SMTP/red: se informa sin exponer credenciales
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"No se pudo enviar: {type(e).__name__}")
+    return {"ok": True, "message_id": mid}
 
 
 @router.post("/modulos/{modulo_id}/todos", summary="Dar o quitar un módulo a todas las cuentas que no son administrador")

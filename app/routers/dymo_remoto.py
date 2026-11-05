@@ -23,7 +23,7 @@ class Pedido(BaseModel):
     tarjeta_id: Optional[int] = Field(default=None, gt=0)
     numero: str = Field(default="", max_length=13)
     r3: str = Field(default="", max_length=6)   # v1.4.5: «Cable R3»
-    nombres: List[str] = Field(default_factory=list, max_length=2)
+    nombres: List[str] = Field(default_factory=list, max_length=1)
     copias: int = Field(default=1, ge=1, le=20)
 
 
@@ -70,9 +70,9 @@ def _validar(p: Pedido):
         if p.r3:
             return {"numero": p.numero, "r3": p.r3}, f"Cable TQT {p.numero} · R3 {p.r3}"
         return {"numero": p.numero}, "Cable " + p.numero
-    if not 1 <= len(p.nombres) <= 2 or not all(re.fullmatch(NOMBRE_R3, n) for n in p.nombres):
-        raise HTTPException(422, "Indica una o dos placas con nombre TQT-Rx-Vxx-0000.")
-    return {"nombres": p.nombres}, " + ".join(p.nombres)
+    if len(p.nombres) != 1 or not re.fullmatch(NOMBRE_R3, p.nombres[0]):
+        raise HTTPException(422, "Indica una placa con nombre TQT-Rx-Vxx-0000.")
+    return {"nombres": p.nombres}, p.nombres[0]
 
 
 def _svg(tipo, params):
