@@ -56,13 +56,14 @@ document.addEventListener('DOMContentLoaded', () => {
         svg.append(bg, p);
         return svg;
     }
-    function buildLabel(t) {
+    function buildLabel(t, aprobada) {
         const [n1, m1, n2, m2] = lineas(t);
         return h('div', { class: 'dymo-label', role: 'img', 'aria-label': `Etiqueta de la tarjeta ${t.id_tarjeta_num}` },
             h('div', { class: 'dymo-qr' }, qrSvg(trama(t))),
             h('div', { class: 'dymo-trama' },
                 h('div', { class: 'dymo-par' }, h('span', { class: 'dymo-l n' }, n1), h('span', { class: 'dymo-l m' }, m1)),
-                h('div', { class: 'dymo-par' }, h('span', { class: 'dymo-l n' }, n2), h('span', { class: 'dymo-l m' }, m2))));
+                h('div', { class: 'dymo-par' }, h('span', { class: 'dymo-l n' }, n2), h('span', { class: 'dymo-l m' }, m2)),
+                aprobada ? h('div', { class: 'dymo-par' }, h('span', { class: 'dymo-l n' }, 'Aprobada')) : null));
     }
     function aplicarZoom() {
         const z = state.zoom; const host = $('zoomHost');
@@ -168,6 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const t = state.cur; const ok = Boolean(t) && modo(t).k !== 'NO';
         const pr = state.dymo.estado === 'listo' ? impresora() : null; const dym = remota() ? state.remota.disponible : Boolean(pr && pr.isConnected) || navegador();   // v1.3.90: sin DYMO Connect se imprime con el navegador
         $('btnPrint').disabled = state.busy || !ok || !dym;
+        $('btnPrintAprob').disabled = state.busy || !ok || !dym;
         $('btnOpen').disabled = state.busy || !t;
         $('btnPrintAll').disabled = state.busy || !dym || !state.tarjetas.some((x) => modo(x).k !== 'NO');
         $('btnDownAll').disabled = state.busy || !state.tarjetas.some((x) => modo(x).k !== 'NO');
@@ -189,9 +191,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ------------------------------------------------------------------ servidor: XML y archivo .dymo
-    async function xmlDe(t, tipo) {
+    async function xmlDe(t, tipo, aprobada) {
         let res;
-        try { res = await fetch(`/api/dymo/label/${t.id}/xml?tipo=${tipo || 'label'}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        try { res = await fetch(`/api/dymo/label/${t.id}/xml?tipo=${tipo || 'label'}${aprobada ? '&aprobada=true' : ''}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        if (!res.ok && aprobada) { let d = ''; try { d = (await res.json()).detail || ''; } catch (e) { /* nada */ } throw new Error(d || `El servidor respondió ${res.status}.`); }
         if (!res.ok) throw new Error(res.status === 404 ? 'El servidor no tiene todavía el XML de la etiqueta (actualiza el servidor).' : `El servidor respondió ${res.status}.`);
         let txt = await res.text();
         if (txt.trim().startsWith('{')) { try { const j = JSON.parse(txt); txt = j.xml || j.dymo_xml || ''; } catch (e) { txt = ''; } }
@@ -251,13 +254,13 @@ html, body { margin: 0; padding: 0; background: #fff; }
         toast(`Se abrió el cuadro de impresión (${nodos.length} etiqueta${nodos.length === 1 ? '' : 's'}): elige la DYMO LabelWriter, papel 30334 (57 × 32 mm) y escala 100 %.`, { ms: 8000 });
         setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } finally { setTimeout(fin, 1000); } }, 150);
     }
-    async function imprimirTarjeta(printer, t, c) {
-        if (printer === REMOTA) { await R.imprimir({ tipo: 'tarjeta', tarjeta_id: t.id, copias: c }); await marcarImpresa(t); return; }
-        if (navegador()) { encolar(buildLabel(t), c, () => marcarImpresa(t)); return; }
+    async function imprimirTarjeta(printer, t, c, aprobada) {
+        if (printer === REMOTA) { await R.imprimir({ tipo: aprobada ? 'aprobada' : 'tarjeta', tarjeta_id: t.id, copias: c }); await marcarImpresa(t); return; }
+        if (navegador()) { encolar(buildLabel(t, aprobada), c, () => marcarImpresa(t)); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
-            try { await D.print(printer, await xmlDe(t, tipo), c); await marcarImpresa(t); return; }
-            catch (e) { if (/no respondi|no encuentra|Elige|cargó|Sin conexión/i.test(e.message)) throw e; if (!primero) primero = e; }
+            try { await D.print(printer, await xmlDe(t, tipo, aprobada), c); await marcarImpresa(t); return; }
+            catch (e) { if (aprobada || /no respondi|no encuentra|Elige|cargó|Sin conexión/i.test(e.message)) throw e; if (!primero) primero = e; }
         }
         throw primero;
     }
@@ -283,6 +286,20 @@ html, body { margin: 0; padding: 0; background: #fff; }
         } catch (e) {
             progreso(0, 1, ''); $('prog').hidden = true;
             $('aviso').prepend(T.banner('bad', 'alert', h('b', null, 'No se pudo imprimir. '), e.message));
+            if (/DYMO Connect|servicio|respond/i.test(e.message)) conectar(true);
+        } finally { state.busy = false; refrescarBotones(); }
+    });
+
+    $('btnPrintAprob').addEventListener('click', async () => {
+        const t = state.cur; if (!t) return;
+        state.busy = true; refrescarBotones(); progreso(0, 1, 'Preparando etiqueta…');
+        try {
+            progreso(0.5, 1, `Enviando a ${remota() ? 'la DYMO compartida' : $('selPrinter').value}…`);
+            await imprimirTarjeta($('selPrinter').value, t, copias(), true);
+            progreso(1, 1, `Etiqueta APROBADA de la tarjeta ${t.id_tarjeta_num} enviada a la impresora.`); toast('Etiqueta «Aprobada» enviada a la DYMO', { kind: 'ok' }); ocultarProg(2500);
+        } catch (e) {
+            progreso(0, 1, ''); $('prog').hidden = true;
+            $('aviso').prepend(T.banner('bad', 'alert', h('b', null, 'No se pudo imprimir como aprobada. '), e.message));
             if (/DYMO Connect|servicio|respond/i.test(e.message)) conectar(true);
         } finally { state.busy = false; refrescarBotones(); }
     });
@@ -616,8 +633,32 @@ html, body { margin: 0; padding: 0; background: #fff; }
     cargarLotesR3();
 
     // ------------------------------------------------------------------ etiquetas de cable (v1.3.83): una por número
+    const cableDoble = () => $('cableBarra').getAttribute('aria-pressed') === 'true';   // v1.3.92: «0000/0000» (R1/R2)
+    function cableNumeros() {
+        const d = $('cableDesde').value.trim(), hs = $('cableHasta').value.trim() || d;
+        if (!d) return { lista: [], error: '' };
+        if (cableDoble()) {
+            const r2 = $('cableR2').value.trim();
+            if (!/^\d{1,4}$/.test(d) || !/^\d{1,4}$/.test(r2)) return { lista: [], error: r2 ? 'Escribe números de 1 a 4 dígitos.' : 'Escribe también el número de la R2.' };
+            return { lista: [`${d.padStart(4, '0')}/${r2.padStart(4, '0')}`], error: '' };
+        }
+        if (!/^\d{1,4}$/.test(d) || !/^\d{1,4}$/.test(hs)) return { lista: [], error: 'Escribe números de 1 a 4 dígitos.' };
+        const a = +d, b = +hs;
+        if (b < a) return { lista: [], error: '«Hasta» debe ser mayor o igual que «Desde».' };
+        if (b - a >= 500) return { lista: [], error: 'Máximo 500 etiquetas por tanda.' };
+        const lista = []; for (let n = a; n <= b; n++) lista.push(String(n).padStart(4, '0'));
+        return { lista, error: '' };
+    }
     const nodoCable = (num) => h('div', { class: 'dymo-label cable', role: 'img', 'aria-label': `Etiqueta de cable: ${num}` },
         h('div', { class: num.includes('/') ? 'cable-num doble' : 'cable-num' }, h('span', { class: 'cable-tqt' }, 'TQT'), h('span', null, num)), h('div', { class: 'cable-vacia', 'aria-hidden': 'true' }), h('i', { class: 'cable-linea', 'aria-hidden': 'true' }));
+    function cableVista() {
+        const { lista, error } = cableNumeros(); const num = lista[0] || (cableDoble() ? '0000/0000' : '0000');
+        $('cableLabel').replaceChildren(nodoCable(num));
+        $('cableZoomHost').style.transform = `scale(${state.zoom})`;
+        const lbl = $('cableLabel').firstChild; $('cableZoomHost').style.width = `${lbl.offsetWidth * state.zoom}px`; $('cableZoomHost').style.height = `${lbl.offsetHeight * state.zoom}px`;
+        $('cableInfo').textContent = error || (lista.length ? `${lista.length} etiqueta${lista.length === 1 ? '' : 's'} (${lista[0]}${lista.length > 1 ? ' … ' + lista[lista.length - 1] : ''})` : 'Vista previa · 57 × 32 mm, número en la mitad izquierda');
+        $('btnCablePrint').disabled = $('btnCableOpen').disabled = !lista.length || state.busy;
+    }
     async function xmlCable(num, tipo, r3) {
         let res;
         try { res = await fetch(`/api/dymo/cable/xml?numero=${encodeURIComponent(num)}&tipo=${tipo}${r3 ? `&r3=${encodeURIComponent(r3)}` : ''}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
@@ -636,6 +677,32 @@ html, body { margin: 0; padding: 0; background: #fff; }
         }
         throw primero;
     }
+    $('btnCablePrint').addEventListener('click', async () => {
+        const { lista } = cableNumeros(); if (!lista.length) return;
+        const printer = $('selPrinter').value; const c = Math.max(1, Math.min(99, parseInt($('cableCopias').value || '1', 10) || 1));
+        state.busy = true; refrescarBotones(); cableVista(); let hechas = 0; const fallos = [];
+        for (const num of lista) {
+            progreso(hechas, lista.length, `Imprimiendo ${hechas + 1} de ${lista.length}: cable ${num}…`);
+            try { await imprimirCable(printer, num, c); hechas++; }
+            catch (e) { fallos.push(`${num}: ${e.message}`); if (/no respondió|DYMO Connect|servicio|compartida/i.test(e.message)) break; }
+        }
+        progreso(hechas, lista.length, `${hechas} de ${lista.length} etiquetas de cable enviadas.`);
+        if (fallos.length) $('aviso').prepend(T.banner('bad', 'alert', h('b', null, `${fallos.length} etiqueta${fallos.length === 1 ? '' : 's'} de cable sin imprimir. `), fallos.slice(0, 4).join(' · ')));
+        else toast(`${hechas} etiqueta${hechas === 1 ? '' : 's'} de cable enviada${hechas === 1 ? '' : 's'} a la DYMO.`, { kind: 'ok', ms: 4000 });
+        ocultarProg(4000); state.busy = false; refrescarBotones(); cableVista();
+    });
+    $('btnCableOpen').addEventListener('click', () => {
+        const { lista } = cableNumeros();
+        lista.slice(0, 20).forEach((num, i) => setTimeout(() => bajar(`/api/dymo/cable/archivo?numero=${encodeURIComponent(num)}&tipo=label`, `TQT_cable_${num.replace('/', '-')}.label`), i * 250));
+    });
+    ['cableDesde', 'cableHasta', 'cableR2'].forEach((id) => $(id).addEventListener('input', cableVista));
+    $('cableBarra').addEventListener('click', () => {
+        const on = !cableDoble(); $('cableBarra').setAttribute('aria-pressed', String(on)); $('cableBarra').classList.toggle('btn-primary', on);
+        $('cableR2Box').hidden = !on; $('cableHastaBox').hidden = on; $('cableDesdeLbl').textContent = on ? 'Número R1' : 'Número desde';
+        cableVista(); if (on) $('cableR2').focus();
+    });
+    $('selZoom').addEventListener('change', cableVista);
+    cableVista();
 
     // ------------------------------------------------------------------ v1.4.5: «Cable R3» (TQT: 0000 arriba, R3: 0000 abajo)
     // Al emparejar una R3 con su R1/R2 (evento WS), la tarjeta y su R3 se cargan solas en esta zona.
@@ -834,7 +901,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
     escPintar(); escRestaurar();
 
     // ------------------------------------------------------------------ v1.3.94: zonas con botones (la hoja era muy larga)
-    // Solo se ve la zona elegida: tarjetas, escanear, R3 o cable R3. Se recuerda la última en este navegador.
+    // Solo se ve la zona elegida: tarjetas, escanear, R3, cable o cable R3. Se recuerda la última en este navegador.
     const ZONA_KEY = 'tqt.dymo.zona';
     const zonaActual = () => { const b = document.querySelector('#zonas [aria-pressed="true"]'); return b ? b.dataset.zona : 'tarj'; };
     function mostrarZona(z, enfocar) {
@@ -844,7 +911,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
         document.querySelectorAll('main [data-zona]:not(button)').forEach((el) => { el.hidden = el.dataset.zona !== z; });
         try { localStorage.setItem(ZONA_KEY, z); } catch (e) { /* nada */ }
         // Las vistas previas miden la etiqueta y oculta mide 0: se recalculan al mostrarse
-        aplicarZoom(); r3Vista(); cr3Vista();
+        aplicarZoom(); r3Vista(); cableVista(); cr3Vista();
         if (enfocar && z === 'esc') $('escIn').focus();   // listo para el lector USB
     }
     document.querySelectorAll('#zonas [data-zona]').forEach((b) => b.addEventListener('click', () => mostrarZona(b.dataset.zona, true)));
