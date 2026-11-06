@@ -2,6 +2,8 @@
 
 ## v1.4.96 — 2026-11-06
 
+- **Pruebas automáticas:** en la tabla de ciclos el «Motivo» largo ya no se traslapa con la columna LOG (.txt); el texto se parte en líneas (solo CSS).
+
 - **Tarjetas anteriores a 1.4.94 ya se imprimen «Aprobada»:** auditoría sobre la BD local (100 tarjetas): las 12 R3 entregadas con última prueba TQT aprobada (6) o con advertencias (6) tenían `aprobada=0` y el servidor respondía 403. Al arrancar, una sola vez (marca `r3_aprobadas_anteriores_v1_4_96` en `ajustes`), esas R3 pasan a «Aprobada» (`aprobada_por = 'migración v1.4.96'`). Fallidas, no verificadas, sin prueba o sin firmware no se tocan; si luego se desaprueba una a mano ya no se vuelve a aprobar sola.
 - **Etiqueta «Aprobada» de la tarjeta** (`/api/dymo/label/{id}/xml|archivo?aprobada=` y DYMO compartida) ahora también se emite con prueba «aprobado con advertencias» (antes solo `aprobado`); la fallida sigue en 403.
 - **Validación:** el botón de imprimir aprobada también aparece cuando la prueba termina «aprobada con advertencias».
