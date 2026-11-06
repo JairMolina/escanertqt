@@ -38,6 +38,7 @@ _SELECT_PCB = """
            COALESCE(NULLIF(TRIM(p.firmware), ''), CASE WHEN t.pcb_r1_id = p.id THEN t.firmware_r1
                     WHEN t.pcb_r2_id = p.id THEN t.firmware_r2 END) AS firmware, p.estado_ciclo, p.estado_pcb, p.origen, p.operador,
            p.nota, p.recibida_en, p.confirmada_en, p.updated_at, p.lote_id AS recibida_lote_id,
+           p.aprobada, p.aprobada_en, p.aprobada_por,
            t.id AS tarjeta_id, t.id_tarjeta_num, t.lote_id AS tarjeta_lote_id,
            COALESCE(t.lote_id,p.lote_id) AS lote_id,
            (SELECT codigo_lote FROM lotes_mensuales WHERE id=COALESCE(t.lote_id,p.lote_id)) AS lote_codigo,
@@ -131,7 +132,14 @@ def get_ajustes(conn: Optional[sqlite3.Connection] = None, db_path: Optional[Pat
 # Consultas
 # ============================================================================
 def pcb_a_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, Any]]:
-    return dict(row) if row is not None else None
+    if row is None:
+        return None
+    d = dict(row)
+    if "aprobada" in d:   # v1.4.94: bool; solo la R3 se aprueba
+        d["aprobada"] = bool(d["aprobada"]) and d.get("tipo") == "R3"
+        if not d["aprobada"]:
+            d["aprobada_en"] = d["aprobada_por"] = None
+    return d
 
 
 def _pcb_por_id(c: sqlite3.Connection, pcb_id: int) -> Optional[Dict[str, Any]]:
@@ -824,6 +832,39 @@ def _set_firmware_tx(c: sqlite3.Connection, pcb_id: int, firmware: Optional[str]
 def set_firmware(pcb_id: int, firmware: Optional[str], operador: Optional[str] = None,
                  conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> Dict[str, Any]:
     return db._con_conn(conn, db_path, lambda c: _set_firmware_tx(c, pcb_id, firmware, operador), escribe=True)
+
+
+def _aprobar_tx(c: sqlite3.Connection, pcb_id: int, aprobar: bool, operador: Optional[str]) -> Dict[str, Any]:
+    p = _pcb_o_error(c, pcb_id)
+    if p["tipo"] != "R3":
+        raise ValueError(f"{p['nombre']} es {p['tipo']}: solo las R3 se aprueban.")
+    if p["estado_ciclo"] in ("FALLA", "BAJA"):
+        raise ConflictoError(f"{p['nombre']} está en {p['estado_ciclo']}: no se puede aprobar ni desaprobar.")
+    if aprobar:
+        if not (p.get("firmware") or "").strip():
+            raise ConflictoError(f"{p['nombre']} no está programada (sin firmware): prográmala antes de aprobarla.")
+        if p["aprobada"]:
+            return p   # idempotente
+        c.execute("UPDATE pcb_inventario SET aprobada=1, aprobada_en=?, aprobada_por=?, updated_at=? WHERE id=?",
+                  (_ahora(), operador, _ahora(), pcb_id))
+        evento, det = "PCB_APROBADA", f"R3 aprobada (FW {p['firmware']})"
+    else:
+        if not p["aprobada"]:
+            return p
+        c.execute("UPDATE pcb_inventario SET aprobada=0, aprobada_en=NULL, aprobada_por=NULL, updated_at=? WHERE id=?",
+                  (_ahora(), pcb_id))
+        evento, det = "PCB_DESAPROBADA", "R3 desaprobada"
+    if p["tarjeta_id"]:
+        c.execute("UPDATE tarjetas_produccion SET updated_at=? WHERE id=?", (_ahora(), p["tarjeta_id"]))
+    db.log_evento(evento, p["tarjeta_lote_id"], p["nombre"], det, operador, conn=c)
+    return _pcb_por_id(c, pcb_id)
+
+
+def aprobar_pcb(pcb_id: int, aprobar: bool = True, operador: Optional[str] = None,
+                conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> Dict[str, Any]:
+    """R3 «Aprobada» (solo tipo R3, exige firmware = programada). Idempotente. La anulación automática (cambio de firmware,
+    FALLA, BAJA, salir de la tarjeta) la hace el trigger `trg_pcb_anula_aprobada`."""
+    return db._con_conn(conn, db_path, lambda c: _aprobar_tx(c, pcb_id, aprobar, operador), escribe=True)
 
 
 def contar_macs_hoy(conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> int:

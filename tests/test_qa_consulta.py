@@ -184,6 +184,7 @@ class TestMigracionFirmwarePorPcb(unittest.TestCase):
             ruta = Path(d) / "vieja.db"
             db.init_db(ruta)
             con = sqlite3.connect(ruta)
+            con.execute("DROP TRIGGER IF EXISTS trg_pcb_anula_aprobada")   # una base antigua real no lo tiene; init_db lo crea
             con.execute("ALTER TABLE pcb_inventario DROP COLUMN firmware")
             con.execute("DELETE FROM firmware_catalogo")
             con.commit()

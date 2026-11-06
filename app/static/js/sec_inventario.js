@@ -55,11 +55,12 @@
                 { id: 'version', titulo: 'Hardware', cel: (p) => h('span', { class: 'mono' }, 'V' + p.version), sort: (a, b) => (+a.version) - (+b.version) },
                 { id: 'firmware', titulo: 'Firmware', cel: (p) => (p.firmware ? h('span', { class: 'mono' }, p.firmware) : h('span', { class: 'muted' }, 'sin firmware')), valor: (p) => p.firmware || '' },
                 { id: 'mac', titulo: 'MAC', cel: (p) => (p.tipo === 'R3' ? h('span', { class: 'muted' }, 'no aplica') : p.mac ? h('span', { class: 'mono' }, String(p.mac).toUpperCase()) : h('span', { class: 'muted' }, 'sin MAC')), valor: (p) => (p.tipo === 'R3' ? '' : p.mac) },
-                { id: 'estado_ciclo', titulo: 'Estado', cel: (p) => T.cicloBadge(p.estado_ciclo, p) },
+                { id: 'estado_ciclo', titulo: 'Estado', cel: (p) => (p.tipo === 'R3' && p.aprobada ? h('span', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, T.cicloBadge(p.estado_ciclo, p), h('span', { class: 'badge', dataset: { k: 'ok' } }, 'Aprobada')) : T.cicloBadge(p.estado_ciclo, p)) },
                 { id: 'tarjeta', titulo: 'Tarjeta', cls: 'c-3', cel: (p) => (p.id_tarjeta_num ? h('a', { class: 'mono', href: `#/tarjetas?id=${p.tarjeta_id}` }, p.id_tarjeta_num) : h('span', { class: 'muted' }, '—')), valor: (p) => p.id_tarjeta_num },
                 { id: 'lote', titulo: 'Lote', cls: 'c-2', cel: (p) => (p.lote_id ? h('span', null, loteNom(p.lote_id)) : h('span', { class: 'muted' }, 'Sin lote')), valor: (p) => loteNom(p.lote_id) },
                 { id: 'recibida_en', titulo: 'Recibida', cls: 'c-2', cel: (p) => h('span', { class: 'mono' }, util.fecha(p.recibida_en)), valor: (p) => p.recibida_en },
-                { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (p) => h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'data-escribe': true, 'aria-label': `Editar ${p.nombre}`, onclick: () => editar(p) }, icon('edit'), 'Editar') },
+                { id: 'acc', titulo: '', sr: 'Acciones', sortable: false, cls: 'act', cel: (p) => h('span', { class: 'row', style: 'gap:6px;justify-content:flex-end' }, accionesPlaca(p),
+                    h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'data-escribe': true, 'aria-label': `Editar ${p.nombre}`, onclick: () => editar(p) }, icon('edit'), 'Editar')) },
             ];
             function pintarInfo(n) {
                 const s = st.sel.size;
@@ -116,7 +117,8 @@
                         h('div', { class: 'field' }, h('label', { for: 'eFw' }, 'Firmware'), fwSel, fwOtra),
                         macIn ? null : h('p', { class: 'hint' }, 'La R3 no lleva MAC.'),
                         h('div', { class: 'field' }, h('span', { class: 'lbl' }, 'Quedará como'), prev),
-                        montada ? h('p', { class: 'hint' }, `Está en la tarjeta ${p.id_tarjeta_num}: el cambio se refleja allí y en el Excel.`) : null, aviso, err,
+                                montada ? h('p', { class: 'hint' }, `Está en la tarjeta ${p.id_tarjeta_num}: el cambio se refleja allí y en el Excel.`) : null, aviso,
+                        h('div', { class: 'row', style: 'gap:6px' }, accionesPlaca(p, () => s.close())), err,
                     ],
                     actions: [
                         { label: 'Eliminar', kind: 'danger', icon: 'trash', keepOpen: 'always', onClick: async (btn) => {
@@ -143,6 +145,70 @@
                             if (fwSel.value === '__otra' && !fwValor()) { err.textContent = 'Escribe la versión de firmware.'; fwOtra.focus(); return false; }
                             if (fwSel && (fwValor() || '') !== (p.firmware || '')) { const r = await api(`/api/pcb/${p.id}/firmware`, { method: 'PUT', body: { firmware: fwValor() || null } }); if (!r.ok) { err.textContent = r.error; return false; } }
                             toast('Cambios guardados', { kind: 'ok' }); ctx.actualizar(); return true;
+                        } },
+                    ],
+                });
+            }
+
+            // ---- Cambiar / Falla (mismos endpoints y reglas que Emparejar del celular)
+            function accionesPlaca(p, antes) {
+                const lectura = () => { if (T.acceso.rol === 'consultor') { T.avisoAcceso('accion', 'Tu cuenta es de consulta: puede ver el inventario, pero no cambiar placas ni marcar fallas.'); return true; } return false; };
+                const out = [];
+                if (p.estado_ciclo === 'ASIGNADA' && p.tarjeta_id) {
+                    out.push(h('button', { class: 'btn btn-sm', type: 'button', 'data-escribe': true, 'aria-label': `Cambiar ${p.nombre}`, onclick: () => { if (lectura()) return; antes && antes(); cambiarPlaca(p); } }, 'Cambiar'));
+                }
+                if (!['FALLA', 'BAJA'].includes(p.estado_ciclo)) {
+                    out.push(h('button', { class: 'btn btn-sm btn-danger', type: 'button', 'data-escribe': true, 'aria-label': `Marcar falla en ${p.nombre}`, onclick: () => { if (lectura()) return; antes && antes(); fallaPlaca(p); } }, 'Falla'));
+                }
+                return out;
+            }
+            /** Elige una placa DISPONIBLE del mismo tipo (las que ya trae el inventario). */
+            function elegirSuelta({ p, title, onPick }) {
+                let q = '';
+                const search = h('input', { class: 'input', type: 'search', inputmode: 'numeric', placeholder: 'Buscar serie', 'aria-label': 'Buscar placa', autocomplete: 'off' });
+                const list = h('div', { class: 'list', style: 'max-height:38dvh;overflow:auto' });
+                let sh;
+                const draw = () => {
+                    list.replaceChildren();
+                    const rows = (st.pcbs || []).filter((x) => x.tipo === p.tipo && x.estado_ciclo === 'DISPONIBLE' && x.id !== p.id && (!q || x.nombre.toLowerCase().includes(q)));
+                    if (!rows.length) { list.className = 'empty'; list.append(icon('box'), h('b', null, 'No hay placas sueltas'), h('span', null, `No queda ninguna ${p.tipo} disponible${q ? ' con esa búsqueda' : ''}.`)); return; }
+                    list.className = 'list';
+                    rows.forEach((x) => list.appendChild(h('button', { class: 'item', type: 'button', 'aria-label': `Elegir ${x.nombre}`, onclick: () => { sh.close(); onPick(x); } },
+                        T.tipoChip(x.tipo), h('div', null, h('div', { class: 't1' }, x.nombre), h('div', { class: 't2' }, `Recibida ${util.fecha(x.recibida_en)}`)), icon('chevron'))));
+                };
+                search.addEventListener('input', () => { search.value = search.value.replace(/[^0-9a-zA-Z-]/g, ''); q = search.value.toLowerCase(); draw(); });
+                sh = sheet({ title, body: [search, list], actions: [{ label: 'Cancelar', kind: 'ghost', onClick: () => true }] });
+                draw();
+                return sh;
+            }
+            function cambiarPlaca(p) {
+                elegirSuelta({ p, title: `Reemplazar ${p.nombre}`, onPick: async (np) => {
+                    const u = await api(`/api/tarjetas/${p.tarjeta_id}/asignar`, { method: 'PUT', body: { ranura: p.tipo, pcb_id: np.id } });
+                    if (!u.ok) { toast(u.error, { kind: 'bad' }); return; }
+                    toast(`${p.tipo} reemplazada: ${np.nombre} en lugar de ${p.nombre}`, { kind: 'ok' }); st.sel.delete(p.id); ctx.actualizar();
+                } });
+            }
+            function fallaPlaca(p) {
+                let repl = null;
+                const montada = p.estado_ciclo === 'ASIGNADA' && p.tarjeta_id;
+                const motivo = h('input', { class: 'input', id: 'fMot', maxlength: 120, placeholder: 'Motivo (opcional)', 'aria-label': 'Motivo de la falla' });
+                const replInfo = h('div', { class: 'mono', style: 'font-weight:600' }, 'Sin reemplazo por ahora');
+                const ferr = h('div', { class: 'hint err', role: 'alert' });
+                sheet({
+                    title: `Falla en ${p.nombre}`,
+                    body: [
+                        h('p', { class: 'muted' }, montada ? 'La placa sale de la tarjeta y queda marcada como FALLA. Puedes poner otra suelta en su lugar ahora o después.' : 'La placa queda marcada como FALLA.'),
+                        h('div', { class: 'field' }, h('label', { for: 'fMot' }, 'Motivo'), motivo),
+                        montada ? h('div', { class: 'field' }, h('span', { class: 'lbl' }, 'Reemplazo'), replInfo,
+                            h('button', { class: 'btn btn-sm', type: 'button', onclick: () => elegirSuelta({ p, title: `Reemplazo para ${p.tipo}`, onPick: (np) => { repl = np; replInfo.textContent = np.nombre; } }) }, 'Elegir reemplazo')) : null,
+                        ferr,
+                    ],
+                    actions: [
+                        { label: 'Cancelar', kind: 'ghost', onClick: () => true },
+                        { label: 'Marcar falla', kind: 'danger', keepOpen: true, onClick: async () => {
+                            const u = await api(`/api/pcb/${p.id}/falla`, { method: 'POST', body: { motivo: motivo.value || undefined, reemplazo_id: repl ? repl.id : undefined } });
+                            if (!u.ok) { ferr.textContent = u.error; return false; }
+                            toast(`${p.nombre} marcada en falla${repl ? ` · reemplazo ${repl.nombre}` : ''}`, { kind: 'ok' }); st.sel.delete(p.id); ctx.actualizar(); return true;
                         } },
                     ],
                 });

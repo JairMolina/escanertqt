@@ -643,13 +643,13 @@ class DymoService:
 
     # ------------------------------------------------------------------ R3 doble (v1.3.44): dos R3 por etiqueta, una por mitad
     @classmethod
-    def generate_r3_label_xml(cls, nombres: List[str], label_format: Optional[str] = None) -> str:
+    def generate_r3_label_xml(cls, nombres: List[str], label_format: Optional[str] = None, aprobada: bool = False) -> str:
         """`.label` (DYMO Label v8): R3 arriba (QR1/TEXTO1) y «R3 nnnn» girado dos veces abajo (NUMR3, NUMR3D)."""
         f = obtener_formato(label_format)
         objetos = ""
         for i, md in enumerate(calcular_diseno_r3(f, nombres), 1):
             objetos += _v8_imagen(f"QR{i}", cls.generate_qr_base64(md.nombre, box_size=md.puntos_por_modulo), md.qr)
-            objetos += _v8_texto(f"TEXTO{i}", md.nombre, R3_FUENTE_PT, md.texto)
+            objetos += _v8_texto(f"TEXTO{i}", md.nombre + (chr(10) + LEYENDA_APROBADA if aprobada else ""), R3_FUENTE_PT, md.texto)
             objetos += _v8_texto("NUMR3D", texto_num_r3(md.nombre), R3_CABLE_PT, caja_num_r3_der(f), "Center", "Rotation90")
             objetos += _v8_texto("NUMR3", texto_num_r3(md.nombre), R3_CABLE_PT, caja_num_r3(f), "Center", "Rotation90")
             ln = caja_linea_r3(f)
@@ -665,7 +665,7 @@ class DymoService:
 {objetos}</DieCutLabel>"""
 
     @classmethod
-    def generate_r3_dcd_xml(cls, nombres: List[str], label_format: Optional[str] = None) -> str:
+    def generate_r3_dcd_xml(cls, nombres: List[str], label_format: Optional[str] = None, aprobada: bool = False) -> str:
         """`.dymo` (DYMO Connect): R3 arriba y «R3 nnnn» dos veces abajo."""
         f = obtener_formato(label_format)
         m = MARGEN_SEGURO_MM
@@ -740,7 +740,7 @@ class DymoService:
             <HorizontalAlignment>Left</HorizontalAlignment>
             <VerticalAlignment>Middle</VerticalAlignment>
             <IsVertical>False</IsVertical>
-            <LineTextSpan><TextSpan><Text>{xml_escape(md.nombre)}</Text>{fuente}</TextSpan></LineTextSpan>
+            {"".join(f"<LineTextSpan><TextSpan><Text>{xml_escape(t)}</Text>{fuente}</TextSpan></LineTextSpan>" for t in ([md.nombre, LEYENDA_APROBADA] if aprobada else [md.nombre]))}
           </FormattedText>
           {layout(md.texto)}
         </TextObject>
@@ -791,11 +791,11 @@ class DymoService:
 </DesktopLabel>"""
 
     @classmethod
-    def archivo_r3(cls, nombres: List[str], label_format: Optional[str] = None, tipo: str = "dymo") -> Tuple[bytes, str]:
+    def archivo_r3(cls, nombres: List[str], label_format: Optional[str] = None, tipo: str = "dymo", aprobada: bool = False) -> Tuple[bytes, str]:
         base = "_".join(n.rsplit("-", 1)[-1] for n in nombres[:1])
         if tipo == "label":
-            return cls.generate_r3_label_xml(nombres, label_format).encode("utf-8"), f"TQT_R3_{base}.label"
-        return b"\xef\xbb\xbf" + cls.generate_r3_dcd_xml(nombres, label_format).encode("utf-8"), f"TQT_R3_{base}.dymo"
+            return cls.generate_r3_label_xml(nombres, label_format, aprobada).encode("utf-8"), f"TQT_R3_{base}.label"
+        return b"\xef\xbb\xbf" + cls.generate_r3_dcd_xml(nombres, label_format, aprobada).encode("utf-8"), f"TQT_R3_{base}.dymo"
 
     # ------------------------------------------------------------------ cable (v1.3.83): número en la mitad izquierda
     @classmethod
@@ -816,7 +816,7 @@ class DymoService:
 {objeto}</DieCutLabel>"""
 
     @classmethod
-    def generate_r3_svg(cls, nombres: List[str], label_format: Optional[str] = None) -> str:
+    def generate_r3_svg(cls, nombres: List[str], label_format: Optional[str] = None, aprobada: bool = False) -> str:
         """v1.4.2: SVG a escala real (1 unidad = 1 mm); v1.4.89: R3 (QR + nombre) arriba y «R3 nnnn» dos veces abajo."""
         f = obtener_formato(label_format)
         pt = R3_FUENTE_PT * PT_A_MM
@@ -826,8 +826,11 @@ class DymoService:
             x0, y0 = md.qr.x + SILENCIO_MODULOS * mod, md.qr.y + SILENCIO_MODULOS * mod
             partes.append("".join(f'<rect x="{x0 + c * mod:.4f}" y="{y0 + r * mod:.4f}" width="{mod:.4f}" height="{mod:.4f}"/>'
                                   for r, fila in enumerate(matriz_qr(md.nombre)) for c, v in enumerate(fila) if v))
-            partes.append(f'<text x="{md.texto.x:.3f}" y="{md.texto.y + md.texto.h / 2:.3f}" dominant-baseline="central" '
-                          f'font-family="{FUENTE_SVG}" font-weight="700" font-size="{pt:.4f}">{xml_escape(md.nombre)}</text>')
+            lins_t = [md.nombre, LEYENDA_APROBADA] if aprobada else [md.nombre]
+            y_t = md.texto.y + md.texto.h / 2 - (len(lins_t) - 1) * pt * 0.6
+            for k, t in enumerate(lins_t):
+                partes.append(f'<text x="{md.texto.x:.3f}" y="{y_t + k * pt * 1.2:.3f}" dominant-baseline="central" '
+                              f'font-family="{FUENTE_SVG}" font-weight="700" font-size="{pt:.4f}">{xml_escape(t)}</text>')
             # «R3 nnnn» girado (izquierda y derecha) como generate_cable_svg: dos columnas, leídas de abajo hacia arriba
             for caja, lins in ((caja_num_r3(f), lineas_num_r3(md.nombre)), (caja_num_r3_der(f), lineas_num_r3(md.nombre))):
                 ptc = min(R3_CABLE_PT * PT_A_MM, caja.w / 2.1, caja.h / 4 / 0.6)

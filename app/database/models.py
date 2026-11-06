@@ -434,6 +434,9 @@ CREATE TABLE IF NOT EXISTS pcb_inventario (
     recibida_en TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     confirmada_en TEXT,
     updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    aprobada INTEGER NOT NULL DEFAULT 0,          -- solo R3: aprobada tras programarla (se anula al cambiar firmware/FALLA/BAJA/salir de la tarjeta)
+    aprobada_en TEXT,
+    aprobada_por TEXT,
     UNIQUE (tipo, version, serie)
 )"""
 
@@ -649,6 +652,10 @@ class FirmwareUpdate(BaseModel):
 class FirmwareCatalogoIn(BaseModel):
     rol: str = Field(..., max_length=2, description="R1 (Principal), R2 (Respaldo) o R3")
     version: str = Field(..., min_length=1, max_length=40)
+
+
+class AprobarPCB(BaseModel):
+    operador: Optional[str] = Field(None, max_length=60)
 
 
 class MACUpdate(BaseModel):

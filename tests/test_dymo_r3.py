@@ -65,6 +65,30 @@ class TestDymoR3(unittest.TestCase):
         r = self.c.get("/api/dymo/r3/archivo?nombre=TQT-R3-V30-0001&tipo=dymo")
         self.assertIn("TQT_R3_0001.dymo", r.headers["content-disposition"])
 
+    def _r3(self, nombre, aprobada):
+        with db.get_db() as c:
+            c.execute("DELETE FROM pcb_inventario WHERE nombre=?", (nombre,))
+            c.execute("INSERT INTO pcb_inventario(tipo, version, serie, nombre, aprobada) VALUES('R3', ?, ?, ?, ?)",
+                      (nombre.split("-")[2][1:], nombre[-4:], nombre, 1 if aprobada else 0))
+
+    def test_r3_aprobada(self):
+        """v1.4.94: «Aprobada» solo si pcb_inventario.aprobada=1 (403 si no); sin el flag la etiqueta no cambia."""
+        n = "TQT-R3-V30-0777"
+        self._r3(n, False)
+        for ruta in ("xml", "archivo"):
+            r = self.c.get(f"/api/dymo/r3/{ruta}?nombre={n}&aprobada=true")
+            self.assertEqual(r.status_code, 403); self.assertIn("La R3 no está aprobada", r.json()["detail"])
+        self.assertEqual(self.c.get("/api/dymo/r3/xml?nombre=TQT-R3-V30-0778&aprobada=true").status_code, 403)   # inexistente
+        self.assertNotIn("Aprobada", self.c.get(f"/api/dymo/r3/xml?nombre={n}").text)
+        self._r3(n, True)
+        for tipo in ("label", "dymo"):
+            r = self.c.get(f"/api/dymo/r3/xml?nombre={n}&tipo={tipo}&aprobada=true")
+            self.assertEqual(r.status_code, 200); self.assertIn("Aprobada", r.text)
+            self.assertIn("QR1", r.text); self.assertIn("NUMR3D", r.text); self.assertIn("Rotation90", r.text)
+        self.assertEqual(self.c.get(f"/api/dymo/r3/archivo?nombre={n}&tipo=label&aprobada=true").status_code, 200)
+        svg = DymoService.generate_r3_svg([n], "30334", aprobada=True)
+        self.assertIn(">Aprobada<", svg); self.assertNotIn("Aprobada", DymoService.generate_r3_svg([n], "30334"))
+
 
 if __name__ == "__main__":
     unittest.main()

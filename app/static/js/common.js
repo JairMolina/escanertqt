@@ -199,6 +199,8 @@
      *  todo presente y con MAC -> completa. */
     function estadoTarjeta(t) {
         const x = t || {};
+        // v1.4.94: FINALIZADA (3 placas programadas + Skytec + prueba TQT aprobada + R3 aprobada; la calcula el backend) gana a todo
+        if (x.finalizada) return { key: 'finalizada', programada: true, validada: !!x.validada, skytec: true, label: 'FINALIZADA', kind: 'ok', icon: 'check' };
         const falta = ['r1', 'r2', 'r3'].filter((r) => !x[r]).map((r) => r.toUpperCase());
         const sm = x.sin_mac || [];
         if (falta.includes('R1') || falta.includes('R2')) return { key: 'incompleta', label: 'Falta ' + falta.join(', '), kind: 'warn', icon: 'alert' };
@@ -215,8 +217,19 @@
     function tarjetaProgramada(t) { const x = t || {}; return !!(x.r1 && x.r2 && x.r3) && ['r1', 'r2', 'r3'].every((r) => programada(conFw(x, r))); }
     /** Filtro por estado: 'programada' es derivado; el resto usa estadoTarjeta().key. */
     // 'validada' = t.validada del backend (v1.3.65: confirmada en Pruebas y validación › Placas validadas)
-    const cumpleEstado = (t, key) => !key || (key === 'programada' ? tarjetaProgramada(t) : key === 'r1r2' ? r1r2Programadas(t) : key === 'validada' ? !!(t && t.validada) : estadoTarjeta(t).key === key);
-    const TARJETA_ESTADOS = [{ key: 'incompleta', label: 'Falta placa' }, { key: 'sin_mac', label: 'Sin MAC' }, { key: 'r1r2', label: 'R1 y R2 programadas' }, { key: 'programada', label: 'Programadas (R1+R2+R3)' }, { key: 'validada', label: 'Validadas' }, { key: 'completa', label: 'Completas' }];
+    const cumpleEstado = (t, key) => !key || (key === 'programada' ? tarjetaProgramada(t) : key === 'r1r2' ? r1r2Programadas(t) : key === 'validada' ? !!(t && t.validada) : key === 'finalizada' ? !!(t && t.finalizada) : estadoTarjeta(t).key === key);
+    const TARJETA_ESTADOS = [{ key: 'incompleta', label: 'Falta placa' }, { key: 'sin_mac', label: 'Sin MAC' }, { key: 'r1r2', label: 'R1 y R2 programadas' }, { key: 'programada', label: 'Programadas (R1+R2+R3)' }, { key: 'validada', label: 'Validadas' }, { key: 'completa', label: 'Completas' }, { key: 'finalizada', label: 'Finalizadas' }];
+    /** v1.4.94: qué le falta a una tarjeta para quedar FINALIZADA (lista vacía = ya lo está). */
+    function faltaFinalizar(t) {
+        const x = t || {}; if (x.finalizada) return [];
+        const f = [];
+        ['r1', 'r2', 'r3'].forEach((r) => { if (!x[r]) f.push('Falta ' + r.toUpperCase()); });
+        if (x.r1 && x.r2 && x.r3 && !tarjetaProgramada(x)) f.push('Falta programar (MAC y firmware)');
+        if (!x.skytec) f.push('Falta Skytec');
+        if (!x.aprobada) f.push('Falta prueba TQT aprobada');
+        if (!(x.r3 && x.r3.aprobada)) f.push('Falta aprobar R3');
+        return f;
+    }
     // v1.3.44: lote de mes ("Septiembre 2026"), semana ("Semana 40 · 28 sep–4 oct 2026") o día ("15 sep 2026").
     const MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     function fechaLote(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; }
@@ -919,7 +932,7 @@
     window.TQT = {
         versionP,
         hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, esTpms, esAntijammer, esSpeedlocker, esSigfox, esCaiquen, nombreDe, parseMac, verMac, formatMacProgress, VERSION_DEFAULT,
-        CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
+        CICLO_LABEL, estadoTarjeta, faltaFinalizar, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
         loteNombre, loteConteo, ordenarLotes, loteVista, guardarLoteVista, todosLotes, cabecerasLote, loteUrl, loteEtiqueta, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,
         toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, irModulos, openLotes,

@@ -444,29 +444,30 @@ html, body { margin: 0; padding: 0; background: #fff; }
     // Origen: las R3 de las tarjetas de un lote (como el lote de R1/R2) o un rango de series.
     const soloDig = (e) => { e.target.value = e.target.value.replace(/\D/g, ''); };
     const r3Serie = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 && n <= 9999 ? n : null; };
-    const r3st = { lote: [], cargando: false, error: '' };
+    const r3st = { lote: [], cargando: false, error: '', aprob: new Set() };   // v1.4.94: aprob = nombres de R3 aprobadas (celular)
+    const r3Aprob = (nombre) => r3st.aprob.has(nombre);
     const esLote = () => $('r3Origen').value === 'lote';
     function r3Nombres() {
         const ver = ($('r3Ver').value || '').replace(/\D/g, '') || '30';
-        if (esLote()) return { ver, lista: r3st.lote.map((x) => ({ nombre: x.nombre })), error: r3st.error || (r3st.cargando ? 'Cargando las R3 del lote…' : (!r3st.lote.length && $('r3Lote').value ? 'No hay R3 en las tarjetas del lote ni R3 sueltas.' : '')) };
+        if (esLote()) return { ver, lista: r3st.lote.map((x) => ({ nombre: x.nombre, aprobada: r3Aprob(x.nombre) })), error: r3st.error || (r3st.cargando ? 'Cargando las R3 del lote…' : (!r3st.lote.length && $('r3Lote').value ? 'No hay R3 en las tarjetas del lote ni R3 sueltas.' : '')) };
         const d = r3Serie($('r3Desde').value); if (d === null) return { ver, lista: [] };
         const hRaw = $('r3Hasta').value.trim(); const hh = hRaw ? r3Serie(hRaw) : d;
         if (hh === null || hh < d) return { ver, lista: [], error: '"Serie hasta" debe ser mayor o igual que "desde".' };
         if (hh - d >= 1000) return { ver, lista: [], error: 'Máximo 1000 R3 (1000 etiquetas) por tanda.' };
-        const lista = []; for (let n = d; n <= hh; n++) lista.push({ nombre: `TQT-R3-V${ver}-${String(n).padStart(4, '0')}` });
+        const lista = []; for (let n = d; n <= hh; n++) { const nombre = `TQT-R3-V${ver}-${String(n).padStart(4, '0')}`; lista.push({ nombre, aprobada: r3Aprob(nombre) }); }
         return { ver, lista };
     }
-    function mitad(nombre) {
+    function mitad(nombre, aprobada) {
         const svg = qrSvg(nombre);
         const total = +svg.getAttribute('viewBox').split(' ')[2];
         let ppm = 6; while (ppm > 3 && total * ppm / 11.811 > 13) ppm--;   // igual que calcular_diseno_r3 del servidor (tira de 16 mm)
         const mm = (total * ppm / 11.811).toFixed(2) + 'mm'; svg.setAttribute('width', mm); svg.setAttribute('height', mm);
-        return h('div', { class: 'r3m' }, h('div', { class: 'dymo-qr' }, svg), h('span', { class: 'dymo-l n' }, nombre));
+        return h('div', { class: 'r3m' }, h('div', { class: 'dymo-qr' }, svg), aprobada ? h('span', { class: 'dymo-l n', style: 'display:flex;flex-direction:column;line-height:1.15' }, nombre, h('span', { class: 'r3-aprobada' }, 'Aprobada')) : h('span', { class: 'dymo-l n' }, nombre));
     }
     // v1.4.92: abajo «R3» + 4 dígitos GIRADO, pegado a la izquierda y repetido pegado a la derecha, con línea punteada al centro
     const numR3 = (nombre) => h('div', { class: 'cable-num r3-cable-num' }, h('span', { class: 'cable-tqt' }, 'R3'), h('span', null, nombre.slice(-4)));
     const mitadCable = (nombre) => h('div', { class: 'r3m r3cable' }, numR3(nombre), h('i', { class: 'cable-linea', 'aria-hidden': 'true' }), numR3(nombre));
-    const nodoR3 = (it) => h('div', { class: 'dymo-label r3doble' }, mitad(it.nombre), mitadCable(it.nombre));
+    const nodoR3 = (it, aprobada) => h('div', { class: 'dymo-label r3doble' }, mitad(it.nombre, aprobada), mitadCable(it.nombre));
     function r3Vista() {
         document.querySelectorAll('.r3-serie').forEach((e) => { e.hidden = esLote(); });
         document.querySelectorAll('.r3-lote').forEach((e) => { e.hidden = !esLote(); });
@@ -480,6 +481,11 @@ html, body { margin: 0; padding: 0; background: #fff; }
         const n = lista.length;
         $('r3Info').textContent = error || (n ? `${n} R3 → ${n} etiqueta${n === 1 ? '' : 's'} (${lista[0].nombre} … ${lista[n - 1].nombre})` : 'Vista previa · 57 × 32 mm: R3 arriba, R3 repetido abajo');
         $('btnR3Print').disabled = $('btnR3Open').disabled = !lista.length || state.busy;
+        // v1.4.94: «Imprimir como aprobada»: solo si la(s) R3 elegida(s) están aprobadas (se aprueban escaneándolas en el celular)
+        const nAp = lista.filter((x) => x.aprobada).length;
+        const pa = $('btnR3PrintAprob');
+        pa.disabled = state.busy || !nAp || (!esLote() && nAp !== lista.length);
+        pa.title = !lista.length ? 'Elige una R3' : (!nAp ? 'La R3 no está aprobada; apruébala escaneándola en el celular' : (!esLote() && nAp !== lista.length ? `${lista.length - nAp} R3 del rango no están aprobadas; apruébalas en el celular` : 'Imprime la etiqueta con la leyenda «Aprobada»'));
         $('btnR3Print').lastChild.textContent = esLote() ? ' Imprimir lote R3 en DYMO…' : ' Imprimir R3 en DYMO';
     }
     async function cargarLotesR3() {
@@ -497,12 +503,17 @@ html, body { margin: 0; padding: 0; background: #fff; }
     }
     async function cargarR3Lote() {
         const id = $('r3Lote').value; r3st.lote = []; r3st.error = '';
-        if (!id) { r3Vista(); return; }
+        if (!id) {
+            const rq = await api('/api/pcb?tipo=R3&limit=5000', { timeout: 20000 });
+            if (rq.ok && rq.data && rq.data.items) r3st.aprob = new Set(rq.data.items.filter((p) => p.aprobada).map((p) => p.nombre));
+            r3Vista(); return;
+        }
         r3st.cargando = true; r3Vista();
         // v1.3.44: las R3 de las tarjetas del lote y TODAS las R3 sueltas (registradas pero sin emparejar)
         const [r, rp] = await Promise.all([api(`/api/tarjetas?lote_id=${encodeURIComponent(id)}&limit=500`), api('/api/pcb?tipo=R3&limit=5000', { timeout: 20000 })]);
         if (id !== $('r3Lote').value) return;
         r3st.cargando = false;
+        if (rp.ok && rp.data && rp.data.items) r3st.aprob = new Set(rp.data.items.filter((p) => p.aprobada).map((p) => p.nombre));
         if (!r.ok) r3st.error = r.error || 'No se pudieron cargar las tarjetas del lote.';
         else {
             const vistos = new Set();
@@ -527,31 +538,32 @@ html, body { margin: 0; padding: 0; background: #fff; }
     ['r3Ver', 'r3Desde', 'r3Hasta', 'r3Copias'].forEach((id) => $(id).addEventListener('input', (e) => { soloDig(e); r3Vista(); }));
     $('selZoom').addEventListener('change', r3Vista);
     const qsR3 = (it) => `nombre=${encodeURIComponent(it.nombre)}`;
-    async function xmlR3(it, tipo) {
+    async function xmlR3(it, tipo, aprobada) {
         let res;
-        try { res = await fetch(`/api/dymo/r3/xml?${qsR3(it)}&tipo=${tipo}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        try { res = await fetch(`/api/dymo/r3/xml?${qsR3(it)}&tipo=${tipo}${aprobada ? '&aprobada=true' : ''}`, { cache: 'no-store' }); } catch (e) { throw new Error('Sin conexión con el servidor.'); }
+        if (res.status === 403) throw new Error('La R3 no está aprobada; apruébala escaneándola en el celular.');
         if (!res.ok) throw new Error(`El servidor respondió ${res.status}.`);
         const txt = await res.text();
         if (!D.esXmlEtiqueta(txt)) throw new Error('El servidor no devolvió un XML de etiqueta válido.');
         return txt;
     }
-    async function imprimirR3(printer, it, c) {
-        if (printer === REMOTA) { await R.imprimir({ tipo: 'r3', nombres: [it.nombre], copias: c }); return; }
-        if (navegador()) { encolar(nodoR3(it), c); return; }
+    async function imprimirR3(printer, it, c, aprobada) {
+        if (printer === REMOTA) { await R.imprimir({ tipo: aprobada ? 'r3_aprobada' : 'r3', nombres: [it.nombre], copias: c }); return; }
+        if (navegador()) { encolar(nodoR3(it, aprobada), c); return; }
         let primero = null;
         for (const tipo of ['label', 'dymo']) {
-            try { await D.print(printer, await xmlR3(it, tipo), c); return; }
+            try { await D.print(printer, await xmlR3(it, tipo, aprobada), c); return; }
             catch (e) { if (/no respondi|no encuentra|Elige|cargó|Sin conexión/i.test(e.message)) throw e; if (!primero) primero = e; }
         }
         throw primero;
     }
-    async function imprimirParesR3(lista) {
+    async function imprimirParesR3(lista, aprobada) {
         const etiquetas = lista; const tq = lista.every((x) => /-R3-/.test(x.nombre)) ? 'R3' : 'individual';
         const printer = $('selPrinter').value; const c = Math.max(1, Math.min(99, parseInt($('r3Copias').value || '1', 10) || 1));
         state.busy = true; refrescarBotones(); r3Vista(); let hechas = 0; const fallos = [];
         for (const it of etiquetas) {
             progreso(hechas, etiquetas.length, `Imprimiendo ${hechas + 1} de ${etiquetas.length}: ${it.nombre}…`);
-            try { await imprimirR3(printer, it, c); hechas++; }
+            try { await imprimirR3(printer, it, c, aprobada); hechas++; }
             catch (e) { fallos.push(`${it.nombre}: ${e.message}`); if (/no respondió|DYMO Connect|servicio|compartida/i.test(e.message)) break; }
         }
         progreso(hechas, etiquetas.length, `${hechas} de ${etiquetas.length} etiquetas ${tq} enviadas.`);
@@ -560,9 +572,9 @@ html, body { margin: 0; padding: 0; background: #fff; }
         ocultarProg(4000); state.busy = false; refrescarBotones(); r3Vista();
     }
     // Lote: hoja con TODAS las R3 del lote para marcar cuáles imprimir (igual que "Imprimir lote en DYMO…" de R1/R2)
-    function hojaLoteR3() {
-        const todas = r3st.lote.slice();
-        if (!todas.length) { toast('No hay R3 en el lote ni sueltas', { kind: 'bad' }); return; }
+    function hojaLoteR3(aprobada) {
+        const todas = r3st.lote.filter((x) => !aprobada || r3Aprob(x.nombre));   // v1.4.94: con «aprobada» solo las R3 aprobadas
+        if (!todas.length) { toast(aprobada ? 'Ninguna R3 del lote está aprobada; apruébalas escaneándolas en el celular' : 'No hay R3 en el lote ni sueltas', { kind: 'bad' }); return; }
         const marcadas = new Set(todas.map((x) => x.nombre));
         const cajas = new Map();
         const cuenta = h('b', { 'aria-live': 'polite' });
@@ -605,13 +617,13 @@ html, body { margin: 0; padding: 0; background: #fff; }
             cuenta, lista);
         pintarLista();
         const hoja = T.sheet({
-            title: 'Imprimir lote de R3 en DYMO', body: cuerpo,
+            title: aprobada ? 'Imprimir lote de R3 como aprobadas' : 'Imprimir lote de R3 en DYMO', body: cuerpo,
             actions: [
                 { label: 'Cancelar', onClick: () => true },
                 { label: 'Imprimir seleccionadas', kind: 'primary', icon: 'layers', onClick: () => {
                     const elegidas = todas.filter((x) => marcadas.has(x.nombre)).map((x) => ({ nombre: x.nombre }));
                     if (!elegidas.length) return false;
-                    imprimirParesR3(elegidas);
+                    imprimirParesR3(elegidas, aprobada);
                     return true;
                 } },
             ],
@@ -622,6 +634,12 @@ html, body { margin: 0; padding: 0; background: #fff; }
     $('btnR3Print').addEventListener('click', () => {
         if (esLote()) { hojaLoteR3(); return; }
         const { lista } = r3Nombres(); if (lista.length) imprimirParesR3(lista);
+    });
+    $('btnR3PrintAprob').addEventListener('click', () => {
+        if (esLote()) { hojaLoteR3(true); return; }
+        const { lista } = r3Nombres();
+        if (!lista.length || lista.some((x) => !x.aprobada)) { toast('La R3 no está aprobada; apruébala escaneándola en el celular', { kind: 'warn' }); return; }
+        imprimirParesR3(lista, true);
     });
     $('btnR3Open').addEventListener('click', () => {
         const { lista } = r3Nombres(); if (!lista.length) return;

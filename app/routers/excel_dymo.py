@@ -334,6 +334,14 @@ def get_dymo_archivo(
 NOMBRE_R3 = r"^TQT-R[123]-V[0-9]{1,3}-[0-9]{4}$"
 
 
+def _exigir_r3_aprobada(nombre: str) -> None:
+    """v1.4.94: «Aprobada» en la etiqueta R3 solo si esa R3 tiene aprobada=1 en pcb_inventario (aprobada desde el celular)."""
+    with db.get_db() as c:
+        r = c.execute("SELECT aprobada FROM pcb_inventario WHERE nombre = ? AND tipo = 'R3'", (nombre,)).fetchone()
+    if not r or not r["aprobada"]:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="La R3 no está aprobada; apruébala escaneándola en el celular")
+
+
 def _nombres_r3(nombre: List[str]) -> List[str]:
     """Exactamente 1 nombre TQT-R3-Vxx-0000 (v1.4.89: una R3 arriba y «R3 nnnn» repetido abajo)."""
     if len(nombre) != 1:
@@ -346,13 +354,16 @@ def get_dymo_r3_xml(
     nombre: List[str] = Query(..., description="1 sola vez, ej. ?nombre=TQT-R3-V30-0084"),
     label_format: str = Query("30334", description=FORMATO_DOC),
     tipo: str = Query("dymo", pattern="^(dymo|label)$"),
+    aprobada: bool = Query(False, description="v1.4.94: leyenda «Aprobada»; exige R3 aprobada (403 si no)"),
 ):
     for n in nombre:
         if not re.fullmatch(NOMBRE_R3, n):
             raise HTTPException(422, f"Nombre de placa inválido: {n}")
     fmt = _formato_o_400(label_format)
     nombres = _nombres_r3(nombre)
-    xml = DymoService.generate_r3_dcd_xml(nombres, fmt) if tipo == "dymo" else DymoService.generate_r3_label_xml(nombres, fmt)
+    if aprobada:
+        _exigir_r3_aprobada(nombres[0])
+    xml = DymoService.generate_r3_dcd_xml(nombres, fmt, aprobada) if tipo == "dymo" else DymoService.generate_r3_label_xml(nombres, fmt, aprobada)
     return Response(content=xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
@@ -361,11 +372,15 @@ def get_dymo_r3_archivo(
     nombre: List[str] = Query(...),
     label_format: str = Query("30334", description=FORMATO_DOC),
     tipo: str = Query("dymo", pattern="^(dymo|label)$"),
+    aprobada: bool = Query(False, description="v1.4.94: leyenda «Aprobada»; exige R3 aprobada (403 si no)"),
 ):
     for n in nombre:
         if not re.fullmatch(NOMBRE_R3, n):
             raise HTTPException(422, f"Nombre de placa inválido: {n}")
-    datos, archivo = DymoService.archivo_r3(_nombres_r3(nombre), _formato_o_400(label_format), tipo)
+    nombres = _nombres_r3(nombre)
+    if aprobada:
+        _exigir_r3_aprobada(nombres[0])
+    datos, archivo = DymoService.archivo_r3(nombres, _formato_o_400(label_format), tipo, aprobada)
     return _adjunto(datos, archivo)
 
 

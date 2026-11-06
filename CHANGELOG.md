@@ -1,5 +1,12 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.94 — 2026-11-06
+
+- **Etiquetas DYMO:** vuelve la zona «Cable» (retirada en `5dc5d76`/1.4.89) y el botón amarillo «Imprimir como aprobada» en Tarjetas y en R3 (la leyenda «Aprobada» solo sale si la última prueba TQT quedó aprobada / si la R3 está aprobada; remoto `r3_aprobada`).
+- **R3 «Aprobada»:** columnas `aprobada/aprobada_en/aprobada_por` en `pcb_inventario`, `POST /api/pcb/{id}/aprobar|desaprobar` (solo R3 programada; se anula sola al cambiar firmware, pasar a FALLA/BAJA o salir de la tarjeta). En el celular, Emparejar › «Aprobar R3» (escaneo) y panel en la ranura R3 de la tarjeta.
+- **Tarjeta FINALIZADA:** R1+R2+R3 programadas + Skytec + prueba TQT aprobada + R3 aprobada (`tarjeta.finalizada`, filtro `estado=finalizada`, badge en Tarjetas/Consultar/Resumen, «Para finalizar: …» en el panel, reporte por día y Excel).
+- **Inventario de PCB (escritorio):** «Cambiar» y «Falla» por placa (mismos endpoints que Emparejar móvil).
+
 ## v1.4.93 — 2026-11-05
 
 - Pruebas TQT al volver de otro módulo: el seguimiento de una prueba (`/runs/{id}/events`, `/cancel`, `/log`) devolvía 500 cuando la prueba era de otro lote seleccionado o no existía y la vista quedaba «en prueba activa» sin avance; ahora responde 400 con el motivo y la vista lo muestra (sigue esperando sin repetir la prueba).

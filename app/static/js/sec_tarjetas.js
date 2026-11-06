@@ -12,7 +12,7 @@
         montar(host, ctx) {
             const { T, api, h, icon, toast, sheet, util } = ctx;
             const P = ctx.params();
-            const st = { tars: null, error: '', estado: ['completa', 'incompleta', 'sin_mac', 'r1r2', 'programada', 'validada'].includes(P.get('estado')) ? P.get('estado') : '', q: P.get('q') || '', sort: { id: 'num', dir: 'asc' }, sug: null, limit: 200, abierta: P.get('id') ? +P.get('id') : null, sel: new Set() };
+            const st = { tars: null, error: '', estado: ['completa', 'incompleta', 'sin_mac', 'r1r2', 'programada', 'validada', 'finalizada'].includes(P.get('estado')) ? P.get('estado') : '', q: P.get('q') || '', sort: { id: 'num', dir: 'asc' }, sug: null, limit: 200, abierta: P.get('id') ? +P.get('id') : null, sel: new Set() };
             const conFw = T.conFw;   // v1.4.8: helper común
 
             const q = h('input', { class: 'input', type: 'search', id: 'tarQ', placeholder: 'Número, serie o MAC', 'aria-label': 'Buscar tarjeta por número, nombre de placa o MAC', 'data-buscar': '1', value: st.q, autocomplete: 'off' });
@@ -136,6 +136,8 @@
                     h('header', null, h('div', null, h('div', { class: 'silk', style: 'margin-bottom:3px' }, 'Tarjeta'), h('span', { id: 'tarPanelT', class: 'sr-only' }, `Detalle de la tarjeta ${t.id_tarjeta_num}`), num), h('div', { class: 'grow' }), T.tarjetaBadge(t), cerrar),
                     h('div', { class: 'cuerpo' },
                         h('a', { class: 'btn', href: '/monitor#/validacion?tarjeta=' + t.id }, 'Pruebas e historial de esta tarjeta'),
+                        // v1.4.94: qué le falta para quedar FINALIZADA
+                        (() => { const fl = T.faltaFinalizar(t); return fl.length ? h('p', { class: 'hint', role: 'status' }, 'Para finalizar: ' + fl.join(' · ')) : h('p', { class: 'hint' }, T.badge('FINALIZADA', 'ok', 'check'), ' R1, R2 y R3 programadas, Skytec, prueba TQT y R3 aprobadas.'); })(),
                         botonSkytec(t),
                         h('div', { class: 'esc-placas' }, ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'esc-placa-w' },
                             util.placaCard(sl, conFw(t, sl.toLowerCase())),
@@ -348,7 +350,7 @@
                 const enLote = st.tars ? st.tars.filter((t) => st.dia.has(t.id)).length : 0;
                 const q = r.uno ? `fecha=${r.a}` : `desde=${r.a}&hasta=${r.b}`;
                 btnXls.href = T.loteUrl(`/api/reporte-dia/excel?${q}`); btnXls.setAttribute('download', r.uno ? `Tarjetas_${r.a}.xlsx` : `Tarjetas_${r.a}_a_${r.b}.xlsx`);
-                diaRes.replaceChildren(kpiDia(d.programadas || 0, 'con programación', 'ok'), kpiDia(d.completadas, 'completadas', 'ok'), kpiDia(d.entregadas, 'entregadas', 'info'),
+                diaRes.replaceChildren(kpiDia(d.programadas || 0, 'con programación', 'ok'), kpiDia(d.completadas, 'completadas', 'ok'), kpiDia(d.finalizadas || 0, 'finalizadas', 'ok'), kpiDia(d.entregadas, 'entregadas', 'info'),
                     h('span', { class: 'muted' }, (r.uno ? '' : `${d.dias} días · `) + (d.items.length ? `${enLote} de ${d.items.length} en este lote · la tabla muestra solo esas` : `Sin movimientos ${r.uno ? 'ese día' : 'en ese rango'}`)));
                 lista();
             }
