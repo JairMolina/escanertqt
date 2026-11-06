@@ -31,7 +31,7 @@
 
   --ok: #066D42;
   --warn: #875100;
-  --gold: #8A6200;
+  --final: #A3147F;
   --bad: #B42424;
   --info: #1D63C2;
 
@@ -70,7 +70,7 @@
     --accent-text: #E6B458;
     --ok: #3FD08A;
     --warn: #F2B33D;
-    --gold: #FFC83D;
+    --final: #FF7AD9;
     --bad: #FF6B6B;
     --info: #5AA9FF;
     --r1: #62A8FF;
@@ -95,7 +95,7 @@
   --accent-text: #E6B458;
   --ok: #3FD08A;
   --warn: #F2B33D;
-  --gold: #FFC83D;
+  --final: #FF7AD9;
   --bad: #FF6B6B;
   --info: #5AA9FF;
   --r1: #62A8FF;
@@ -282,7 +282,20 @@ button.brand-sub:hover { color: var(--text); }
 .badge[data-k="bad"] { color: var(--bad); }
 .badge[data-k="info"] { color: var(--info); }
 .badge[data-k="accent"] { color: var(--accent-text); }
-.badge[data-k="gold"] { color: var(--gold); background: color-mix(in srgb, var(--gold) 22%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 50%, transparent), 0 0 10px color-mix(in srgb, var(--gold) 30%, transparent); }
+/* v1.4.97: FINALIZADA en fucsia (el dorado se confundía con el ámbar de «Falta R3 · R1 y R2 programadas»; el fucsia no lo usa ningún otro estado ni placa) con destello que cruza y dos brillitos */
+.badge[data-k="final"] {
+  --f: var(--final, #A3147F); position: relative; overflow: hidden; isolation: isolate; color: var(--f);
+  background: linear-gradient(105deg, color-mix(in srgb, var(--f) 30%, transparent), color-mix(in srgb, var(--f) 12%, transparent) 55%, color-mix(in srgb, var(--f) 26%, transparent));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--f) 55%, transparent), 0 0 12px color-mix(in srgb, var(--f) 38%, transparent);
+}
+.badge[data-k="final"]::before { content: ""; position: absolute; z-index: -1; top: -2px; bottom: -2px; left: -60%; width: 45%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, #fff 70%, var(--f)), transparent); transform: skewX(-20deg); animation: final-destello 3.6s ease-in-out infinite; }
+.badge[data-k="final"]::after { content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at 88% 22%, #fff 0 1.2px, transparent 2.2px), radial-gradient(circle at 70% 78%, #fff 0 .9px, transparent 1.8px), radial-gradient(circle at 12% 30%, #fff 0 .8px, transparent 1.6px);
+  animation: final-brillitos 2.4s ease-in-out infinite; }
+@keyframes final-destello { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+@keyframes final-brillitos { 0%, 100% { opacity: .15; } 50% { opacity: .95; } }
+@media (prefers-reduced-motion: reduce) { .badge[data-k="final"]::before { animation: none; display: none; } .badge[data-k="final"]::after { animation: none; opacity: .6; } }
 .badge .svg-i { width: 13px; height: 13px; stroke-width: 2.4; }
 
 /* ---------- tarjetas/paneles ---------- */
@@ -426,6 +439,7 @@ button.item:hover, a.item:hover { background: var(--surface-2); }
 .kpi[data-k="warn"]::before { background: var(--warn); }
 .kpi[data-k="bad"]::before { background: var(--bad); }
 .kpi[data-k="info"]::before { background: var(--info); }
+.kpi[data-k="final"]::before { background: var(--final); }
 .kpi .v { font-family: var(--font-mono); font-size: 34px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .tools-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .tools-row .input { min-height: 44px; width: auto; }
