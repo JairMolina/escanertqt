@@ -191,7 +191,7 @@
         if (slot === 'R3') {   // v1.4.98: la R3 no lleva MAC ni versión de firmware: solo «programada» y «aprobada»
             const prog = T.r3Programada(p) ? T.badge('Programada', 'ok', 'check') : T.badge('Sin programar', 'warn');
             const apr = p.aprobada ? T.badge('Aprobada', 'ok', 'check') : T.badge('Sin aprobar', '');
-            return art([h('dl', null, campo('Hardware', 'V' + p.version), campo('Programación', prog), campo('Aprobación', apr), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC.')]);
+            return art([h('dl', { class: 'pl-r3' }, campo('Hardware', 'V' + p.version), campo('Programación', prog), campo('Aprobación', apr), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC.')]);
         }
         const mac = p.mac ? String(p.mac).toUpperCase() : '';
         const macBox = mac

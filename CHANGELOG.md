@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.99 — 2026-11-06
+
+- **R3 entregadas ya no salen «Sin programar»:** las 17 R3 asignadas de la BD local pertenecían a tarjetas entregadas el 5–19 oct (antes de registrar el firmware de R3) y figuraban sin programar. Migración única (marca `r3_programadas_entregadas_v1_4_99` en `ajustes`): las R3 ASIGNADAS sin firmware de tarjetas con fecha de entrega quedan programadas (firmware interno `s/d`, versión no registrada; no se inventa una versión) y, si su última prueba TQT fue aprobada o con advertencias, también «Aprobada». Las R3 en stock y las de tarjetas no entregadas no se tocan.
+- **Ficha de la R3:** «Programación» y «Aprobación» ya no se traslapan en paneles angostos (dos columnas y el badge parte línea).
+
 ## v1.4.98 — 2026-11-06
 
 - **Tarjetas › detalle:** «Para finalizar» ahora es una **lista por placa** (chip R1/R2/R3 + qué falta: Sin placa asignada, Falta MAC, Falta firmware, Falta programar en R3, Falta el candado en Skytec, Falta prueba TQT aprobada). La API de tarjetas trae el campo nuevo `faltantes` (`[{placa, motivo}]`, vacío si ya está FINALIZADA) y `r3.programada`; el JS usa `T.faltantesFinalizar` (con cálculo de respaldo).

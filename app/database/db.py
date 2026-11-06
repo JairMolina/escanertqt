@@ -426,6 +426,38 @@ def _aprobar_r3_anteriores(conn: sqlite3.Connection) -> None:
     conn.execute("INSERT INTO ajustes (clave, valor) VALUES ('r3_aprobadas_anteriores_v1_4_96', ?)", (str(cur.rowcount),))
 
 
+SIN_DATO_FW = "s/d"   # R3 programada de fábrica/antes de registrar versión: no se inventa una versión
+
+
+def _programar_r3_entregadas(conn: sqlite3.Connection) -> None:
+    """v1.4.99: UNA sola vez, las R3 ASIGNADAS sin firmware de tarjetas YA ENTREGADAS (fecha_real) se marcan «programadas»
+    (firmware interno «s/d»: versión no registrada; la R3 solo muestra Programada/Aprobada). Eran tarjetas entregadas antes de
+    registrar el firmware de la R3 y quedaban «Sin programar» y fuera de FINALIZADA. Además, las que tienen última prueba TQT
+    aprobada o con advertencias pasan a «Aprobada» (misma regla que la migración v1.4.96). Las R3 en stock (DISPONIBLE) o de
+    tarjetas aún no entregadas no se tocan. `ajustes` evita repetirlo."""
+    if not {r[1] for r in conn.execute("PRAGMA table_info(pcb_inventario)")} >= {"aprobada", "aprobada_en", "aprobada_por", "firmware"}:
+        return
+    conn.execute("CREATE TABLE IF NOT EXISTS ajustes (clave TEXT PRIMARY KEY, valor TEXT NOT NULL, "
+                 "updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')))")
+    if conn.execute("SELECT 1 FROM ajustes WHERE clave = 'r3_programadas_entregadas_v1_4_99'").fetchone():
+        return
+    ids = [r[0] for r in conn.execute(
+        "SELECT p.id FROM pcb_inventario p JOIN tarjetas_produccion t ON t.pcb_r3_id = p.id "
+        "WHERE p.tipo = 'R3' AND p.estado_ciclo = 'ASIGNADA' AND TRIM(COALESCE(p.firmware, '')) = '' "
+        "AND TRIM(COALESCE(t.fecha_real, '')) <> ''")]
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    aprobadas = 0
+    for pid in ids:
+        conn.execute("UPDATE pcb_inventario SET firmware = ?, updated_at = ? WHERE id = ?", (SIN_DATO_FW, ahora, pid))
+        cur = conn.execute(
+            "UPDATE pcb_inventario SET aprobada = 1, aprobada_en = ?, aprobada_por = 'migración v1.4.99' WHERE id = ? AND aprobada = 0 "
+            "AND id IN (SELECT t.pcb_r3_id FROM tarjetas_produccion t WHERE COALESCE((SELECT r.result FROM tqt_test_runs r "
+            "WHERE r.requested_card = t.id OR r.tarjeta_id = t.id ORDER BY r.created DESC LIMIT 1), '') "
+            "IN ('aprobado', 'aprobado_con_advertencias'))", (ahora, pid))
+        aprobadas += cur.rowcount
+    conn.execute("INSERT INTO ajustes (clave, valor) VALUES ('r3_programadas_entregadas_v1_4_99', ?)", (f"{len(ids)}/{aprobadas}",))
+
+
 def _asegurar_columnas(conn: sqlite3.Connection) -> None:
     """Bases anteriores: agrega pcb_inventario.firmware y siembra el catálogo de firmware con el de la plantilla Excel
     (idempotente, conserva datos). El firmware pasa de la tarjeta a cada PCB; el valor antiguo de la tarjeta se sigue
@@ -456,6 +488,7 @@ def _asegurar_columnas(conn: sqlite3.Connection) -> None:
                  "operator TEXT NOT NULL, state TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL, "
                  "inventory TEXT NOT NULL, report TEXT, result TEXT, cancel INTEGER NOT NULL DEFAULT 0)")
     _aprobar_r3_anteriores(conn)
+    _programar_r3_entregadas(conn)
     _asegurar_fechas_entrega(conn)
     lcols ={r[1] for r in conn.execute("PRAGMA table_info(lotes_mensuales)")}
     if lcols and "tipo_lote" not in lcols:   # v1.3.44: lotes de mes, semana o día; los existentes quedan como 'mes'

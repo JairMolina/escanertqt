@@ -637,3 +637,7 @@ a.acceso-bloq::after { content: ""; position: absolute; top: 6px; right: 6px; wi
 
 /* MAC siempre en MAYUSCULAS (AA:BB:CC:DD:EE:FF), aunque se teclee o llegue en minusculas */
 .macval, .c-mac, .macfield, .macs-in input, #eMac, .mac .val, input[data-mac], input[id*="mac" i] { text-transform: uppercase; }
+
+/* v1.4.99: ficha de R3 (Programación / Aprobación como badges): dos columnas y badge que parte línea; antes se traslapaban en paneles angostos */
+.esc-pl dl.pl-r3, .pcbf dl.pl-r3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pl-r3 dd .badge { max-width: 100%; white-space: normal; line-height: 1.25; font-size: 11px; }
