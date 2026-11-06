@@ -860,6 +860,25 @@ def _fila_a_tarjeta(row: sqlite3.Row) -> Dict[str, Any]:
         all(d[r] for r in ("r1", "r2", "r3"))
         and all(lleno(d[f"firmware_{r}"]) for r in ("r1", "r2", "r3")) and all(lleno(d[f"mac_{r}"]) for r in ("r1", "r2"))
         and d["skytec"] and d["aprobada"])
+    # v1.4.98: qué le falta para quedar FINALIZADA, por placa (misma regla que `finalizada`; vacío si ya lo está).
+    # La R3 no lleva MAC ni versión visible: solo «programada» (firmware interno no vacío) y «aprobada».
+    falt: List[Dict[str, str]] = []
+    if not d["finalizada"]:
+        for r in ("r1", "r2", "r3"):
+            if not d[r]:
+                falt.append({"placa": r.upper(), "motivo": "falta"})
+                continue
+            if r != "r3" and not lleno(d[f"mac_{r}"]):
+                falt.append({"placa": r.upper(), "motivo": "sin_mac"})
+            if not lleno(d[f"firmware_{r}"]):
+                falt.append({"placa": r.upper(), "motivo": "sin_programar"})
+        if not d["skytec"]:
+            falt.append({"placa": "R1 y R2", "motivo": "sin_skytec"})
+        if not d["aprobada"]:
+            falt.append({"placa": "TARJETA", "motivo": "sin_prueba_tqt"})
+    d["faltantes"] = falt
+    if d["r3"]:
+        d["r3"]["programada"] = lleno(d["firmware_r3"])
     return d
 
 

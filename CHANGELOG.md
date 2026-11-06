@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.98 — 2026-11-06
+
+- **Tarjetas › detalle:** «Para finalizar» ahora es una **lista por placa** (chip R1/R2/R3 + qué falta: Sin placa asignada, Falta MAC, Falta firmware, Falta programar en R3, Falta el candado en Skytec, Falta prueba TQT aprobada). La API de tarjetas trae el campo nuevo `faltantes` (`[{placa, motivo}]`, vacío si ya está FINALIZADA) y `r3.programada`; el JS usa `T.faltantesFinalizar` (con cálculo de respaldo).
+- **R3 sin MAC ni versión de firmware:** en Tarjetas (celda y ficha), Consultar (web y móvil), Copiar datos, Inventario PCB, Resumen, etiquetas DYMO, Validación y avisos en vivo la R3 solo muestra **Programada / Sin programar** y **Aprobada / Sin aprobar**. El firmware interno se conserva (es lo que define «programada»); la pantalla de captura de firmware R3 en MACs no cambia. El evento de aprobar R3 ya no escribe el FW.
+- Textos corregidos: FINALIZADA no exige R3 aprobada (KPI del Resumen, panel); «Aprobar R3» ya no dice «lista para finalizar».
+
 ## v1.4.97 — 2026-11-06
 
 - **Tarjeta FINALIZADA con estilo propio:** el dorado se confundía con el ámbar de «Falta R3 · R1 y R2 programadas». Ahora el badge es **fucsia** (token `--final`, claro y oscuro; ningún otro estado ni placa usa ese tono) con destello que cruza y brillitos, y respeta «movimiento reducido». Mismo color en el KPI «FINALIZADAS» del Resumen. Solo CSS/JS de presentación (`badge[data-k="final"]`, `kind: 'final'`).

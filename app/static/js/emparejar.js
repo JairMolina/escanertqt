@@ -244,9 +244,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 box.append(h('div', { class: 'row wrap', style: 'gap:8px' }, T.badge('Aprobada', 'ok', 'check'),
                     h('button', { class: 'btn btn-sm', type: 'button', style: btnCss, onclick: () => confirmar('Quitar aprobación', `${p.nombre} dejará de estar aprobada.`, 'Quitar aprobación', 'danger', () => llamar('desaprobar')) }, 'Quitar aprobación')));
             } else if (T.programada(p)) {
-                box.append(h('button', { class: 'btn btn-primary', type: 'button', style: btnCss + ';width:100%', onclick: () => confirmar('Aprobar R3', `¿Aprobar ${p.nombre}? Quedará lista para finalizar la tarjeta.`, 'Aprobar', 'primary', () => llamar('aprobar')) }, icon('check'), 'Aprobar'));
+                box.append(h('button', { class: 'btn btn-primary', type: 'button', style: btnCss + ';width:100%', onclick: () => confirmar('Aprobar R3', `¿Aprobar ${p.nombre}? Quedará marcada como aprobada.`, 'Aprobar', 'primary', () => llamar('aprobar')) }, icon('check'), 'Aprobar'));
             } else {
-                box.append(h('div', { class: 'hint', role: 'status' }, 'No se puede aprobar: la R3 aún no está programada (sin firmware).'));
+                box.append(h('div', { class: 'hint', role: 'status' }, 'No se puede aprobar: la R3 aún no está programada.'));
             }
         }
         pintar();

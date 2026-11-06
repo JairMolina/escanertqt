@@ -847,7 +847,7 @@ def _aprobar_tx(c: sqlite3.Connection, pcb_id: int, aprobar: bool, operador: Opt
             return p   # idempotente
         c.execute("UPDATE pcb_inventario SET aprobada=1, aprobada_en=?, aprobada_por=?, updated_at=? WHERE id=?",
                   (_ahora(), operador, _ahora(), pcb_id))
-        evento, det = "PCB_APROBADA", f"R3 aprobada (FW {p['firmware']})"
+        evento, det = "PCB_APROBADA", "R3 aprobada"
     else:
         if not p["aprobada"]:
             return p

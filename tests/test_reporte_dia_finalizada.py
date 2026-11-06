@@ -51,7 +51,7 @@ class TestReporteDiaFinalizada(unittest.TestCase):
             ws = load_workbook(io.BytesIO(reporte_dia.excel_del_rango(self.hoy, self.hoy))).active
         cab = [ws.cell(8, i).value for i in range(1, 15)]
         self.assertEqual(cab[12:], ["Estado", "R3 aprobada"])
-        fila = next(r for r in range(9, 30) if ws.cell(r, 1).value == "#9101")
+        fila = next(r for r in range(9, 400) if ws.cell(r, 1).value == "#9101")
         self.assertEqual((ws.cell(fila, 13).value, ws.cell(fila, 14).value), ("FINALIZADA", "Sí"))
 
 

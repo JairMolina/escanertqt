@@ -438,7 +438,7 @@
       const roles = ["r1", "r2", "r3"].filter((k) => t[k]);
       curChips.textContent = roles.map((k) => k.toUpperCase()).join(" + ");
       curMeta.textContent = roles
-        .map((k) => k.toUpperCase() + " " + (t[k].version ? "V" + t[k].version : "HW —") + " · FW " + (t[k].firmware || "sin registro")).join(" · ");
+        .map((k) => k.toUpperCase() + " " + (t[k].version ? "V" + t[k].version : "HW —") + (k === "r3" ? " · " + (t[k].firmware ? "programada" : "sin programar") : " · FW " + (t[k].firmware || "sin registro"))).join(" · ");
     }
     const expandBtn = h("button", { class: "btn tqt-link tqt-expand", type: "button", "aria-expanded": "false",
       onclick: () => { const open = !GROUPS.every((g) => g.el.open); GROUPS.forEach((g) => (g.el.open = open)); expandBtn.setAttribute("aria-expanded", String(open)); expandTxt.textContent = open ? "Contraer etapas" : "Expandir etapas"; } },
