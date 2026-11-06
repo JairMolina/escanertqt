@@ -63,10 +63,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const head = h('header', null, T.tipoChip(S, { lg: true }), h('span', { class: 'nm' }, p.nombre), T.cicloBadge(p.estado_ciclo, Object.assign({ tipo: S }, p)));
         const fwBox = p.firmware ? h('span', { class: 'mono' }, p.firmware) : h('span', { class: 'soft' }, icon('clock'), 'Sin firmware');
-        if (S === 'R3') {   // la R3 no lleva MAC, pero sí se programa (firmware)
+        if (S === 'R3') {   // v1.4.98: la R3 no lleva MAC ni versión de firmware: solo «programada» y «aprobada»
             return h('article', { class: 'pcbf', dataset: { t: S, hit: hit ? '1' : '' }, 'aria-label': `${S} ${p.nombre}` }, head,
-                h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fwBox), campo('Serie', p.serie)),
-                h('p', { class: 'pcbf-nota' }, icon('info'), 'La R3 no lleva MAC'), p.aprobada ? T.badge('Aprobada', 'ok', 'check') : null);
+                h('dl', null, campo('Hardware', 'V' + p.version), campo('Programación', T.r3Programada(p) ? T.badge('Programada', 'ok', 'check') : T.badge('Sin programar', 'warn')),
+                    campo('Aprobación', p.aprobada ? T.badge('Aprobada', 'ok', 'check') : T.badge('Sin aprobar', '')), campo('Serie', p.serie)),
+                h('p', { class: 'pcbf-nota' }, icon('info'), 'La R3 no lleva MAC'));
         }
         const mac = p.mac ? String(p.mac).toUpperCase() : '';
         const macBox = mac
@@ -82,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const l = [`Tarjeta ${t.id_tarjeta_num}`];
         SLOTS.forEach((s) => {
             const p = t[s]; if (!p) return;
-            if (s === 'r3') { l.push(`R3 ${p.nombre} (Hardware V${p.version}; sin MAC${p.firmware ? '; Firmware ' + p.firmware : '; sin firmware'})`); return; }
+            if (s === 'r3') { l.push(`R3 ${p.nombre} (Hardware V${p.version}; sin MAC; ${T.r3Programada(p) ? 'Programada' : 'Sin programar'}; ${p.aprobada ? 'Aprobada' : 'Sin aprobar'})`); return; }
             l.push(`${s.toUpperCase()} ${p.nombre} · Hardware V${p.version}${p.mac ? ' · MAC ' + String(p.mac).toUpperCase() : ''}${p.firmware ? ' · Firmware ' + p.firmware : ''}`);
         });
         return l.join('\n');

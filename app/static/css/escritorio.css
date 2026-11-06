@@ -386,3 +386,10 @@ details.esc-dia[open] > summary.esc-dia-sum { margin-bottom: 10px; }
 @media (prefers-reduced-motion: reduce) { details.esc-dia > summary.esc-dia-sum::after { transition: none; } }
 .esc-placa-w { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .esc-slot-acts { justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+
+/* v1.4.98: «Para finalizar»: lista de lo que falta, por placa */
+.esc-falta { border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: var(--r-1); background: var(--surface); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.esc-falta ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.esc-falta li { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.esc-falta-ambito { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); min-width: 44px; }
+.esc-falta .hint { margin: 0; }

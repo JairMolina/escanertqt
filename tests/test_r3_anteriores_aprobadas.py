@@ -1,6 +1,7 @@
 """v1.4.96: las R3 entregadas antes de v1.4.94 con prueba TQT aprobada (o con advertencias) pasan a «Aprobada» una sola vez;
 las fallidas y sin prueba no; y la etiqueta «Aprobada» de la tarjeta se emite también con advertencias."""
 import _aislamiento  # noqa: F401  (debe ser lo primero)
+import itertools
 import unittest
 
 from app.database import db
@@ -14,6 +15,11 @@ CLAVE = "r3_aprobadas_anteriores_v1_4_96"
 
 
 class TestR3Anteriores(_Base):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        _Base._tarjeta.__globals__['_serie'] = itertools.count(9000)   # rango propio: evita choques con la prueba base cargada dos veces
+
     def _r3(self, r3):
         with db.get_db() as c:
             return c.execute("SELECT aprobada, aprobada_por FROM pcb_inventario WHERE id=?", (r3,)).fetchone()

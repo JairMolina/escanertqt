@@ -599,7 +599,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
                 lista.append(h('label', { style: 'display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2,transparent)' },
                     cb, h('b', { class: 'mono', style: 'min-width:54px' }, x.num ? `#${x.num}` : '—'), h('span', { class: 'mono grow' }, x.nombre),
                     x.suelta ? T.badge('Suelta', 'info') : null,
-                    T.badge(x.prog ? 'Programada' : 'Sin firmware', x.prog ? 'ok' : 'warn')));
+                    T.badge(x.prog ? 'Programada' : 'Sin programar', x.prog ? 'ok' : 'warn')));
             });
         }
         const marcarVisibles = (on) => { visibles().forEach((x) => { if (on) marcadas.add(x.nombre); else marcadas.delete(x.nombre); const cb = cajas.get(x.nombre); if (cb) cb.checked = on; }); actualizarCuenta(); };

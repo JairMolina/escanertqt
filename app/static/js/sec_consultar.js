@@ -53,7 +53,7 @@
                         h('div', { class: 'esc-placas' }, ['r1', 'r2', 'r3'].map((s) => { const p = conFw(s); return util.placaCard(s.toUpperCase(), p, p && leidos.has(p.nombre)); })),
                         h('div', { class: 'esc-bar' },
                             h('a', { class: 'btn btn-primary', href: `/dymo?tarjeta_id=${t.id}` }, icon('printer'), 'Etiqueta DYMO'),
-                            h('button', { class: 'btn', type: 'button', onclick: () => util.copiar(util.resumenTarjeta(Object.assign({}, t, { r1: conFw('r1'), r2: conFw('r2') })), 'Datos copiados') }, icon('paste'), 'Copiar datos'),
+                            h('button', { class: 'btn', type: 'button', onclick: () => util.copiar(util.resumenTarjeta(Object.assign({}, t, { r1: conFw('r1'), r2: conFw('r2'), r3: conFw('r3') })), 'Datos copiados') }, icon('paste'), 'Copiar datos'),
                             h('a', { class: 'btn', href: `#/tarjetas?id=${t.id}` }, icon('card'), 'Ver en Tarjetas'), nueva));
                 } else if (d.serie) {   // número sin tarjeta: las placas que tienen ese número
                     cuerpo.append(h('div', { class: 'esc-ficha-cab' },

@@ -137,7 +137,14 @@
                     h('div', { class: 'cuerpo' },
                         h('a', { class: 'btn', href: '/monitor#/validacion?tarjeta=' + t.id }, 'Pruebas e historial de esta tarjeta'),
                         // v1.4.94: qué le falta para quedar FINALIZADA
-                        (() => { const fl = T.faltaFinalizar(t); return fl.length ? h('p', { class: 'hint', role: 'status' }, 'Para finalizar: ' + fl.join(' · ')) : h('p', { class: 'hint' }, T.badge('FINALIZADA', 'ok', 'check'), ' R1, R2 y R3 programadas, Skytec, prueba TQT y R3 aprobadas.'); })(),
+                        // v1.4.98: lista por placa de lo que falta (la R3 solo necesita estar programada; su aprobación no es requisito)
+                        (() => {
+                            const fl = T.faltantesFinalizar(t);
+                            if (!fl.length) return h('p', { class: 'hint' }, T.badge('FINALIZADA', 'final', 'check'), ' R1, R2 y R3 programadas, Skytec y prueba TQT aprobada.');
+                            return h('section', { class: 'esc-falta', role: 'status', 'aria-label': 'Para finalizar' }, h('div', { class: 'silk' }, 'Para finalizar'),
+                                h('ul', null, fl.map((i) => h('li', null, ['R1', 'R2', 'R3'].includes(i.placa) ? T.tipoChip(i.placa, {}) : h('span', { class: 'esc-falta-ambito' }, i.placa === 'TARJETA' ? 'Tarjeta' : i.placa), h('span', null, i.texto)))),
+                                t.r3 && !t.r3.aprobada ? h('p', { class: 'hint' }, 'La R3 sin aprobar no impide finalizar.') : null);
+                        })(),
                         botonSkytec(t),
                         h('div', { class: 'esc-placas' }, ['R1', 'R2', 'R3'].map((sl) => h('div', { class: 'esc-placa-w' },
                             util.placaCard(sl, conFw(t, sl.toLowerCase())),

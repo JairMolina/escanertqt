@@ -89,7 +89,7 @@
         if (!p) return h('span', { class: 'muted' }, '—');
         const r3 = slot === 'R3' || p.tipo === 'R3';
         return h('div', { class: 'esc-placa' }, h('span', { class: 'mono nm' }, p.nombre),
-            r3 ? (p.firmware ? h('span', { class: 'mono sub' }, h('span', { class: 'fw' }, `fw ${p.firmware}`)) : null) : h('span', { class: 'mono sub' }, p.mac ? String(p.mac).toUpperCase() : 'sin MAC', p.firmware ? h('span', { class: 'fw' }, ` · fw ${p.firmware}`) : null));
+            r3 ? h('span', { class: 'sub' }, T.r3Programada(p) ? 'Programada' : 'Sin programar', p.aprobada ? ' · Aprobada' : ' · Sin aprobar') : h('span', { class: 'mono sub' }, p.mac ? String(p.mac).toUpperCase() : 'sin MAC', p.firmware ? h('span', { class: 'fw' }, ` · fw ${p.firmware}`) : null));
     }
 
     /**
@@ -188,8 +188,10 @@
         const cab = h('header', null, T.tipoChip(slot, { lg: true }), h('span', { class: 'nm' }, p.nombre), T.cicloBadge(p.estado_ciclo, Object.assign({ tipo: slot }, p)));
         const art = (kids) => h('article', { class: 'esc-pl', dataset: { t: slot, hit: hit ? '1' : '' }, 'aria-label': `${slot} ${p.nombre}` }, cab, kids);
         const fw = p.firmware ? h('span', null, p.firmware) : h('span', { class: 'soft' }, icon('clock'), 'Sin firmware');
-        if (slot === 'R3') {   // la R3 no lleva MAC, pero sí firmware (programada = con firmware)
-            return art([h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fw), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC.'), p.aprobada ? T.badge('Aprobada', 'ok', 'check') : null]);
+        if (slot === 'R3') {   // v1.4.98: la R3 no lleva MAC ni versión de firmware: solo «programada» y «aprobada»
+            const prog = T.r3Programada(p) ? T.badge('Programada', 'ok', 'check') : T.badge('Sin programar', 'warn');
+            const apr = p.aprobada ? T.badge('Aprobada', 'ok', 'check') : T.badge('Sin aprobar', '');
+            return art([h('dl', null, campo('Hardware', 'V' + p.version), campo('Programación', prog), campo('Aprobación', apr), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC.')]);
         }
         const mac = p.mac ? String(p.mac).toUpperCase() : '';
         const macBox = mac
@@ -203,7 +205,7 @@
         const l = [`Tarjeta ${t.id_tarjeta_num}`];
         ['r1', 'r2', 'r3'].forEach((s) => {
             const p = t[s]; if (!p) return;
-            if (s === 'r3') { l.push(`R3 ${p.nombre} · Hardware V${p.version} (sin MAC)${p.firmware ? ' · Firmware ' + p.firmware : ''}`); return; }
+            if (s === 'r3') { l.push(`R3 ${p.nombre} · Hardware V${p.version} (sin MAC) · ${T.r3Programada(p) ? 'Programada' : 'Sin programar'} · ${p.aprobada ? 'Aprobada' : 'Sin aprobar'}`); return; }
             l.push(`${s.toUpperCase()} ${p.nombre} · Hardware V${p.version}${p.mac ? ' · MAC ' + String(p.mac).toUpperCase() : ''}${p.firmware ? ' · Firmware ' + p.firmware : ''}`);
         });
         if (t.fecha_llegada || t.fecha_finalizado || t.fecha_real || t.gabinete) l.push(`Llegada ${t.fecha_llegada || '—'} · Finalizado ${t.fecha_finalizado || '—'} · Entrega ${t.fecha_real || '—'} · Gabinete ${t.gabinete || '—'}`);
@@ -609,7 +611,7 @@
     // ------------------------------------------------------------------ tiempo real
     const EV = {
         PCB_RECIBIDA: (d) => ['ok', d && d.pcb ? `Recibida ${d.pcb.nombre}` : 'Placa recibida'],
-        PCB_ACTUALIZADA: (d) => ['info', d && d.pcb ? `Actualizada ${d.pcb.nombre}${d.pcb.mac ? ' · ' + String(d.pcb.mac).toUpperCase() : ''}${d.pcb.firmware ? ' · fw ' + d.pcb.firmware : ''}` : 'Placa actualizada'],
+        PCB_ACTUALIZADA: (d) => ['info', d && d.pcb ? `Actualizada ${d.pcb.nombre}${d.pcb.mac ? ' · ' + String(d.pcb.mac).toUpperCase() : ''}${d.pcb.tipo === 'R3' ? (d.pcb.firmware ? ' · programada' : '') : d.pcb.firmware ? ' · fw ' + d.pcb.firmware : ''}` : 'Placa actualizada'],
         PCB_ELIMINADA: (d) => ['warn', d && d.nombre ? `Eliminada ${d.nombre}` : 'Placa eliminada'],
         RECEPCION_CONFIRMADA: (d) => ['ok', `Recepción confirmada${d && d.confirmadas ? ` (${d.confirmadas} placas)` : ''}`],
         TARJETA_EMPAREJADA: (d) => ['ok', d && d.tarjeta ? `Tarjeta ${d.tarjeta.id_tarjeta_num} emparejada` : 'Tarjeta emparejada'],
