@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.95 — 2026-11-06
+
+- **Pruebas TQT:** si una prueba termina mientras el operador está en otro módulo, (1) el servidor emite `PRUEBA_TQT_TERMINADA` y quien la inició recibe una notificación («Prueba TQT de la tarjeta 0072 terminó: aprobada» con botón «Ver e imprimir etiqueta»), y (2) al volver a Pruebas TQT la vista recupera el resultado de la última prueba terminada (pasos, reporte y botón de imprimir etiqueta si salió aprobada) sin repetirla.
+- **FINALIZADA** ya no exige aprobar la R3, cuenta también «aprobado con advertencias» y se muestra en dorado.
+
 ## v1.4.94 — 2026-11-06
 
 - **Etiquetas DYMO:** vuelve la zona «Cable» (retirada en `5dc5d76`/1.4.89) y el botón amarillo «Imprimir como aprobada» en Tarjetas y en R3 (la leyenda «Aprobada» solo sale si la última prueba TQT quedó aprobada / si la R3 está aprobada; remoto `r3_aprobada`).

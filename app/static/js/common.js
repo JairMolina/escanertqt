@@ -445,6 +445,24 @@
 
     // ---------------------------------------------------------------- WebSocket compartido
     let wsClient = null;
+    // v1.4.94: aviso a quien dejó una prueba TQT corriendo cuando termina en otro módulo (solo a quien la inició).
+    let yoEmail;
+    async function avisoPruebaTQT(msg) {
+        const d = (msg && msg.data) || msg || {};
+        if (!d.run_id || !d.result) return;
+        try {
+            if (yoEmail === undefined) { const r = await api('/api/auth/yo'); yoEmail = r.ok && r.data ? String(r.data.email || '').toLowerCase() : ''; }
+            if (!yoEmail || String(d.operator || '').toLowerCase() !== yoEmail) return;
+            const vistas = JSON.parse(sessionStorage.getItem('tqt.pruebaAvisada') || '[]');
+            if (vistas.includes(d.run_id)) return;
+            sessionStorage.setItem('tqt.pruebaAvisada', JSON.stringify([...vistas.slice(-20), d.run_id]));
+        } catch (e) { /* sin sessionStorage: se avisa igual */ }
+        const ok = d.result === 'aprobado', adv = d.result === 'aprobado_con_advertencias';
+        const txt = { aprobado: 'aprobada', aprobado_con_advertencias: 'aprobada con advertencias', fallido: 'fallida', no_verificado: 'sin verificar' }[d.result] || d.result;
+        toast(`Prueba TQT de la tarjeta ${d.id_tarjeta_num || ''} terminó: ${txt}.`, { kind: ok ? 'ok' : adv ? 'warn' : 'bad', ms: 20000,
+            action: { label: ok ? 'Ver e imprimir etiqueta' : 'Ver resultado', onClick: () => { location.href = '/monitor#/validacion?tarjeta=' + encodeURIComponent(d.tarjeta_id); if (/\/monitor/.test(location.pathname)) location.reload(); } } });
+        try { if (navigator.vibrate) navigator.vibrate(ok ? [120, 60, 120] : [300]); } catch (e) { /* nada */ }
+    }
     function ws(clientType) {
         if (!wsClient && window.TQTWebSocketClient) {
             wsClient = new window.TQTWebSocketClient(clientType || 'operador_movil');
@@ -454,6 +472,7 @@
                 if (lbl) lbl.textContent = { connected: 'En línea', connecting: 'Conectando', disconnected: 'Sin red', error: 'Sin red' }[s] || s;
             }));
             wsClient.connect();
+            if (wsClient.on) wsClient.on('PRUEBA_TQT_TERMINADA', avisoPruebaTQT);
         }
         return wsClient;
     }
