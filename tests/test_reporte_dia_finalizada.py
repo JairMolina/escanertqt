@@ -33,7 +33,8 @@ class TestReporteDiaFinalizada(unittest.TestCase):
         f = self._fila()
         self.assertFalse(f["finalizada"])
         self.assertFalse(f["r3_aprobada"])
-        self.assertEqual(reporte_dia.tarjetas_del_rango(self.hoy, self.hoy)["finalizadas"], 0)
+        d = reporte_dia.tarjetas_del_rango(self.hoy, self.hoy)
+        self.assertEqual(d["finalizadas"], sum(1 for i in d["items"] if i["finalizada"]))   # otras tarjetas de la base de prueba pueden estar finalizadas
 
     def test_finalizada_se_cuenta_y_sale_en_excel(self):
         real = db.get_tarjeta_by_id
@@ -43,9 +44,10 @@ class TestReporteDiaFinalizada(unittest.TestCase):
                 t["finalizada"] = True
                 t["r3"]["aprobada"] = True
             return t
+        antes = reporte_dia.tarjetas_del_rango(self.hoy, self.hoy)["finalizadas"]
         with mock.patch.object(db, "get_tarjeta_by_id", side_effect=falso):
             d = reporte_dia.tarjetas_del_rango(self.hoy, self.hoy)
-            self.assertEqual(d["finalizadas"], 1)
+            self.assertEqual(d["finalizadas"], antes + 1)
             ws = load_workbook(io.BytesIO(reporte_dia.excel_del_rango(self.hoy, self.hoy))).active
         cab = [ws.cell(8, i).value for i in range(1, 15)]
         self.assertEqual(cab[12:], ["Estado", "R3 aprobada"])

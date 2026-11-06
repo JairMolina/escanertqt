@@ -119,12 +119,11 @@ class TestR3AprobadaFinalizada(unittest.TestCase):
         t = self._tarjeta_api(tid)
         self.assertFalse(t["finalizada"]); self.assertFalse(t["aprobada"]); self.assertFalse(t["skytec"])
         self._skytec(tid)
-        self.assertFalse(self._tarjeta_api(tid)["finalizada"])          # falta TQT aprobada y R3 aprobada
+        self.assertFalse(self._tarjeta_api(tid)["finalizada"])          # falta la prueba TQT aprobada
         self._prueba_tqt(tid)
         t = self._tarjeta_api(tid)
-        self.assertTrue(t["aprobada"]); self.assertFalse(t["finalizada"])   # falta R3 aprobada
-        self.c.post(f"/api/pcb/{r3}/aprobar", json={})
-        self.assertTrue(self._tarjeta_api(tid)["finalizada"])
+        self.assertTrue(t["aprobada"]); self.assertTrue(t["finalizada"])   # no exige aprobar la R3
+        self.assertFalse(t["r3"]["aprobada"])
         # el filtro del backend coincide con el campo
         ids = {x["id"] for x in db.list_tarjetas(estado="finalizada", limit=500)[0]}
         self.assertIn(tid, ids)
@@ -134,13 +133,23 @@ class TestR3AprobadaFinalizada(unittest.TestCase):
         self.assertFalse(t["aprobada"]); self.assertFalse(t["finalizada"])
         self.assertNotIn(tid, {x["id"] for x in db.list_tarjetas(estado="finalizada", limit=500)[0]})
 
-    def test_finalizada_se_pierde_si_cambia_firmware_de_r3(self):
+    def test_prueba_aprobada_con_advertencias_tambien_finaliza(self):
+        tid, _, _, _ = self._tarjeta()
+        self._skytec(tid); self._prueba_tqt(tid, result="aprobado_con_advertencias")
+        t = self._tarjeta_api(tid)
+        self.assertTrue(t["aprobada"]); self.assertTrue(t["finalizada"])
+        self._prueba_tqt(tid, result="fallido", created=9e9)   # una prueba posterior fallida la quita
+        self.assertFalse(self._tarjeta_api(tid)["finalizada"])
+
+    def test_cambiar_firmware_de_r3_anula_su_aprobacion_no_la_finalizacion(self):
         tid, _, _, r3 = self._tarjeta()
         self._skytec(tid); self._prueba_tqt(tid)
         self.c.post(f"/api/pcb/{r3}/aprobar", json={})
         self.assertTrue(self._tarjeta_api(tid)["finalizada"])
         self.c.put(f"/api/pcb/{r3}/firmware", json={"firmware": "3.3"})
-        self.assertFalse(self._tarjeta_api(tid)["finalizada"])
+        t = self._tarjeta_api(tid)
+        self.assertFalse(t["r3"]["aprobada"])   # cambiar el firmware anula la aprobación de la R3
+        self.assertTrue(t["finalizada"])        # pero la tarjeta sigue finalizada (no depende de aprobar la R3)
 
     def test_sin_skytec_o_sin_mac_no_finaliza(self):
         tid, _, _, r3 = self._tarjeta(mac_ok=False)

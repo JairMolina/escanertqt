@@ -31,6 +31,7 @@
 
   --ok: #066D42;
   --warn: #875100;
+  --gold: #8A6200;
   --bad: #B42424;
   --info: #1D63C2;
 
@@ -69,6 +70,7 @@
     --accent-text: #E6B458;
     --ok: #3FD08A;
     --warn: #F2B33D;
+    --gold: #FFC83D;
     --bad: #FF6B6B;
     --info: #5AA9FF;
     --r1: #62A8FF;
@@ -93,6 +95,7 @@
   --accent-text: #E6B458;
   --ok: #3FD08A;
   --warn: #F2B33D;
+  --gold: #FFC83D;
   --bad: #FF6B6B;
   --info: #5AA9FF;
   --r1: #62A8FF;
@@ -279,6 +282,7 @@ button.brand-sub:hover { color: var(--text); }
 .badge[data-k="bad"] { color: var(--bad); }
 .badge[data-k="info"] { color: var(--info); }
 .badge[data-k="accent"] { color: var(--accent-text); }
+.badge[data-k="gold"] { color: var(--gold); background: color-mix(in srgb, var(--gold) 22%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 50%, transparent), 0 0 10px color-mix(in srgb, var(--gold) 30%, transparent); }
 .badge .svg-i { width: 13px; height: 13px; stroke-width: 2.4; }
 
 /* ---------- tarjetas/paneles ---------- */

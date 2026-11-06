@@ -200,7 +200,7 @@
     function estadoTarjeta(t) {
         const x = t || {};
         // v1.4.94: FINALIZADA (3 placas programadas + Skytec + prueba TQT aprobada + R3 aprobada; la calcula el backend) gana a todo
-        if (x.finalizada) return { key: 'finalizada', programada: true, validada: !!x.validada, skytec: true, label: 'FINALIZADA', kind: 'ok', icon: 'check' };
+        if (x.finalizada) return { key: 'finalizada', programada: true, validada: !!x.validada, skytec: true, label: 'FINALIZADA', kind: 'gold', icon: 'check' };
         const falta = ['r1', 'r2', 'r3'].filter((r) => !x[r]).map((r) => r.toUpperCase());
         const sm = x.sin_mac || [];
         if (falta.includes('R1') || falta.includes('R2')) return { key: 'incompleta', label: 'Falta ' + falta.join(', '), kind: 'warn', icon: 'alert' };
@@ -227,7 +227,6 @@
         if (x.r1 && x.r2 && x.r3 && !tarjetaProgramada(x)) f.push('Falta programar (MAC y firmware)');
         if (!x.skytec) f.push('Falta Skytec');
         if (!x.aprobada) f.push('Falta prueba TQT aprobada');
-        if (!(x.r3 && x.r3.aprobada)) f.push('Falta aprobar R3');
         return f;
     }
     // v1.3.44: lote de mes ("Septiembre 2026"), semana ("Semana 40 · 28 sep–4 oct 2026") o día ("15 sep 2026").

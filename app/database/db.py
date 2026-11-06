@@ -759,15 +759,15 @@ def _cols_pcb(alias: str, ranura: str) -> str:
 
 # v1.4.94: última prueba TQT de la tarjeta (misma regla que excel_dymo._exigir_aprobada: requested_card o tarjeta_id)
 _SQL_TQT_APROBADA = ("COALESCE((SELECT r.result FROM tqt_test_runs r WHERE r.requested_card = t.id OR r.tarjeta_id = t.id "
-                     "ORDER BY r.created DESC LIMIT 1), '') = 'aprobado'")
+                     "ORDER BY r.created DESC LIMIT 1), '') IN ('aprobado', 'aprobado_con_advertencias')")   # la prueba que pasa con avisos también cuenta
 _SKYTEC_OK = ("(SELECT COUNT(*) FROM skytec_candados sk WHERE sk.tarjeta_id = t.id "
               "AND ((sk.slot = 'R1' AND sk.mac = upper(p1.mac)) OR (sk.slot = 'R2' AND sk.mac = upper(p2.mac)))) >= 2")
-# FINALIZADA = R1+R2+R3 presentes y programadas (R1/R2 con MAC y firmware, R3 con firmware) + Skytec + prueba TQT aprobada + R3 aprobada
+# FINALIZADA = R1+R2+R3 presentes y programadas (R1/R2 con MAC y firmware, R3 con firmware) + Skytec + prueba TQT aprobada (la aprobación de la R3 es un estado aparte)
 _SQL_FINALIZADA = (
     "(p1.id IS NOT NULL AND p2.id IS NOT NULL AND p3.id IS NOT NULL "
     "AND TRIM(COALESCE(p1.firmware, t.firmware_r1, '')) <> '' AND TRIM(COALESCE(p1.mac, '')) <> '' "
     "AND TRIM(COALESCE(p2.firmware, t.firmware_r2, '')) <> '' AND TRIM(COALESCE(p2.mac, '')) <> '' "
-    f"AND TRIM(COALESCE(p3.firmware, '')) <> '' AND p3.aprobada = 1 AND {_SKYTEC_OK} AND {_SQL_TQT_APROBADA})")
+    f"AND TRIM(COALESCE(p3.firmware, '')) <> '' AND {_SKYTEC_OK} AND {_SQL_TQT_APROBADA})")
 
 
 # v1.3.65: antes de esta fecha bastaba PPON+POFF para «Validada»; desde v1.3.65 la tarjeta se valida explícitamente
@@ -837,7 +837,7 @@ def _fila_a_tarjeta(row: sqlite3.Row) -> Dict[str, Any]:
     d["finalizada"] = bool(
         all(d[r] for r in ("r1", "r2", "r3"))
         and all(lleno(d[f"firmware_{r}"]) for r in ("r1", "r2", "r3")) and all(lleno(d[f"mac_{r}"]) for r in ("r1", "r2"))
-        and d["skytec"] and d["aprobada"] and d["r3"]["aprobada"])
+        and d["skytec"] and d["aprobada"])
     return d
 
 
