@@ -67,7 +67,7 @@ def _generar(p: EnvioExcelIn) -> Tuple[str, bytes, str, Kpis]:
         a = p.desde or p.fecha or ""
         b = p.hasta or a
         res = reporte_dia.tarjetas_del_rango(a, b)
-        kpis = [("Completadas", res["completadas"], "ok"), ("Entregadas", res["entregadas"], "info"), ("En el reporte", len(res["items"]), "gris")]
+        kpis = [("Completadas", res["completadas"], "ok"), ("Finalizadas", res["finalizadas"], "ok"), ("Entregadas", res["entregadas"], "info"), ("En el reporte", len(res["items"]), "gris")]
         return reporte_dia.nombre_archivo(a, b), reporte_dia.excel_del_rango(a, b), f"Reporte de tarjetas {'del ' if a == b else ''}{reporte_dia.texto_rango(a, b)}", kpis
     from app.services import inventario_tqtr
     hoy = date.today()

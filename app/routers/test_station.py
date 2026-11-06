@@ -11,6 +11,9 @@ from app.routers.stm32 import station_token, operator, run
 from app.services import test_station as svc, stm32_programming as stm
 from app.services import native_ble, pruebas_auto, skytec, usuarios, instalador_windows
 from app.database import db
+from app.routers.ws import manager
+import logging
+from anyio import from_thread
 
 router = APIRouter(prefix="/api/validacion/tqt", tags=["Pruebas TQT"])
 agent_router = APIRouter(prefix="/api/stm32/agent/tests", tags=["Agente Pruebas TQT"])
@@ -205,9 +208,23 @@ def web_identity(jid: str, body: WebIdentity, req: Request):
     return run(svc.web_identity, operator(req), jid, body.detectada, body.confirmar)
 
 
+def avisar_fin_prueba(jid: str) -> None:
+    """v1.4.94: avisa por WebSocket que una prueba TQT terminó, para notificar a quien la dejó corriendo en otro módulo."""
+    try:
+        with db.get_db() as c:
+            r = c.execute("SELECT r.id AS run_id, r.requested_card AS tarjeta_id, r.operator, r.result, r.origin, t.id_tarjeta_num "
+                          "FROM tqt_test_runs r LEFT JOIN tarjetas_produccion t ON t.id = r.requested_card WHERE r.id = ?", (jid,)).fetchone()
+        if r and r["result"]:
+            from_thread.run(manager.broadcast, "PRUEBA_TQT_TERMINADA", dict(r))
+    except Exception as e:  # noqa: BLE001 (el aviso nunca debe romper el cierre de la prueba)
+        logging.getLogger(__name__).warning("No se pudo avisar el fin de la prueba %s: %s", jid, e)
+
+
 @router.post("/web/runs/{jid}/result")
 def web_result(jid: str, body: dict, req: Request):
-    return run(svc.web_finish, operator(req), jid, body)
+    res = run(svc.web_finish, operator(req), jid, body)
+    avisar_fin_prueba(jid)
+    return res
 
 
 @router.get("/runs/{jid}")
@@ -499,4 +516,6 @@ def events(jid: str, body: Events, st=Depends(station_token)):
 
 @agent_router.post("/runs/{jid}/result")
 def finish(jid: str, body: dict, st=Depends(station_token)):
-    return run(svc.finish, st["id"], jid, body)
+    res = run(svc.finish, st["id"], jid, body)
+    avisar_fin_prueba(jid)
+    return res

@@ -14,6 +14,7 @@ from app.database import db, inventario as inv
 from app.database.db import ConflictoError, NoEncontradoError
 from app.database.models import (
     AjustesUpdate,
+    AprobarPCB,
     AsignarPCB,
     DisolverMasivo,
     ConfirmarRecepcion,
@@ -257,6 +258,24 @@ async def post_programacion_lote(payload: ProgramacionLote):
     for f in res["resultados"]:
         f.pop("pcb", None)     # la respuesta lleva solo lo necesario por fila
     return res
+
+
+async def _aprobar(pcb_id: int, aprobar: bool, payload: AprobarPCB):
+    pcb = await _run(inv.aprobar_pcb, pcb_id, aprobar, payload.operador)
+    await manager.broadcast("PCB_ACTUALIZADA", {"pcb": pcb, "conteos": await run_in_threadpool(_conteos)})
+    if pcb.get("tarjeta_id"):
+        await _notificar_tarjeta(await run_in_threadpool(db.get_tarjeta_by_id, pcb["tarjeta_id"]))
+    return pcb
+
+
+@router.post("/pcb/{pcb_id}/aprobar", summary="Aprobar una R3 programada (409 si no tiene firmware; idempotente)")
+async def aprobar_r3(pcb_id: int, payload: AprobarPCB = AprobarPCB()):
+    return await _aprobar(pcb_id, True, payload)
+
+
+@router.post("/pcb/{pcb_id}/desaprobar", summary="Quitar la aprobación de una R3")
+async def desaprobar_r3(pcb_id: int, payload: AprobarPCB = AprobarPCB()):
+    return await _aprobar(pcb_id, False, payload)
 
 
 @router.put("/pcb/{pcb_id}/firmware", summary="Guardar (o borrar) el firmware de una R1, R2 o R3 (la R3 lleva firmware pero no MAC)")

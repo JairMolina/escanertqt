@@ -8,7 +8,7 @@ ENVIADA_TTL queda «desconocido» (nunca se reimprime solo)."""
 import hashlib, json, secrets, time
 from app.database import db
 
-TIPOS = ("tarjeta", "aprobada", "cable", "r3", "activo")   # v1.4.14: «activo» lo encola el módulo Impresora
+TIPOS = ("tarjeta", "aprobada", "cable", "r3", "r3_aprobada", "activo")   # v1.4.14: «activo» lo encola el módulo Impresora
 FINALES = ("impresa", "error", "desconocido", "cancelada")
 EN_LINEA_S = 45          # latido cada 15 s
 PENDIENTE_TTL = 600

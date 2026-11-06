@@ -93,6 +93,7 @@
                 <button type="button" data-zona="tarj" aria-controls="tarjBox" aria-pressed="true">Tarjetas</button>
                 <button type="button" data-zona="esc" aria-controls="escBox" aria-pressed="false">Escanear <span class="cuenta" id="escCuenta" hidden></span></button>
                 <button type="button" data-zona="r3" aria-controls="r3Box" aria-pressed="false">R3</button>
+                <button type="button" data-zona="cable" aria-controls="cableBox" aria-pressed="false">Cable</button>
                 <button type="button" data-zona="cr3" aria-controls="cr3Box" aria-pressed="false">Cable R3</button>
             </div>
             <div class="field"><label for="selZoom">Ampliación de la vista</label>
@@ -120,6 +121,7 @@
 
             <div class="row wrap" style="gap:10px">
                 <button class="btn btn-primary" type="button" id="btnPrint"><span class="svg-slot" data-i="printer"></span> Imprimir en DYMO</button>
+                <button class="btn" type="button" id="btnPrintAprob" style="background:#f2b33d;border-color:#f2b33d;color:#1a1200;font-weight:700" title="Imprime esta etiqueta con la leyenda «Aprobada» (solo si la última prueba TQT de la tarjeta quedó aprobada)"><span class="svg-slot" data-i="check"></span> Imprimir como aprobada</button>
                 <button class="btn" type="button" id="btnOpen"><span class="svg-slot" data-i="download"></span> Abrir en DYMO</button>
                 <button class="btn" type="button" id="btnPrintAll"><span class="svg-slot" data-i="layers"></span> Imprimir lote en DYMO…</button>
                 <button class="btn" type="button" id="btnDownAll"><span class="svg-slot" data-i="download"></span> Descargar lote</button>
@@ -161,7 +163,29 @@
             </div>
             <div class="row wrap" style="gap:10px">
                 <button class="btn btn-primary" type="button" id="btnR3Print"><span class="svg-slot" data-i="printer"></span> Imprimir R3 en DYMO</button>
+                <button class="btn" type="button" id="btnR3PrintAprob" style="background:#f2b33d;border-color:#f2b33d;color:#1a1200;font-weight:700" title="Imprime la etiqueta R3 con la leyenda «Aprobada» (solo si la R3 está aprobada desde el celular)"><span class="svg-slot" data-i="check"></span> Imprimir como aprobada</button>
                 <button class="btn" type="button" id="btnR3Open"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
+            </div>
+        </section>
+        <section class="panel pad stack" aria-labelledby="hCable" id="cableBox" data-zona="cable" hidden>
+            <div class="row wrap" style="justify-content:space-between;gap:8px">
+                <h2 class="silk grow" id="hCable" style="min-width:200px">Etiquetas cable</h2>
+                <span class="hint">La etiqueta se divide a la mitad: el número va solo en la izquierda y la derecha se enrolla en el cable.</span>
+            </div>
+            <div class="row wrap" style="gap:10px;align-items:flex-end">
+                <div class="field" style="width:130px"><label for="cableDesde" id="cableDesdeLbl">Número desde</label><input class="input mono" id="cableDesde" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
+                <button class="btn" type="button" id="cableBarra" aria-pressed="false" title="Dos números: R1 y R2 con número diferente (TQT 0000/0000)" style="min-width:44px;font-weight:700">/</button>
+                <div class="field" style="width:130px" id="cableR2Box" hidden><label for="cableR2">Número R2</label><input class="input mono" id="cableR2" inputmode="numeric" maxlength="4" placeholder="0001" autocomplete="off"></div>
+                <div class="field" style="width:130px" id="cableHastaBox"><label for="cableHasta">Número hasta</label><input class="input mono" id="cableHasta" inputmode="numeric" maxlength="4" placeholder="(igual)" autocomplete="off"></div>
+                <div class="field" style="width:110px"><label for="cableCopias">Copias</label><input class="input mono" id="cableCopias" inputmode="numeric" maxlength="2" value="1"></div>
+            </div>
+            <div class="stage-preview" role="region" aria-label="Vista previa de la etiqueta de cable">
+                <div class="silk" style="width:100%" id="cableInfo">Vista previa · 57 × 32 mm</div>
+                <div id="cableZoomHost" class="zoomhost"><div id="cableLabel"></div></div>
+            </div>
+            <div class="row wrap" style="gap:10px">
+                <button class="btn btn-primary" type="button" id="btnCablePrint"><span class="svg-slot" data-i="printer"></span> Imprimir cable en DYMO</button>
+                <button class="btn" type="button" id="btnCableOpen"><span class="svg-slot" data-i="download"></span> Descargar .label</button>
             </div>
         </section>
         <!-- v1.4.5: «Cable R3» = TQT: 0000 arriba y R3: 0000 abajo; se llena solo al emparejar una R3 con su R1/R2 -->
@@ -195,6 +219,6 @@
 <script src="/static/js/vendor/dymo.connect.framework.js?v=1316"></script>
 <script src="/static/js/dymo_connect.js?v=1389"></script>
 <script src="/static/js/dymo_remoto.js?v=1420"></script>
-<script src="/static/js/dymo.js?v=1450"></script>
+<script src="/static/js/dymo.js?v=1451"></script>
 </body>
 </html>

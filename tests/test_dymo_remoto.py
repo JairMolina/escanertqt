@@ -108,6 +108,15 @@ class TestDymoRemoto(unittest.TestCase):
         self.assertEqual(p({"tipo": "aprobada", "tarjeta_id": t["id"]}), 403)   # sin prueba TQT aprobada
         self.assertEqual(p({"tipo": "r3", "nombres": ["TQT-R3-V30-0084", "TQT-R3-V30-0085"]}), 422)   # v1.4.89: una R3 por etiqueta
         self.assertEqual(p({"tipo": "r3", "nombres": ["TQT-R3-V30-0084"]}), 200)
+        # v1.4.94: R3 «Aprobada» solo si pcb_inventario.aprobada=1
+        n = "TQT-R3-V30-0779"
+        with db.get_db() as c:
+            c.execute("DELETE FROM pcb_inventario WHERE nombre=?", (n,))
+            c.execute("INSERT INTO pcb_inventario(tipo, version, serie, nombre, aprobada) VALUES('R3','30','0779',?,0)", (n,))
+        self.assertEqual(p({"tipo": "r3_aprobada", "nombres": [n]}), 403)
+        with db.get_db() as c:
+            c.execute("UPDATE pcb_inventario SET aprobada=1 WHERE nombre=?", (n,))
+        self.assertEqual(p({"tipo": "r3_aprobada", "nombres": [n]}), 200)
 
     def test_resultado_tolerante_no_atora_al_agente(self):
         """v1.4.9: un resultado con null, texto largo o estado raro ya no da 422 (el agente lo reintentaba para siempre)."""

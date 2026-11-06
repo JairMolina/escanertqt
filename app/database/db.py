@@ -419,8 +419,23 @@ def _asegurar_columnas(conn: sqlite3.Connection) -> None:
     if cols:   # v1.4.82: placas sueltas recibidas sin lote (antes de v1.4.24) pasan al lote de su mes; sin esto no salian al elegir ese lote
         conn.execute("UPDATE pcb_inventario SET lote_id = (SELECT l.id FROM lotes_mensuales l WHERE l.codigo_lote = strftime('%Y-%m', pcb_inventario.recibida_en)) "
                      "WHERE lote_id IS NULL AND recibida_en IS NOT NULL AND EXISTS (SELECT 1 FROM lotes_mensuales l WHERE l.codigo_lote = strftime('%Y-%m', pcb_inventario.recibida_en))")
+    for nombre_col, ddl_col in (("aprobada", "INTEGER NOT NULL DEFAULT 0"), ("aprobada_en", "TEXT"), ("aprobada_por", "TEXT")):
+        if cols and nombre_col not in cols:   # v1.4.94: R3 «Aprobada» (aditivo, idempotente)
+            conn.execute(f"ALTER TABLE pcb_inventario ADD COLUMN {nombre_col} {ddl_col}")
+    if cols:   # la aprobación de una R3 se anula sola si cambia su firmware, pasa a FALLA/BAJA o sale de la tarjeta
+        conn.execute("DROP TRIGGER IF EXISTS trg_pcb_anula_aprobada")
+        conn.execute("CREATE TRIGGER trg_pcb_anula_aprobada AFTER UPDATE OF firmware, estado_ciclo ON pcb_inventario "
+                     "WHEN old.aprobada = 1 AND new.aprobada = 1 AND (COALESCE(new.firmware,'') <> COALESCE(old.firmware,'') "
+                     "OR TRIM(COALESCE(new.firmware,'')) = '' OR new.estado_ciclo IN ('FALLA','BAJA') "
+                     "OR (old.estado_ciclo = 'ASIGNADA' AND new.estado_ciclo <> 'ASIGNADA')) "
+                     "BEGIN UPDATE pcb_inventario SET aprobada = 0, aprobada_en = NULL, aprobada_por = NULL WHERE id = new.id; END")
+    # la subconsulta «última prueba TQT» de las tarjetas necesita la tabla aunque nadie haya usado Pruebas TQT (mismo DDL que test_station.init)
+    conn.execute("CREATE TABLE IF NOT EXISTS tqt_test_runs(id TEXT PRIMARY KEY, station TEXT NOT NULL REFERENCES stm32_stations(id), "
+                 "requested_card INTEGER NOT NULL REFERENCES tarjetas_produccion(id), tarjeta_id INTEGER REFERENCES tarjetas_produccion(id), "
+                 "operator TEXT NOT NULL, state TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL, "
+                 "inventory TEXT NOT NULL, report TEXT, result TEXT, cancel INTEGER NOT NULL DEFAULT 0)")
     _asegurar_fechas_entrega(conn)
-    lcols = {r[1] for r in conn.execute("PRAGMA table_info(lotes_mensuales)")}
+    lcols ={r[1] for r in conn.execute("PRAGMA table_info(lotes_mensuales)")}
     if lcols and "tipo_lote" not in lcols:   # v1.3.44: lotes de mes, semana o día; los existentes quedan como 'mes'
         conn.execute("ALTER TABLE lotes_mensuales ADD COLUMN tipo_lote TEXT NOT NULL DEFAULT 'mes'")
     if lcols and "fecha_inicio" not in lcols:
@@ -738,7 +753,21 @@ def _cols_pcb(alias: str, ranura: str) -> str:
     """Columnas del inventario que se exponen por ranura (nombre, mac, estado, y datos para armar el objeto)."""
     r = ranura.lower()
     return (f"{alias}.nombre AS nombre_{r}, {alias}.mac AS mac_{r}, {alias}.estado_pcb AS estado_pcb_{r}, "
-            f"{alias}.version AS _{r}_version, {alias}.serie AS _{r}_serie, {alias}.estado_ciclo AS _{r}_ciclo")
+            f"{alias}.version AS _{r}_version, {alias}.serie AS _{r}_serie, {alias}.estado_ciclo AS _{r}_ciclo, "
+            f"{alias}.aprobada AS _{r}_aprobada, {alias}.aprobada_en AS _{r}_aprobada_en")
+
+
+# v1.4.94: última prueba TQT de la tarjeta (misma regla que excel_dymo._exigir_aprobada: requested_card o tarjeta_id)
+_SQL_TQT_APROBADA = ("COALESCE((SELECT r.result FROM tqt_test_runs r WHERE r.requested_card = t.id OR r.tarjeta_id = t.id "
+                     "ORDER BY r.created DESC LIMIT 1), '') IN ('aprobado', 'aprobado_con_advertencias')")   # la prueba que pasa con avisos también cuenta
+_SKYTEC_OK = ("(SELECT COUNT(*) FROM skytec_candados sk WHERE sk.tarjeta_id = t.id "
+              "AND ((sk.slot = 'R1' AND sk.mac = upper(p1.mac)) OR (sk.slot = 'R2' AND sk.mac = upper(p2.mac)))) >= 2")
+# FINALIZADA = R1+R2+R3 presentes y programadas (R1/R2 con MAC y firmware, R3 con firmware) + Skytec + prueba TQT aprobada (la aprobación de la R3 es un estado aparte)
+_SQL_FINALIZADA = (
+    "(p1.id IS NOT NULL AND p2.id IS NOT NULL AND p3.id IS NOT NULL "
+    "AND TRIM(COALESCE(p1.firmware, t.firmware_r1, '')) <> '' AND TRIM(COALESCE(p1.mac, '')) <> '' "
+    "AND TRIM(COALESCE(p2.firmware, t.firmware_r2, '')) <> '' AND TRIM(COALESCE(p2.mac, '')) <> '' "
+    f"AND TRIM(COALESCE(p3.firmware, '')) <> '' AND {_SKYTEC_OK} AND {_SQL_TQT_APROBADA})")
 
 
 # v1.3.65: antes de esta fecha bastaba PPON+POFF para «Validada»; desde v1.3.65 la tarjeta se valida explícitamente
@@ -761,6 +790,7 @@ _SELECT_TARJETA = f"""
         {_cols_pcb('p1', 'R1')},
         {_cols_pcb('p2', 'R2')},
         {_cols_pcb('p3', 'R3')},
+        ({_SQL_TQT_APROBADA}) AS _tqt_aprobada,
         COALESCE(pr.soldadura, 'PENDIENTE') AS soldadura,
         COALESCE(pr.programacion, 'PENDIENTE') AS programacion,
         COALESCE(pr.prueba_pcb, 'PENDIENTE') AS prueba_pcb,
@@ -782,7 +812,9 @@ def _fila_a_tarjeta(row: sqlite3.Row) -> Dict[str, Any]:
     for r in ("r1", "r2", "r3"):
         pid = d.get(f"pcb_{r}_id")
         version, serie, ciclo = d.pop(f"_{r}_version"), d.pop(f"_{r}_serie"), d.pop(f"_{r}_ciclo")
+        apr, apr_en = bool(d.pop(f"_{r}_aprobada", 0)) and r == "r3", d.pop(f"_{r}_aprobada_en", None)
         d[r] = None if not pid else {
+            "aprobada": apr, "aprobada_en": apr_en if apr else None,
             "id": pid, "tipo": r.upper(), "version": version, "serie": serie, "nombre": d.get(f"nombre_{r}"),
             "mac": d.get(f"mac_{r}"), "estado_ciclo": ciclo, "estado_pcb": d.get(f"estado_pcb_{r}"),
             "firmware": d.get(f"firmware_{r}"),
@@ -800,6 +832,12 @@ def _fila_a_tarjeta(row: sqlite3.Row) -> Dict[str, Any]:
         d["validada_modo"] = "pruebas" if {"PPON_ANT", "POFF_ANT"} <= ok else None
     d["validada"] = d["validada_modo"] is not None
     d["sin_mac"] = [r.upper() for r in ("r1", "r2") if d[r] and not d[r]["mac"]]
+    d["aprobada"] = bool(d.pop("_tqt_aprobada", 0))   # última prueba TQT = 'aprobado'
+    lleno = lambda v: bool(str(v or "").strip())
+    d["finalizada"] = bool(
+        all(d[r] for r in ("r1", "r2", "r3"))
+        and all(lleno(d[f"firmware_{r}"]) for r in ("r1", "r2", "r3")) and all(lleno(d[f"mac_{r}"]) for r in ("r1", "r2"))
+        and d["skytec"] and d["aprobada"])
     return d
 
 
@@ -828,7 +866,9 @@ def list_tarjetas(
             params.extend([like] * 6)
         filtro = normalizar_estado_general(estado_general or estado)
         if filtro:
-            if filtro == "PENDIENTE":
+            if filtro == "FINALIZADA":   # v1.4.94: estado derivado (R3 aprobada + prueba TQT aprobada + Skytec + 3 placas programadas)
+                where.append(_SQL_FINALIZADA)
+            elif filtro == "PENDIENTE":
                 where.append("COALESCE(pr.estado_general, 'PENDIENTE') = 'PENDIENTE'")
             else:
                 where.append("pr.estado_general = ?")

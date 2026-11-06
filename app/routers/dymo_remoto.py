@@ -8,7 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator
 
-from app.routers.excel_dymo import NOMBRE_R3, _cable_ok, _exigir_aprobada, _tarjeta_o_404
+from app.routers.excel_dymo import NOMBRE_R3, _exigir_r3_aprobada, _cable_ok, _exigir_aprobada, _tarjeta_o_404
 from app.routers.stm32 import operator, run
 from app.services import dymo_remoto as svc
 from app.services.dymo_service import DymoService, obtener_formato
@@ -19,7 +19,7 @@ FORMATO = "30334"
 
 
 class Pedido(BaseModel):
-    tipo: Literal["tarjeta", "aprobada", "cable", "r3"]
+    tipo: Literal["tarjeta", "aprobada", "cable", "r3", "r3_aprobada"]
     tarjeta_id: Optional[int] = Field(default=None, gt=0)
     numero: str = Field(default="", max_length=13)
     r3: str = Field(default="", max_length=6)   # v1.4.5: «Cable R3»
@@ -72,6 +72,9 @@ def _validar(p: Pedido):
         return {"numero": p.numero}, "Cable " + p.numero
     if len(p.nombres) != 1 or not re.fullmatch(NOMBRE_R3, p.nombres[0]):
         raise HTTPException(422, "Indica una placa con nombre TQT-Rx-Vxx-0000.")
+    if p.tipo == "r3_aprobada":
+        _exigir_r3_aprobada(p.nombres[0])
+        return {"nombres": p.nombres}, "Aprobada · " + p.nombres[0]
     return {"nombres": p.nombres}, p.nombres[0]
 
 
@@ -86,7 +89,7 @@ def _svg(tipo, params):
         return activos.svg_etiqueta(params["numero"], params["base"], FORMATO)
     if tipo == "cable":
         return DymoService.generate_cable_svg(params["numero"], FORMATO, params.get("r3", ""))
-    return DymoService.generate_r3_svg(params["nombres"], FORMATO)
+    return DymoService.generate_r3_svg(params["nombres"], FORMATO, aprobada=tipo == "r3_aprobada")
 
 
 # ------------------------------------------------------------------ operadores (sesión)

@@ -92,6 +92,11 @@ def tarjetas_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optiona
         sql = sql.replace("_PROG_", _PROGRAMADAS).replace("_LOTE_", w)
         filas = [dict(r) for r in c.execute(sql, [a, b, a, b, a, b, *args])]
         prog = {r[0] for r in c.execute(_PROGRAMADAS, (a, b))}
+        # v1.4.94: estado FINALIZADA (misma regla que la app) y R3 aprobada desde el celular
+        for f in filas:
+            tar = db.get_tarjeta_by_id(f["id"], conn=c) or {}
+            f["finalizada"] = bool(tar.get("finalizada"))
+            f["r3_aprobada"] = bool((tar.get("r3") or {}).get("aprobada"))
     for f in filas:
         f["lote"] = db.nombre_lote_de({k: f.pop(k) for k in ("mes", "anio", "tipo_lote", "fecha_inicio", "codigo_lote")})
         f["completada"] = bool(f["fecha_finalizado"]) and a <= f["fecha_finalizado"] <= b
@@ -99,7 +104,8 @@ def tarjetas_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optiona
         f["programada"] = f["id"] in prog
     return {"fecha": a, "desde": a, "hasta": b, "dias": (d2 - d1).days + 1,
             "completadas": sum(f["completada"] for f in filas), "entregadas": sum(f["entregada"] for f in filas),
-            "programadas": sum(f["programada"] for f in filas), "items": filas}
+            "programadas": sum(f["programada"] for f in filas),
+            "finalizadas": sum(f["finalizada"] for f in filas), "items": filas}
 
 
 # ---------------------------------------------------------------- Excel
@@ -187,13 +193,13 @@ def excel_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optional[P
     fino = Side(style="thin", color=BORDE)
 
     # Encabezado
-    ws.merge_cells("A1:L1")
+    ws.merge_cells("A1:N1")
     ws["A1"] = "Escáner TQT · Reporte de tarjetas del " + ("día" if un_dia else "periodo")
     ws["A1"].font = Font(name=F, size=16, bold=True, color="FFFFFF")
     ws["A1"].fill = PatternFill("solid", fgColor=AZUL)
     ws["A1"].alignment = Alignment(vertical="center", indent=1)
     ws.row_dimensions[1].height = 34
-    ws.merge_cells("A2:L2")
+    ws.merge_cells("A2:N2")
     ws["A2"] = _fecha_larga(d1) if un_dia else f"Del {_fecha_larga(d1).lower()} al {_fecha_larga(d2).lower()} · {datos['dias']} días"
     ws["A2"].font = Font(name=F, size=11, italic=True, color=GRIS)
     ws["A2"].alignment = Alignment(indent=1)
@@ -203,7 +209,7 @@ def excel_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optional[P
     ini, fin = 9, 9 + max(n, 1)   # rango de datos de la tabla (fila 8 = encabezados)
     kpis = [("B", "D", "Completadas", f'=COUNTIF(H{ini}:H{fin - 1},"Sí")', VERDE, VERDE_CLARO),
             ("E", "G", "Entregadas", f'=COUNTIF(I{ini}:I{fin - 1},"Sí")', AZUL, AZUL_CLARO),
-            ("H", "L", "Tarjetas en el reporte", f"=COUNTA(A{ini}:A{fin - 1})", GRIS, "F2F4F7")]
+            ("H", "N", "Tarjetas en el reporte", f"=COUNTA(A{ini}:A{fin - 1})", GRIS, "F2F4F7")]
     for c1, c2, titulo, formula, color, fondo in kpis:
         ws.merge_cells(f"{c1}4:{c2}4")
         ws.merge_cells(f"{c1}5:{c2}5")
@@ -220,7 +226,7 @@ def excel_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optional[P
 
     ws["A7"] = "Detalle"
     ws["A7"].font = Font(name=F, size=12, bold=True, color=AZUL)
-    cab = ["Tarjeta", "Lote", "R1", "MAC R1", "R2", "MAC R2", "R3", "Completada", "Entregada", "Gabinete", "Fecha finalizado", "Fecha entrega"]
+    cab = ["Tarjeta", "Lote", "R1", "MAC R1", "R2", "MAC R2", "R3", "Completada", "Entregada", "Gabinete", "Fecha finalizado", "Fecha entrega", "Estado", "R3 aprobada"]
     for i, t in enumerate(cab, 1):
         c = ws.cell(row=8, column=i, value=t)
         c.font = Font(name=F, bold=True, color="FFFFFF")
@@ -230,33 +236,34 @@ def excel_del_rango(desde: str, hasta: Optional[str] = None, db_path: Optional[P
     for r, f in enumerate(filas, ini):
         valores = ["#" + str(f["id_tarjeta_num"]), f["lote"], f["nombre_r1"] or "—", f["mac_r1"] or "—", f["nombre_r2"] or "—", f["mac_r2"] or "—",
                    f["nombre_r3"] or "—", "Sí" if f["completada"] else "No", "Sí" if f["entregada"] else "No", f["gabinete"] or "—",
-                   _dia(f["fecha_finalizado"]), _dia(f["fecha_real"])]
+                   _dia(f["fecha_finalizado"]), _dia(f["fecha_real"]),
+                   "FINALIZADA" if f["finalizada"] else "—", "Sí" if f["r3_aprobada"] else "No"]
         for i, v in enumerate(valores, 1):
             c = ws.cell(row=r, column=i, value=v)
-            c.font = Font(name=F, size=10, color=(VERDE if v == "Sí" else GRIS if v in ("No", "—") else "1B2333"), bold=(v == "Sí"))
+            c.font = Font(name=F, size=10, color=(VERDE if v in ("Sí", "FINALIZADA") else GRIS if v in ("No", "—") else "1B2333"), bold=(v in ("Sí", "FINALIZADA")))
             c.border = Border(bottom=fino)
-            c.alignment = Alignment(horizontal="center" if i in (1, 8, 9, 10, 11, 12) else "left", vertical="center")
+            c.alignment = Alignment(horizontal="center" if i in (1, 8, 9, 10, 11, 12, 13, 14) else "left", vertical="center")
             if isinstance(v, date):
                 c.number_format = "dd/mm/yyyy"
     if n:
-        tabla = Table(displayName="TarjetasDelDia", ref=f"A8:L{fin - 1}")
+        tabla = Table(displayName="TarjetasDelDia", ref=f"A8:N{fin - 1}")
         tabla.tableStyleInfo = TableStyleInfo(name="TableStyleLight9", showRowStripes=True)
         ws.add_table(tabla)
     else:
-        ws.merge_cells("A9:L9")
+        ws.merge_cells("A9:N9")
         ws["A9"] = "No hubo tarjetas completadas ni entregadas en " + ("esta fecha." if un_dia else "este periodo.")
         ws["A9"].font = Font(name=F, italic=True, color=GRIS)
         ws["A9"].alignment = Alignment(horizontal="center")
 
     nota = fin + 1
-    ws.merge_cells(f"A{nota}:L{nota}")
+    ws.merge_cells(f"A{nota}:N{nota}")
     ws[f"A{nota}"] = ("Completada = la tarjeta quedó con R1, R2, R3 y MAC de R1 y R2 dentro del " + ("día" if un_dia else "periodo") + " (fecha de finalizado). "
                       "Entregada = fecha real de entrega dentro del " + ("día" if un_dia else "periodo") + ". Fuente: base de datos de Escáner TQT.")
     ws[f"A{nota}"].font = Font(name=F, size=9, italic=True, color=GRIS)
     ws[f"A{nota}"].alignment = Alignment(wrap_text=True)
     ws.row_dimensions[nota].height = 28
 
-    _formato_hoja(ws, [11, 17, 22, 20, 22, 20, 22, 13, 12, 14, 15, 15], "A9", "8:8")
+    _formato_hoja(ws, [11, 17, 22, 20, 22, 20, 22, 13, 12, 14, 15, 15, 14, 13], "A9", "8:8")
     if not un_dia:
         _hoja_por_dia(wb, d1, d2, filas)
     buf = io.BytesIO()

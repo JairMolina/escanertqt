@@ -199,6 +199,8 @@
      *  todo presente y con MAC -> completa. */
     function estadoTarjeta(t) {
         const x = t || {};
+        // v1.4.94: FINALIZADA (3 placas programadas + Skytec + prueba TQT aprobada + R3 aprobada; la calcula el backend) gana a todo
+        if (x.finalizada) return { key: 'finalizada', programada: true, validada: !!x.validada, skytec: true, label: 'FINALIZADA', kind: 'gold', icon: 'check' };
         const falta = ['r1', 'r2', 'r3'].filter((r) => !x[r]).map((r) => r.toUpperCase());
         const sm = x.sin_mac || [];
         if (falta.includes('R1') || falta.includes('R2')) return { key: 'incompleta', label: 'Falta ' + falta.join(', '), kind: 'warn', icon: 'alert' };
@@ -215,8 +217,18 @@
     function tarjetaProgramada(t) { const x = t || {}; return !!(x.r1 && x.r2 && x.r3) && ['r1', 'r2', 'r3'].every((r) => programada(conFw(x, r))); }
     /** Filtro por estado: 'programada' es derivado; el resto usa estadoTarjeta().key. */
     // 'validada' = t.validada del backend (v1.3.65: confirmada en Pruebas y validación › Placas validadas)
-    const cumpleEstado = (t, key) => !key || (key === 'programada' ? tarjetaProgramada(t) : key === 'r1r2' ? r1r2Programadas(t) : key === 'validada' ? !!(t && t.validada) : estadoTarjeta(t).key === key);
-    const TARJETA_ESTADOS = [{ key: 'incompleta', label: 'Falta placa' }, { key: 'sin_mac', label: 'Sin MAC' }, { key: 'r1r2', label: 'R1 y R2 programadas' }, { key: 'programada', label: 'Programadas (R1+R2+R3)' }, { key: 'validada', label: 'Validadas' }, { key: 'completa', label: 'Completas' }];
+    const cumpleEstado = (t, key) => !key || (key === 'programada' ? tarjetaProgramada(t) : key === 'r1r2' ? r1r2Programadas(t) : key === 'validada' ? !!(t && t.validada) : key === 'finalizada' ? !!(t && t.finalizada) : estadoTarjeta(t).key === key);
+    const TARJETA_ESTADOS = [{ key: 'incompleta', label: 'Falta placa' }, { key: 'sin_mac', label: 'Sin MAC' }, { key: 'r1r2', label: 'R1 y R2 programadas' }, { key: 'programada', label: 'Programadas (R1+R2+R3)' }, { key: 'validada', label: 'Validadas' }, { key: 'completa', label: 'Completas' }, { key: 'finalizada', label: 'Finalizadas' }];
+    /** v1.4.94: qué le falta a una tarjeta para quedar FINALIZADA (lista vacía = ya lo está). */
+    function faltaFinalizar(t) {
+        const x = t || {}; if (x.finalizada) return [];
+        const f = [];
+        ['r1', 'r2', 'r3'].forEach((r) => { if (!x[r]) f.push('Falta ' + r.toUpperCase()); });
+        if (x.r1 && x.r2 && x.r3 && !tarjetaProgramada(x)) f.push('Falta programar (MAC y firmware)');
+        if (!x.skytec) f.push('Falta Skytec');
+        if (!x.aprobada) f.push('Falta prueba TQT aprobada');
+        return f;
+    }
     // v1.3.44: lote de mes ("Septiembre 2026"), semana ("Semana 40 · 28 sep–4 oct 2026") o día ("15 sep 2026").
     const MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     function fechaLote(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; }
@@ -433,6 +445,24 @@
 
     // ---------------------------------------------------------------- WebSocket compartido
     let wsClient = null;
+    // v1.4.94: aviso a quien dejó una prueba TQT corriendo cuando termina en otro módulo (solo a quien la inició).
+    let yoEmail;
+    async function avisoPruebaTQT(msg) {
+        const d = (msg && msg.data) || msg || {};
+        if (!d.run_id || !d.result) return;
+        try {
+            if (yoEmail === undefined) { const r = await api('/api/auth/yo'); yoEmail = r.ok && r.data ? String(r.data.email || '').toLowerCase() : ''; }
+            if (!yoEmail || String(d.operator || '').toLowerCase() !== yoEmail) return;
+            const vistas = JSON.parse(sessionStorage.getItem('tqt.pruebaAvisada') || '[]');
+            if (vistas.includes(d.run_id)) return;
+            sessionStorage.setItem('tqt.pruebaAvisada', JSON.stringify([...vistas.slice(-20), d.run_id]));
+        } catch (e) { /* sin sessionStorage: se avisa igual */ }
+        const ok = d.result === 'aprobado', adv = d.result === 'aprobado_con_advertencias';
+        const txt = { aprobado: 'aprobada', aprobado_con_advertencias: 'aprobada con advertencias', fallido: 'fallida', no_verificado: 'sin verificar' }[d.result] || d.result;
+        toast(`Prueba TQT de la tarjeta ${d.id_tarjeta_num || ''} terminó: ${txt}.`, { kind: ok ? 'ok' : adv ? 'warn' : 'bad', ms: 20000,
+            action: { label: ok ? 'Ver e imprimir etiqueta' : 'Ver resultado', onClick: () => { location.href = '/monitor#/validacion?tarjeta=' + encodeURIComponent(d.tarjeta_id); if (/\/monitor/.test(location.pathname)) location.reload(); } } });
+        try { if (navigator.vibrate) navigator.vibrate(ok ? [120, 60, 120] : [300]); } catch (e) { /* nada */ }
+    }
     function ws(clientType) {
         if (!wsClient && window.TQTWebSocketClient) {
             wsClient = new window.TQTWebSocketClient(clientType || 'operador_movil');
@@ -442,6 +472,7 @@
                 if (lbl) lbl.textContent = { connected: 'En línea', connecting: 'Conectando', disconnected: 'Sin red', error: 'Sin red' }[s] || s;
             }));
             wsClient.connect();
+            if (wsClient.on) wsClient.on('PRUEBA_TQT_TERMINADA', avisoPruebaTQT);
         }
         return wsClient;
     }
@@ -919,7 +950,7 @@
     window.TQT = {
         versionP,
         hydrateIcons, MESES, esc, h, store, api, NOMBRE_RE, parseNombre, esTpms, esAntijammer, esSpeedlocker, esSigfox, esCaiquen, nombreDe, parseMac, verMac, formatMacProgress, VERSION_DEFAULT,
-        CICLO_LABEL, estadoTarjeta, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
+        CICLO_LABEL, estadoTarjeta, faltaFinalizar, tarjetaProgramada, r1r2Programadas, cumpleEstado, TARJETA_ESTADOS,
         loteNombre, loteConteo, ordenarLotes, loteVista, guardarLoteVista, todosLotes, cabecerasLote, loteUrl, loteEtiqueta, debounce, hora,
         icon, tipoChip, badge, tarjetaBadge, cicloBadge, programada, conFw, banner, empty,
         toast, sheet, enviarExcel, botonCorreo, estatusTarjeta, estatusCiclo, avisoAcceso, acceso, zonaPermitida, applyTheme, currentTheme, toggleTheme, ws, resync, cerrarSesion, mountShell, irModulos, openLotes,

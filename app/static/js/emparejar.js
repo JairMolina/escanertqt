@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { completas, impares, r3_pendientes, incompletas, sueltas } = state.sug;
         const porHacer = completas.length + impares.length + r3_pendientes.length;
         // Completas / incompletas = tarjetas ya armadas del lote (misma regla que el Resumen), no solo las series por unir
-        const nComp = state.tarjetas.filter((t) => T.estadoTarjeta(t).key === 'completa').length;
+        const nComp = state.tarjetas.filter((t) => ['completa', 'finalizada'].includes(T.estadoTarjeta(t).key)).length;
         $('nComp').textContent = String(nComp);
         $('nInc').textContent = String(state.tarjetas.length - nComp);
         $('nSue').textContent = String(SLOTS.reduce((n, s) => n + (sueltas[s] || []).length, 0));
@@ -95,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!(r1 && r2 && r3)) flags.push(T.badge('Incompleta', 'warn'));
         if ((t.sin_mac || []).length) flags.push(T.badge('Sin MAC', 'warn'));
         if (impar) flags.push(T.badge('Impar', 'info'));
+        if (r3 && r3.aprobada) flags.push(T.badge('R3 aprobada', 'ok', 'check'));
         return h('button', { class: 'item', type: 'button', style: 'grid-template-columns:auto 1fr auto', 'aria-label': `Tarjeta ${t.id_tarjeta_num}. Abrir`, onclick: () => openCard(t.id) },
             h('span', { class: 'mono', style: 'font-size:24px;font-weight:600' }, t.id_tarjeta_num),
             h('div', { class: 'stack', style: 'gap:6px' },
@@ -107,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const box = $('tar'); box.replaceChildren();
         const q = state.q.trim().toLowerCase();
         // Las completas (R1+R2+R3 con MAC) van al final; las pendientes arriba
-        const fin = (t) => (T.estadoTarjeta(t).key === 'completa' ? 1 : 0);
+        const fin = (t) => (['completa', 'finalizada'].includes(T.estadoTarjeta(t).key) ? 1 : 0);
         const rows = state.tarjetas.slice().sort((a, b) => fin(a) - fin(b) || String(a.id_tarjeta_num).localeCompare(String(b.id_tarjeta_num))).filter((t) => !q || [t.id_tarjeta_num, t.nombre_r1, t.nombre_r2, t.nombre_r3, t.mac_r1, t.mac_r2].some((v) => String(v || '').toLowerCase().includes(q)));
         if (!rows.length) {
             box.className = 'empty';
@@ -219,6 +220,61 @@ document.addEventListener('DOMContentLoaded', () => {
         return sh;
     }
 
+    // ------------------------------------------------------------------ aprobar R3 (v1.4.94)
+    /** Panel «Aprobar / Aprobada · Quitar aprobación» para una R3. `p` = PCB (con firmware); `onChange(pcbActualizada)` tras cambiar. */
+    function panelAprobar(p, onChange) {
+        const box = h('div', { class: 'stack', style: 'gap:8px;grid-column:1/-1' });
+        const btnCss = 'min-height:44px;min-width:44px';
+        const confirmar = (titulo, texto, label, kind, hacer) => sheet({
+            title: titulo, body: [h('p', { class: 'muted' }, texto)],
+            actions: [{ label: 'Cancelar', kind: 'ghost', onClick: () => true },
+                { label, kind, keepOpen: true, onClick: async () => { const ok = await hacer(); return ok !== false; } }],
+        });
+        const llamar = async (accion) => {
+            const r = await api(`/api/pcb/${p.id}/${accion}`, { method: 'POST', body: accion === 'aprobar' ? {} : undefined });
+            if (!r.ok) { window.SoundFX.playError(); window.Haptics.error(); toast(r.error || 'No se pudo actualizar la aprobación', { kind: 'bad' }); return false; }
+            Object.assign(p, r.data && typeof r.data === 'object' ? r.data : {}, { aprobada: accion === 'aprobar' });
+            if (accion === 'aprobar') { window.SoundFX.playSuccess(); window.Haptics.success(); toast(`${p.nombre} aprobada`, { kind: 'ok' }); }
+            else { window.Haptics.step(); toast(`Aprobación de ${p.nombre} quitada`, { kind: 'ok' }); }
+            pintar(); if (onChange) onChange(p); return true;
+        };
+        function pintar() {
+            box.replaceChildren();
+            if (p.aprobada) {
+                box.append(h('div', { class: 'row wrap', style: 'gap:8px' }, T.badge('Aprobada', 'ok', 'check'),
+                    h('button', { class: 'btn btn-sm', type: 'button', style: btnCss, onclick: () => confirmar('Quitar aprobación', `${p.nombre} dejará de estar aprobada.`, 'Quitar aprobación', 'danger', () => llamar('desaprobar')) }, 'Quitar aprobación')));
+            } else if (T.programada(p)) {
+                box.append(h('button', { class: 'btn btn-primary', type: 'button', style: btnCss + ';width:100%', onclick: () => confirmar('Aprobar R3', `¿Aprobar ${p.nombre}? Quedará lista para finalizar la tarjeta.`, 'Aprobar', 'primary', () => llamar('aprobar')) }, icon('check'), 'Aprobar'));
+            } else {
+                box.append(h('div', { class: 'hint', role: 'status' }, 'No se puede aprobar: la R3 aún no está programada (sin firmware).'));
+            }
+        }
+        pintar();
+        return box;
+    }
+
+    /** Escanea el QR de una R3 y muestra su panel de aprobación. */
+    function escanearR3() {
+        const host = h('div'); const res = h('div', { class: 'stack', style: 'gap:10px' }); let visor = null; let busy = false;
+        const sh = sheet({ title: 'Aprobar R3', body: [host, res], focus: false, onClose: () => { if (visor) visor.stop(); } });
+        async function onCode(text) {
+            if (busy) return; busy = true;
+            try {
+                const parsed = T.parseNombre(text);
+                if (!parsed || parsed.tipo !== 'R3') { window.SoundFX.playError(); window.Haptics.error(); toast(parsed ? `${parsed.nombre} no es una R3` : 'Código no reconocido', { kind: 'bad' }); return; }
+                const r = await api('/api/pcb?tipo=R3&limit=5000');
+                const p = ((r.ok && r.data && r.data.items) || []).find((x) => x.nombre === parsed.nombre);
+                if (!p) { window.SoundFX.playError(); window.Haptics.error(); toast(`${parsed.nombre} no está en el inventario`, { kind: 'bad' }); return; }
+                window.SoundFX.playScan('R3'); window.Haptics.scan();
+                res.replaceChildren(h('div', { class: 'row', style: 'gap:8px' }, T.tipoChip('R3', { lg: true }), h('b', { class: 'mono' }, p.nombre)), panelAprobar(p, reloadSoon));
+            } finally { setTimeout(() => { busy = false; }, 800); }
+        }
+        visor = T.mountVisor(host, { compact: true, onCode });
+        return sh;
+    }
+    const btnAprR3 = h('button', { class: 'btn', type: 'button', style: 'min-height:44px', onclick: escanearR3 }, icon('qr'), 'Aprobar R3');
+    $('btnArmar').before(btnAprR3);
+
     // ------------------------------------------------------------------ tarjeta abierta
     async function openCard(id) {
         const r = await api(`/api/tarjetas/${id}`);
@@ -247,7 +303,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return h('div', { class: 'slot', dataset: { empty: p ? '' : '1' }, style: 'grid-template-columns:auto 1fr;row-gap:8px' },
                 T.tipoChip(s, { lg: true, empty: !p }),
                 h('div', null, h('div', { class: 'nm' }, p ? p.nombre : 'Sin placa asignada'), p ? h('div', { class: 'mc' }, ['Hardware V' + p.version, s !== 'R3' ? (p.mac ? String(p.mac).toUpperCase() : 'sin MAC todavía') : null, s !== 'R3' && (p.firmware || t['firmware_' + s.toLowerCase()]) ? 'Firmware ' + (p.firmware || t['firmware_' + s.toLowerCase()]) : null].filter(Boolean).join(' · ')) : null),
-                h('span'), acts);
+                h('span'), acts,
+                p && s === 'R3' ? panelAprobar(Object.assign({}, T.conFw(t, 'r3')), () => { loadAll(); }) : null);
         };
 
         function openFalla(p, s) {

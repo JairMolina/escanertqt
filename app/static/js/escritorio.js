@@ -189,7 +189,7 @@
         const art = (kids) => h('article', { class: 'esc-pl', dataset: { t: slot, hit: hit ? '1' : '' }, 'aria-label': `${slot} ${p.nombre}` }, cab, kids);
         const fw = p.firmware ? h('span', null, p.firmware) : h('span', { class: 'soft' }, icon('clock'), 'Sin firmware');
         if (slot === 'R3') {   // la R3 no lleva MAC, pero sí firmware (programada = con firmware)
-            return art([h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fw), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC.')]);
+            return art([h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fw), campo('Serie', p.serie)), h('p', { class: 'nota' }, icon('info'), 'La R3 no lleva MAC.'), p.aprobada ? T.badge('Aprobada', 'ok', 'check') : null]);
         }
         const mac = p.mac ? String(p.mac).toUpperCase() : '';
         const macBox = mac
@@ -628,7 +628,7 @@
         if (!S.lote || document.querySelector('.sheet')) return;
         const r = await api(`/api/tarjetas?lote_id=${S.lote.id}&limit=500`); if (!r.ok || !r.data) return;
         const pospuestas = leerPospuestas();
-        const pend = (r.data.items || []).filter((t) => !t.fecha_real && T.estadoTarjeta(t).key === 'completa' && !pospuestas.includes(t.id))
+        const pend = (r.data.items || []).filter((t) => !t.fecha_real && ['completa', 'finalizada'].includes(T.estadoTarjeta(t).key) && !pospuestas.includes(t.id))
             .sort((a, b) => String(a.id_tarjeta_num).localeCompare(String(b.id_tarjeta_num)));
         if (!pend.length) return;
         const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

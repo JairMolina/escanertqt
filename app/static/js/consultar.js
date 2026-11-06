@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (S === 'R3') {   // la R3 no lleva MAC, pero sí se programa (firmware)
             return h('article', { class: 'pcbf', dataset: { t: S, hit: hit ? '1' : '' }, 'aria-label': `${S} ${p.nombre}` }, head,
                 h('dl', null, campo('Hardware', 'V' + p.version), campo('Firmware', fwBox), campo('Serie', p.serie)),
-                h('p', { class: 'pcbf-nota' }, icon('info'), 'La R3 no lleva MAC'));
+                h('p', { class: 'pcbf-nota' }, icon('info'), 'La R3 no lleva MAC'), p.aprobada ? T.badge('Aprobada', 'ok', 'check') : null);
         }
         const mac = p.mac ? String(p.mac).toUpperCase() : '';
         const macBox = mac

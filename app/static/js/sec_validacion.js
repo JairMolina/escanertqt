@@ -1419,6 +1419,7 @@
       const sel = selSeq;
       setTimeout(() => { if (alive && !active && sel === selSeq) history(sel); }, 15000);
     }
+    const recuperadas = new Set();
     async function history(my = selSeq) {
       if (!tarjeta) return;
       const tid = tarjeta.id;
@@ -1431,6 +1432,23 @@
       }
       if (my !== selSeq || !alive) return; // historial de una selección anterior
       reanudar(rows_);
+      // v1.4.94: la prueba terminó mientras el operador estaba en otro módulo: se recupera su resultado (y el botón de
+      // imprimir etiqueta si salió aprobada) sin repetirla.
+      const ult = rows_[0];
+      if (!active && !manualBusy && ult && !["queued", "running"].includes(ult.state) && ult.result && lastRun?.id !== ult.id && !recuperadas.has(ult.id)) {
+        recuperadas.add(ult.id);
+        try {
+          const full = await call("/runs/" + ult.id);
+          if (my === selSeq && alive && !active) {
+            prepareRun(false);
+            run.started = full.created || ult.created;
+            await finishRun(full);
+            run.ended = full.updated || run.ended;
+            paintSummary();
+            return;
+          }
+        } catch (e) { /* si falla, queda el historial normal */ }
+      }
       const label = (r) => {
         const map = { aprobado: "Aprobada", aprobado_con_advertencias: "Aprobada con advertencias", fallido: "Fallida", no_verificado: "No verificada" };
         if (["queued", "running"].includes(r.state)) return "En curso";
