@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fwBox = p.firmware ? h('span', { class: 'mono' }, p.firmware) : h('span', { class: 'soft' }, icon('clock'), 'Sin firmware');
         if (S === 'R3') {   // v1.4.98: la R3 no lleva MAC ni versión de firmware: solo «programada» y «aprobada»
             return h('article', { class: 'pcbf', dataset: { t: S, hit: hit ? '1' : '' }, 'aria-label': `${S} ${p.nombre}` }, head,
-                h('dl', null, campo('Hardware', 'V' + p.version), campo('Programación', T.r3Programada(p) ? T.badge('Programada', 'ok', 'check') : T.badge('Sin programar', 'warn')),
+                h('dl', { class: 'pl-r3' }, campo('Hardware', 'V' + p.version), campo('Programación', T.r3Programada(p) ? T.badge('Programada', 'ok', 'check') : T.badge('Sin programar', 'warn')),
                     campo('Aprobación', p.aprobada ? T.badge('Aprobada', 'ok', 'check') : T.badge('Sin aprobar', '')), campo('Serie', p.serie)),
                 h('p', { class: 'pcbf-nota' }, icon('info'), 'La R3 no lleva MAC'));
         }

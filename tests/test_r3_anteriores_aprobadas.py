@@ -18,7 +18,14 @@ class TestR3Anteriores(_Base):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        _Base._tarjeta.__globals__['_serie'] = itertools.count(9000)   # rango propio: evita choques con la prueba base cargada dos veces
+        g = _Base._tarjeta.__globals__
+        cls._serie_previa = g['_serie']
+        g['_serie'] = itertools.count(9000)   # rango propio (la MAC sale de serie % 256)
+
+    @classmethod
+    def tearDownClass(cls):
+        _Base._tarjeta.__globals__['_serie'] = cls._serie_previa   # no afecta a las pruebas de la clase base
+        super().tearDownClass()
 
     def _r3(self, r3):
         with db.get_db() as c:

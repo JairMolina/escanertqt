@@ -16,7 +16,14 @@ class TestFaltantes(_Base):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        _Base._tarjeta.__globals__['_serie'] = itertools.count(9600)   # rango propio: evita choques con la prueba base cargada dos veces
+        g = _Base._tarjeta.__globals__
+        cls._serie_previa = g['_serie']
+        g['_serie'] = itertools.count(9600)   # rango propio (la MAC sale de serie % 256)
+
+    @classmethod
+    def tearDownClass(cls):
+        _Base._tarjeta.__globals__['_serie'] = cls._serie_previa   # no afecta a las pruebas de la clase base
+        super().tearDownClass()
 
     def test_r3_sin_programar_y_sin_prueba(self):
         tid, _, _, _ = self._tarjeta(fw_r3=None)
