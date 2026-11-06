@@ -263,7 +263,7 @@ def _tarjeta_o_404(tarjeta_id: int) -> Dict[str, Any]:
 
 
 def _exigir_aprobada(tarjeta_id: int) -> None:
-    """v1.4.0: la leyenda «Aprobada» solo se emite si la última prueba TQT de la tarjeta quedó 'aprobado'."""
+    """v1.4.0: la leyenda «Aprobada» solo se emite si la última prueba TQT de la tarjeta quedó 'aprobado' o 'aprobado_con_advertencias' (v1.4.96)."""
     from app.services import test_station  # import diferido: evita ciclos al cargar routers
     test_station.init()
     with db.get_db() as c:
@@ -271,7 +271,7 @@ def _exigir_aprobada(tarjeta_id: int) -> None:
             "SELECT result FROM tqt_test_runs WHERE requested_card=? OR tarjeta_id=? ORDER BY created DESC LIMIT 1",
             (tarjeta_id, tarjeta_id),
         ).fetchone()
-    if not r or r["result"] != "aprobado":
+    if not r or r["result"] not in ("aprobado", "aprobado_con_advertencias"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="La tarjeta no tiene una prueba TQT aprobada como última ejecución; no se imprime «Aprobada».")
 

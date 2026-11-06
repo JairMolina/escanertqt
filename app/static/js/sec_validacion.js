@@ -1150,7 +1150,7 @@
         ...fact("Comandos", started ? run.commands.serial + " serial · " + run.commands.ble + " BLE registrados" + (r ? " · LOG completo en el reporte" : "") : ""),
         ...(run.issue ? fact("Motivo", run.issue) : []),
       );
-      const eligible = !!r && r.result === "aprobado" && v.k === "ok";
+      const eligible = !!r && (r.result === "aprobado_con_advertencias" || (r.result === "aprobado" && v.k === "ok"));
       printBtn.hidden = !eligible;
       reportBtn.hidden = !r;
       metOk.textContent = String(v.n);   // v1.4.63: métricas de la cabecera
@@ -1176,7 +1176,7 @@
       });
       printTarjeta = null;
       printOut.textContent = skyOut.textContent = "";
-      if (r?.tarjeta_id && r.result === "aprobado") {
+      if (r?.tarjeta_id && (r.result === "aprobado" || r.result === "aprobado_con_advertencias")) {
         const t = await api("/api/tarjetas/" + r.tarjeta_id);
         printTarjeta = t.ok ? t.data : null;
       }

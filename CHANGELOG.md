@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.96 — 2026-11-06
+
+- **Tarjetas anteriores a 1.4.94 ya se imprimen «Aprobada»:** auditoría sobre la BD local (100 tarjetas): las 12 R3 entregadas con última prueba TQT aprobada (6) o con advertencias (6) tenían `aprobada=0` y el servidor respondía 403. Al arrancar, una sola vez (marca `r3_aprobadas_anteriores_v1_4_96` en `ajustes`), esas R3 pasan a «Aprobada» (`aprobada_por = 'migración v1.4.96'`). Fallidas, no verificadas, sin prueba o sin firmware no se tocan; si luego se desaprueba una a mano ya no se vuelve a aprobar sola.
+- **Etiqueta «Aprobada» de la tarjeta** (`/api/dymo/label/{id}/xml|archivo?aprobada=` y DYMO compartida) ahora también se emite con prueba «aprobado con advertencias» (antes solo `aprobado`); la fallida sigue en 403.
+- **Validación:** el botón de imprimir aprobada también aparece cuando la prueba termina «aprobada con advertencias».
+
 ## v1.4.95 — 2026-11-06
 
 - **Pruebas TQT:** si una prueba termina mientras el operador está en otro módulo, (1) el servidor emite `PRUEBA_TQT_TERMINADA` y quien la inició recibe una notificación («Prueba TQT de la tarjeta 0072 terminó: aprobada» con botón «Ver e imprimir etiqueta»), y (2) al volver a Pruebas TQT la vista recupera el resultado de la última prueba terminada (pasos, reporte y botón de imprimir etiqueta si salió aprobada) sin repetirla.

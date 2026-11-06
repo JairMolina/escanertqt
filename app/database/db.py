@@ -405,6 +405,27 @@ def _asegurar_fechas_entrega(conn: sqlite3.Connection) -> None:
         conn.execute(f"UPDATE tarjetas_produccion SET fecha_finalizado = date(updated_at) WHERE fecha_finalizado IS NULL AND {_TARJETA_COMPLETA}")
 
 
+def _aprobar_r3_anteriores(conn: sqlite3.Connection) -> None:
+    """v1.4.96: UNA sola vez, las R3 ya entregadas (ASIGNADA y programadas) de tarjetas cuya última prueba TQT quedó
+    'aprobado' o 'aprobado_con_advertencias' pasan a «Aprobada» (antes de v1.4.94 esa marca no existía y solo se podían
+    imprimir las aprobadas después de la actualización). Las fallidas/no verificadas/sin prueba no se tocan. La marca en
+    `ajustes` evita repetirlo: una R3 que el operador desapruebe después ya no se vuelve a aprobar sola."""
+    if not {r[1] for r in conn.execute("PRAGMA table_info(pcb_inventario)")} >= {"aprobada", "aprobada_en", "aprobada_por"}:
+        return
+    conn.execute("CREATE TABLE IF NOT EXISTS ajustes (clave TEXT PRIMARY KEY, valor TEXT NOT NULL, "
+                 "updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')))")
+    if conn.execute("SELECT 1 FROM ajustes WHERE clave = 'r3_aprobadas_anteriores_v1_4_96'").fetchone():
+        return
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cur = conn.execute(
+        "UPDATE pcb_inventario SET aprobada = 1, aprobada_en = ?, aprobada_por = 'migración v1.4.96' "
+        "WHERE tipo = 'R3' AND aprobada = 0 AND estado_ciclo = 'ASIGNADA' AND TRIM(COALESCE(firmware, '')) <> '' "
+        "AND id IN (SELECT t.pcb_r3_id FROM tarjetas_produccion t WHERE t.pcb_r3_id IS NOT NULL AND "
+        "COALESCE((SELECT r.result FROM tqt_test_runs r WHERE r.requested_card = t.id OR r.tarjeta_id = t.id "
+        "ORDER BY r.created DESC LIMIT 1), '') IN ('aprobado', 'aprobado_con_advertencias'))", (ahora,))
+    conn.execute("INSERT INTO ajustes (clave, valor) VALUES ('r3_aprobadas_anteriores_v1_4_96', ?)", (str(cur.rowcount),))
+
+
 def _asegurar_columnas(conn: sqlite3.Connection) -> None:
     """Bases anteriores: agrega pcb_inventario.firmware y siembra el catálogo de firmware con el de la plantilla Excel
     (idempotente, conserva datos). El firmware pasa de la tarjeta a cada PCB; el valor antiguo de la tarjeta se sigue
@@ -434,6 +455,7 @@ def _asegurar_columnas(conn: sqlite3.Connection) -> None:
                  "requested_card INTEGER NOT NULL REFERENCES tarjetas_produccion(id), tarjeta_id INTEGER REFERENCES tarjetas_produccion(id), "
                  "operator TEXT NOT NULL, state TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL, "
                  "inventory TEXT NOT NULL, report TEXT, result TEXT, cancel INTEGER NOT NULL DEFAULT 0)")
+    _aprobar_r3_anteriores(conn)
     _asegurar_fechas_entrega(conn)
     lcols ={r[1] for r in conn.execute("PRAGMA table_info(lotes_mensuales)")}
     if lcols and "tipo_lote" not in lcols:   # v1.3.44: lotes de mes, semana o día; los existentes quedan como 'mes'
