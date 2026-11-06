@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.97 — 2026-11-06
+
+- **Tarjeta FINALIZADA con estilo propio:** el dorado se confundía con el ámbar de «Falta R3 · R1 y R2 programadas». Ahora el badge es **fucsia** (token `--final`, claro y oscuro; ningún otro estado ni placa usa ese tono) con destello que cruza y brillitos, y respeta «movimiento reducido». Mismo color en el KPI «FINALIZADAS» del Resumen. Solo CSS/JS de presentación (`badge[data-k="final"]`, `kind: 'final'`).
+- **Auditoría:** FINALIZADA es un estado derivado en vivo (`_SQL_FINALIZADA`), no se guarda: las 6 tarjetas de la BD local que cumplen (0018, 0028, 0030, 0040, 0041, 0045) ya salen finalizadas; las demás no cumplen (sin R3, R3 sin firmware, sin Skytec o sin prueba TQT aprobada).
+
 ## v1.4.96 — 2026-11-06
 
 - **Pruebas automáticas:** en la tabla de ciclos el «Motivo» largo ya no se traslapa con la columna LOG (.txt); el texto se parte en líneas (solo CSS).

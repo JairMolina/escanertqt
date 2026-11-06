@@ -200,7 +200,7 @@
     function estadoTarjeta(t) {
         const x = t || {};
         // v1.4.94: FINALIZADA (3 placas programadas + Skytec + prueba TQT aprobada + R3 aprobada; la calcula el backend) gana a todo
-        if (x.finalizada) return { key: 'finalizada', programada: true, validada: !!x.validada, skytec: true, label: 'FINALIZADA', kind: 'gold', icon: 'check' };
+        if (x.finalizada) return { key: 'finalizada', programada: true, validada: !!x.validada, skytec: true, label: 'FINALIZADA', kind: 'final', icon: 'check' };
         const falta = ['r1', 'r2', 'r3'].filter((r) => !x[r]).map((r) => r.toUpperCase());
         const sm = x.sin_mac || [];
         if (falta.includes('R1') || falta.includes('R2')) return { key: 'incompleta', label: 'Falta ' + falta.join(', '), kind: 'warn', icon: 'alert' };
