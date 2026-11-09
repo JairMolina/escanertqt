@@ -91,7 +91,7 @@
 
     function editor(it) {
         const nuevo = !it; it = it || { tarjeta: d.tarjetas[0], moneda: 'MXN', tipo: 'produccion', cantidad: 1, cantidad_lote: 1, costo_unitario: 0 };
-        const campo = (id, etq, el) => h('div', { class: 'field' }, h('label', { for: id }, etq), el);
+        const campo = (id, etq, el, ayuda) => h('div', { class: 'field' }, h('label', { for: id }, etq), el, ayuda);
         const inp = (id, v, extra) => h('input', Object.assign({ class: 'input', id, value: v == null ? '' : String(v), autocomplete: 'off' }, extra || {}));
         const sel = (id, v, ops) => { const s = h('select', { class: 'input', id }, ...ops.map(([k, t]) => h('option', { value: k }, t))); s.value = v; return s; };
         const f = {
@@ -107,6 +107,18 @@
             tipo: sel('ceTipo', it.tipo, [['produccion', 'Producción (suma al costo de la tarjeta)'], ['recurrente', 'Recurrente (aparte, p. ej. licencia anual)']]),
             notas: inp('ceNotas', it.notas, { maxlength: '300' }),
         };
+        const aviso = !nuevo && cfg.avisoDescripcion === '1'
+            ? h('p', { id: 'ceAvisoDesc', class: 'x-intro', role: 'status' }) : null;
+        if (aviso) {
+            f.descripcion.setAttribute('aria-describedby', aviso.id);
+            f.descripcion.addEventListener('input', () => {
+                const nombre = f.descripcion.value.trim();
+                const mensaje = nombre && nombre !== it.descripcion
+                    ? `Las existencias y los movimientos de «${it.descripcion}» seguirán asociados a esa descripción. El material anterior solo seguirá en Componentes si otra lista de producción aún lo usa.`
+                    : '';
+                if (aviso.textContent !== mensaje) aviso.textContent = mensaje;
+            });
+        }
         const err = h('p', { class: 'c-err', role: 'alert' });
         const guardar = h('button', { class: 'btn btn-primary', type: 'submit' }, icon('check'), nuevo ? 'Agregar' : 'Guardar');
         const borrar = nuevo ? null : h('button', { class: 'btn btn-danger', type: 'button' }, icon('trash'), 'Eliminar');
@@ -114,7 +126,7 @@
         const form = h('form', { class: 'c-form', novalidate: true },
             h('h2', { class: 'c-grupo-t' }, nuevo ? 'Agregar material' : 'Editar material'),
             h('div', { class: 'c-campos' },
-                campo('ceDesc', 'Descripción del material', f.descripcion), campo('ceTar', 'Tarjeta', f.tarjeta),
+                campo('ceDesc', 'Descripción del material', f.descripcion, aviso), campo('ceTar', 'Tarjeta', f.tarjeta),
                 campo('ceCat', 'Categoría', f.categoria), campo('ceProv', 'Proveedor', f.proveedor),
                 campo('ceCant', 'Cantidad por tarjeta', f.cantidad), campo('ceUni', 'Unidad', f.unidad),
                 campo('ceLote', 'Cantidad por caja/bobina/lote', f.cantidad_lote), campo('ceCosto', 'Costo unitario', f.costo_unitario),

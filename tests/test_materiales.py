@@ -126,6 +126,39 @@ class TestMateriales(unittest.TestCase):
         self.c.patch(b + f"/costos/{cid}", json={"unidad": "cm"})
         self.assertTrue(tomar()["materiales"][0]["unidad_ambigua"])
 
+    def test_antijammer_reemplazo_oculta_material_retirado_y_conserva_registro(self):
+        self.limpiar("antijammer")
+        b = "/api/antijammer"
+        viejo, nuevo = "LED 3mm Rosa", "LED 5mm Rosa"
+        ids = {}
+        for tarjeta in ("RX", "TX"):
+            r = self.c.post(b + "/costos", json=dict(tarjeta=tarjeta, unidad="pza", cantidad=1, descripcion=viejo))
+            self.assertEqual(r.status_code, 201, r.text)
+            ids[tarjeta] = r.json()["id"]
+        self.assertEqual(self.c.post(b + "/materiales/movimientos",
+                                     json=dict(descripcion=viejo, tipo="entrada", cantidad=10)).status_code, 201)
+        self.assertEqual(self.c.patch(b + "/materiales/minimo", json=dict(descripcion=viejo, minimo=12)).status_code, 200)
+        self.assertEqual(self.c.post(b + "/materiales/activar", json={}).status_code, 200)
+        pid = self.placa("antijammer", "904")
+        anterior = self.c.post(b + "/materiales/asignar", json=dict(pcb_ids=[pid], tarjeta="RX")).json()
+        self.assertEqual(self.disp(anterior, viejo), 9)
+        self.assertEqual(anterior["bajo_minimo"], 1)
+        self.assertEqual(len(anterior["consumos"]), 1)
+
+        self.assertEqual(self.c.patch(b + f"/costos/{ids['RX']}", json=dict(descripcion=nuevo)).status_code, 200)
+        parcial = self.c.get(b + "/materiales").json()
+        self.assertEqual({m["descripcion"]: m["tarjetas"] for m in parcial["materiales"]}, {viejo: ["TX"], nuevo: ["RX"]})
+        self.assertEqual(self.disp(parcial, viejo), 9)
+        self.assertEqual(self.disp(parcial, nuevo), 0)
+
+        self.assertEqual(self.c.patch(b + f"/costos/{ids['TX']}", json=dict(descripcion=nuevo)).status_code, 200)
+        actual = self.c.get(b + "/materiales").json()
+        self.assertEqual([m["descripcion"] for m in actual["materiales"]], [nuevo])
+        self.assertEqual(self.disp(actual, nuevo), 0)
+        self.assertEqual(actual["bajo_minimo"], 0)
+        self.assertEqual(actual["movimientos"], anterior["movimientos"])
+        self.assertEqual(actual["consumos"], anterior["consumos"])
+
     def test_solicitud_disponible_en_modulos_de_una_tarjeta(self):
         """v1.4.90: la solicitud de material usa por_tarjeta en todos los módulos, no solo en AntiJammer."""
         self.limpiar("sigfox")

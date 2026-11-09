@@ -173,11 +173,13 @@ def _estado(c, conf: Dict[str, Any]) -> Dict[str, Any]:
     realizadas = {t: 0 for t in conf["tarjetas"]}
     for r in c.execute("SELECT tarjeta, COUNT(DISTINCT pcb_id) AS n FROM costeo_consumos WHERE modulo=? AND estado='activo' GROUP BY 1", (modulo,)):
         realizadas[r["tarjeta"]] = r["n"]
+    # AntiJammer muestra el catálogo vigente. Las entradas y consumos anteriores se consultan en Registro.
+    materiales = [m for m in mats.values() if m["en_bom"] or modulo != "skudo-antijammer"]
     return {
         "modulo": modulo, "nombre": conf["nombre"], "tarjetas": list(conf["tarjetas"]),
         "activo": bool(_meta(c, modulo, "consumo_desde")), "consumo_desde": _meta(c, modulo, "consumo_desde"),
-        "materiales": list(mats.values()), "posibles": posibles, "realizadas": realizadas,
-        "bajo_minimo": sum(1 for m in mats.values() if m["bajo_minimo"]),
+        "materiales": materiales, "posibles": posibles, "realizadas": realizadas,
+        "bajo_minimo": sum(1 for m in materiales if m["bajo_minimo"]),
         "pendientes": _pendientes(c, conf),
         "movimientos": [dict(r) for r in c.execute("SELECT * FROM costeo_movimientos WHERE modulo=? ORDER BY id DESC LIMIT 100", (modulo,))],
         "consumos": [dict(r) for r in c.execute(

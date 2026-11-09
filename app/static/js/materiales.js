@@ -14,10 +14,13 @@
     let vista = 'Resumen';
     const plan = { cantidades: {}, conStock: true };
     let busqueda = '';
+    let lectura = 0;
 
     async function cargar() {
+        const id = ++lectura;
         const r = await api(B);
         if (conPlan) await P.yo;
+        if (id !== lectura) return;
         if (!r.ok) { $('mtCuerpo').replaceChildren(h('p', { class: 'x-intro', role: 'alert' }, 'No se pudo cargar el inventario: ' + r.error, ' ', h('button', { class: 'btn', type: 'button', onclick: cargar }, 'Reintentar'))); return; }
         d = r.data; pintar();
     }
@@ -29,6 +32,19 @@
     }
     const kpi = (t, v, n, clase) => h('div', { class: 'c-kpi' + (clase ? ' ' + clase : '') }, h('span', { class: 'c-kpi-t' }, t), h('strong', { class: 'mono' }, v), n ? h('span', { class: 'c-kpi-n' }, n) : null);
 
+    function seleccionar(v) {
+        if (v === vista) return;
+        const recargar = vista === 'Costos';
+        if (recargar) {
+            T.costeoEn(null);
+            d = null;   // Costos pudo cambiar el catálogo mientras estaba abierta esta vista.
+        }
+        vista = v;
+        pintar();
+        $('mtCuerpo').querySelector('[aria-pressed="true"]').focus();
+        if (recargar) cargar();
+    }
+
     function pintar() {
         const ro = P.soloLectura();
         if (!conPlan) {
@@ -38,9 +54,12 @@
         const vistas = ['Resumen', 'Componentes', 'Registro', 'Solicitud de material', 'Costos'];
         const barra = h('div', { class: 'mt-vistas', role: 'group', 'aria-label': 'Vistas de componentes' },
             vistas.map(v => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(v === vista),
-                onclick: () => { if (vista === 'Costos' && v !== 'Costos') T.costeoEn(null); vista = v; pintar(); $('mtCuerpo').querySelector('[aria-pressed="true"]').focus(); } }, v)));
+                onclick: () => seleccionar(v) }, v)));
+        const focoEnVistas = $('mtCuerpo').querySelector('.mt-vistas')?.contains(document.activeElement);
         let contenido;
-        if (vista === 'Resumen') {
+        if (!d && vista !== 'Costos') {
+            contenido = [h('p', { class: 'x-intro', role: 'status' }, 'Cargando inventario…')];
+        } else if (vista === 'Resumen') {
             const bajos = d.materiales.filter(m => m.bajo_minimo);
             contenido = [...resumen(ro), h('section', { class: 'x-caja' }, h('h2', { class: 'c-grupo-t' }, 'Componentes bajo mínimo'),
                 bajos.length ? h('ul', { class: 'mt-lista' }, bajos.map(m => h('li', null, m.descripcion, h('b', null, num(m.disponible) + ' / ' + num(m.minimo) + ' ' + m.unidad)))) :
@@ -56,7 +75,7 @@
                 value: busqueda, oninput: e => { busqueda = e.target.value; filtrar(); } });
             filtrar();
             contenido = [h('div', { class: 'c-barra' }, h('div', { class: 'field c-q' }, h('label', { for: 'mtBuscar' }, 'Buscar componente'), buscar),
-                h('button', { class: 'btn', type: 'button', onclick: () => { vista = 'Costos'; pintar(); } }, ro ? 'Ver lista por tarjeta' : 'Editar lista por tarjeta')), zona];
+                h('button', { class: 'btn', type: 'button', onclick: () => seleccionar('Costos') }, ro ? 'Ver lista por tarjeta' : 'Editar lista por tarjeta')), zona];
         } else if (vista === 'Registro') {
             contenido = [historial(ro)];
         } else if (vista === 'Costos') {
@@ -68,6 +87,7 @@
             contenido = [window.TQT.solicitudMateriales(d, plan, cargar)];
         }
         $('mtCuerpo').replaceChildren(barra, ...contenido);
+        if (focoEnVistas) barra.querySelector('[aria-pressed="true"]').focus();
     }
 
     function resumen(ro) {
