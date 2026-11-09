@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.101 — 2026-11-09
+
+- Solicitud de material muestra cuántos componentes se deben pedir del total. El CSV conserva toda la tabla, incluyendo las filas cubiertas por existencias, con la misma numeración y los mismos conteos que la web.
+
 ## v1.4.100 — 2026-11-09
 
 - AntiJammer muestra en Componentes solo los materiales de producción vigentes en Costos. Al editar la descripción, informa que las existencias y los movimientos quedan asociados al material anterior. El inventario se actualiza al salir de Costos.
