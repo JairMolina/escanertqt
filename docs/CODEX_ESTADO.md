@@ -1,5 +1,7 @@
 # Estado de Codex: TQT-Web
 
+2026-11-09 · **CSV completo de Solicitud de material, verificado en QA.** La descarga conserva todas las filas del desglose y su orden, incluidos los materiales cubiertos con «A solicitar» en cero. Se puede descargar aunque el stock cubra todo. Rama `codex/solicitud-csv-completa-20261109` sobre `250f617`. Playwright comparó tabla y CSV en ambos modos y con stock suficiente para todo. Revisión local en `http://localhost:18095/antijammer#materiales`. Pendiente de despliegue.
+
 2026-11-09 · **1.4.100 desplegada en la Orange Pi** (`d4dd8f9`). Componentes de AntiJammer y sus alertas se limitan al catálogo vigente. En producción aparece el LED de 5 mm para RX/TX y Registro conserva la entrada de 10 LED de 3 mm. Se preservó el Dashboard de producción (`bf006e8`). Pasaron 37 pruebas aisladas y se verificó el flujo de edición en Playwright. HTTPS y contenedor saludables, seis hashes iguales a Git y nueve tablas iguales al respaldo íntegro `/backups/predeploy_1.4.100_20261109_164359.db`. Se desplegó en el intervalo programado de «Prueba1», que siguió activa con dos ciclos guardados.
 
 2026-11-06 · **1.4.94 local (rama `luna-pruebas-auto-acceso`)**: zona Cable restaurada, «Imprimir como aprobada» (tarjeta y R3), R3 aprobada desde el celular, tarjeta FINALIZADA, Cambiar/Falla en Inventario PCB. Evidencia: suite 1032 pruebas (solo falla test_excel_r3_v1112 por falta del tag git v1.1.11, preexistente), Docker local healthy con migración OK. Sin probar en celular ni DYMO reales; sin desplegar.

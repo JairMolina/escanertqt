@@ -37,10 +37,10 @@
         const modo = conStock ? 'Descontando existencias' : 'Sin descontar existencias';
         const series = datos.tarjetas.map(t => t + ': ' + (cantidades[t] || 0)).join(' / ');
         const contenido = [['Componente', 'Unidad', 'Necesario', ...(conStock ? ['Disponible'] : []), 'A solicitar', 'Tarjetas', 'Cálculo'],
-            ...filas.filter(f => f.pedir > 0).map(f => [f.nombre, f.unidad, f.necesario, ...(conStock ? [f.disponible] : []), f.pedir, series, modo])];
+            ...filas.map(f => [f.nombre, f.unidad, f.necesario, ...(conStock ? [f.disponible] : []), f.pedir, series, modo])];
         const csv = '\uFEFF' + contenido.map(r => r.map(celda).join(',')).join('\r\n');
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-        const a = h('a', { download: 'Solicitud-' + datos.modulo + '-' + (conStock ? 'faltantes' : 'total') + '.csv', href: url });
+        const a = h('a', { download: 'Solicitud-' + datos.modulo + '-' + (conStock ? 'con-existencias' : 'total') + '.csv', href: url });
         document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
@@ -84,7 +84,7 @@
                 h('tbody', null, filas.map(f => h('tr', null, h('th', { class: 'i-c-nom', scope: 'row' }, f.nombre),
                     h('td', { 'data-l': 'Unidad' }, f.unidad || '—'), numero('Necesario', f.necesario),
                     conStock ? numero('Disponible', f.disponible) : null, numero('A solicitar', f.pedir, 'mt-pedir')))))),
-                n ? h('button', { type: 'button', class: 'btn', onclick: () => descargar(datos, filas, conStock, cantidades) }, icon('download'), 'Descargar solicitud CSV') : null);
+                h('button', { type: 'button', class: 'btn', onclick: () => descargar(datos, filas, conStock, cantidades) }, icon('download'), 'Descargar solicitud CSV'));
         }
         actualizar();
         return h('section', { class: 'mt-plan' },
