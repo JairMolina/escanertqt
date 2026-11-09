@@ -28,7 +28,7 @@
         return { filas };
     }
 
-    function descargar(datos, filas, conStock, cantidades) {
+    function descargar(datos, filas, conStock, cantidades, porSolicitar) {
         const celda = v => {
             let s = String(v ?? '');
             if (typeof v !== 'number' && /^\s*[=+@-]|^[\t\r\n]/.test(s)) s = "'" + s;
@@ -36,8 +36,10 @@
         };
         const modo = conStock ? 'Descontando existencias' : 'Sin descontar existencias';
         const series = datos.tarjetas.map(t => t + ': ' + (cantidades[t] || 0)).join(' / ');
-        const contenido = [['Componente', 'Unidad', 'Necesario', ...(conStock ? ['Disponible'] : []), 'A solicitar', 'Tarjetas', 'Cálculo'],
-            ...filas.map(f => [f.nombre, f.unidad, f.necesario, ...(conStock ? [f.disponible] : []), f.pedir, series, modo])];
+        const contenido = [['N.º', 'Componente', 'Unidad', 'Necesario', ...(conStock ? ['Disponible'] : []), 'A solicitar', 'Tarjetas', 'Cálculo',
+            'Componentes para solicitar', 'Total de componentes'],
+            ...filas.map((f, i) => [i + 1, f.nombre, f.unidad, f.necesario, ...(conStock ? [f.disponible] : []), f.pedir, series, modo,
+                porSolicitar, filas.length])];
         const csv = '\uFEFF' + contenido.map(r => r.map(celda).join(',')).join('\r\n');
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
         const a = h('a', { download: 'Solicitud-' + datos.modulo + '-' + (conStock ? 'con-existencias' : 'total') + '.csv', href: url });
@@ -75,16 +77,16 @@
                 calcular(datos, cantidades, estado.conStock);
             if (calc.aviso) { aviso.textContent = calc.aviso; resultado.replaceChildren(); return; }
             const filas = calc.filas, conStock = estado.conStock, n = filas.filter(f => f.pedir > 0).length;
-            aviso.textContent = n ? n + (n === 1 ? ' componente para solicitar.' : ' componentes para solicitar.') :
-                'El stock cubre todas las tarjetas. No necesitas solicitar material.';
-            const cols = ['Componente', 'Unidad', 'Necesario', ...(conStock ? ['Disponible'] : []), 'A solicitar'];
+            const resumen = `${formato.format(n)} de ${formato.format(filas.length)} ${filas.length === 1 ? 'componente' : 'componentes'} para solicitar.`;
+            aviso.textContent = n ? resumen : resumen + ' El stock cubre todas las tarjetas.';
+            const cols = ['N.º', 'Componente', 'Unidad', 'Necesario', ...(conStock ? ['Disponible'] : []), 'A solicitar'];
             const numero = (label, v, clase = '') => h('td', { 'data-l': label, class: 'mono ' + clase }, formato.format(v));
             resultado.replaceChildren(h('div', { class: 'i-tabla' }, h('table', { class: 'grid mt-tabla', 'aria-label': 'Desglose de la solicitud' },
                 h('thead', null, h('tr', null, cols.map(c => h('th', { scope: 'col' }, c)))),
-                h('tbody', null, filas.map(f => h('tr', null, h('th', { class: 'i-c-nom', scope: 'row' }, f.nombre),
+                h('tbody', null, filas.map((f, i) => h('tr', null, numero('N.º', i + 1), h('th', { class: 'i-c-nom', scope: 'row' }, f.nombre),
                     h('td', { 'data-l': 'Unidad' }, f.unidad || '—'), numero('Necesario', f.necesario),
                     conStock ? numero('Disponible', f.disponible) : null, numero('A solicitar', f.pedir, 'mt-pedir')))))),
-                h('button', { type: 'button', class: 'btn', onclick: () => descargar(datos, filas, conStock, cantidades) }, icon('download'), 'Descargar solicitud CSV'));
+                h('button', { type: 'button', class: 'btn', onclick: () => descargar(datos, filas, conStock, cantidades, n) }, icon('download'), 'Descargar solicitud CSV'));
         }
         actualizar();
         return h('section', { class: 'mt-plan' },

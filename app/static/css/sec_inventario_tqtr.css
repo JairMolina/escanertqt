@@ -102,5 +102,6 @@
 .itq-sol .mt-plan-bar { justify-content: space-between; }
 .itq-sol .mt-resultado .btn { margin-top: 12px; }
 .itq-sol .mt-pedir { font-weight: 700; }
-.itq-sol table.grid td.mono, .itq-sol .i-tabla thead th:nth-child(n+3) { text-align: right; }
+.itq-sol .i-tabla thead th:first-child { width: 1%; text-align: right; }
+.itq-sol table.grid td.mono, .itq-sol .i-tabla thead th:nth-child(n+4) { text-align: right; }
 .itq-sol input[aria-invalid="true"] { border-color: var(--bad); }

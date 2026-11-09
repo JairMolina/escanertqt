@@ -56,4 +56,8 @@
 .mt-plan-bar { justify-content: space-between; }
 .mt-resultado .btn { margin-top: 12px; }
 .mt-pedir { font-weight: 700; }
-.mt-plan .i-tabla thead th:nth-child(n+3) { text-align: right; }
+.mt-plan .i-tabla thead th:first-child { width: 1%; text-align: right; }
+.mt-plan .i-tabla thead th:nth-child(n+4) { text-align: right; }
+@media (max-width: 767.98px) {
+  #v-materiales .mt-plan .i-tabla table.grid tbody th.i-c-nom { flex: 1 1 calc(100% - 6rem); overflow-wrap: anywhere; }
+}

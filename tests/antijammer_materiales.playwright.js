@@ -26,7 +26,8 @@ async (page, claveLocal) => {
         const pedir = async material => fila(material).locator('[data-l="A solicitar"]').textContent();
         await rx.fill('5'); await tx.fill('4');
         ok(await pedir('Conector de banco') === '10' && await pedir('Relevador de prueba') === '4' && await pedir('Cable de prueba') === '0', 'Saldo compartido solo una vez');
-        async function descargar(sufijo) {
+        async function descargar(sufijo, faltantes, total) {
+            await p.getByText(`${faltantes} de ${total} componentes para solicitar.`, { exact: faltantes > 0 }).waitFor();
             const [archivo] = await Promise.all([p.waitForEvent('download'), btn('Descargar solicitud CSV').click()]);
             ok(archivo.suggestedFilename().endsWith(sufijo), 'Nombre del CSV');
             const flujo = await archivo.createReadStream(), bytes = [];
@@ -34,22 +35,26 @@ async (page, claveLocal) => {
             const lineas = Buffer.concat(bytes).toString('utf8').split('\r\n');
             const tabla = p.getByRole('table', { name: 'Desglose de la solicitud' });
             const nombres = await tabla.locator('tbody th').allTextContents();
-            ok(lineas.length === nombres.length + 1 && nombres.every((nombre, i) => lineas[i + 1].startsWith('"' + nombre + '",')),
-                'CSV y tabla muestran las mismas filas en el mismo orden');
+            const numeros = await tabla.locator('tbody td[data-l="N.º"]').allTextContents();
+            ok(lineas.length === total + 1 && nombres.length === total &&
+                nombres.every((nombre, i) => numeros[i] === String(i + 1) && lineas[i + 1].startsWith(`"${numeros[i]}","${nombre}",`)),
+                'CSV y tabla tienen los mismos renglones numerados');
+            ok(lineas[0].endsWith('"Componentes para solicitar","Total de componentes"') &&
+                lineas.slice(1).every(l => l.endsWith(`,"${faltantes}","${total}"`)), 'CSV y aviso tienen los mismos totales');
             return lineas;
         }
-        const csv = await descargar('-con-existencias.csv');
-        ok(csv.some(l => l.startsWith('"Conector de banco","pza","22","12","10",')) &&
-            csv.some(l => l.startsWith('"Cable de prueba","m","1.25","4","0",')), 'CSV con faltantes y materiales cubiertos');
+        const csv = await descargar('-con-existencias.csv', 2, 3);
+        ok(csv.some(l => l.includes(',"Conector de banco","pza","22","12","10",')) &&
+            csv.some(l => l.includes(',"Cable de prueba","m","1.25","4","0",')), 'CSV con faltantes y materiales cubiertos');
         await radio('Ignorar existencias').check();
         ok(await pedir('Conector de banco') === '22' && await pedir('Cable de prueba') === '1.25', 'Material bruto y fracciones');
         ok(!await p.getByRole('columnheader', { name: 'Disponible' }).count(), 'Modo bruto ignora existencias');
-        const bruto = await descargar('-total.csv');
-        ok(!bruto[0].includes('"Disponible"') && bruto.some(l => l.startsWith('"Conector de banco","pza","22","22",')), 'CSV sin descontar existencias');
+        const bruto = await descargar('-total.csv', 3, 3);
+        ok(!bruto[0].includes('"Disponible"') && bruto.some(l => l.includes(',"Conector de banco","pza","22","22",')), 'CSV sin descontar existencias');
         await radio('Descontar existencias').check();
         await rx.fill('1'); await tx.fill('0');
         await p.getByText('El stock cubre todas las tarjetas.', { exact: false }).waitFor();
-        const cubierto = await descargar('-con-existencias.csv');
+        const cubierto = await descargar('-con-existencias.csv', 0, 2);
         ok(cubierto.slice(1).every(l => l.includes(',"0","RX: 1 / TX: 0",')), 'CSV disponible aunque todo esté cubierto');
         await rx.fill('-1'); await p.getByText(/Usa cantidades enteras/).waitFor();
         await rx.fill('1.5'); ok(!await p.getByRole('table', { name: 'Desglose de la solicitud' }).count(), 'Sin cálculos parciales inválidos');
