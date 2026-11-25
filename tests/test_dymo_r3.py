@@ -65,6 +65,17 @@ class TestDymoR3(unittest.TestCase):
         r = self.c.get("/api/dymo/r3/archivo?nombre=TQT-R3-V30-0001&tipo=dymo")
         self.assertIn("TQT_R3_0001.dymo", r.headers["content-disposition"])
 
+    def test_linea_horizontal_entre_mitades(self):
+        """v1.4.102: la línea punteada horizontal (mitad de la etiqueta, ancho útil) sale en SVG, .label y .dymo."""
+        from app.services.dymo_service import caja_linea_r3_h, DymoService, obtener_formato
+        f = obtener_formato("30334")
+        lh = caja_linea_r3_h(f)
+        self.assertAlmostEqual(lh.y + lh.h / 2, f.alto_mm / 2); self.assertAlmostEqual(lh.x, 1.5); self.assertAlmostEqual(lh.derecha, f.ancho_mm - 1.5)
+        y = f"{f.alto_mm / 2:.3f}"
+        self.assertIn(f'y1="{y}" x2="{lh.derecha:.3f}" y2="{y}"', DymoService.generate_r3_svg(["TQT-R3-V30-0001"], "30334"))
+        for xml in (DymoService.generate_r3_label_xml(["TQT-R3-V30-0001"], "30334"), DymoService.generate_r3_dcd_xml(["TQT-R3-V30-0001"], "30334")):
+            self.assertIn("LINEAH", xml)
+
     def _r3(self, nombre, aprobada):
         with db.get_db() as c:
             c.execute("DELETE FROM pcb_inventario WHERE nombre=?", (nombre,))

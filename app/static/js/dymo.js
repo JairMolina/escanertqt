@@ -245,7 +245,8 @@ document.addEventListener('DOMContentLoaded', () => {
 html, body { margin: 0; padding: 0; background: #fff; }
 .dymo-label { outline: none !important; box-shadow: none !important; border-radius: 0 !important; break-after: page; page-break-after: always; }
 .dymo-label:last-child { break-after: auto; page-break-after: auto; }
-.dymo-label::after, .r3m + .r3m::before { display: none !important; }
+.dymo-label::after { display: none !important; }
+.r3m + .r3m::before { border-top: 0.5mm dashed #000 !important; }   /* v1.4.102: la línea horizontal entre mitades SÍ se imprime */
 .cable-linea { border-left: 0.5mm dashed #000 !important; }
 </style></head><body></body></html>`);
         doc.close();

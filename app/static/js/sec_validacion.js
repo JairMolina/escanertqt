@@ -576,9 +576,20 @@
       }
       picker?.close();   // v1.4.64: elegida la tarjeta (lista, número o QR) se cierra el modal
       const my = ++selSeq;
+      // v1.4.102: al cambiar de tarjeta el resumen/botón de imprimir de la anterior no se arrastra; history() recupera la última
+      // prueba terminada de la tarjeta elegida y, si salió aprobada, muestra «Imprimir etiquetas» sin repetir la prueba.
+      const cambia = !active && String(tarjeta?.id) !== String(t.id);
+      if (cambia) {
+        lastRun = null;
+        printTarjeta = null;
+        recuperadas.clear();
+        printOut.textContent = skyOut.textContent = "";
+        printBtn.textContent = "Imprimir etiquetas";
+      }
       tarjeta = t;
       historyPanel.hidden = !t;
       card = null;
+      if (cambia) paintSummary();
       markSelected();
       cardHost.replaceChildren(h("p", { class: "hint" }, "Cargando tarjeta " + cardNum(t) + "…"));
       historyHost.replaceChildren(h("p", { class: "hint" }, "Cargando historial…"));

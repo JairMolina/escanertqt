@@ -232,6 +232,12 @@ def caja_linea_r3(formato: FormatoEtiqueta) -> Caja:
     return Caja(formato.ancho_mm / 2 - CABLE_LINEA_ANCHO_MM / 2, mitad + m, CABLE_LINEA_ANCHO_MM, mitad - 2 * m)
 
 
+def caja_linea_r3_h(formato: FormatoEtiqueta) -> Caja:
+    """v1.4.102: línea punteada HORIZONTAL que separa las dos mitades (QR/nombre arriba, «R3 nnnn» abajo), a todo el ancho útil."""
+    m = MARGEN_SEGURO_MM
+    return Caja(m, formato.alto_mm / 2 - CABLE_LINEA_ANCHO_MM / 2, formato.ancho_mm - 2 * m, CABLE_LINEA_ANCHO_MM)
+
+
 def lineas_num_r3(nombre: str) -> List[str]:
     return ["R3", nombre[-4:]]
 
@@ -278,17 +284,20 @@ def caja_linea_cable(formato: "FormatoEtiqueta") -> "Caja":
     return Caja(formato.ancho_mm / 2 - CABLE_LINEA_ANCHO_MM / 2, m, CABLE_LINEA_ANCHO_MM, formato.alto_mm - 2 * m)
 
 
-def png_linea_punteada(c: "Caja") -> str:
-    """PNG (base64) a 300 dpi con una línea vertical punteada negra que llena la caja `c`."""
+def png_linea_punteada(c: "Caja", horizontal: bool = False) -> str:
+    """PNG (base64) a 300 dpi con una línea punteada negra (vertical, u horizontal si `horizontal`) que llena la caja `c`."""
     from PIL import Image, ImageDraw
     ppm = 300 / 25.4
-    w, h = max(3, round(c.w * ppm)), max(10, round(c.h * ppm))
+    w, h = max(3, round(c.w * ppm)), max(3, round(c.h * ppm))
     img = Image.new("L", (w, h), 255)
     d = ImageDraw.Draw(img)
     guion, paso = round(CABLE_GUION_MM * ppm), round((CABLE_GUION_MM + CABLE_HUECO_MM) * ppm)
-    x0, x1 = w // 2 - 3, w // 2 + 3   # ~0.5 mm a 300 dpi
-    for y in range(0, h, paso):
-        d.rectangle([x0, y, x1, min(h - 1, y + guion - 1)], fill=0)
+    if horizontal:
+        for x in range(0, w, paso):
+            d.rectangle([x, h // 2 - 3, min(w - 1, x + guion - 1), h // 2 + 3], fill=0)   # ~0.5 mm a 300 dpi
+    else:
+        for y in range(0, h, paso):
+            d.rectangle([w // 2 - 3, y, w // 2 + 3, min(h - 1, y + guion - 1)], fill=0)
     buf = io.BytesIO()
     img.convert("1").save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("ascii")
@@ -654,6 +663,8 @@ class DymoService:
             objetos += _v8_texto("NUMR3", texto_num_r3(md.nombre), R3_CABLE_PT, caja_num_r3(f), "Center", "Rotation90")
             ln = caja_linea_r3(f)
             objetos += _v8_imagen("LINEA", png_linea_punteada(ln), ln)   # v1.4.91: línea punteada al centro de la mitad inferior
+            lh = caja_linea_r3_h(f)
+            objetos += _v8_imagen("LINEAH", png_linea_punteada(lh, True), lh)   # v1.4.102: línea horizontal entre mitades
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
     <PaperOrientation>{f.v8_orientacion}</PaperOrientation>
@@ -762,6 +773,22 @@ class DymoService:
           <VerticalAlignment>Middle</VerticalAlignment>
           {layout(ln)}
         </ImageObject>"""
+            lh = caja_linea_r3_h(f)
+            objetos += f"""
+        <ImageObject>
+          <Name>LINEAH</Name>
+          {cls._brushes()}
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          {margen}
+          <Data>{png_linea_punteada(lh, True)}</Data>
+          <ScaleMode>Fill</ScaleMode>
+          <HorizontalAlignment>Center</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          {layout(lh)}
+        </ImageObject>"""
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <DesktopLabel Version="1">
   <DYMOLabel Version="3">
@@ -841,6 +868,9 @@ class DymoService:
         ln = caja_linea_r3(f)
         linea = (f'<line x1="{ln.x + ln.w / 2:.3f}" y1="{ln.y:.3f}" x2="{ln.x + ln.w / 2:.3f}" y2="{ln.abajo:.3f}" stroke="#000" stroke-width="0.5" '
                  f'stroke-dasharray="{CABLE_GUION_MM} {CABLE_HUECO_MM}"/>')
+        lh = caja_linea_r3_h(f)   # v1.4.102: línea horizontal entre mitades
+        linea += (f'<line x1="{lh.x:.3f}" y1="{lh.y + lh.h / 2:.3f}" x2="{lh.derecha:.3f}" y2="{lh.y + lh.h / 2:.3f}" stroke="#000" stroke-width="0.5" '
+                  f'stroke-dasharray="{CABLE_GUION_MM} {CABLE_HUECO_MM}"/>')
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f.ancho_mm:g}mm" height="{f.alto_mm:g}mm" viewBox="0 0 {f.ancho_mm:g} {f.alto_mm:g}">'
                 f'<rect width="{f.ancho_mm:g}" height="{f.alto_mm:g}" fill="#fff"/><g fill="#000" shape-rendering="crispEdges">{"".join(partes)}</g>{linea}</svg>')
 

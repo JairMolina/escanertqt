@@ -1,5 +1,7 @@
 # Estado de Codex: TQT-Web
 
+2026-11-25 · **1.4.102 local (rama `dymo-r3-linea-imprimir-pruebas`)**: línea horizontal de la etiqueta R3 impresa; botón Imprimir etiqueta en Pruebas TQT para tarjetas ya aprobadas. Sin desplegar; sin probar en DYMO física.
+
 2026-11-09 · **1.4.101 desplegada en la Orange Pi** (`0de233e`). La web muestra cuántos componentes se deben solicitar del total. El CSV conserva esos conteos, la numeración y todas las filas, incluidos los materiales cubiertos. Playwright comparó numeración, conteos y datos en ambos modos y con stock suficiente para todo. Pasaron 37 pruebas aisladas. HTTPS y contenedor saludables, cinco archivos iguales a Git y nueve tablas iguales al respaldo íntegro `/backups/predeploy_1.4.101_20261109_172707.db`. Consulta de producción con 14 RX y 14 TX: 19 de 31 componentes para solicitar. «Prueba1» siguió activa con dos ciclos guardados durante la actualización entre ciclos.
 
 2026-11-09 · **1.4.100 desplegada en la Orange Pi** (`d4dd8f9`). Componentes de AntiJammer y sus alertas se limitan al catálogo vigente. En producción aparece el LED de 5 mm para RX/TX y Registro conserva la entrada de 10 LED de 3 mm. Se preservó el Dashboard de producción (`bf006e8`). Pasaron 37 pruebas aisladas y se verificó el flujo de edición en Playwright. HTTPS y contenedor saludables, seis hashes iguales a Git y nueve tablas iguales al respaldo íntegro `/backups/predeploy_1.4.100_20261109_164359.db`. Se desplegó en el intervalo programado de «Prueba1», que siguió activa con dos ciclos guardados.

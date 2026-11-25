@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.102 — 2026-11-25
+
+- **Etiqueta DYMO R3:** la línea punteada horizontal que separa la mitad del QR de la mitad del cable ahora se imprime (navegador, DYMO Connect y Raspberry).
+- **Pruebas TQT:** al seleccionar una tarjeta ya probada y aprobada aparece el botón Imprimir etiqueta sin repetir la prueba.
+
 ## v1.4.101 — 2026-11-09
 
 - Solicitud de material muestra cuántos componentes se deben pedir del total. El CSV conserva toda la tabla, incluyendo las filas cubiertas por existencias, con la misma numeración y los mismos conteos que la web.
