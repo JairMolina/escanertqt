@@ -20,6 +20,8 @@
     <link rel="stylesheet" href="/static/css/antijammer.css?v=1">
     <link rel="stylesheet" href="/static/css/antijammer_vistas.css?v=1">
     <link rel="stylesheet" href="/static/css/antijammer_consola.css?v=1">
+    <link rel="stylesheet" href="/static/css/antijammer_etiquetas.css?v=1">
+    <link rel="stylesheet" href="/static/css/antijammer_emparejar.css?v=1">
     <link rel="stylesheet" href="/static/css/costeo.css?v=2">
 </head>
 <body>
@@ -47,6 +49,7 @@
             <a href="#dashboard" data-tab="dashboard" data-mas><i class="svg-slot" data-i="dash"></i><span>Dashboard</span></a>
             <a href="#recibir" data-tab="recibir"><i class="svg-slot" data-i="recibir"></i><span>Recibir</span></a>
             <a href="#programar" data-tab="programar"><i class="svg-slot" data-i="programar"></i><span>Programar</span></a>
+            <a href="#emparejar" data-tab="emparejar" data-mas><i class="svg-slot" data-i="link"></i><span>Emparejar</span></a>
             <a href="#consultar" data-tab="consultar"><i class="svg-slot" data-i="consultar"></i><span>Consultar</span></a>
         </div>
         <div class="grupo">
@@ -56,6 +59,7 @@
             <a href="#lotes" data-tab="lotes" data-mas><i class="svg-slot" data-i="layers"></i><span>Lotes</span></a>
             <a href="#movimientos" data-tab="movimientos" data-mas><i class="svg-slot" data-i="clock"></i><span>Movimientos</span></a>
             <a href="#excel" data-tab="excel" data-mas><i class="svg-slot" data-i="excel"></i><span>Excel</span></a>
+            <a href="#etiquetas" data-tab="etiquetas" data-mas><i class="svg-slot" data-i="printer"></i><span>Etiquetas DYMO</span></a>
         </div>
         <button class="mas" type="button" id="bMas" aria-haspopup="dialog"><i class="svg-slot" data-i="more"></i><span>Más</span></button>
     </nav>
@@ -143,6 +147,37 @@
             <div class="lado" id="cLado"></div>
         </section>
 
+        <!-- ============================================================ EMPAREJAR (v1.4.103) -->
+        <section class="vista pag pag-ancha" id="v-emparejar" data-vista="emparejar" aria-labelledby="tEmparejar" hidden>
+            <div class="inv-cab">
+                <h1 id="tEmparejar" tabindex="-1">Emparejar RX y TX</h1>
+                <span class="inv-cuenta" id="epCuenta" aria-live="polite"></span>
+                <span class="espacio"></span>
+                <label class="sr-only" for="epMes">Periodo de recepción</label>
+                <select class="input ep-mes" id="epMes"></select>
+            </div>
+            <p class="solo-lectura" hidden>Tu rol es de consulta: ves las parejas, pero no puedes emparejar ni deshacer.</p>
+            <div class="cam-slot"></div>
+            <div id="epError"></div>
+            <div id="epCuerpo">
+                <div class="ep-caja">
+                    <form class="ep-form" id="epForm" autocomplete="off">
+                        <label class="sr-only" for="epCod">Código de la placa</label>
+                        <input class="input mono" id="epCod" type="text" inputmode="text" maxlength="200" placeholder="SJ-V1-0001 o 1" data-escribe>
+                        <button class="btn" type="submit" data-escribe><i class="svg-slot" data-i="plus"></i>Agregar</button>
+                    </form>
+                    <div class="ep-ranuras" id="epRanuras"></div>
+                    <p class="ep-msg" id="epMsg" role="status" aria-live="polite"></p>
+                    <div class="ep-acc">
+                        <button class="btn btn-primary" type="button" id="epOk" disabled data-escribe><i class="svg-slot" data-i="link"></i>Emparejar</button>
+                        <button class="btn btn-ghost" type="button" id="epLimpiar"><i class="svg-slot" data-i="x"></i>Limpiar</button>
+                    </div>
+                </div>
+                <section class="ep-sec" aria-labelledby="epSueltasT"><h2 id="epSueltasT">Sin pareja</h2><div id="epSueltas"></div></section>
+                <section class="ep-sec" aria-labelledby="epParT"><h2 id="epParT">Parejas</h2><div id="epPar"></div></section>
+            </div>
+        </section>
+
         <!-- ============================================================ INVENTARIO -->
         <section class="vista pag pag-ancha" id="v-inventario" data-vista="inventario" aria-labelledby="tInventario" hidden>
             <div class="inv-cab">
@@ -191,6 +226,13 @@
             </div>
             <div id="xCuerpo"></div>
         </section>
+        <!-- ============================================================ ETIQUETAS DYMO -->
+        <section class="vista pag pag-ancha" id="v-etiquetas" data-vista="etiquetas" aria-labelledby="tEtiquetas" hidden>
+            <div class="inv-cab">
+                <h1 id="tEtiquetas" tabindex="-1">Etiquetas DYMO</h1>
+            </div>
+            <div id="etCuerpo"></div>
+        </section>
         <!-- ============================================================ MATERIALES (v1.4.35) -->
         <section class="vista pag pag-ancha" id="v-materiales" data-vista="materiales" aria-labelledby="tMateriales" hidden>
             <div class="inv-cab">
@@ -223,12 +265,14 @@
 <script src="/static/js/antijammer.js?v=1"></script>
 <script src="/static/js/antijammer_recibir.js?v=1"></script>
 <script src="/static/js/antijammer_programar.js?v=1"></script>
+<script src="/static/js/antijammer_emparejar.js?v=1"></script>
 <script src="/static/js/antijammer_consultar.js?v=1"></script>
 <script src="/static/js/antijammer_inventario.js?v=1"></script>
 <script src="/static/js/antijammer_dashboard.js?v=1"></script>
 <script src="/static/js/antijammer_lotes.js?v=1"></script>
 <script src="/static/js/antijammer_movimientos.js?v=1"></script>
 <script src="/static/js/antijammer_excel.js?v=1"></script>
+<script src="/static/js/antijammer_etiquetas.js?v=1"></script>
 <script src="/static/js/costeo.js?v=2" data-ns="AJ" data-base="/api/antijammer/costos" data-aviso-descripcion="1"></script>
 <script src="/static/js/solicitud_materiales.js?v=1"></script>
 <script src="/static/js/materiales.js?v=3" data-ns="AJ" data-base="/api/antijammer/materiales" data-evento="antijammer:cambio" data-plan="1"></script>

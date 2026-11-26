@@ -1,0 +1,40 @@
+/* Etiquetas DYMO del gabinete (Skudo AntiJammer). Usa los tokens de tema de la consola; móvil 375 px sin scroll horizontal. */
+.et-caja { display: flex; flex-direction: column; gap: 16px; max-width: 980px; padding: 18px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-sizing: border-box; }
+.et-elige { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: end; }
+.et-elige .input, .et-imp .input { min-height: 46px; width: 100%; box-sizing: border-box; background: var(--campo); border-color: var(--line-2); }
+.et-q { position: relative; }
+.et-lote { display: flex; gap: 8px; flex-wrap: wrap; }
+.et-lote .input { flex: 1 1 140px; min-width: 0; }
+.et-lote .btn, .et-imp .btn { min-height: 46px; }
+.et-sug { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); overflow: hidden; }
+.et-sug[hidden] { display: none; }
+.et-sug-op { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.et-sug-op:last-child { border-bottom: 0; }
+.et-sug-op:hover, .et-sug-op:focus-visible { background: var(--campo); }
+.et-sug-op small { color: var(--muted); }
+.et-barra { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.et-cuenta { margin: 0; font-weight: 600; }
+.et-vacio { margin: 0; padding: 18px 14px; border: 1px dashed var(--line-2); border-radius: 10px; color: var(--muted); line-height: 1.5; }
+.et-vacio[hidden] { display: none; }
+.et-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 12px; }
+.et-item { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.et-lamina { background: #fff; border: 1px solid var(--line-2); border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; aspect-ratio: 57 / 32; box-sizing: border-box; overflow: hidden; }
+.et-lamina svg { width: 100%; height: auto; max-height: 100%; display: block; }
+.et-carga { color: #555; font-size: .85rem; }
+.et-item figcaption { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: .9rem; }
+.et-quita { width: 44px; height: 44px; }
+.et-imp { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 12px; align-items: end; padding-top: 14px; border-top: 1px solid var(--line); }
+.et-imp .btn-primary { grid-column: 1 / -1; min-height: 48px; }
+.et-estado, .et-msg { margin: 0; line-height: 1.45; }
+.et-estado { color: var(--muted); }
+.et-estado[data-k="ok"] { color: var(--ok, inherit); }
+.et-msg { padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--campo); overflow-wrap: anywhere; }
+.et-msg[hidden] { display: none; }
+.et-msg[data-k="bad"] { border-color: var(--bad, #d64545); }
+.et-msg[data-k="ok"] { border-color: var(--ok, #2fa36b); }
+.et-msg[data-k="warn"] { border-color: var(--warn, #d9a32b); }
+@media (min-width: 768px) {
+    .et-elige { grid-template-columns: minmax(240px, 2fr) minmax(260px, 2fr); }
+    .et-imp { grid-template-columns: minmax(220px, 1fr) 110px auto; }
+    .et-imp .btn-primary { grid-column: auto; }
+}

@@ -101,7 +101,10 @@
             const mxn = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }));
             const muted = (t) => h('span', { class: 'muted' }, t);
             const estadoBadge = (e) => { const x = ESTADOS[e] || ESTADOS.ok; return T.badge(x[0], x[1], x[2]); };
-            const grupoNombre = (g) => (st.dash && st.dash.grupos && st.dash.grupos[g]) || g || '—';
+            const grupoNombre = (g) => (g === '__otros' ? 'Otros' : (st.dash && st.dash.grupos && st.dash.grupos[g]) || g || '—');
+            // v1.4.103: al volver a esta pestaña del navegador se recargan los datos (otra persona pudo programar o asignar tarjetas)
+            const alVolver = () => { if (!host.isConnected) { document.removeEventListener('visibilitychange', alVolver); return; } if (document.visibilityState === 'visible' && st.tab !== 'configuracion') cargar(); };
+            document.addEventListener('visibilitychange', alVolver);
 
             // ---------------------------------------------------------------- armazón: pestañas + acciones
             const panel = h('div', { class: 'itq-panel', role: 'tabpanel', id: 'itqPanel', tabindex: '-1' });
@@ -133,9 +136,10 @@
                         st.regs = await obtener(`${B}/registros?${q}`);
                     } else if (st.tab === 'stock') { st.stock = await obtener(`${B}/stock-minimo`); contarStock(st.stock.pendientes ?? st.stock.a_comprar.length); }
                     else if (st.tab === 'consumo') { st.cons = await obtener(`${B}/consumos`); }
-                    else if (st.tab === 'costos') { st.costos = await obtener(`${B}/costos`); if (!st.comps) st.comps = await obtener(`${B}/componentes`); }
+                    // v1.4.103: siempre datos frescos (antes Costos y Componentes reusaban componentes/dashboard viejos)
+                    else if (st.tab === 'costos') { [st.costos, st.comps] = await Promise.all([obtener(`${B}/costos`), obtener(`${B}/componentes`)]); }
                     else if (st.tab === 'solicitud') { st.comps = await obtener(`${B}/componentes`); }
-                    else if (st.tab === 'componentes') { st.comps = await obtener(`${B}/componentes`); if (!st.dash) st.dash = await obtener(`${B}/dashboard`); }
+                    else if (st.tab === 'componentes') { [st.comps, st.dash] = await Promise.all([obtener(`${B}/componentes`), obtener(`${B}/dashboard`)]); }
                     else st.conf = await obtener(`${B}/configuracion`);
                     st.error = '';
                 } catch (e) { st.error = e.message; }
@@ -193,8 +197,11 @@
                     out.push(T.banner('warn', 'alert', h('b', null, 'Modelos del registro sin componente: '), d.sin_coincidencia.join(', '), '. No cuentan en el dashboard; usa exactamente el Tipo / Modelo del catálogo.'));
                 }
                 const izq = h('div', { class: 'stack' });
-                Object.keys(d.grupos).forEach((g) => {
-                    const filas = d.componentes.filter((f) => f.grupo === g);
+                // v1.4.103: los componentes sin grupo conocido van en «Otros» (antes no aparecían en el dashboard)
+                const conocidos = Object.keys(d.grupos);
+                const otros = d.componentes.some((f) => !conocidos.includes(f.grupo));
+                (otros ? [...conocidos, '__otros'] : conocidos).forEach((g) => {
+                    const filas = d.componentes.filter((f) => (g === '__otros' ? !conocidos.includes(f.grupo) : f.grupo === g));
                     if (!filas.length) return;
                     const max = Math.max(...filas.map((f) => Math.max(0, f.disponible) + f.consumida), 0);
                     izq.append(bloque(grupoNombre(g) + (pc[g] !== undefined ? ` · ${fmt(pc[g])} PCBA posibles` : ''), h('div', { class: 'esc-tw' }, h('table', { class: 'esc-t itq-t' },

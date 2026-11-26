@@ -458,6 +458,64 @@ class TestConsumoTarjetas(unittest.TestCase):
         self.assertEqual(dif["Cable calibre 18 | Rojo"]["consumo"], 0.55)
         self.assertNotIn("Catalizador para silicón P-53 | R1+R2", dif)  # v1.3.39: ml en ambos lados (6 ml por armado)
 
+    def test_14_material_repetido_en_costos_se_suma_sin_romper(self):
+        """v1.4.103: el mismo componente en dos filas incluidas del mismo evento ya no rompe la conciliación (UNIQUE) y suma."""
+        rel = "Relevador automotriz 12 VCD"
+        comp = next(f for f in svc.dashboard(db_path=self.path)["componentes"] if f["descripcion"] == rel)
+        svc.crear_costo({"descripcion": "Relevador extra", "grupo": "R1", "costo_unitario": 1, "moneda": "MXN",
+                         "cantidad_armado": 1, "componente_id": comp["id"]}, db_path=self.path)
+        r0 = self.disp(rel)
+        self.tarjeta()
+        self.assertEqual(self.disp(rel), r0 - 7)   # 6 de la fila original + 1 de la repetida, en una sola fila
+        svc.sincronizar_consumos(self.path)        # idempotente
+        self.assertEqual(self.disp(rel), r0 - 7)
+
+    def test_16_mismo_material_en_dos_eventos_descuenta_ambos(self):
+        """v1.4.103b: un componente en Costos de R1/R2 (placas) y de R3 (r3) se descontaba solo en el primer evento (UNIQUE tarjeta+componente)."""
+        rel = "Relevador automotriz 12 VCD"
+        comp = next(f for f in svc.dashboard(db_path=self.path)["componentes"] if f["descripcion"] == rel)
+        svc.crear_costo({"descripcion": "Relevador R3", "grupo": "R3", "costo_unitario": 1, "moneda": "MXN",
+                         "cantidad_armado": 2, "componente_id": comp["id"]}, db_path=self.path)
+        r0 = self.disp(rel)
+        t = self.tarjeta(firmware=False)          # solo R3 asignada: 2
+        self.assertEqual(self.disp(rel), r0 - 2)
+        self.programar(t)                          # + placas: 6
+        self.assertEqual(self.disp(rel), r0 - 8)
+        svc.sincronizar_consumos(self.path)
+        self.assertEqual(self.disp(rel), r0 - 8)
+        t2 = self.tarjeta()                        # al revés: placas primero, R3 ya asignada al crear
+        self.assertEqual(self.disp(rel), r0 - 16)
+
+    def test_17_migra_unique_antiguo_conservando_consumos(self):
+        """v1.4.103b: una BD con UNIQUE (tarjeta, componente) se reconstruye con origen y conserva sus filas."""
+        from app.database import db
+        t = self.tarjeta()
+        n = len(svc.materiales_tarjeta(t["id"], db_path=self.path)["items"])
+        with db.transaction(self.path) as c:
+            c.execute("ALTER TABLE inv_tqtr_consumos RENAME TO x_old")
+            c.execute("DROP INDEX IF EXISTS ix_inv_tqtr_cons_tarjeta")
+            ddl = svc._DDL.split("CREATE TABLE IF NOT EXISTS inv_tqtr_consumos (", 1)[1].split(");", 1)[0]
+            c.execute("CREATE TABLE inv_tqtr_consumos (" + ddl.replace("componente_id, origen)", "componente_id)") + ")")
+            c.execute("INSERT INTO inv_tqtr_consumos SELECT * FROM x_old")
+            c.execute("DROP TABLE x_old")
+        svc._reiniciar_cache()
+        svc.asegurar(self.path)
+        with db.get_db(self.path) as c:
+            sql = c.execute("SELECT sql FROM sqlite_master WHERE name='inv_tqtr_consumos'").fetchone()[0]
+            cuantos = c.execute("SELECT COUNT(*) FROM inv_tqtr_consumos").fetchone()[0]
+        self.assertIn("componente_id, origen)", sql)
+        self.assertEqual(cuantos, n)
+
+    def test_15_no_se_elimina_componente_ya_consumido(self):
+        """v1.4.103: dar de baja un componente con consumos dejaba componente_id NULL y su consumo dejaba de restar."""
+        self.tarjeta()
+        comp = next(f for f in svc.dashboard(db_path=self.path)["componentes"] if f["descripcion"] == "Relevador automotriz 12 VCD")
+        from app.database import db
+        with db.transaction(self.path) as c:   # sin movimientos, para llegar a la nueva validación
+            c.execute("DELETE FROM inv_tqtr_movimientos WHERE modelo=?", (comp["descripcion"],))
+        with self.assertRaises(svc.ConflictoError):
+            svc.eliminar_componente(comp["id"], db_path=self.path)
+
 
 class TestV1339(unittest.TestCase):
     """Unidades del silicón/catalizador, ajuste de sensores, stock mínimo y aviso por correo una sola vez por cruce."""

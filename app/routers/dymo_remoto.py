@@ -87,6 +87,9 @@ def _svg(tipo, params):
     if tipo == "activo":   # v1.4.14: módulo Impresora (params = {numero, base})
         from app.services import activos
         return activos.svg_etiqueta(params["numero"], params["base"], FORMATO)
+    if tipo == "antijammer":   # etiqueta del gabinete AntiJammer (params = {nombre})
+        from app.services import antijammer_etiqueta
+        return antijammer_etiqueta.svg(antijammer_etiqueta.datos_de(params["nombre"]), FORMATO)
     if tipo == "cable":
         return DymoService.generate_cable_svg(params["numero"], FORMATO, params.get("r3", ""))
     return DymoService.generate_r3_svg(params["nombres"], FORMATO, aprobada=tipo == "r3_aprobada")

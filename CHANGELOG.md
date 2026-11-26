@@ -1,5 +1,14 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.103 — 2026-11-25
+
+- **Inventario TQTR (auditoría de consumo):** si el mismo material aparece en dos filas de Costos del mismo evento, se suma en una sola fila de consumo; antes la conciliación chocaba con UNIQUE y dejaba de descontar.
+- **Inventario TQTR:** no se puede dar de baja un componente que ya se consumió en tarjetas (su consumo dejaba de restar en existencias).
+- **Inventario TQTR (pantalla):** Costos y Componentes siempre recargan datos frescos, el dashboard muestra los componentes sin grupo en «Otros» y la pestaña recarga al volver a ella en el navegador.
+- **Inventario TQTR:** un material que está en Costos de dos eventos (p. ej. R1/R2 y R3, o placas y gabinete) ahora descuenta en ambos; antes solo descontaba en el primero (UNIQUE pasa a tarjeta+componente+origen, migración `_migrar_unico_origen` conserva los datos).
+- **Skudo AntiJammer · Etiquetas DYMO:** sección nueva debajo de Excel para la etiqueta del gabinete (30334, 57×32 mm): QR con el identificador, «SKUDO ANTIJAMMER» + RX/TX si está asignada en Materiales, lote y fecha. Vista previa e impresión por DYMO compartida, DYMO Connect o navegador (`/api/antijammer/etiquetas/*`).
+- **Skudo AntiJammer · Emparejar (Operación):** cada equipo es una placa RX + una TX. Escaneando o eligiendo dos placas se nombran RX y TX y quedan como pareja numerada (`antijammer_parejas`, `/api/antijammer/parejas`); el RX/TX se guarda también en Materiales para el consumo y la etiqueta. Filtro por mes de recepción, placas sin pareja, deshacer (conserva RX/TX) y registro en Movimientos.
+
 ## v1.4.102 — 2026-11-25
 
 - **Etiqueta DYMO R3:** la línea punteada horizontal que separa la mitad del QR de la mitad del cable ahora se imprime (navegador, DYMO Connect y Raspberry).

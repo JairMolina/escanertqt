@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS inv_tqtr_consumos (
     nota TEXT NOT NULL DEFAULT '',
     creado_en TEXT NOT NULL DEFAULT (datetime('now')),
     actualizado_en TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (tarjeta_id, componente_id)
+    UNIQUE (tarjeta_id, componente_id, origen)
 );
 CREATE TABLE IF NOT EXISTS inv_tqtr_tarjetas_borradas (
     tarjeta_id INTEGER PRIMARY KEY,
@@ -184,6 +184,7 @@ def asegurar(db_path: Optional[Path] = None) -> None:
             _migrar_1339(c)
             _migrar_1340(c)
             _migrar_1464(c)
+            _migrar_unico_origen(c)
             _asegurar_trigger(c)
         _listas.add(clave)
 
@@ -687,6 +688,10 @@ def eliminar_componente(comp_id: int, db_path: Optional[Path] = None) -> None:
         n = c.execute("SELECT COUNT(*) FROM inv_tqtr_movimientos WHERE modelo=?", (comp["descripcion"],)).fetchone()[0]
         if n:
             raise ConflictoError(f"«{comp['descripcion']}» tiene {n} movimiento{'s' if n != 1 else ''} en el registro. Elimínalos antes de dar de baja el componente.")
+        # v1.4.103: con consumos de tarjetas el borrado dejaba componente_id NULL y ese consumo dejaba de restar en existencias
+        n = c.execute("SELECT COUNT(*) FROM inv_tqtr_consumos WHERE componente_id=?", (comp_id,)).fetchone()[0]
+        if n:
+            raise ConflictoError(f"«{comp['descripcion']}» ya se consumió en {n} tarjeta{'s' if n != 1 else ''}; no se puede dar de baja sin perder ese consumo.")
         c.execute("DELETE FROM inv_tqtr_componentes WHERE id=?", (comp_id,))
 
 
@@ -1115,7 +1120,6 @@ def _sincronizar(c) -> Dict[str, int]:
             continue
         cond = _condiciones(t)
         gab = t["gabinete"] if cond["gabinete"] else None
-        por_comp = {f["componente_id"]: f for f in lista}
         for origen in ORIGENES:
             propias = [f for f in lista if f["origen"] == origen]
             if (tid, origen) in base:   # ya cumplía este evento antes de v1.4.6: no se descuenta (nunca se disuelve lo ya descontado)
@@ -1135,11 +1139,20 @@ def _sincronizar(c) -> Dict[str, int]:
             else:
                 disolver(propias)   # se quitó el evento (desprogramar, quitar R3 o gabinete): vuelve lo devolvible
                 continue
-            ids_deseados = {e["componente_id"] for e in deseados}
+            # v1.4.103: el mismo material en dos filas de Costos del mismo evento se suma en una sola fila (UNIQUE tarjeta+componente);
+            # antes el segundo INSERT chocaba y la conciliación entera se caía en cada lectura.
+            agrupados: Dict[Any, Dict[str, Any]] = {}
+            for e in deseados:
+                prev = agrupados.get(e["componente_id"])
+                agrupados[e["componente_id"]] = dict(prev, cantidad=prev["cantidad"] + e["cantidad"]) if prev else e
+            deseados = list(agrupados.values())
+            ids_deseados = set(agrupados)
+            por_comp = {f["componente_id"]: f for f in propias}   # una fila por material y evento
             for e in deseados:
                 f = por_comp.get(e["componente_id"])
                 if f is None:
                     crear(t, e)
+                    por_comp[e["componente_id"]] = {"componente_id": e["componente_id"], "estado": "activo"}
                 elif f["estado"] != "activo":
                     poner(f, "activo", ""); cambios["reactivados"] += 1
             for f in propias:  # cambio de gabinete: vuelve la caja anterior
@@ -1470,6 +1483,22 @@ def _migrar_1464(c) -> None:
         c.execute("UPDATE inv_tqtr_costos SET incluido=0, cantidad_armado=2, cantidad_consumo=NULL WHERE componente_id=?", (sen["id"],))
         c.execute("UPDATE inv_tqtr_componentes SET notas=? WHERE descripcion=? AND COALESCE(notas,'')=''", ("Incluye 2 sensores magnéticos CS1-U.", ACTUADOR))
     c.execute("INSERT OR REPLACE INTO inv_tqtr_meta (clave, valor) VALUES ('migr_1464_relevadores_sensores', datetime('now','localtime'))")
+
+
+def _migrar_unico_origen(c) -> None:
+    """v1.4.103: UNIQUE (tarjeta, componente) -> (tarjeta, componente, origen). Un mismo material en Costos de dos eventos (p. ej. R1/R2 y R3)
+    solo se descontaba en el primero. Reconstruye la tabla conservando los datos (SQLite no permite quitar un UNIQUE)."""
+    r = c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='inv_tqtr_consumos'").fetchone()
+    if not r or "componente_id, origen)" in (r[0] or ""):
+        return
+    cols = "id, tarjeta_id, tarjeta_num, lote_id, componente_id, costo_id, descripcion, origen, variante, devolvible, cantidad_estandar, cantidad_real, estado, nota, creado_en, actualizado_en"
+    c.execute("ALTER TABLE inv_tqtr_consumos RENAME TO inv_tqtr_consumos_old")
+    c.execute("DROP INDEX IF EXISTS ix_inv_tqtr_cons_tarjeta")
+    ddl = _DDL.split("CREATE TABLE IF NOT EXISTS inv_tqtr_consumos (", 1)[1].split(");", 1)[0]
+    c.execute("CREATE TABLE inv_tqtr_consumos (" + ddl + ")")
+    c.execute(f"INSERT INTO inv_tqtr_consumos ({cols}) SELECT {cols} FROM inv_tqtr_consumos_old")
+    c.execute("DROP TABLE inv_tqtr_consumos_old")
+    c.execute("CREATE INDEX IF NOT EXISTS ix_inv_tqtr_cons_tarjeta ON inv_tqtr_consumos(tarjeta_id)")
 
 
 def conversiones(db_path: Optional[Path] = None) -> Dict[str, Any]:

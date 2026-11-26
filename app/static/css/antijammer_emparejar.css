@@ -1,0 +1,43 @@
+/* Emparejar RX/TX (Skudo AntiJammer, v1.4.103) */
+.ep-caja { display: flex; flex-direction: column; gap: 14px; max-width: 980px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-sizing: border-box; }
+.ep-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.ep-form .input { flex: 1 1 200px; min-width: 0; min-height: 46px; background: var(--campo); border-color: var(--line-2); }
+.ep-form .btn, .ep-acc .btn { min-height: 46px; }
+.ep-ranuras { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: stretch; }
+.ep-union { display: grid; place-items: center; color: var(--muted); }
+.ep-ranura { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 76px; padding: 12px 40px 12px 14px;
+  background: var(--campo); border: 1px dashed var(--line-2); border-radius: 10px; color: inherit; font: inherit; text-align: left; cursor: pointer; min-width: 0; }
+.ep-ranura b { font-size: 1.05rem; overflow-wrap: anywhere; }
+.ep-ranura.activa { border-style: solid; border-color: var(--acc, var(--info)); box-shadow: 0 0 0 1px var(--acc, var(--info)); }
+.ep-ranura:focus-visible { outline: 2px solid var(--acc, var(--info)); outline-offset: 2px; }
+.ep-rx { --acc: var(--info); }
+.ep-tx { --acc: var(--ok); }
+.ep-k { font-size: .75rem; font-weight: 700; letter-spacing: .08em; color: var(--acc); }
+.ep-vacia { color: var(--muted); font-size: .9rem; }
+.ep-quitar { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--muted); cursor: pointer; }
+.ep-quitar:hover, .ep-quitar:focus-visible { background: var(--surface); color: inherit; }
+.ep-acc { display: flex; gap: 8px; flex-wrap: wrap; }
+.ep-msg { margin: 0; min-height: 1.2em; color: var(--warn); font-size: .9rem; }
+.ep-sec { margin-top: 18px; max-width: 980px; }
+.ep-sec h2 { font-size: 1rem; margin: 0 0 8px; }
+.ep-chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.ep-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 999px; color: inherit; font: inherit; cursor: pointer; }
+.ep-chip:hover:not(:disabled), .ep-chip:focus-visible { background: var(--campo); }
+.ep-chip:disabled { cursor: default; opacity: .7; }
+.ep-tipo { font-size: .7rem; font-weight: 700; letter-spacing: .06em; padding: 2px 6px; border-radius: 6px; color: var(--acc); border: 1px solid currentColor; }
+.ep-lista { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.ep-par { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.ep-par:last-child { border-bottom: 0; }
+.ep-num { color: var(--muted); }
+.ep-lado { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ep-lado b { overflow-wrap: anywhere; }
+.ep-fecha { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+.ep-nada { color: var(--muted); margin: 0; }
+.ep-mes { width: auto; max-width: 240px; min-height: 40px; background: var(--campo); border-color: var(--line-2); }
+@media (max-width: 640px) {
+  .ep-ranuras { grid-template-columns: minmax(0, 1fr); }
+  .ep-union { transform: rotate(90deg); }
+  .ep-par { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .ep-par .ep-lado:nth-of-type(3) { grid-column: 2; }
+  .ep-fecha { display: none; }
+}
