@@ -1,6 +1,7 @@
 /* antijammer_consultar.js - Pestaña Consultar: escanear/teclear una placa → ficha (hardware, firmware, estado, lote, fechas,
  * operador) e historial de eventos. Solo lectura: sirve también al rol consultor.
- * API: GET /api/antijammer/pcb/por-codigo?codigo= → {pcb, eventos} | 404 */
+ * v1.4.106: el QR de la etiqueta del gabinete abre aquí la ficha; muestra la pareja (SKUDO n, RX/TX) y su compañera (botón para verla).
+ * API: GET /api/antijammer/pcb/por-codigo?codigo= → {pcb, eventos, pareja:{numero,tipo,socio}|null} | 404 */
 (function () {
     'use strict';
     const T = window.TQT, P = window.AJ;
@@ -35,13 +36,13 @@
         }
         if (!r.ok) { P.sonar.mal(); ui.res.replaceChildren(P.error((r.error || 'No se pudo consultar la placa.') + ' Revisa la conexión.', () => buscar(ultimo))); return { ok: false, texto: r.error || 'No se pudo consultar la placa' }; }
         P.sonar.ok();
-        ficha(r.data.pcb, r.data.eventos || []);
+        ficha(r.data.pcb, r.data.eventos || [], r.data.pareja || null);
         return { ok: true, texto: `Ficha de ${r.data.pcb.nombre} abierta` };
     }
 
     function dato(t, v, mono) { return h('div', null, h('dt', null, t), h('dd', { class: mono ? 'mono' : null }, v == null || v === '' ? '—' : v)); }
 
-    function ficha(p, eventos) {
+    function ficha(p, eventos, par) {
         const evs = eventos.slice().sort((a, b) => String(b.creado_en || '').localeCompare(String(a.creado_en || '')));
         ui.res.replaceChildren(
             h('article', { class: 'c-ficha', dataset: { estado: p.estado || '' }, 'aria-labelledby': 'cNom' },
@@ -49,6 +50,11 @@
                     h('h2', { class: 'c-nom mono', id: 'cNom' }, p.nombre),
                     P.estadoBadge(p.estado)),
                 h('dl', { class: 'c-datos' },
+                    dato('Pareja', par ? `SKUDO ${par.numero} · ${par.tipo}` : 'Sin pareja', true),
+                    dato('Compañera', par ? (par.socio ? h('button', { class: 'btn btn-sm btn-ghost mono', type: 'button',
+                        onclick: () => { ui.cod.value = par.socio; buscar(par.socio); },
+                        'aria-label': `Ver la ficha de ${par.socio}, ${par.tipo === 'RX' ? 'TX' : 'RX'} de la pareja ${par.numero}` },
+                        icon('link'), `${par.socio} (${par.tipo === 'RX' ? 'TX' : 'RX'})`) : `Falta la ${par.tipo === 'RX' ? 'TX' : 'RX'}`) : '—'),
                     dato('Hardware', P.hw(p.version), true),
                     dato('Firmware', p.firmware || 'Sin firmware', true),
                     dato('Serie', p.serie, true),

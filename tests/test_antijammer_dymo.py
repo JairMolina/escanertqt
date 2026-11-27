@@ -43,27 +43,38 @@ class TestAntijammerDymo(unittest.TestCase):
         self.assertTrue(any("no tiene número de pareja" in e["detail"] for e in d["errores"]))
         a = d["items"][0]["svg"]
         self.assertIn('width="57mm" height="32mm"', a)
-        self.assertIn(">PAREJA 77<", a)
+        self.assertIn(">SKUDO 77<", a)
         self.assertIn(">RX<", a)
-        for fuera in ("SJ-V1-8053", "SKUDO", "Lote", "<rect x="):   # sin nombre, marca, lote ni QR
+        self.assertIn("<rect x=", a)   # v1.4.106: lleva QR
+        for fuera in ("PAREJA", ">SJ-V1-8053<", "Lote"):   # el nombre va solo dentro del QR, no como texto
             self.assertNotIn(fuera, a)
 
     def test_diseno_dentro_de_zona_segura(self):
-        f, lineas = etq.diseno({"nombre": "SJ-V1-0001", "numero": 9999, "tipo": "TX"})
+        f, qr, ppm, lineas = etq.diseno({"nombre": "SJ-V1-0001", "numero": 9999, "tipo": "TX"})
         m = 1.5
-        self.assertEqual([t for t, *_ in lineas], ["PAREJA 9999", "TX"])
+        self.assertEqual([t for t, *_ in lineas], ["SKUDO 9999", "TX"])
+        # QR dentro de la zona segura, a la izquierda y legible (>= 4 puntos por módulo); el texto a su derecha
+        self.assertGreaterEqual(ppm, 4)
+        self.assertGreaterEqual(qr.x, m - 1e-6)
+        self.assertGreaterEqual(qr.y, m - 1e-6)
+        self.assertLessEqual(qr.y + qr.h, f.alto_mm - m + 1e-6)
         for _t, c, pt, _b in lineas:
+            self.assertGreaterEqual(c.x, qr.x + qr.w)
             self.assertGreaterEqual(c.y, m - 1e-6)
             self.assertLessEqual(c.y + c.h, f.alto_mm - m + 1e-6)
-            self.assertLessEqual(len(_t) * 0.55 * pt * 25.4 / 72, f.ancho_mm - 2 * m + 1e-6)
+            self.assertLessEqual(c.x + c.w, f.ancho_mm - m + 1e-6)
+            self.assertLessEqual(len(_t) * 0.55 * pt * 25.4 / 72, c.w + 1e-6)
         self.assertGreater(lineas[1][2], lineas[0][2])   # RX/TX más grande que el número
 
     def test_xml_dymo_connect(self):
         r = self.c.get("/api/antijammer/etiquetas/SJ-V1-8052/xml")
         self.assertEqual(r.status_code, 200, r.text)
         x = r.text
-        self.assertNotIn("BarcodeObject", x)
-        self.assertIn("<Text>PAREJA 77</Text>", x)
+        self.assertIn("<BarcodeFormat>QRCode</BarcodeFormat>", x)
+        self.assertIn("<DataString>SJ-V1-8052</DataString>", x)   # el QR abre la ficha de esa placa en Consultar
+        self.assertIn("<Text>SKUDO 77</Text>", x)
+        q = self.c.get("/api/antijammer/pcb/por-codigo", params={"codigo": "SJ-V1-8052"}).json()   # lo que hace Consultar al leerlo
+        self.assertEqual(q["pareja"], {"numero": 77, "tipo": "TX", "socio": "SJ-V1-8053"})
         self.assertIn("<Text>TX</Text>", x)
         self.assertEqual(len(re.findall("<TextObject>", x)), 2)
         self.assertEqual(self.c.get("/api/antijammer/etiquetas/SJ-V1-9999/xml").status_code, 404)
@@ -89,7 +100,7 @@ class TestAntijammerDymo(unittest.TestCase):
         cab = {"Authorization": "Bearer " + ag["token"]}
         s = self.c.get(f"/api/dymo/remoto/agente/trabajos/{j['id']}/svg", headers=cab)
         self.assertEqual(s.status_code, 200, s.text)
-        self.assertIn(">PAREJA 77<", s.text)
+        self.assertIn(">SKUDO 77<", s.text)
         self.assertEqual(self.c.post("/api/antijammer/etiquetas/imprimir", json={"codigos": []}).status_code, 422)
 
 

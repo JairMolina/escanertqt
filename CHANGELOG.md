@@ -1,5 +1,10 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.106 — 2026-11-27
+
+- **Skudo AntiJammer · Etiqueta DYMO del gabinete:** dice «SKUDO n» en vez de «PAREJA n» y vuelve a llevar QR a la izquierda con el nombre de la placa (p. ej. `SJ-V1-0015`). RX/TX sigue grande a la derecha. Aplica a vista previa, navegador, DYMO Connect y DYMO compartida.
+- **Skudo AntiJammer · Consultar:** al escanear ese QR la ficha muestra la pareja («SKUDO n · RX/TX») y la compañera, con botón para abrir su ficha, además del hardware, firmware, lote, fechas e historial.
+
 ## v1.4.105 — 2026-11-27
 
 - **Skudo AntiJammer · Cambiar número de pareja:** en Emparejar cada pareja tiene el botón «Número» para escribir a mano su número real (el número de emparejado era solo el orden). Si otra pareja ya tiene ese número y le falta justo esta placa (una solo RX y otra solo TX), se unen; si chocan, no se cambia nada (409). La etiqueta DYMO toma el número nuevo y queda registro «renumerada» en Movimientos (`PUT /api/antijammer/parejas/{id} {numero}`).
