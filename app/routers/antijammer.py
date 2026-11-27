@@ -32,6 +32,8 @@ class AltaManual(BaseModel):
 
 class FirmwareAj(BaseModel):
     firmware: Optional[str] = Field(None, max_length=60)
+    tipo: Optional[Literal["RX", "TX"]] = None          # v1.4.104: RX/TX y número de pareja dados al programar
+    pareja: Optional[int] = Field(None, ge=1, le=9999)
 
 
 class EdicionAj(BaseModel):
@@ -105,14 +107,15 @@ async def etiquetas_estado():
 @router.get("/etiquetas/vista", summary="Vista previa SVG (1 unidad = 1 mm) de las etiquetas de varias placas; las no registradas van en `faltan`")
 async def etiquetas_vista(codigos: str = Query(..., min_length=1, max_length=4000, description="nombres separados por comas (máx. 100)")):
     def _go():
-        items, faltan = [], []
-        for c in _lista_codigos(codigos):
+        items, faltan, errores = [], [], []
+        for c in etq.expandir(_lista_codigos(codigos)):
             try:
                 d = etq.datos_de(c)
                 items.append({**d, "svg": etq.svg(d, FORMATO_ETQ)})
-            except svc.AntijammerError:
+            except svc.AntijammerError as e:
                 faltan.append(c)
-        return {"items": items, "faltan": faltan}
+                errores.append({"codigo": c, "detail": str(e)})
+        return {"items": items, "faltan": faltan, "errores": errores}
     return await run_in_threadpool(_go)
 
 
@@ -128,10 +131,10 @@ async def etiquetas_imprimir(body: EtiquetasAj, request: Request):
         if not dymo_remoto.estado()["disponible"]:
             raise HTTPException(503, "La DYMO compartida no está en línea o la impresora no está lista; no se envió ninguna etiqueta.")
         por, enc, errores = _email(request) or "", [], []
-        for c in body.codigos:
+        for c in etq.expandir(body.codigos):
             try:
                 d = etq.datos_de(c)
-                t = dymo_remoto.encolar("antijammer", {"nombre": d["nombre"]}, body.copias, f"AntiJammer {d['nombre']}", por)
+                t = dymo_remoto.encolar("antijammer", {"nombre": d["nombre"]}, body.copias, f"AntiJammer pareja {d['numero']} {d['tipo']} {d['nombre']}", por)
                 enc.append({"nombre": d["nombre"], "trabajo": t["id"]})
             except svc.AntijammerError as e:
                 errores.append({"codigo": c, "detail": str(e)})
@@ -143,7 +146,10 @@ async def etiquetas_imprimir(body: EtiquetasAj, request: Request):
 
 @router.get("/pcb/por-codigo", summary="Placa por QR, nombre o serie, con su historial")
 async def por_codigo(codigo: str = Query(..., min_length=1, max_length=200)):
-    return await _ejecutar(svc.por_codigo, codigo)
+    d = await _ejecutar(svc.por_codigo, codigo)
+    if isinstance(d, dict) and d.get("pcb"):   # v1.4.104: número de pareja y RX/TX de la placa
+        d["pareja"] = await run_in_threadpool(parejas_svc.de_placa, d["pcb"]["id"])
+    return d
 
 
 @router.get("/pcb", summary="Placas Skudo AntiJammer registradas (más recientes primero)")
@@ -182,7 +188,19 @@ async def exportar(q: Optional[str] = Query(None, max_length=100), estado: Optio
 
 @router.put("/pcb/{pcb_id}/firmware", summary="Asignar o quitar firmware")
 async def firmware(pcb_id: int, body: FirmwareAj, request: Request):
-    return {"pcb": await _ejecutar(svc.poner_firmware, pcb_id, body.firmware, _email(request))}
+    """Con `pareja` (y `tipo`) la placa entra a esa pareja antes de guardar el firmware: si el número choca, no se guarda nada."""
+    if body.pareja is not None and not body.tipo:
+        raise HTTPException(status_code=422, detail="Indica si la placa es RX o TX para darle el número de pareja.")
+    par = None
+    try:
+        if body.pareja is not None:
+            par = await _ejecutar(parejas_svc.asignar, pcb_id, body.tipo, body.pareja, _email(request))
+        pcb = await _ejecutar(svc.poner_firmware, pcb_id, body.firmware, _email(request))
+        if body.tipo and body.pareja is None:
+            await run_in_threadpool(materiales.asignar_tarjeta, "antijammer", [pcb_id], body.tipo)
+    except materiales.CosteoError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"pcb": pcb, "pareja": par}
 
 
 @router.patch("/pcb/{pcb_id}", summary="Editar versión, serie, lote, estado o nota")
@@ -204,6 +222,7 @@ async def resumen():
 class ParejaAj(BaseModel):
     rx: str = Field(..., min_length=1, max_length=200)   # id numérico o QR/nombre/serie
     tx: str = Field(..., min_length=1, max_length=200)
+    numero: Optional[int] = Field(None, ge=1, le=9999)   # vacío = el siguiente libre
 
 
 def _ref(v: str):
@@ -219,7 +238,7 @@ async def parejas(mes: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$")):
 @router.post("/parejas", status_code=status.HTTP_201_CREATED, summary="Emparejar una RX con una TX (guarda RX/TX en Materiales)")
 async def emparejar(body: ParejaAj, request: Request):
     try:
-        return await _ejecutar(parejas_svc.emparejar, _ref(body.rx), _ref(body.tx), _email(request))
+        return await _ejecutar(parejas_svc.emparejar, _ref(body.rx), _ref(body.tx), _email(request), body.numero)
     except materiales.CosteoError as e:
         raise HTTPException(status_code=422, detail=str(e))
 

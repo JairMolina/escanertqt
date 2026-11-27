@@ -1,6 +1,7 @@
 /* antijammer_etiquetas.js - Etiquetas DYMO del gabinete (consola Skudo AntiJammer): elegir una o varias placas (código, buscador,
  * lote o escáner), vista previa a escala 57x32 mm e impresión por DYMO compartida (cola de la Raspberry), DYMO Connect local
- * o diálogo del navegador. Cada QR es una tarjeta: SJ-V1-0052.
+ * o diálogo del navegador. v1.4.104: la etiqueta solo lleva el número de pareja y RX/TX, y se imprime por pareja
+ * (al elegir una placa entra también su compañera).
  * API: GET /api/antijammer/etiquetas/vista?codigos= · /etiquetas/{nombre}/xml · /etiquetas/estado · POST /etiquetas/imprimir
  *      GET /api/antijammer/pcb/por-codigo · /pcb?q=&lote=&limit= (selección) */
 (function () {
@@ -109,8 +110,16 @@
         const r = await api('/api/antijammer/etiquetas/vista?codigos=' + enc(faltan.join(',')));
         if (k !== seq) return;
         if (!r.ok) { msg('bad', r.error || 'No se pudo generar la vista previa.'); return; }
-        (r.data.items || []).forEach((it) => svgs.set(it.nombre, it.svg));
+        (r.data.items || []).forEach((it) => {
+            svgs.set(it.nombre, it.svg);
+            if (!sel.includes(it.nombre)) {   // la compañera de pareja entra junto a su placa
+                const j = it.socio ? sel.indexOf(it.socio) : -1;
+                if (j >= 0) sel.splice(it.tipo === 'RX' ? j : j + 1, 0, it.nombre); else sel.push(it.nombre);
+            }
+        });
         (r.data.faltan || []).forEach((c) => { const i = sel.indexOf(c); if (i >= 0) sel.splice(i, 1); });
+        const er = r.data.errores || [];
+        if (er.length) msg('warn', er.slice(0, 3).map((e) => e.detail).join(' ') + (er.length > 3 ? ` Y ${er.length - 3} más.` : ''));
         pintaSel();
     }
 
@@ -208,7 +217,7 @@
             ui.bImp = h('button', { class: 'btn btn-primary', type: 'button', onclick: imprime, disabled: true }, icon('printer'), 'Imprimir etiquetas');
             ui.bVaciar = h('button', { class: 'btn', type: 'button', disabled: true, onclick: () => { sel.length = 0; pintaSel(); msg('', ''); } }, 'Vaciar lista');
             $('etCuerpo').replaceChildren(h('div', { class: 'et-caja' },
-                h('p', { class: 'x-intro' }, 'Etiqueta DYMO 30334 (57 x 32 mm) para el gabinete de cada tarjeta: QR con su identificador, «SKUDO ANTIJAMMER», lote y fecha de recepción.'),
+                h('p', { class: 'x-intro' }, 'Etiqueta DYMO 30334 (57 x 32 mm) para el gabinete: solo el número de pareja y si es RX o TX. Se imprime por pareja: al elegir una placa entra también su compañera.'),
                 h('div', { class: 'et-elige' },
                     h('div', { class: 'field et-f-q' }, h('label', { for: 'etQ' }, 'Agregar placa'), h('div', { class: 'et-q' }, ui.q, ui.sug)),
                     h('div', { class: 'field' }, h('label', { for: 'etLote' }, 'O un lote completo'), h('div', { class: 'et-lote' }, ui.lote, ui.bLote))),
@@ -224,5 +233,7 @@
         entrar() { cargaLotes(); estado(); },
         /** Lectura del celular vinculado (botón de escaneo): agrega la placa a la lista. */
         escaneo(texto) { return agregaPorCodigo(texto); },
+        /** Desde Emparejar: imprimir una pareja (el nombre de una de sus placas). */
+        recibirDato(nombre) { if (nombre) { sel.length = 0; agrega([nombre]); } },
     });
 })();

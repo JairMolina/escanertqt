@@ -167,6 +167,9 @@
                         <button class="btn" type="submit" data-escribe><i class="svg-slot" data-i="plus"></i>Agregar</button>
                     </form>
                     <div class="ep-ranuras" id="epRanuras"></div>
+                    <div class="field ep-f-num"><label for="epNum">Número de pareja</label>
+                        <input class="input mono" id="epNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-describedby="epNumAy" data-escribe>
+                        <p class="ayuda" id="epNumAy">El que les diste al programarlas. Vacío = el siguiente libre.</p></div>
                     <p class="ep-msg" id="epMsg" role="status" aria-live="polite"></p>
                     <div class="ep-acc">
                         <button class="btn btn-primary" type="button" id="epOk" disabled data-escribe><i class="svg-slot" data-i="link"></i>Emparejar</button>

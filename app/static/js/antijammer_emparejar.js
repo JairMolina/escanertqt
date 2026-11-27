@@ -1,7 +1,9 @@
 /* antijammer_emparejar.js - Emparejar (consola Skudo AntiJammer, v1.4.103): cada equipo es una placa RX + una TX (sin R1/R2/R3).
  * Escanea o elige dos placas; la primera va a RX y la segunda a TX (o la ranura activa). Las placas que ya tienen RX/TX en
  * Materiales van solas a su ranura. Deshacer conserva el RX/TX de cada placa.
- * API: GET /api/antijammer/parejas?mes=AAAA-MM · POST /api/antijammer/parejas {rx, tx} · DELETE /api/antijammer/parejas/{id} */
+ * v1.4.104: cada pareja tiene un NÚMERO (el que se le da al programar; aquí se puede escribir a mano o usar el siguiente libre).
+ * Una pareja incompleta (solo RX o solo TX, de Programar) se completa eligiendo su placa y la que falta.
+ * API: GET /api/antijammer/parejas?mes=AAAA-MM · POST /api/antijammer/parejas {rx, tx, numero} · DELETE /api/antijammer/parejas/{id} */
 (function () {
     'use strict';
     const T = window.TQT, P = window.AJ;
@@ -45,35 +47,49 @@
         if (!r.ok) { msg.textContent = (r.error || 'No se encontró la placa') + '.'; return { ok: false, texto: msg.textContent }; }
         const pcb = r.data.pcb;
         const suelta = ((datos && datos.sin_pareja) || []).find((x) => x.id === pcb.id);
-        const par = !suelta && datos && datos.parejas.find((x) => x.rx.id === pcb.id || x.tx.id === pcb.id);
-        if (par) { msg.textContent = `${pcb.nombre} ya está en la pareja #${par.id}. Deshazla primero.`; return { ok: false, texto: msg.textContent }; }
+        const par = !suelta && datos && datos.parejas.find((x) => (x.rx && x.rx.id === pcb.id) || (x.tx && x.tx.id === pcb.id));
+        if (par && par.completa) { msg.textContent = `${pcb.nombre} ya está en la pareja ${par.numero}. Deshazla primero.`; return { ok: false, texto: msg.textContent }; }
         msg.textContent = '';
+        if (par) { completar(par); return { ok: true, texto: `Pareja ${par.numero}: falta la ${par.rx ? 'TX' : 'RX'}` }; }
         poner(suelta || { id: pcb.id, nombre: pcb.nombre, tipo: '' });
         return { ok: true, texto: `${pcb.nombre} lista` };
     }
 
+    /** Pareja incompleta de Programar: su placa va a su ranura con su número; falta elegir la otra. */
+    function completar(par) {
+        const k = par.rx ? 'rx' : 'tx', otra = k === 'rx' ? 'tx' : 'rx';
+        sel[k] = Object.assign({}, par[k], { tipo: k.toUpperCase() });
+        if (sel[otra] && sel[otra].id === sel[k].id) sel[otra] = null;
+        $('epNum').value = par.numero; activa = otra; fijada = false;
+        pintar(); $('epCod').focus();
+    }
+
     async function emparejar() {
         if (!sel.rx || !sel.tx || P.soloLectura()) return;
+        const n = $('epNum').value.trim();
+        if (n && !/^\d{1,4}$/.test(n)) { $('epNum').setAttribute('aria-invalid', 'true'); $('epMsg').textContent = 'El número de pareja va de 1 a 9999.'; $('epNum').focus(); return; }
         const b = $('epOk'); b.disabled = true;
-        const r = await api('/api/antijammer/parejas', { method: 'POST', body: { rx: '#' + sel.rx.id, tx: '#' + sel.tx.id } });
+        const body = { rx: '#' + sel.rx.id, tx: '#' + sel.tx.id };
+        if (n) body.numero = +n;
+        const r = await api('/api/antijammer/parejas', { method: 'POST', body });
         b.disabled = false;
         if (!r.ok) { $('epMsg').textContent = (r.error || 'No se pudo emparejar') + '.'; return; }
-        T.toast(`Pareja #${r.data.id}: ${sel.rx.nombre} (RX) + ${sel.tx.nombre} (TX)`, { kind: 'ok' });
-        sel.rx = sel.tx = null; activa = 'rx';
+        T.toast(`Pareja ${r.data.numero}: ${sel.rx.nombre} (RX) + ${sel.tx.nombre} (TX)`, { kind: 'ok' });
+        sel.rx = sel.tx = null; activa = 'rx'; $('epNum').value = '';
         P.cambio(); cargar();
     }
 
     function deshacer(par) {
         if (P.soloLectura()) return;
         T.sheet({
-            title: `Deshacer la pareja #${par.id}`,
-            body: [h('p', null, `${par.rx.nombre} (RX) y ${par.tx.nombre} (TX) quedan sin pareja. Cada placa conserva si es RX o TX.`)],
+            title: `Deshacer la pareja ${par.numero}`,
+            body: [h('p', null, `${[par.rx && par.rx.nombre + ' (RX)', par.tx && par.tx.nombre + ' (TX)'].filter(Boolean).join(' y ')} quedan sin pareja ni número. Cada placa conserva si es RX o TX.`)],
             actions: [
                 { label: 'Cancelar', kind: 'ghost', onClick: () => true },
-                { label: `Deshacer pareja #${par.id}`, kind: 'danger', icon: 'unlink', onClick: async () => {
+                { label: `Deshacer pareja ${par.numero}`, kind: 'danger', icon: 'unlink', onClick: async () => {
                     const r = await api('/api/antijammer/parejas/' + par.id, { method: 'DELETE' });
                     if (!r.ok) { T.toast((r.error || 'No se pudo deshacer la pareja') + '. Inténtalo otra vez.', { kind: 'bad' }); return false; }
-                    T.toast(`Pareja #${par.id} deshecha`, { kind: 'ok' });
+                    T.toast(`Pareja ${par.numero} deshecha`, { kind: 'ok' });
                     P.cambio(); cargar();
                     return true;
                 } },
@@ -87,6 +103,8 @@
         const elegidas = new Set([sel.rx && sel.rx.id, sel.tx && sel.tx.id]);
         $('epRanuras').replaceChildren(ranura('rx'), h('span', { class: 'ep-union', 'aria-hidden': 'true' }, icon('link')), ranura('tx'));
         $('epOk').disabled = ro || !(sel.rx && sel.tx);
+        $('epNum').placeholder = String(datos.siguiente || '');
+        $('epNum').disabled = ro;
         const sueltas = datos.sin_pareja.filter((p) => !elegidas.has(p.id));
         const nRx = datos.sin_pareja.filter((p) => p.tipo === 'RX').length, nTx = datos.sin_pareja.filter((p) => p.tipo === 'TX').length;
         $('epSueltasT').textContent = `Sin pareja · ${datos.sin_pareja.length}` + (nRx || nTx ? ` (${nRx} RX, ${nTx} TX)` : '');
@@ -96,15 +114,22 @@
                 'aria-label': `Elegir ${p.nombre}${p.tipo ? ' (' + p.tipo + ')' : ''}`,
             }, h('span', { class: 'mono' }, p.nombre), p.tipo ? h('span', { class: 'ep-tipo ep-' + p.tipo.toLowerCase() }, p.tipo) : null))))
             : h('p', { class: 'ep-nada' }, datos.sin_pareja.length ? 'Las placas sin pareja ya están en las ranuras.' : 'Todas las placas de este periodo tienen pareja.'));
-        $('epParT').textContent = `Parejas · ${datos.parejas.length}`;
+        const nInc = datos.parejas.filter((p) => !p.completa).length;
+        $('epParT').textContent = `Parejas · ${datos.parejas.length - nInc}` + (nInc ? ` (+${nInc} incompletas)` : '');
+        const lado = (par, k) => h('span', { class: 'ep-lado' }, h('span', { class: 'ep-tipo ep-' + k }, k.toUpperCase()),
+            par[k] ? h('b', { class: 'mono' }, par[k].nombre) : h('span', { class: 'ep-falta' }, 'Falta'));
         $('epPar').replaceChildren(datos.parejas.length
-            ? h('ul', { class: 'ep-lista' }, datos.parejas.map((par) => h('li', { class: 'ep-par' },
-                h('span', { class: 'ep-num mono' }, '#' + par.id),
-                h('span', { class: 'ep-lado' }, h('span', { class: 'ep-tipo ep-rx' }, 'RX'), h('b', { class: 'mono' }, par.rx.nombre)),
-                h('span', { class: 'ep-lado' }, h('span', { class: 'ep-tipo ep-tx' }, 'TX'), h('b', { class: 'mono' }, par.tx.nombre)),
+            ? h('ul', { class: 'ep-lista' }, datos.parejas.map((par) => h('li', { class: 'ep-par' + (par.completa ? '' : ' incompleta') },
+                h('span', { class: 'ep-num mono', title: 'Número de pareja' }, 'P' + par.numero),
+                lado(par, 'rx'), lado(par, 'tx'),
                 h('span', { class: 'ep-fecha' }, P.fecha(par.creada_en, false)),
-                ro ? null : h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => deshacer(par),
-                    'aria-label': `Deshacer la pareja #${par.id}` }, icon('unlink'), 'Deshacer'))))
+                h('span', { class: 'ep-btns' },
+                    par.completa || ro ? null : h('button', { class: 'btn btn-sm', type: 'button', onclick: () => completar(par),
+                        'aria-label': `Completar la pareja ${par.numero}` }, icon('link'), 'Completar'),
+                    h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => P.abrir('etiquetas', (par.rx || par.tx).nombre),
+                        'aria-label': `Imprimir las etiquetas de la pareja ${par.numero}` }, icon('printer'), 'Etiquetas'),
+                    ro ? null : h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => deshacer(par),
+                        'aria-label': `Deshacer la pareja ${par.numero}` }, icon('unlink'), 'Deshacer')))))
             : h('p', { class: 'ep-nada' }, 'Aún no hay parejas en este periodo.'));
     }
 
@@ -124,8 +149,9 @@
         s.value = mes || '';
         // lo elegido que ya no está suelto (otra sesión lo emparejó) se suelta de la ranura
         const libres = new Set(datos.sin_pareja.map((p) => p.id));
-        ['rx', 'tx'].forEach((x) => { if (sel[x] && !libres.has(sel[x].id) && datos.parejas.some((p) => p.rx.id === sel[x].id || p.tx.id === sel[x].id)) sel[x] = null; });
-        $('epCuenta').textContent = `${datos.parejas.length} ${datos.parejas.length === 1 ? 'pareja' : 'parejas'} · ${datos.sin_pareja.length} sin pareja`;
+        ['rx', 'tx'].forEach((x) => { if (sel[x] && !libres.has(sel[x].id) && datos.parejas.some((p) => p.completa && (p.rx.id === sel[x].id || p.tx.id === sel[x].id))) sel[x] = null; });
+        const nOk = datos.parejas.filter((p) => p.completa).length;
+        $('epCuenta').textContent = `${nOk} ${nOk === 1 ? 'pareja' : 'parejas'} · ${datos.sin_pareja.length} sin pareja`;
         pintar();
     }
 
@@ -139,7 +165,8 @@
                 await leer(v); inp.focus();
             });
             $('epOk').addEventListener('click', emparejar);
-            $('epLimpiar').addEventListener('click', () => { sel.rx = sel.tx = null; activa = 'rx'; $('epMsg').textContent = ''; pintar(); });
+            $('epNum').addEventListener('input', (e) => e.target.removeAttribute('aria-invalid'));
+            $('epLimpiar').addEventListener('click', () => { sel.rx = sel.tx = null; activa = 'rx'; $('epNum').value = ''; $('epMsg').textContent = ''; pintar(); });
             document.addEventListener('antijammer:cambio', () => { if (sec.hidden) viejo = true; });
             cargar();
         },

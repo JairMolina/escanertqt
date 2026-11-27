@@ -1,5 +1,11 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.104 — 2026-11-26
+
+- **Skudo AntiJammer · Número de pareja al programar:** en Programar se elige si la placa es RX o TX y el número de pareja que se le dio al programarla. Cuando la RX y la TX comparten número quedan emparejadas solas; mientras falta la otra, la pareja aparece incompleta. Si el número ya tiene esa RX/TX, no se guarda nada (409). Reprogramar con otro número cambia la placa de pareja.
+- **Skudo AntiJammer · Emparejar:** campo «Número de pareja» manual (vacío = el siguiente libre), parejas incompletas con botón Completar y botón Etiquetas por pareja. Las parejas de 1.4.103 toman su id como número (migración automática de `antijammer_parejas`).
+- **Skudo AntiJammer · Etiqueta DYMO:** solo lleva «PAREJA n» y RX/TX grande (sin QR, nombre, lote ni fecha) y se imprime por pareja: al elegir una placa entra también su compañera. Las placas sin número no se imprimen y se avisa.
+
 ## v1.4.103 — 2026-11-25
 
 - **Inventario TQTR (auditoría de consumo):** si el mismo material aparece en dos filas de Costos del mismo evento, se suma en una sola fila de consumo; antes la conciliación chocaba con UNIQUE y dejaba de descontar.

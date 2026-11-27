@@ -28,7 +28,11 @@
 .ep-lista { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .ep-par { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .ep-par:last-child { border-bottom: 0; }
-.ep-num { color: var(--muted); }
+.ep-num { font-weight: 700; color: var(--ink, inherit); }
+.ep-par.incompleta { background: var(--surface-2, var(--surface)); }
+.ep-falta { color: var(--muted); font-style: italic; }
+.ep-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ep-f-num { margin: 12px 0 0; max-width: 260px; }
 .ep-lado { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ep-lado b { overflow-wrap: anywhere; }
 .ep-fecha { color: var(--muted); font-size: .85rem; white-space: nowrap; }
@@ -39,5 +43,6 @@
   .ep-union { transform: rotate(90deg); }
   .ep-par { grid-template-columns: 44px minmax(0, 1fr) auto; }
   .ep-par .ep-lado:nth-of-type(3) { grid-column: 2; }
+  .ep-btns { grid-column: 1 / -1; justify-content: flex-start; }
   .ep-fecha { display: none; }
 }

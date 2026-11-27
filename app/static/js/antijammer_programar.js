@@ -1,6 +1,7 @@
 /* antijammer_programar.js - Pestaña Programar: escanear/teclear la placa → firmware (recordado por dispositivo) → guardar.
  * Modo lote: cada placa leída se guarda con el firmware escrito sin confirmar. Botón para marcar FALLA (o quitarla).
- * API: GET /api/antijammer/pcb/por-codigo · PUT /api/antijammer/pcb/{id}/firmware · PATCH /api/antijammer/pcb/{id} {estado, nota} */
+ * v1.4.104: RX/TX y número de pareja que se le dio al programarla; la pareja se forma sola cuando la RX y la TX comparten número.
+ * API: GET /api/antijammer/pcb/por-codigo · PUT /api/antijammer/pcb/{id}/firmware {firmware, tipo, pareja} · PATCH /api/antijammer/pcb/{id} {estado, nota} */
 (function () {
     'use strict';
     const T = window.TQT, P = window.AJ;
@@ -30,7 +31,8 @@
             h('dl', { class: 'p-datos' },
                 h('div', null, h('dt', null, 'Hardware'), h('dd', { class: 'mono' }, P.hw(p.version))),
                 h('div', null, h('dt', null, 'Firmware actual'), h('dd', { class: 'mono' }, p.firmware || 'Sin firmware')),
-                h('div', null, h('dt', null, 'Lote'), h('dd', null, p.lote || '—'))),
+                h('div', null, h('dt', null, 'Lote'), h('dd', null, p.lote || '—')),
+                h('div', null, h('dt', null, 'Pareja'), h('dd', { class: 'mono' }, p.pareja ? `${p.pareja.numero} (${p.pareja.tipo})` : 'Sin número'))),
             enFalla || p.estado === 'BAJA' ? h('p', { class: 'p-nota' }, `Esta placa está en ${P.ESTADOS[p.estado].txt.toLowerCase()}. Guardar firmware no cambia ese estado.`) : null].filter(Boolean));
     }
 
@@ -61,7 +63,8 @@
             ui.placa.replaceChildren(P.error((r.error || 'No se pudo buscar la placa.') + ' Revisa la conexión.', () => cargar(codigo)));
             return;
         }
-        st.placa = r.data.pcb; pintaPlaca();
+        st.placa = Object.assign({}, r.data.pcb, { pareja: r.data.pareja || null }); pintaPlaca();
+        if (st.placa.pareja && !ui.num.value) { ui.tipo.value = st.placa.pareja.tipo; ui.num.value = st.placa.pareja.numero; }
         if (ui.lote.checked && ui.fw.value.trim()) { await guardar(); return; }
         P.sonar.ok();
         aviso('', `${st.placa.nombre} lista. Revisa el firmware y guarda.`);
@@ -72,15 +75,32 @@
         const p = st.placa, fw = ui.fw.value.trim();
         if (!p || st.ocupado) return;
         if (!fw) { ui.fw.setAttribute('aria-invalid', 'true'); aviso('bad', 'Escribe el firmware con el que programaste la placa.'); ui.fw.focus(); return; }
+        const tipo = ui.tipo.value, num = ui.num.value.trim();
+        if (num && !tipo) { ui.tipo.setAttribute('aria-invalid', 'true'); aviso('bad', 'Elige si la placa es RX o TX para darle el número de pareja.'); ui.tipo.focus(); return; }
+        if (num && !/^\d{1,4}$/.test(num)) { ui.num.setAttribute('aria-invalid', 'true'); aviso('bad', 'El número de pareja va de 1 a 9999.'); ui.num.focus(); return; }
+        const body = { firmware: fw };
+        if (tipo) body.tipo = tipo;
+        if (num) body.pareja = +num;
         st.ocupado = true; pintaPlaca(); aviso('', 'Guardando…');
-        const r = await api(`/api/antijammer/pcb/${p.id}/firmware`, { method: 'PUT', body: { firmware: fw } });
+        const r = await api(`/api/antijammer/pcb/${p.id}/firmware`, { method: 'PUT', body });
         st.ocupado = false;
         if (!r.ok) { P.sonar.mal(); pintaPlaca(); aviso('bad', (r.error || 'No se guardó el firmware.') + ' Inténtalo otra vez.'); return; }
         escribir(CLAVE_FW, fw);
-        st.placa = (r.data && r.data.pcb) || Object.assign({}, p, { firmware: fw });
-        st.sesion = [{ nombre: st.placa.nombre, firmware: fw }].concat(st.sesion.filter((x) => x.nombre !== st.placa.nombre));
+        const par = r.data && r.data.pareja;
+        st.placa = Object.assign({}, (r.data && r.data.pcb) || Object.assign({}, p, { firmware: fw }),
+            { pareja: par ? { numero: par.numero, tipo: tipo } : p.pareja || null });
+        const meta = fw + (par ? ` · P${par.numero} ${tipo}` : tipo ? ` · ${tipo}` : '');
+        st.sesion = [{ nombre: st.placa.nombre, firmware: meta }].concat(st.sesion.filter((x) => x.nombre !== st.placa.nombre));
+        let extra = '';
+        if (par && par.completa) {   // pareja lista: el siguiente número se escribe a mano
+            extra = ` Pareja ${par.numero} completa: ${par.rx.nombre} (RX) + ${par.tx.nombre} (TX).`;
+            ui.num.value = ''; ui.tipo.value = 'RX';
+        } else if (par) {             // falta la otra: se deja lista la otra mitad con el mismo número
+            extra = ` Pareja ${par.numero}: falta la ${tipo === 'RX' ? 'TX' : 'RX'}.`;
+            ui.tipo.value = tipo === 'RX' ? 'TX' : 'RX';
+        }
         P.sonar.ok(); P.cam.destello('ok');
-        aviso('ok', `${st.placa.nombre} programada con ${fw}.${ui.lote.checked ? ' Escanea la siguiente.' : ''}`);
+        aviso('ok', `${st.placa.nombre} programada con ${fw}.${extra}${ui.lote.checked ? ' Escanea la siguiente.' : ''}`);
         pintaPlaca(); pintaSesion(); P.cambio();
         ui.cod.value = '';
     }
@@ -129,6 +149,10 @@
         ui.fw = h('input', { class: 'input mono', id: 'pFw', type: 'text', autocomplete: 'off', spellcheck: 'false', maxlength: '80', list: 'dlFirmwares', 'aria-describedby': 'pFwAy' });
         ui.fw.value = leer(CLAVE_FW, '');
         ui.fw.addEventListener('input', () => { ui.fw.removeAttribute('aria-invalid'); });
+        ui.tipo = h('select', { class: 'input', id: 'pTipo', 'aria-describedby': 'pParAy' },
+            h('option', { value: '' }, 'Sin indicar'), h('option', { value: 'RX' }, 'RX'), h('option', { value: 'TX' }, 'TX'));
+        ui.num = h('input', { class: 'input mono', id: 'pNum', type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '4', autocomplete: 'off', 'aria-describedby': 'pParAy' });
+        [ui.tipo, ui.num].forEach((x) => x.addEventListener('input', () => x.removeAttribute('aria-invalid')));
         ui.lote = h('input', { type: 'checkbox', id: 'pLote' });
         ui.lote.checked = leer(CLAVE_LOTE, '0') === '1';
         ui.lote.addEventListener('change', () => { escribir(CLAVE_LOTE, ui.lote.checked ? '1' : '0'); aviso('', ui.lote.checked ? 'Modo lote activo: cada placa que leas se guarda con este firmware.' : ''); });
@@ -152,6 +176,10 @@
         const fGuardar = h('form', { class: 'p-fw', id: 'pForm', novalidate: true, onsubmit: (e) => { e.preventDefault(); guardar(); } },
             h('div', { class: 'field' }, h('label', { for: 'pFw' }, 'Firmware'), ui.fw,
                 h('p', { class: 'ayuda', id: 'pFwAy' }, 'Se recuerda el último firmware que guardaste en este dispositivo.')),
+            h('div', { class: 'p-par' },
+                h('div', { class: 'field' }, h('label', { for: 'pTipo' }, 'Tarjeta'), ui.tipo),
+                h('div', { class: 'field' }, h('label', { for: 'pNum' }, 'Número de pareja'), ui.num)),
+            h('p', { class: 'ayuda', id: 'pParAy' }, 'El número que le diste al programarla. Cuando la RX y la TX tienen el mismo número, quedan emparejadas solas.'),
             h('label', { class: 'chk', for: 'pLote' }, ui.lote,
                 h('span', null, h('b', null, 'Programar en lote'), h('small', null, 'Cada placa que leas se guarda con este firmware sin pedir confirmación.'))));
 

@@ -23,6 +23,9 @@ main:focus, .vista h1:focus { outline: none; }
 .man-fila .btn { flex: none; }
 .p-fw { display: flex; flex-direction: column; gap: 14px; }
 .p-fw .input { min-height: 52px; font-size: 18px; background: var(--campo); border-color: var(--line-2); border-radius: var(--tp-rad); }
+.p-par { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.p-par .field { margin: 0; }
+.p-fw .p-par + .ayuda { margin-top: -6px; }
 .chk { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--tp-rad); background: var(--surface); cursor: pointer; }
 .chk input { width: 22px; height: 22px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
 .chk span { display: flex; flex-direction: column; gap: 2px; }
