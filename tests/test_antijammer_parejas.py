@@ -23,7 +23,7 @@ class TestAntijammerParejas(unittest.TestCase):
         r = cls.c.post("/api/auth/login", json={"email": "developer@skyguardian.mx", "password": usuarios.CLAVE_INICIAL})
         assert r.status_code == 200, r.text
         cls.id = {}
-        for s in ("7101", "7102", "7103", "7104", "7105", "7110", "7120", "7130"):
+        for s in ("7101", "7102", "7103", "7104", "7105", "7110", "7120", "7130", "7140", "7141", "7142", "7143"):
             r = cls.c.post("/api/antijammer/pcb/manual", json={"version": "1", "serie": s})
             assert r.status_code == 201
             cls.id[s] = r.json()["pcb"]["id"]
@@ -55,9 +55,13 @@ class TestAntijammerParejas(unittest.TestCase):
         self.assertEqual(self.c.post("/api/antijammer/parejas", json={"rx": "7103", "tx": "7104", "numero": 40}).status_code, 409)
         self.assertEqual(self.c.post("/api/antijammer/parejas", json={"rx": "7103", "tx": "7104", "numero": 0}).status_code, 422)
         # sin número = el siguiente libre
-        self.assertEqual(self.c.get("/api/antijammer/parejas").json()["siguiente"], 41)
+        # (otros módulos de la suite pueden dejar parejas en la BD de prueba: el siguiente es el máximo + 1)
+        d = self.c.get("/api/antijammer/parejas").json()
+        sig = max(p["numero"] for p in d["parejas"]) + 1
+        self.assertEqual(d["siguiente"], sig)
         r = self.c.post("/api/antijammer/parejas", json={"rx": "7103", "tx": "7104"})
-        self.assertEqual(r.json()["numero"], 41)
+        self.assertEqual(r.json()["numero"], sig)
+        type(self).auto = sig
         # deshacer: vuelven a estar sueltas, sin número y con su RX/TX
         pid = self._par(40)["id"]
         self.assertEqual(self.c.delete(f"/api/antijammer/parejas/{pid}").status_code, 200)
@@ -105,9 +109,9 @@ class TestAntijammerParejas(unittest.TestCase):
         vacio = self.c.get("/api/antijammer/parejas", params={"mes": "1999-01"}).json()
         self.assertEqual((vacio["parejas"], vacio["sin_pareja"]), ([], []))
         self.assertEqual(self.c.get("/api/antijammer/parejas", params={"mes": "mal"}).status_code, 422)
-        par = self._par(41)
+        par = self._par(self.auto)
         self.assertEqual(self.c.delete(f"/api/antijammer/pcb/{par['tx']['id']}").status_code, 200)
-        self.assertIsNone(self._par(41)["tx"])   # la pareja pierde su lado y queda incompleta
+        self.assertIsNone(self._par(self.auto)["tx"])   # la pareja pierde su lado y queda incompleta
         # tabla de 1.4.103 (sin número): cada pareja toma su id como número
         with db.transaction() as c:
             c.execute("ALTER TABLE antijammer_parejas RENAME TO _bk")
@@ -120,6 +124,36 @@ class TestAntijammerParejas(unittest.TestCase):
             with db.transaction() as c:
                 c.execute("DROP TABLE antijammer_parejas")
                 c.execute("ALTER TABLE _bk RENAME TO antijammer_parejas")
+
+    def test_05_cambiar_numero_a_mano(self):
+        """v1.4.105: el número de una pareja se edita a mano; si choca 409, si complementa a una incompleta se unen."""
+        r = self.c.post("/api/antijammer/parejas", json={"rx": "7140", "tx": "7141", "numero": 70})
+        self.assertEqual(r.status_code, 201, r.text)
+        pid = r.json()["id"]
+        self.assertIn(self.sin.put(f"/api/antijammer/parejas/{pid}", json={"numero": 71}).status_code, (401, 403))
+        r = self.c.put(f"/api/antijammer/parejas/{pid}", json={"numero": 71})
+        self.assertEqual((r.status_code, r.json()["numero"]), (200, 71), r.text)
+        self.assertIsNone(self._par(70))
+        self.assertEqual((self._par(71)["rx"]["nombre"], self._par(71)["tx"]["nombre"]), ("SJ-V1-7140", "SJ-V1-7141"))
+        self.assertEqual(ps.de_placa(self.id["7141"])["numero"], 71)   # la etiqueta toma el nuevo número
+        # mismo número: sin cambio; fuera de rango; inexistente; ocupado por una pareja completa
+        self.assertEqual(self.c.put(f"/api/antijammer/parejas/{pid}", json={"numero": 71}).status_code, 200)
+        self.assertEqual(self.c.put(f"/api/antijammer/parejas/{pid}", json={"numero": 0}).status_code, 422)
+        self.assertEqual(self.c.put("/api/antijammer/parejas/999999", json={"numero": 5}).status_code, 404)
+        otra = self.c.post("/api/antijammer/parejas", json={"rx": "7142", "tx": "7143", "numero": 72})
+        self.assertEqual(otra.status_code, 201, otra.text)
+        self.assertEqual(self.c.put(f"/api/antijammer/parejas/{pid}", json={"numero": 72}).status_code, 409)
+        self.assertEqual(self._par(71)["rx"]["nombre"], "SJ-V1-7140")   # nada cambió
+        # una incompleta solo-RX y otra solo-TX: renumerar una al número de la otra las une
+        self.c.delete(f"/api/antijammer/parejas/{otra.json()['id']}")
+        rx = self._prog("7142", tipo="RX", pareja=80)
+        tx = self._prog("7143", tipo="TX", pareja=81)
+        self.assertEqual((rx.status_code, tx.status_code), (200, 200), rx.text + tx.text)
+        r = self.c.put(f"/api/antijammer/parejas/{self._par(81)['id']}", json={"numero": 80})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIsNone(self._par(81))
+        par = self._par(80)
+        self.assertEqual((par["rx"]["nombre"], par["tx"]["nombre"], par["completa"]), ("SJ-V1-7142", "SJ-V1-7143", True))
 
 
 if __name__ == "__main__":

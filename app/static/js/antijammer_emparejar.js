@@ -3,7 +3,9 @@
  * Materiales van solas a su ranura. Deshacer conserva el RX/TX de cada placa.
  * v1.4.104: cada pareja tiene un NÚMERO (el que se le da al programar; aquí se puede escribir a mano o usar el siguiente libre).
  * Una pareja incompleta (solo RX o solo TX, de Programar) se completa eligiendo su placa y la que falta.
- * API: GET /api/antijammer/parejas?mes=AAAA-MM · POST /api/antijammer/parejas {rx, tx, numero} · DELETE /api/antijammer/parejas/{id} */
+ * v1.4.105: botón «Número» en cada pareja para cambiar su número a mano (el orden de emparejado no es el número real).
+ * API: GET /api/antijammer/parejas?mes=AAAA-MM · POST /api/antijammer/parejas {rx, tx, numero} · PUT /api/antijammer/parejas/{id} {numero}
+ *      · DELETE /api/antijammer/parejas/{id} */
 (function () {
     'use strict';
     const T = window.TQT, P = window.AJ;
@@ -97,6 +99,38 @@
         });
     }
 
+    /** v1.4.105: cambiar a mano el número de una pareja (PUT /api/antijammer/parejas/{id} {numero}). */
+    function renumerar(par) {
+        if (P.soloLectura()) return;
+        const inp = h('input', { class: 'input mono', id: 'epRenum', type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '4',
+            autocomplete: 'off', value: String(par.numero), 'aria-describedby': 'epRenumAy', 'data-escribe': '' });
+        const err = h('p', { class: 'ayuda', id: 'epRenumAy', 'aria-live': 'polite' },
+            'De 1 a 9999. Si otra pareja incompleta ya tiene ese número y le falta justo esta placa, se unen.');
+        const nombres = [par.rx && par.rx.nombre + ' (RX)', par.tx && par.tx.nombre + ' (TX)'].filter(Boolean).join(' y ');
+        const guardar = async () => {
+            const v = inp.value.trim();
+            if (!/^\d{1,4}$/.test(v) || +v < 1) { inp.setAttribute('aria-invalid', 'true'); err.textContent = 'Escribe un número de 1 a 9999.'; inp.focus(); return false; }
+            if (+v === par.numero) return true;
+            const r = await api('/api/antijammer/parejas/' + par.id, { method: 'PUT', body: { numero: +v } });
+            if (!r.ok) { inp.setAttribute('aria-invalid', 'true'); err.textContent = (r.error || 'No se pudo cambiar el número') + '.'; inp.focus(); return false; }
+            T.toast(`Pareja ${par.numero} ahora es la pareja ${r.data.numero}`, { kind: 'ok' });
+            P.cambio(); cargar();
+            return true;
+        };
+        inp.addEventListener('input', () => inp.removeAttribute('aria-invalid'));
+        const hoja = T.sheet({
+            title: `Cambiar el número de la pareja ${par.numero}`,
+            body: [h('p', null, nombres + '. La etiqueta DYMO toma el número nuevo al imprimirla.'),
+                h('div', { class: 'field' }, h('label', { for: 'epRenum' }, 'Número nuevo'), inp, err)],
+            actions: [
+                { label: 'Cancelar', kind: 'ghost', onClick: () => true },
+                { label: 'Guardar número', kind: 'primary', icon: 'check', onClick: guardar },
+            ],
+        });
+        inp.addEventListener('keydown', async (e) => { if (e.key === 'Enter') { e.preventDefault(); if (await guardar()) hoja.close(); } });
+        setTimeout(() => { try { inp.select(); } catch (e) { /* nada */ } }, 40);
+    }
+
     function pintar() {
         if (!datos) return;
         const ro = P.soloLectura();
@@ -126,6 +160,8 @@
                 h('span', { class: 'ep-btns' },
                     par.completa || ro ? null : h('button', { class: 'btn btn-sm', type: 'button', onclick: () => completar(par),
                         'aria-label': `Completar la pareja ${par.numero}` }, icon('link'), 'Completar'),
+                    ro ? null : h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => renumerar(par),
+                        'aria-label': `Cambiar el número de la pareja ${par.numero}` }, icon('edit'), 'Número'),
                     h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => P.abrir('etiquetas', (par.rx || par.tx).nombre),
                         'aria-label': `Imprimir las etiquetas de la pareja ${par.numero}` }, icon('printer'), 'Etiquetas'),
                     ro ? null : h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => deshacer(par),

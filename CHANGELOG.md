@@ -1,5 +1,9 @@
 # Historial de versiones — Escáner TQT
 
+## v1.4.105 — 2026-11-27
+
+- **Skudo AntiJammer · Cambiar número de pareja:** en Emparejar cada pareja tiene el botón «Número» para escribir a mano su número real (el número de emparejado era solo el orden). Si otra pareja ya tiene ese número y le falta justo esta placa (una solo RX y otra solo TX), se unen; si chocan, no se cambia nada (409). La etiqueta DYMO toma el número nuevo y queda registro «renumerada» en Movimientos (`PUT /api/antijammer/parejas/{id} {numero}`).
+
 ## v1.4.104 — 2026-11-26
 
 - **Skudo AntiJammer · Número de pareja al programar:** en Programar se elige si la placa es RX o TX y el número de pareja que se le dio al programarla. Cuando la RX y la TX comparten número quedan emparejadas solas; mientras falta la otra, la pareja aparece incompleta. Si el número ya tiene esa RX/TX, no se guarda nada (409). Reprogramar con otro número cambia la placa de pareja.

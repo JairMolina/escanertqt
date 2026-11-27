@@ -243,6 +243,15 @@ async def emparejar(body: ParejaAj, request: Request):
         raise HTTPException(status_code=422, detail=str(e))
 
 
+class NumeroPareja(BaseModel):
+    numero: int = Field(..., ge=1, le=9999)
+
+
+@router.put("/parejas/{pareja_id}", summary="Cambiar a mano el número de una pareja (v1.4.105)")
+async def renumerar_pareja(pareja_id: int, body: NumeroPareja, request: Request):
+    return await _ejecutar(parejas_svc.renumerar, pareja_id, body.numero, _email(request))
+
+
 @router.delete("/parejas/{pareja_id}", summary="Deshacer una pareja (cada placa conserva su RX/TX)")
 async def deshacer_pareja(pareja_id: int, request: Request):
     return await _ejecutar(parejas_svc.deshacer, pareja_id, _email(request))

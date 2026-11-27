@@ -223,6 +223,44 @@ def deshacer(pareja_id: int, operador: Optional[str] = None) -> Dict[str, Any]:
     return out
 
 
+def renumerar(pareja_id: int, numero: Any, operador: Optional[str] = None) -> Dict[str, Any]:
+    """v1.4.105: cambia a mano el número de una pareja (el número de emparejado no siempre es el real del equipo).
+    Si el número nuevo es de otra pareja INCOMPLETA cuyo lado libre coincide (una tiene solo RX y la otra solo TX), se unen
+    en una sola; si chocan, 409 sin tocar nada. La etiqueta toma el número nuevo al imprimirse."""
+    n = _numero(numero)
+    aj._asegurar()
+    with db.transaction() as c:
+        _asegurar(c)
+        p = c.execute("SELECT * FROM antijammer_parejas WHERE id=?", (int(pareja_id),)).fetchone()
+        if not p:
+            raise aj.NoEncontrada(f"La pareja #{pareja_id} no existe.")
+        viejo = p["numero"]
+        if viejo == n:
+            return _salida(c, p)
+        otra = c.execute("SELECT * FROM antijammer_parejas WHERE numero=?", (n,)).fetchone()
+        if otra:
+            choque = [k for k in ("rx_id", "tx_id") if p[k] and otra[k]]
+            if choque:
+                lado = "RX" if choque[0] == "rx_id" else "TX"
+                d = c.execute("SELECT nombre FROM antijammer_pcb WHERE id=?", (otra[choque[0]],)).fetchone()
+                raise aj.Duplicada(f"El número {n} ya es de otra pareja que tiene {lado}: {d['nombre'] if d else otra[choque[0]]}.")
+            c.execute("DELETE FROM antijammer_parejas WHERE id=?", (p["id"],))
+            for k in ("rx_id", "tx_id"):
+                if p[k]:
+                    c.execute(f"UPDATE antijammer_parejas SET {k}=? WHERE id=?", (p[k], otra["id"]))
+            fila_id = otra["id"]
+        else:
+            c.execute("UPDATE antijammer_parejas SET numero=? WHERE id=?", (n, p["id"]))
+            fila_id = p["id"]
+        fila = c.execute("SELECT * FROM antijammer_parejas WHERE id=?", (fila_id,)).fetchone()
+        out = _salida(c, fila)
+        for k in ("rx", "tx"):
+            if out[k]:
+                aj._evento(c, out[k]["id"], out[k]["nombre"], "renumerada",
+                           f"Pareja {viejo} → {n}" + (" (unida con la pareja que ya tenía ese número)" if otra else ""), operador)
+    return out
+
+
 def de_placa(pcb_id: int) -> Optional[Dict[str, Any]]:
     """{numero, tipo, socio} de la pareja de una placa (etiquetas, fichas); None si no tiene número."""
     with db.transaction() as c:

@@ -73,6 +73,7 @@ class TestAntijammerDymo(unittest.TestCase):
         with db.get_db() as conn:
             dymo_remoto.init()
             conn.execute("UPDATE dymo_trabajos SET estado='cancelada' WHERE estado IN ('pendiente','enviada')")
+            conn.execute("DELETE FROM dymo_agentes")   # agentes que dejaron otros módulos de la suite
         r = self.c.post("/api/antijammer/etiquetas/imprimir", json={"codigos": ["SJ-V1-8052"]})
         self.assertEqual(r.status_code, 503, r.text)
         ag = dymo_remoto.agente_crear("Raspberry AJ")
